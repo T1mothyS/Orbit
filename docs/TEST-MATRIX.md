@@ -15,6 +15,8 @@
 
 2026-09-19 增量验证：`schedule-time.test.ts` 和 `unscheduled-api.test.ts` 覆盖共同日期约束/旧数据兼容；`dependency-security.test.ts` 覆盖升级后的邮件解析及依赖输入；`daily-report.test.ts`、Cloud API 测试覆盖媒体计数、版本、账号及恢复。具体数字、浏览器尺寸与未验证范围见[本次修复快照](FORMAT-SECURITY-REPAIR-20260919.md)。
 
+2026-09-22 浏览器补验：合成 Shadow 在四种规定尺寸的明暗主题实际截图检查通过，覆盖缺失输入、长正文、图片、返回列表、禁用投递与刷新保留主题。窄屏列表圆点贴边已通过显式缩进修正；邮件 HTML 在桌面与390宽度检查，仅证明浏览器排版，不代表真实邮箱。
+
 ## 1. 通用命令
 
 隔离服务增量：`server/digest-shadow-server.test.ts` 实际启动独立子进程，验证后台任务被强制关闭、合成账号登录、匿名日报拒绝、非 Shadow 业务写入拒绝与 MCP 认证边界。`digest-v2.test.ts` 另覆盖两版正式发布与邮件入队在 Shadow 模式被拒绝。`npx tsc -p tsconfig.shadow.json` 验证独立服务构建；Linux 图片处理、真实 OAuth 与 Work 连续运行仍须独立验收。

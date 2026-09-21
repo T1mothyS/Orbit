@@ -21,7 +21,7 @@ export function snapshotWarnings(snapshot: DigestSnapshot): string[] {
 export function renderDigestV2(p: DigestPublication, email = false): string {
   const d = p.digest;
   const section = (title: string, body: string) => `<section style="margin:28px 0"><h2 style="font-size:18px;border-bottom:1px solid #b9c2ce;padding-bottom:10px">${title}</h2>${body || '<p>本期无新增内容。</p>'}</section>`;
-  const list = (items: string[]) => items.length ? `<ul>${items.map(x => `<li style="margin:8px 0">${esc(x)}</li>`).join('')}</ul>` : '';
+  const list = (items: string[]) => items.length ? `<ul style="padding-left:24px">${items.map(x => `<li style="margin:8px 0">${esc(x)}</li>`).join('')}</ul>` : '';
   const evidence = (ids: string[]) => ids.map(id => d.evidence.find(e => e.id === id)).filter(Boolean).map(e => `<a href="${esc(e!.url)}" rel="noopener noreferrer" style="color:${email ? '#285eaa' : 'var(--td-brand-color, #285eaa)'}">${esc(e!.source)}</a>${e!.published_at ? ` · ${esc(e!.published_at)}` : ' · 发布时间未提供'}`).join('；');
   const stories = (items: DigestStory[]) => items.map(s => {
     const images = s.media_ids.map(id => p.media.find(m => m.id === id)).filter(m => m && publicDigestUrl(m.publicUrl));
