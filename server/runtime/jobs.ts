@@ -75,6 +75,7 @@ export function createBackgroundJobs({ isReady, resolveAiImportCredential, clean
 
       try {
         const expiredImports = activityStore.expireAiImports();
+        activityStore.expireDigestSnapshots();
         if (expiredImports > 0) addLog('info', 'ai', '清理 AI 助手过期草稿', {
           event: 'ai_imports_expired',
           count: expiredImports,

@@ -4,6 +4,7 @@
  */
 
 import nodemailer from 'nodemailer';
+import { decodeDigestPublication, renderDigestV2, digestV2Text } from './digest-v2-render.js';
 import type { ReminderCycle, ReminderTask, SimConfig, CreditCardConfig, GenericReminderConfig } from './reminder-store.js';
 import * as db from './db.js';
 import { getSchedulesByDate } from './schedule-store.js';
@@ -364,14 +365,15 @@ function reportAppUrl(date: string): string {
 export async function sendDailyReportEmail(to: string, date: string, markdown: string): Promise<EmailSendResult> {
   const subject = `个人情报日报 · ${date}`;
   const url = reportAppUrl(date);
-  const html = renderDailyDigestEmailPage(markdown, url) || `
+  const v2 = decodeDigestPublication(markdown);
+  const html = (v2 ? renderDigestV2(v2, true) : null) || renderDailyDigestEmailPage(markdown, url) || `
     <div style="font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; max-width: 920px; margin: 0 auto; padding: 24px; color: #1f2937;">
       <h1 style="font-size: 24px; margin: 0 0 20px;">${escapeHtml(subject)}</h1>
       <article class="daily-report-markdown" style="line-height: 1.75;">${renderMarkdown(markdown)}</article>
       <p style="margin-top: 28px; font-size: 13px;"><a href="${escapeHtml(url)}">在 AI Calendar 中查看私有日报页面</a></p>
     </div>
   `;
-  const text = renderDailyDigestPlainText(markdown, url) || `${subject}\n\n${markdown}\n\n在 AI Calendar 中查看私有日报页面：${url}`;
+  const text = (v2 ? digestV2Text(v2) : null) || renderDailyDigestPlainText(markdown, url) || `${subject}\n\n${markdown}\n\n在 AI Calendar 中查看私有日报页面：${url}`;
   return sendEmail({
     from: `"AI Calendar" <${OFFICIAL_SENDER_EMAIL}>`,
     to,

@@ -4,6 +4,8 @@
 
 # Now
 
+- Daily Digest V2.5 第一阶段已授权实施；当前工程单元是新版合同、输入快照、R2、隔离预览与恢复，不包括正式切换。阶段整体须完成隔离 Work 与至少七个不同日期真实 Shadow，不能以合成七日期代替。合同见 [Cloud 日报](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
+
 - 保持 Settings V2 稳定，沿用统一的 Section、Row、Dialog 和窄屏验收。
 - 使用可提交的 AGENTS.md、架构/UI/测试文档和 GitHub Actions CI 固化协作基础。
 - 对导航图标完成低风险体积优化；持续使用 npm typecheck、test、build 和浏览器分层验收。
@@ -22,6 +24,16 @@
 - 日历与历史数据兼容：将“个人/工作/家庭”等真实日历选择与“出行/工作/社交/生活/健康/其他”分类筛选分开呈现；为旧版全天事件和多日全天事件定义可复核的结束日期语义，先提供修复预览/迁移，再允许桥接。
 
 # Later
+
+Daily Digest 后续阶段暂未授权，按第一阶段实际结果再收紧设计：
+
+| 阶段 | 目标与验收 | 难度与主要风险 |
+|---|---|---|
+| V3 Core | Event、Revision、Evidence、Analysis；`intelligence.read_inputs`/`submit_analysis`；匹配建议、可纠正合并、版本引用；至少 30 个固定真实案例及连续 Shadow 正确区分重复、不同事件、后续进展、无变化 | 高；错误合并、转载伪装成独立证据、历史漂移、数据增长 |
+| Scheduled Events 与 Macro | Exact/Window、首批中美宏观和财报，实际/前值/修订/预期及来源分开保存；检查 Playbook；验收时区、夏令时、延期取消、延迟、缺预期和修订 | 中高；来源结构变化、周期/单位混淆、时间不可靠 |
+| Research、Thesis、Radar、Flash | 研究历史；用户确认的 Thesis/Proposal；低频候选；先验证服务器触发 Agent，不满足则定时领取；订阅、核实、实质变化、去重与上限全部满足后提醒 | 高；误报、重复提醒、触发权限、成本与状态增长 |
+
+每个 Release 报告已完成/未完成、分层证据、Git/版本/文档、剩余风险、下一目标及更新后的难度。第一阶段本地完成后优先推进隔离 Cloud 与七日观察，不提前启动 V3 Core。
 
 - 文章收藏、附件和更完整的版本 diff。
 

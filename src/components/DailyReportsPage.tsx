@@ -9,6 +9,7 @@ type DailyReportSource = 'local' | 'cloud';
 type DeliveryStatus = 'RECEIVED' | 'CANDIDATE';
 
 interface DailyReportSummary {
+  shadow?: boolean;
   mediaReceipt?: { imageCount: number; candidateImageCount: number; mediaFailureCount: number; noImageReason: string | null; consecutiveNoImageReports: number; warnings: string[] } | null;
   id: string;
   date: string;
@@ -98,7 +99,7 @@ export function DailyReportsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
-  const viewMode = searchParams.get('view') === 'candidates' ? 'candidates' : 'received';
+  const viewMode = searchParams.get('view') === 'shadow' ? 'shadow' : searchParams.get('view') === 'candidates' ? 'candidates' : 'received';
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -148,15 +149,15 @@ export function DailyReportsPage() {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [navigate]);
 
-  const switchView = (next: 'received' | 'candidates') => {
+  const switchView = (next: 'received' | 'candidates' | 'shadow') => {
     if (next === viewMode) return;
     setReports([]);
     setHasMore(false);
-    setSearchParams(next === 'candidates' ? { view: next } : {});
+    setSearchParams(next !== 'received' ? { view: next } : {});
   };
 
   const openReport = (item: DailyReportSummary) => {
-    navigate(`/reports/${encodeURIComponent(item.date)}?source=${item.source}&view=${viewMode}`);
+    navigate(item.shadow ? `/reports/${encodeURIComponent(item.date)}?shadow=${encodeURIComponent(item.id)}` : `/reports/${encodeURIComponent(item.date)}?source=${item.source}&view=${viewMode}`);
   };
 
   const retryEmail = async (item: DailyReportSummary) => {
@@ -185,12 +186,13 @@ export function DailyReportsPage() {
         <div>
           <div className="daily-reports-eyebrow">PRIVATE INTELLIGENCE</div>
           <h1>日报</h1>
-          <p>{viewMode === 'received' ? '正式接收的日报会进入网页和邮件；来源由设置控制。' : '候选日报已经写入生产服务器，但当前未进入正式网页和邮件。'}</p>
+          <p>{viewMode === 'shadow' ? '新版隔离预览，仅供对照，不进入正式日报或邮件。' : viewMode === 'received' ? '正式接收的日报会进入网页和邮件；来源由设置控制。' : '候选日报已经写入生产服务器，但当前未进入正式网页和邮件。'}</p>
         </div>
         <div className="daily-report-toolbar-actions">
           <div className="daily-report-view-toggle" role="tablist" aria-label="日报查看范围">
             <button type="button" role="tab" aria-selected={viewMode === 'received'} className={viewMode === 'received' ? 'active' : undefined} onClick={() => switchView('received')}>正式日报</button>
             <button type="button" role="tab" aria-selected={viewMode === 'candidates'} className={viewMode === 'candidates' ? 'active' : undefined} onClick={() => switchView('candidates')}>候选对照</button>
+            <button type="button" role="tab" aria-selected={viewMode === 'shadow'} className={viewMode === 'shadow' ? 'active' : undefined} onClick={() => switchView('shadow')}>新版预览</button>
           </div>
           <button type="button" className="daily-report-toolbar-button" onClick={() => void load()} disabled={loading}>
             <RefreshCw size={15} className={loading ? 'spin' : undefined} />
@@ -244,14 +246,14 @@ export function DailyReportsPage() {
                   >
                     {latest.heroImageUrl && <img className="daily-report-featured-hero" src={latest.heroImageUrl} alt="" aria-hidden="true" />}
                     <div className="daily-report-featured-body">
-                      <div className="daily-report-featured-kicker">{viewMode === 'received' ? 'FRONT PAGE · 最新日报' : 'CANDIDATE DESK · 最新候选'}</div>
+                      <div className="daily-report-featured-kicker">{viewMode === 'shadow' ? '新版隔离预览' : viewMode === 'received' ? 'FRONT PAGE · 最新日报' : 'CANDIDATE DESK · 最新候选'}</div>
                       <div className="daily-report-card-topline">
                         <span className="daily-report-card-date">{formatReportDate(latest.date)}</span>
                         <span className="daily-report-source-meta">
                           <span className={`daily-report-source-badge ${latest.source}`}>{sourceLabel[latest.source]}</span>
-                          <span className={`daily-report-delivery-status ${latest.deliveryStatus.toLowerCase()}`}>{deliveryStatusLabel[latest.deliveryStatus]}</span>
+                          <span className={`daily-report-delivery-status ${latest.deliveryStatus.toLowerCase()}`}>{latest.shadow ? '预览' : deliveryStatusLabel[latest.deliveryStatus]}</span>
                           <span className={`daily-report-email-status ${latest.emailStatus.toLowerCase()}`}>
-                            <Mail size={13} /> {emailStatusLabel[latest.emailStatus]}
+                            <Mail size={13} /> {latest.shadow ? '不投递邮件' : emailStatusLabel[latest.emailStatus]}
                           </span>
                         </span>
                       </div>
@@ -287,9 +289,9 @@ export function DailyReportsPage() {
                                 <span className="daily-report-card-date">{formatReportDate(item.date)}</span>
                                 <span className="daily-report-source-meta">
                                   <span className={`daily-report-source-badge ${item.source}`}>{sourceLabel[item.source]}</span>
-                                  <span className={`daily-report-delivery-status ${item.deliveryStatus.toLowerCase()}`}>{deliveryStatusLabel[item.deliveryStatus]}</span>
+                                  <span className={`daily-report-delivery-status ${item.deliveryStatus.toLowerCase()}`}>{item.shadow ? '预览' : deliveryStatusLabel[item.deliveryStatus]}</span>
                                   <span className={`daily-report-email-status ${item.emailStatus.toLowerCase()}`}>
-                                    <Mail size={13} /> {emailStatusLabel[item.emailStatus]}
+                                    <Mail size={13} /> {item.shadow ? '不投递邮件' : emailStatusLabel[item.emailStatus]}
                                   </span>
                                 </span>
                               </div>
@@ -317,8 +319,8 @@ export function DailyReportsPage() {
       ) : (
         <div className="daily-report-state">
           <FileText size={34} />
-          <strong>{viewMode === 'received' ? '还没有正式日报' : '还没有候选日报'}</strong>
-          <span>{viewMode === 'received' ? '日报项目发布后，会按日期显示在这里。' : '未勾选来源的有效日报会保存在这里，供后续对照。'}</span>
+          <strong>{viewMode === 'shadow' ? '还没有新版预览' : viewMode === 'received' ? '还没有正式日报' : '还没有候选日报'}</strong>
+          <span>{viewMode === 'shadow' ? '隔离生成的新版日报会显示在这里，不会发送邮件。' : viewMode === 'received' ? '日报项目发布后，会按日期显示在这里。' : '未勾选来源的有效日报会保存在这里，供后续对照。'}</span>
         </div>
       )}
     </div>
@@ -336,6 +338,7 @@ export function DailyReportReaderPage() {
     ? searchParams.get('source') as DailyReportSource
     : undefined;
   const requestedView = searchParams.get('view') === 'candidates' ? 'candidates' : 'received';
+  const shadowId = searchParams.get('shadow');
   const [report, setReport] = useState<DailyReport | null>(null);
   const [dateReports, setDateReports] = useState<DailyReportSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -355,6 +358,7 @@ export function DailyReportReaderPage() {
       const query = new URLSearchParams();
       if (requestedSource) query.set('source', requestedSource);
       query.set('view', requestedView);
+      if (shadowId) query.set('shadow', shadowId);
       const sourceQuery = `?${query.toString()}`;
       const response = await fetch(`/api/daily-reports/${encodeURIComponent(date)}${sourceQuery}`, { headers: authHeaders() });
       if (!response.ok) throw await readError(response, '日报加载失败');
@@ -366,13 +370,13 @@ export function DailyReportReaderPage() {
     } finally {
       setLoading(false);
     }
-  }, [authHeaders, date, requestedSource, requestedView]);
+  }, [authHeaders, date, requestedSource, requestedView, shadowId]);
 
   useEffect(() => { void load(); }, [load]);
 
   const returnToList = useCallback(() => {
-    navigate(requestedView === 'candidates' ? '/reports?view=candidates' : '/reports');
-  }, [navigate, requestedView]);
+    navigate(shadowId ? '/reports?view=shadow' : requestedView === 'candidates' ? '/reports?view=candidates' : '/reports');
+  }, [navigate, requestedView, shadowId]);
 
   const closeMoreMenu = useCallback(() => {
     setMoreMenuOpen(false);
@@ -489,14 +493,14 @@ export function DailyReportReaderPage() {
                         onClick={() => chooseSource(item.source)}
                       >
                         <span className="daily-report-source-menu-check" aria-hidden="true">{item.source === report.source && <Check size={14} />}</span>
-                        <span>{sourceLabel[item.source]} · {deliveryStatusLabel[item.deliveryStatus]}</span>
+                        <span>{sourceLabel[item.source]} · {item.shadow ? '预览' : deliveryStatusLabel[item.deliveryStatus]}</span>
                       </button>
                     ))}
                   </div>
                 </div>
                 <div className="daily-report-menu-status-row">
                   <span className="daily-report-menu-label">邮件状态</span>
-                  <span className={`daily-report-email-status ${report.emailStatus.toLowerCase()}`}><Mail size={13} />{emailStatusLabel[report.emailStatus]}</span>
+                  <span className={`daily-report-email-status ${report.emailStatus.toLowerCase()}`}><Mail size={13} />{report.shadow ? '不投递邮件' : emailStatusLabel[report.emailStatus]}</span>
                 </div>
                 {report.deliveryStatus === 'RECEIVED' ? (
                   <button
@@ -510,7 +514,7 @@ export function DailyReportReaderPage() {
                     <Mail size={14} />
                     {sendingEmail ? '正在排队…' : report.emailStatus === 'SENT' ? '重新发送邮件' : '发送日报邮件'}
                   </button>
-                ) : <span className="daily-report-candidate-note">已写入生产服务器，当前设置未接收</span>}
+                ) : <span className="daily-report-candidate-note">{report.shadow ? '隔离预览，不投递邮件' : '已写入生产服务器，当前设置未接收'}</span>}
               </div>
             )}
           </div>
@@ -533,7 +537,7 @@ export function DailyReportReaderPage() {
             {report.mediaReceipt.warnings.includes('REPEATED_NO_IMAGES') && `最近连续 ${report.mediaReceipt.consecutiveNoImageReports} 篇同来源日报无图，需要检查选图步骤。`}
             {report.mediaReceipt.warnings.includes('REPLACES_ILLUSTRATED_REPORT') && '同日上一版曾有配图，本版没有沿用旧图。'}
           </div>}
-          {report.deliveryStatus === 'CANDIDATE' && <div className="daily-report-notice candidate" role="status">这份 {sourceLabel[report.source]} 日报已经正式写入生产服务器，但按当前设置暂不进入正式网页和邮件。勾选该来源并保存后，下一次正式发布起才会接收。</div>}
+          {report.shadow ? <div className="daily-report-notice candidate" role="status">新版隔离预览：不会进入正式日报或邮件，来源开关不会将其转为正式发布。</div> : report.deliveryStatus === 'CANDIDATE' && <div className="daily-report-notice candidate" role="status">这份 {sourceLabel[report.source]} 日报已经正式写入生产服务器，但按当前设置暂不进入正式网页和邮件。勾选该来源并保存后，下一次正式发布起才会接收。</div>}
           <div className="daily-report-markdown daily-report-reader-markdown" dangerouslySetInnerHTML={{ __html: report.html }} />
         </div>
       ) : (

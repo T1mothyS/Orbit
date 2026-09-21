@@ -23,6 +23,8 @@ const MAGIC = Buffer.from('AICALBK1');
 const FORMAT_VERSION = 1;
 
 interface UserBackupPayload {
+  missingDigestMedia?: string[];
+  digestMedia?: Array<{ filename: string; sha256: string; base64: string }>;
   format: 'aicalendar-user';
   version: number;
   exportedAt: string;
@@ -69,6 +71,13 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
   const importIds = createIdMap((activity.aiImports || []).map(row => row.id));
   const notificationIds = createIdMap((activity.notifications || []).map(row => row.id));
   const reportIds = createIdMap((activity.dailyReports || []).map(row => row.id));
+  const digestRunIds = createIdMap((activity.digestV2Runs || []).map(row => row.id));
+  activity.digestV2Runs = (activity.digestV2Runs || []).map(row => ({ ...row, id: digestRunIds.get(row.id), snapshot_json: null }));
+  activity.digestV2Artifacts = (activity.digestV2Artifacts || []).map(row => {
+    const payload = JSON.parse(row.payload_json);
+    if (payload.reportId) payload.reportId = reportIds.get(payload.reportId) || null;
+    return { ...row, id: crypto.randomUUID(), run_id: digestRunIds.get(row.run_id), payload_json: JSON.stringify(payload) };
+  });
   const noteIds = createIdMap((payload.noteItems || []).map(row => row.id));
   const libraryIds = createIdMap((payload.libraryEntries || []).map(row => row.id));
 
@@ -205,9 +214,21 @@ export function decryptBackup<T>(buffer: Buffer, password: string): T {
   }
 }
 
-export function createUserBackup(userId: string, password: string): Buffer {
+export function createUserBackup(userId: string, password: string, allowMissingDigestMedia = false): Buffer {
   const accountData = db.exportUserAccountData(userId);
   const activity = activityStore.exportUserActivity(userId);
+  const digestFilenames = new Set<string>();
+  for (const row of activity.digestV2Artifacts as Array<{ payload_json: string }>) {
+    for (const media of JSON.parse(row.payload_json).publication.media) digestFilenames.add(media.filename);
+  }
+  const digestMedia = [...digestFilenames].flatMap(filename => {
+    if (!/^[a-f0-9]{64}\.(jpg|png)$/.test(filename)) throw new Error('新版媒体备份路径无效');
+    if (allowMissingDigestMedia && !fs.existsSync(path.join(dailyReportMediaRoot(), filename))) return [];
+    const bytes = fs.readFileSync(path.join(dailyReportMediaRoot(), filename));
+    const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+    if (!filename.startsWith(sha256 + '.')) throw new Error('新版媒体备份哈希不一致');
+    return [{ filename, sha256, base64: bytes.toString('base64') }];
+  });
   const files = activityStore.listAttachments(userId).map(record => ({
     completionId: record.completionId,
     importId: record.importId,
@@ -217,6 +238,8 @@ export function createUserBackup(userId: string, password: string): Buffer {
   }));
   const payload: UserBackupPayload = {
     format: 'aicalendar-user',
+    digestMedia,
+    missingDigestMedia: [...digestFilenames].filter(filename => !digestMedia.some(m => m.filename === filename)),
     version: FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
     account: { email: accountData.user?.email || null, reminder: accountData.reminder },
@@ -233,6 +256,13 @@ export function createUserBackup(userId: string, password: string): Buffer {
 
 function validateUserPayload(payload: UserBackupPayload): void {
   if (payload?.format !== 'aicalendar-user' || payload.version !== FORMAT_VERSION) throw new Error('不支持的用户备份版本');
+  if (payload.digestMedia !== undefined) {
+    if (!Array.isArray(payload.digestMedia)) throw new Error('新版媒体备份无效');
+    for (const item of payload.digestMedia) {
+      if (!item || !/^[a-f0-9]{64}\.(jpg|png)$/.test(item.filename) || typeof item.base64 !== 'string' || item.base64.length > 7_000_000) throw new Error('新版媒体备份无效');
+      if (crypto.createHash('sha256').update(Buffer.from(item.base64, 'base64')).digest('hex') !== item.sha256 || !item.filename.startsWith(item.sha256 + '.')) throw new Error('新版媒体备份校验失败');
+    }
+  }
   if (!payload.schedule || !payload.reminder || !payload.activity || !Array.isArray(payload.files)) throw new Error('备份内容不完整');
   if (payload.noteItems !== undefined && !Array.isArray(payload.noteItems)) throw new Error('备份记事内容不完整');
   if (payload.libraryEntries !== undefined && !Array.isArray(payload.libraryEntries)) throw new Error('备份知识库内容不完整');
@@ -279,10 +309,15 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
   if (!targetAccount) throw new Error('目标账号不存在');
   const isForeignAccount = String(decrypted.account.email || '').toLowerCase() !== targetAccount.email.toLowerCase();
   const payload = isForeignAccount ? remapForeignUserPayload(decrypted) : decrypted;
-  const safetyCopy = createUserBackup(userId, password);
+  const safetyCopy = createUserBackup(userId, password, true);
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
   atomicWriteFile(path.join(BACKUP_DIR, 'pre-user-restore-' + userId + '-' + Date.now() + '.aicalendar-backup'), safetyCopy);
   const oldAttachments = mode === 'replace' ? activityStore.listAttachments(userId) : [];
+  // Content-addressed files are additive; existing files are never removed by a user restore.
+  for (const item of payload.digestMedia || []) {
+    fs.mkdirSync(dailyReportMediaRoot(), { recursive: true });
+    atomicWriteFile(path.join(dailyReportMediaRoot(), item.filename), Buffer.from(item.base64, 'base64'));
+  }
   const attachmentFailures: Array<{ originalName: string; error: string }> = [];
   const missingMedia = [...new Set((payload.activity.dailyReports || []).flatMap((row: any) => [...String(row.markdown || '').matchAll(/\/daily-report-media\/([a-f0-9]{64}\.(?:jpg|png|webp|ico|svg))/g)].map(match => match[1])))].filter(name => !fs.existsSync(path.join(dailyReportMediaRoot(), name)));
   const result = withPersistenceTransaction(() => {

@@ -143,7 +143,7 @@ function isBlockedHostname(hostname: string): boolean {
     || normalized.endsWith('.home.arpa');
 }
 
-async function assertPublicUpstreamUrl(value: string, lookup: LookupLike): Promise<URL> {
+export async function assertPublicUpstreamUrl(value: string, lookup: LookupLike): Promise<URL> {
   let parsed: URL;
   try {
     parsed = new URL(value);
@@ -301,6 +301,7 @@ function classifyMediaFetchError(error: unknown, fallback: DailyReportMediaFailu
 }
 
 export interface ControlledDailyReportMediaOptions {
+  authorizeUrl?: (url: URL) => void;
   fetcher?: FetchLike;
   lookup?: LookupLike;
   mediaRoot?: string;
@@ -328,6 +329,7 @@ export async function controlledMediaFetch(
     let current: URL;
     try {
       current = await assertPublicUpstreamUrl(currentUrl, lookup);
+      options.authorizeUrl?.(current);
     } catch (error) {
       throw classifyMediaFetchError(error, 'SSRF_BLOCKED');
     }

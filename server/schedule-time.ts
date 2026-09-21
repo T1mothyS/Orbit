@@ -1,4 +1,10 @@
 /** Shared by normal writes; legacy backup restoration deliberately bypasses this check. */
+export function scheduleDateInTimezone(value: string, timezone: string, allDay: boolean): string {
+  if (allDay || !/(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return value.slice(0, 10);
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value));
+  return ['year', 'month', 'day'].map(type => parts.find(p => p.type === type)?.value).join('-');
+}
+
 export function validateScheduleTime(value: { type?: string; is_unscheduled?: boolean; all_day?: boolean; start_time?: string; end_time?: string }): void {
   if (value.is_unscheduled) {
     if (value.type !== 'todo' || value.all_day) throw new Error('无固定期限仅适用于非全天待办');

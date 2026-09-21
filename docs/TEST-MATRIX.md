@@ -4,7 +4,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: AI 记事板提示词原位覆盖与撤回 / `0.30.2-260920.2233`（2026-09-20，本地专项回归和浏览器 smoke；其他领域以各节证据为准）。
+- Last verified commit/version: `0.31.0-260921.1951`（2026-09-21，Daily Digest V2.5 本地与测试 R2 工程单元；其他领域保留各节时点，未代表生产或七日 Shadow）。
 - CalDAV 补充验证：2026-09-18，隔离 POC 与主应用回归；仅覆盖下述独立入口，真机尚未验证。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
@@ -16,6 +16,10 @@
 2026-09-19 增量验证：`schedule-time.test.ts` 和 `unscheduled-api.test.ts` 覆盖共同日期约束/旧数据兼容；`dependency-security.test.ts` 覆盖升级后的邮件解析及依赖输入；`daily-report.test.ts`、Cloud API 测试覆盖媒体计数、版本、账号及恢复。具体数字、浏览器尺寸与未验证范围见[本次修复快照](FORMAT-SECURITY-REPAIR-20260919.md)。
 
 ## 1. 通用命令
+
+Daily Digest V2.5 增量入口：`server/digest-v2.test.ts` 覆盖结构/空内容/重复与断裂引用/非法 URL/成功输入遗漏、纯校验无写入、账号/过期隔离、图片解码与超限/超时/失败降级、并发幂等、四处中断恢复、七类合成 Shadow、带媒体字节的备份恢复和 MCP/HTTP 权限。`scripts/digest-v2-r2-smoke.ts` 使用专用测试配置检查真实上传、重复上传、私有接口/公共地址哈希、仅合成对象删除及独立副本恢复。`scripts/digest-v2-preview.ts` 提供本机合成页面与邮件 HTML，无真实 SMTP。
+
+2026-09-21 验证边界：真实 R2 测试成功，七类固定场景为合成测试。浏览器检查四尺寸、明暗主题、登录深链接、隔离列表与无发信入口；截图工具受限项目需在交付记录中注明。隔离 Work 权限/实际 Prompt、OAuth 跨期、七个真实日期对照、生产媒体域名/CDN 清除和真实邮箱仍分别验收；任何一层未完成，都不能报告 V2.5 整体完成。
 
 | 层级 | 入口 | 证明什么 |
 | --- | --- | --- |

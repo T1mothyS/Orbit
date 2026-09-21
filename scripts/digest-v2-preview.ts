@@ -1,0 +1,28 @@
+/** Local UI fixture: fresh temporary data, synthetic content, no SMTP or background jobs. */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import bcrypt from 'bcryptjs';
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'digest-v2-preview-'));
+process.env.APP_ENV = 'development';
+process.env.NODE_ENV = 'test';
+process.env.BACKGROUND_JOBS_ENABLED = 'false';
+process.env.DIGEST_V2_ENABLED = 'true';
+delete process.env.DIGEST_PRODUCTION_CONTRACT;
+const api = await import('../server/index.js');
+const db = await import('../server/db.js');
+const { createDigestSnapshotRun, publishDigestV2 } = await import('../server/digest-v2-service.js');
+await api.initializeServer();
+const now = new Date().toISOString();
+const user = db.createUser({ id: 'digest-preview', email: 'digest-preview@example.com', password_hash: bcrypt.hashSync('Preview-only-2026', 4), role: 'user', disabled: 0, created_at: now, updated_at: now });
+const origin = process.env.DIGEST_R2_PUBLIC_ORIGIN || 'https://example.com';
+const imageUrl = origin + '/tmp/1a48faf2858fa989a3f106cd34fe1f17ddbc6e58f3b7b389ec0e94d9c4530575.png';
+const run = createDigestSnapshotRun(user.id, { date: '2026-09-21', timezone: 'Asia/Shanghai', cutoff: now, contextVersion: 1, calendar: { status: 'complete', items: [{ id: 'appointment', title: '整理本周研究资料', detail: '' }] }, mail: { status: 'failed', items: [] }, watchlist: { status: 'complete', items: [{ id: 'watch-1', title: '示例关注公司', detail: '' }] } });
+const digest = { schema_version: 'daily-digest.v2', date: '2026-09-21', title: '今天值得关注的变化，与仍待确认的信息', executive_signals: ['本页为合成验收内容，不代表真实新闻。'], calendar: [{ input_id: 'appointment', text: '整理本周研究资料 · 19:00，归纳已核实事实及尚待确认的问题。' }], mail: [], market: [], macro: [], stories: [{ id: 'story', title: '以完整来源和明确边界组织信息：长标题与手机阅读验收', summary: '这是用于验证新闻卡片、证据引用和图片布局的合成内容。'.repeat(12), evidence_ids: ['e1'], media_ids: ['m1'], verification: 'unverified' }], watchlist: [{ input_id: 'watch-1', summary: '示例关注公司：本期来源检查尚未完成，不能判断是否出现重大变化。', check: 'incomplete', change: 'unknown', evidence_ids: [] }], what_matters_next: ['补齐缺失输入后再核对变化，不以缺失数据推断无变化。'], evidence: [{ id: 'e1', url: imageUrl, source: '自有合成测试图', published_at: now }], media: [{ id: 'm1', evidence_id: 'e1', url: imageUrl, category: 'AI' }] };
+const result = await publishDigestV2(user.id, run.runId, digest, 'shadow', { rules: [{ pageHost: new URL(origin).hostname, imageHosts: [new URL(origin).hostname], policy: 'OWNED_OPEN', licenseRef: 'owned synthetic preview fixture' }] });
+const { renderDigestV2 } = await import('../server/digest-v2-render.js');
+const { getDigestArtifact } = await import('../server/activity-store.js');
+const publication = JSON.parse(getDigestArtifact(user.id, String(result.artifactId))!.payload_json).publication;
+fs.writeFileSync(path.join(process.env.DATA_DIR, 'email-preview.html'), '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + renderDigestV2(publication, true));
+api.app.get('/fixture-email', (_req, res) => res.type('html').send(fs.readFileSync(path.join(process.env.DATA_DIR!, 'email-preview.html'), 'utf8')));
+api.app.listen(3187, '127.0.0.1', () => console.log(JSON.stringify({ previewUrl: 'http://127.0.0.1:5187' + result.previewUrl, email: user.email, password: 'Preview-only-2026', evidenceDirectory: process.env.DATA_DIR, media: result.media })));

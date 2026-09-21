@@ -61,6 +61,10 @@
 
 ## 数据、配置和版本记录
 
+Daily Digest V2.5 增加 `sharp` 与 R2 S3 客户端，属于路径 B 的依赖变更。Windows 构建产物不能替代 Linux 上匹配架构的 sharp 可选二进制依赖；在独立测试目录按 lockfile 安装，先验证解码/转换，再考虑生产切换。不得将本机 `node_modules` 直接覆盖 Linux 生产目录。
+
+新版开关、许可文件和媒体域名见 [V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。关闭新版时同时设置 `DIGEST_V2_ENABLED=false`、`DIGEST_PRODUCTION_CONTRACT=daily-digest.v1`，后续恢复旧工具/发布；不自动重发当天日报，历史 V2 仍可阅读。回滚不得删除新增表、媒体镜像或已发布 R2 对象。正式切换前需验证自定义媒体域名、独立备份恢复、共享引用下架与 CDN 清除；测试 r2.dev 不是生产配置证明。
+
 数据迁移、配置变化属于部署的附加专项步骤，不是第三种日常路径。它们必须明确：
 
 - 迁移前备份和可恢复性；

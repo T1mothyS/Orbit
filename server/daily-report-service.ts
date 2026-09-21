@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import { decodeDigestPublication } from './digest-v2-render.js';
+import { publicDigestUrl } from './digest-v2-contract.js';
 import * as db from './db.js';
 import * as activityStore from './activity-store.js';
 import { enqueueUserEmailNotificationDetailed } from './notification-service.js';
@@ -146,6 +148,8 @@ function legacyExcerpt(markdown: string): string {
 }
 
 function reportPresentation(markdown: string): { headline: string | null; heroImageUrl: string | null; excerpt: string } {
+  const v2 = decodeDigestPublication(markdown);
+  if (v2) return { headline: v2.digest.title, heroImageUrl: v2.media.find(m => publicDigestUrl(m.publicUrl))?.publicUrl || null, excerpt: v2.digest.executive_signals.join('；').slice(0, 240) || v2.digest.title };
   const digest = parseDailyDigestMarkdown(markdown);
   if (digest) {
     const featured = selectDailyDigestFeaturedStory(digest, { requireImage: false });
@@ -239,10 +243,13 @@ export async function publishDailyReport(
 ): Promise<PublishDailyReportResult> {
   validateDailyReportInput(reportDate, markdown);
   const { source: sourceOverride, mediaAudit, ...localizationOptions } = mediaOptions;
+  if (markdown.includes('<!-- daily-digest.v2 -->')) throw new Error('新版日报必须使用 publish_v2');
+  if (sourceOverride === 'cloud' && process.env.DIGEST_PRODUCTION_CONTRACT === 'daily-digest.v2') throw new Error('旧版 Cloud 正式发布已关闭');
   const source = sourceOverride || 'local';
   if (source !== 'local' && source !== 'cloud') throw new Error('日报来源不受支持');
   const failureCodes: string[] = [];
   const localizedMarkdown = await localizeDailyDigestImages(markdown, { ...localizationOptions, onFailure: failure => { failureCodes.push(failure.code); localizationOptions.onFailure?.(failure); } });
+  if (source === 'cloud' && process.env.DIGEST_PRODUCTION_CONTRACT === 'daily-digest.v2') throw new Error('旧版 Cloud 正式发布已关闭');
   validateDailyReportInput(reportDate, localizedMarkdown);
   const contentHash = hashDailyReport(localizedMarkdown);
   const selectedSources = getDailyReportDeliveryPolicy(userId).sources;

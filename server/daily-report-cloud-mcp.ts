@@ -1,4 +1,6 @@
 import express from 'express';
+import { readDigestV2Inputs, validateDigestRun, publishDigestV2 } from './digest-v2-service.js';
+import { DIGEST_V2_SCHEMA } from './digest-v2-contract.js';
 import * as db from './db.js';
 import { previewDailyReportMedia, publishDailyReport } from './daily-report-service.js';
 import { NO_IMAGE_REASONS } from './daily-report-media-receipt.js';
@@ -69,6 +71,9 @@ interface McpTool {
 }
 
 const TOOL_SCOPES: Record<string, DailyReportCloudScope[]> = {
+  'daily_report.read_inputs_v2': ['daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context', 'daily_report:read_history'],
+  'daily_report.validate_v2': ['daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context'],
+  'daily_report.publish_v2': ['daily_report:publish', 'daily_report:media_prepare', 'daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context'],
   'daily_report.read_inputs': [
     'daily_report:read_calendar',
     'daily_report:read_mail',
@@ -92,6 +97,9 @@ function oauthSecurity(toolName: string): Array<{ type: 'oauth2'; scopes: string
 }
 
 const toolDefinitions: McpTool[] = [
+  { name: 'daily_report.read_inputs_v2', securitySchemes: oauthSecurity('daily_report.read_inputs_v2'), description: '创建账号隔离的新版日报输入快照和 runId，有效期七天；不发布、不发信。', inputSchema: { type: 'object', properties: { date: { type: 'string' } }, required: ['date'], additionalProperties: false } },
+  { name: 'daily_report.validate_v2', securitySchemes: oauthSecurity('daily_report.validate_v2'), description: '对照输入快照纯校验 daily-digest.v2 JSON；无媒体下载、持久化或通知副作用。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, digest: DIGEST_V2_SCHEMA }, required: ['runId', 'digest'], additionalProperties: false } },
+  { name: 'daily_report.publish_v2', securitySchemes: oauthSecurity('daily_report.publish_v2'), description: '新版日报 dry_run 纯校验；shadow 保存隔离预览但不发信；production 必须由服务器单独启用。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, digest: DIGEST_V2_SCHEMA, mode: { type: 'string', enum: ['dry_run', 'shadow', 'production'], default: 'dry_run' } }, required: ['runId', 'digest'], additionalProperties: false } },
   {
     name: 'daily_report.read_inputs',
     securitySchemes: oauthSecurity('daily_report.read_inputs'),
@@ -364,6 +372,9 @@ function summarizeMediaFailures(failures: DailyReportMediaFailure[]): Array<Reco
 async function callTool(auth: OAuthBearerContext, name: string, rawArguments: unknown): Promise<Record<string, unknown>> {
   if (!toolScopeAllowed(auth, name)) throw new DailyReportCloudMcpAuthError(TOOL_SCOPES[name] || []);
   const args = objectValue(rawArguments);
+  if (name === 'daily_report.read_inputs_v2') return readDigestV2Inputs(auth.userId, stringValue(args.date));
+  if (name === 'daily_report.validate_v2') return validateDigestRun(auth.userId, stringValue(args.runId), args.digest);
+  if (name === 'daily_report.publish_v2') return publishDigestV2(auth.userId, stringValue(args.runId), args.digest, args.mode === undefined ? 'dry_run' : stringValue(args.mode));
   if (name === 'daily_report.read_calendar') {
     const timezone = db.getReminder(auth.userId)?.timezone || process.env.APP_TIMEZONE || 'Asia/Shanghai';
     return readCalendar(auth.userId, validDateOrToday(args.date, timezone));
@@ -649,7 +660,7 @@ async function handleJsonRpc(request: JsonRpcRequest, auth: OAuthBearerContext):
     };
   }
   if (method === 'tools/list') {
-    return { jsonrpc: '2.0', id, result: { tools: toolDefinitions } };
+    return { jsonrpc: '2.0', id, result: { tools: toolDefinitions.filter(tool => process.env.DIGEST_V2_ENABLED === 'true' || !tool.name.endsWith('_v2')) } };
   }
   if (method === 'tools/call') {
     const params = objectValue(request.params);

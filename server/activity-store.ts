@@ -279,6 +279,16 @@ export async function initActivityDb(): Promise<void> {
   });
 
   db.run(`
+    CREATE TABLE IF NOT EXISTS digest_v2_runs (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, report_date TEXT NOT NULL,
+      snapshot_json TEXT, manifest_json TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_digest_v2_runs_user ON digest_v2_runs(user_id, created_at);
+    CREATE TABLE IF NOT EXISTS digest_v2_artifacts (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, run_id TEXT NOT NULL, report_date TEXT NOT NULL,
+      mode TEXT NOT NULL, content_hash TEXT NOT NULL, payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL, UNIQUE(user_id, report_date, mode, content_hash)
+    );
     CREATE TABLE IF NOT EXISTS schema_meta (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -900,6 +910,8 @@ function addAudit(userId: string, entityType: string, entityId: string, action: 
 
 export function exportUserActivity(userId: string): Record<string, unknown[]> {
   return {
+    digestV2Runs: queryAll<any>('SELECT * FROM digest_v2_runs WHERE user_id = ?', [userId]).map(row => ({ ...row, snapshot_json: row.expires_at <= nowIso() ? null : row.snapshot_json })),
+    digestV2Artifacts: queryAll<any>('SELECT * FROM digest_v2_artifacts WHERE user_id = ?', [userId]),
     completions: queryAll<any>('SELECT * FROM completion_records WHERE user_id = ?', [userId]),
     attachments: queryAll<any>('SELECT * FROM attachments WHERE user_id = ?', [userId]),
     notifications: queryAll<any>('SELECT * FROM notification_deliveries WHERE user_id = ?', [userId]),
@@ -914,6 +926,51 @@ export function exportActivityDb(): Buffer {
   return Buffer.from(db.export());
 }
 
+export interface DigestRunRow {
+  id: string; user_id: string; report_date: string; snapshot_json: string | null;
+  manifest_json: string; created_at: string; expires_at: string;
+}
+export interface DigestArtifactRow {
+  id: string; user_id: string; run_id: string; report_date: string;
+  mode: 'shadow' | 'production'; content_hash: string; payload_json: string; created_at: string;
+}
+export function createDigestRun(row: DigestRunRow): void {
+  run('INSERT INTO digest_v2_runs VALUES (?, ?, ?, ?, ?, ?, ?)', [row.id, row.user_id, row.report_date, row.snapshot_json, row.manifest_json, row.created_at, row.expires_at]);
+}
+export function updateDigestRunManifest(userId: string, id: string, manifest: unknown): void {
+  run('UPDATE digest_v2_runs SET manifest_json = ? WHERE id = ? AND user_id = ?', [JSON.stringify(manifest), id, userId]);
+}
+export function getDigestRun(userId: string, id: string): DigestRunRow | null {
+  const row = queryOne<DigestRunRow>('SELECT * FROM digest_v2_runs WHERE user_id = ? AND id = ?', [userId, id]);
+  return row ? { ...row, snapshot_json: row.expires_at > nowIso() ? row.snapshot_json : null } : null;
+}
+export function expireDigestSnapshots(): number {
+  return run('UPDATE digest_v2_runs SET snapshot_json = NULL WHERE expires_at <= ? AND snapshot_json IS NOT NULL', [nowIso()]);
+}
+export function saveDigestArtifact(row: DigestArtifactRow): DigestArtifactRow {
+  const existing = queryOne<DigestArtifactRow>('SELECT * FROM digest_v2_artifacts WHERE user_id = ? AND report_date = ? AND mode = ? AND content_hash = ?', [row.user_id, row.report_date, row.mode, row.content_hash]);
+  if (existing) {
+    run('UPDATE digest_v2_artifacts SET payload_json = ? WHERE id = ? AND user_id = ?', [row.payload_json, existing.id, row.user_id]);
+    return { ...existing, payload_json: row.payload_json };
+  }
+  run('INSERT INTO digest_v2_artifacts VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [row.id, row.user_id, row.run_id, row.report_date, row.mode, row.content_hash, row.payload_json, row.created_at]);
+  return row;
+}
+export function getDigestArtifact(userId: string, id: string): DigestArtifactRow | null {
+  return queryOne<DigestArtifactRow>('SELECT * FROM digest_v2_artifacts WHERE user_id = ? AND id = ?', [userId, id]) || null;
+}
+export function findDigestArtifact(userId: string, date: string, mode: string, hash: string): DigestArtifactRow | null {
+  return queryOne<DigestArtifactRow>('SELECT * FROM digest_v2_artifacts WHERE user_id = ? AND report_date = ? AND mode = ? AND content_hash = ?', [userId, date, mode, hash]) || null;
+}
+export function listDigestArtifacts(userId: string, mode?: string, date?: string): DigestArtifactRow[] {
+  return queryAll<DigestArtifactRow>('SELECT * FROM digest_v2_artifacts WHERE user_id = ? AND (? IS NULL OR mode = ?) AND (? IS NULL OR report_date = ?) ORDER BY created_at DESC LIMIT 200', [userId, mode || null, mode || null, date || null, date || null]);
+}
+export function dailyReportHasAutomaticDelivery(userId: string, date: string, exceptId: string): boolean {
+  return !!queryOne('SELECT id FROM daily_reports WHERE user_id = ? AND report_date = ? AND id <> ? AND email_notification_id IS NOT NULL LIMIT 1', [userId, date, exceptId])
+    // A crash may occur after enqueue but before attaching the notification to its report.
+    || !!queryOne('SELECT id FROM notification_deliveries WHERE user_id = ? AND dedupe_key = ? AND source_id <> ? LIMIT 1', [userId, `daily-report-v2:${userId}:${date}:email`, exceptId]);
+}
+
 export function deleteUserActivity(userId: string): {
   attachments: AttachmentRecord[];
   completions: number;
@@ -923,6 +980,8 @@ export function deleteUserActivity(userId: string): {
   processedEmails: number;
 } {
   const attachments = listAttachments(userId);
+  run('DELETE FROM digest_v2_artifacts WHERE user_id = ?', [userId]);
+  run('DELETE FROM digest_v2_runs WHERE user_id = ?', [userId]);
   db.run('DELETE FROM attachments WHERE user_id = ?', [userId]);
   const completions = run('DELETE FROM completion_records WHERE user_id = ?', [userId]);
   const notifications = run('DELETE FROM notification_deliveries WHERE user_id = ?', [userId]);
@@ -941,6 +1000,8 @@ export function restoreUserActivity(
   mode: 'merge' | 'replace',
 ): { completions: number; notifications: number; dailyReports: number; aiImports: number } {
   if (mode === 'replace') {
+    db.run('DELETE FROM digest_v2_artifacts WHERE user_id = ?', [userId]);
+    db.run('DELETE FROM digest_v2_runs WHERE user_id = ?', [userId]);
     db.run('DELETE FROM attachments WHERE user_id = ?', [userId]);
     db.run('DELETE FROM completion_records WHERE user_id = ?', [userId]);
     db.run('DELETE FROM notification_deliveries WHERE user_id = ?', [userId]);
@@ -949,6 +1010,15 @@ export function restoreUserActivity(
     db.run('DELETE FROM email_import_settings WHERE user_id = ?', [userId]);
   }
   let completions = 0;
+  for (const row of data.digestV2Runs || []) {
+    if (!row?.id || !isValidDateOnly(row.report_date) || typeof row.manifest_json !== 'string') throw new Error('新版日报运行备份无效');
+    db.run('INSERT OR IGNORE INTO digest_v2_runs VALUES (?, ?, ?, ?, ?, ?, ?)', [row.id, userId, row.report_date, row.expires_at > nowIso() ? row.snapshot_json : null, row.manifest_json, row.created_at, row.expires_at]);
+  }
+  for (const row of data.digestV2Artifacts || []) {
+    if (!row?.id || !isValidDateOnly(row.report_date) || !['shadow', 'production'].includes(row.mode) || typeof row.payload_json !== 'string') throw new Error('新版日报产物备份无效');
+    if (!queryOne('SELECT id FROM digest_v2_runs WHERE id = ? AND user_id = ?', [row.run_id, userId])) continue;
+    db.run('INSERT OR IGNORE INTO digest_v2_artifacts VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [row.id, userId, row.run_id, row.report_date, row.mode, row.content_hash, row.payload_json, row.created_at]);
+  }
   let notifications = 0;
   let dailyReports = 0;
   let aiImports = 0;

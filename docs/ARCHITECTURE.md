@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: AI 记事板提示词原位覆盖与撤回 / `0.30.2-260920.2233`（2026-09-20，本地源码、自动测试和浏览器 smoke；其他领域以各节证据为准）。
+- Last verified commit/version: `0.31.0-260921.1951`（2026-09-21，Daily Digest V2.5 本地与测试 R2 工程单元；其他领域保留各节时点，未代表生产或七日 Shadow）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -76,6 +76,8 @@ Phase 5 的所有权、等价性和迁移验收见 [Phase 5 验证记录](PHASE5
 这条路径只适合本人控制或已经审阅的 HTML。由于它们仍处于同域，受信任的应用脚本可以看到浏览器本地存储；它不是第三方插件沙箱。未来若要挂载不受信任的代码，必须改用独立 origin 或更严格的沙箱边界。
 
 ## 4. 持久化
+
+Daily Digest V2.5 使用原活动库中的 `digest_v2_runs`（账号/日期/输入快照/版本与诊断）和 `digest_v2_artifacts`（账号/日期/模式/内容哈希唯一的冻结产物）。`daily_reports`、通知、认证与备份入口复用；Shadow 不写正式表。快照七天过期，长期诊断不保留邮箱正文。媒体在 R2 和原媒体目录分别存内容寻址字节，文章来源/许可保留在账号产物引用中。账号恢复重映射运行与产物 ID，跨账号恢复不允许沿用旧输入运行。具体发布状态、失败恢复、媒体生命周期及限制见 [V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 
 server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与写回，schema.ts 和 migrations.ts 拥有按原顺序执行的建表/升级，queries/ 按领域拥有查询。其余三个 store 保持既有领域边界。
 

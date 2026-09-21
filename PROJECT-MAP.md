@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: AI 记事板提示词原位覆盖与撤回 / `0.30.2-260920.2233`（2026-09-20，本地源码、自动测试和浏览器 smoke；其他领域以各节证据为准）。
+- Last verified commit/version: `0.31.0-260921.1951`（2026-09-21，Daily Digest V2.5 本地与测试 R2 工程单元；其他领域保留各节时点，未代表生产或七日 Shadow）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -47,6 +47,8 @@ flowchart TD
 CalDAV 入口为 `server/routes/caldav.ts`；`caldav-service` 共享手动/后台服务，`caldav-control` 管理自动化与备份恢复互斥，投影和账本位于 `caldav-projection`/`caldav-bridge`；周期读取全部已存实例，完成策略显式配置，派生副本按周期 ID 归并。既有任务框架增加默认未启用的5分钟桥接调度；独立服务与合成测试在 `infra/caldav-poc/`，外部进程不读主应用数据库。边界见 [CalDAV 合同](docs/CALDAV-BRIDGE.md)。
 
 ### 1.2 日报 V2 Local 流程
+
+新版 V2.5 的独立 Cloud 分支由 `server/digest-v2-{contract,service,media,fetch,render}.ts` 实现，MCP 入口仍在 `daily-report-cloud-mcp.ts`。输入运行与隔离产物在原 `activity.db` 的 `digest_v2_runs`、`digest_v2_artifacts`；production 才写原日报/通知表。阅读复用 `reports-read.ts` 与 `DailyReportsPage.tsx`，R2 字节镜像进入原媒体/备份边界。V1 Local 图示仍适用于原链路，不能作为新版合同。详细字段、开关和 Shadow 边界见 [V2.5 合同](docs/CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 
 ```mermaid
 flowchart LR
