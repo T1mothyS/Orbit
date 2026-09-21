@@ -32,3 +32,5 @@ data/.system-restore*
 data/.*.restore-*
 data/.*.pre-restore-*
 data/*.pending-*
+
+dist-shadow/

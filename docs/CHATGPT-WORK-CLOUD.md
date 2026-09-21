@@ -2,7 +2,7 @@
 
 - Status: CONTRACT（末尾为历史快照）
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.31.0-260921.1951`（2026-09-21，Daily Digest V2.5 本地与测试 R2 工程单元；其他领域保留各节时点，未代表生产或七日 Shadow）。
+- Last verified commit/version: `0.31.1-260922.0719`（2026-09-22，独立 Shadow 入口与防误发保护；278 项测试通过。其他领域保留各节时点，不代表生产或七日 Shadow）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -165,6 +165,10 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 - 不自动删除内容寻址的本地镜像，避免共享图片引用被误删。临时本地镜像和不再使用的分类图可能累积。需要下架时先冻结后续发布、核对所有账号/历史产物的共享引用，保留私有审计备份；再同步处理正文引用、R2 对象以及自定义域名 CDN 缓存。当前测试未连接 CDN zone，**下架/缓存清除尚未验收，禁止把仅删对象报告为完成下架**。
 
 ### 隔离 Work 执行提示与验收
+
+独立服务入口为 `server/digest-shadow-server.ts`，以 `tsconfig.shadow.json` 编译后运行。它只监听回环地址，要求专用端口和绝对 `DATA_DIR`（末级为 `digest-v2-shadow-data`），拒绝已有符号链接目录；配置验证先于数据库初始化。测试账号由独立邮箱标识和 bcrypt 哈希初始化，JWT 与 HTTPS `APP_URL` 仍按原认证要求验证。
+
+入口强制开启 `DIGEST_SHADOW_ONLY`、关闭后台任务与邮件凭据，只允许登录、OAuth 与 MCP 的 POST；其余业务写接口拒绝。MCP 隐藏旧发布工具，两版正式发布、邮件入队及发送另有服务层拒绝。仅独立快照过期维护运行，不启动生产通知调度。部署隔离与回退见 [部署路径](DEPLOYMENT-PATHS.md#daily-digest-独立-shadow-服务)。
 
 以下提示仅用于单独的测试连接，不替换正式 Work 或 Local Prompt：
 

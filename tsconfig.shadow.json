@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "rootDir": ".",
+    "outDir": "./dist-shadow"
+  },
+  "include": ["server/digest-shadow-server.ts", "server/**/*.d.ts", "src/types/**/*.d.ts"],
+  "exclude": ["server/**/*.test.ts"]
+}

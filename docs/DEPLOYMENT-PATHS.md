@@ -94,7 +94,16 @@ pwsh -NoProfile -File scripts/prepare-protected-tool-release.ps1 `
 
 这条快速路径只适用于本人控制或已经审阅的 HTML；同域工具不是第三方插件沙箱。如果涉及 React、Express、API、认证、CSP 规则或运行时依赖，必须回到路径 A/B，重新走整站版本、预构建、备份和回滚流程。
 
-## 固化的历史教训
+## Daily Digest 独立 Shadow 服务
+
+- 单独目录、系统用户、数据目录、端口、HTTPS 子域名及服务进程；禁止复用生产 `.env`、数据库、JWT 或邮件凭据。只配置专用测试 R2。
+- 本地执行 `npx tsc -p tsconfig.shadow.json` 与客户端构建，打包编译后的 `server/`、关联 `src/`、`dist/`、`package.json`、`package-lock.json`。不打包本机依赖、配置、数据库或测试数据。
+- 目标 Linux 独立目录按锁文件安装生产依赖，验证 sharp 解码与格式转换后，以 `node server/digest-shadow-server.js` 运行。安装与服务使用资源限制，不能在生产目录构建或安装。
+- 独立 Nginx 站点只代理测试回环端口；单独证书，不替换原站点。语法检查后平滑 reload，前后检查原站点 health 与进程，测试账号验证登录及 OAuth/MCP。
+- 回退只停用测试服务及其 Nginx 站点，保留数据与媒体恢复证据；不重启生产应用。配置、地址及部署快照只写被忽略的本机 runbook。
+- HTTP、Linux sharp、R2、OAuth、Work 调用、连续七日期与邮箱渲染分别验收。部署成功不代表 Cloud Shadow 完成。
+
+## 固化的历史教训（通用）
 
 - 远程脚本先使用 LF 换行，并在执行前做 shell 语法检查（例如 `bash -n`）；Windows 换行或 BOM 可能使远程入口在真正切换前失败。
 - 静态文件的服务器磁盘路径与浏览器访问 URL 是两件事；必须检查实际映射，不要拿文件系统路径代替 URL 验收。

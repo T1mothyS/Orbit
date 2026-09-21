@@ -4,7 +4,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.31.0-260921.1951`（2026-09-21，Daily Digest V2.5 本地与测试 R2 工程单元；其他领域保留各节时点，未代表生产或七日 Shadow）。
+- Last verified commit/version: `0.31.1-260922.0719`（2026-09-22，独立 Shadow 入口与防误发保护；278 项测试通过。其他领域保留各节时点，不代表生产或七日 Shadow）。
 - CalDAV 补充验证：2026-09-18，隔离 POC 与主应用回归；仅覆盖下述独立入口，真机尚未验证。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
@@ -16,6 +16,8 @@
 2026-09-19 增量验证：`schedule-time.test.ts` 和 `unscheduled-api.test.ts` 覆盖共同日期约束/旧数据兼容；`dependency-security.test.ts` 覆盖升级后的邮件解析及依赖输入；`daily-report.test.ts`、Cloud API 测试覆盖媒体计数、版本、账号及恢复。具体数字、浏览器尺寸与未验证范围见[本次修复快照](FORMAT-SECURITY-REPAIR-20260919.md)。
 
 ## 1. 通用命令
+
+隔离服务增量：`server/digest-shadow-server.test.ts` 实际启动独立子进程，验证后台任务被强制关闭、合成账号登录、匿名日报拒绝、非 Shadow 业务写入拒绝与 MCP 认证边界。`digest-v2.test.ts` 另覆盖两版正式发布与邮件入队在 Shadow 模式被拒绝。`npx tsc -p tsconfig.shadow.json` 验证独立服务构建；Linux 图片处理、真实 OAuth 与 Work 连续运行仍须独立验收。
 
 Daily Digest V2.5 增量入口：`server/digest-v2.test.ts` 覆盖结构/空内容/重复与断裂引用/非法 URL/成功输入遗漏、纯校验无写入、账号/过期隔离、图片解码与超限/超时/失败降级、并发幂等、四处中断恢复、七类合成 Shadow、带媒体字节的备份恢复和 MCP/HTTP 权限。`scripts/digest-v2-r2-smoke.ts` 使用专用测试配置检查真实上传、重复上传、私有接口/公共地址哈希、仅合成对象删除及独立副本恢复。`scripts/digest-v2-preview.ts` 提供本机合成页面与邮件 HTML，无真实 SMTP。
 

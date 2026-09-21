@@ -194,6 +194,7 @@ async function sendEmail(message: {
   mailType: string;
 }): Promise<EmailSendResult> {
   const { mailType, ...mailOptions } = message;
+  if (process.env.DIGEST_SHADOW_ONLY === 'true') throw new Error('SHADOW_ONLY_EMAIL_DISABLED');
   const startedAt = Date.now();
   addLog('debug', 'mail', '邮件传输开始', {
     event: 'mail_send_started',

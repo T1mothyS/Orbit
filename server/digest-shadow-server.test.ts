@@ -1,0 +1,48 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import net from 'node:net';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import bcrypt from 'bcryptjs';
+
+test('isolated entrypoint starts with jobs disabled and blocks non-Shadow writes', { timeout: 30000 }, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'digest-shadow-http-'));
+  const probe = net.createServer();
+  probe.listen(0, '127.0.0.1'); await once(probe, 'listening');
+  const port = (probe.address() as net.AddressInfo).port;
+  await new Promise<void>(resolve => probe.close(() => resolve()));
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/digest-shadow-server.ts'], {
+    env: { ...process.env, DATA_DIR: path.join(root, 'digest-v2-shadow-data'), PORT: String(port),
+      JWT_SECRET: 'synthetic-shadow-integration-secret-123456', APP_URL: 'https://shadow.example.test',
+      DIGEST_SHADOW_LOGIN_EMAIL: 'shadow@example.test', DIGEST_SHADOW_PASSWORD_HASH: bcrypt.hashSync('synthetic-test-password', 4),
+      BACKGROUND_JOBS_ENABLED: 'true', SMTP_PASS: 'must-not-enable-delivery' },
+    stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+  });
+  let logs = ''; child.stdout.on('data', data => { logs += String(data); });
+  child.stderr.on('data', data => { logs += String(data); });
+  try {
+    const deadline = Date.now() + 20000;
+    while (!logs.includes('digest_shadow_listening') && Date.now() < deadline && child.exitCode === null) await new Promise(resolve => setTimeout(resolve, 100));
+    assert.ok(logs.includes('digest_shadow_listening'), logs);
+    assert.ok(logs.includes('"backgroundJobs":false'));
+    const base = `http://127.0.0.1:${port}`;
+    assert.equal((await fetch(base + '/api/health')).status, 200);
+    assert.equal((await fetch(base + '/api/daily-reports')).status, 401);
+    const login = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'shadow@example.test', password: 'synthetic-test-password' }) });
+    assert.equal(login.status, 200);
+    const { token } = await login.json() as { token: string };
+    assert.ok(token);
+    for (const route of ['/api/schedules', '/api/daily-reports/publish', '/api/auth/register', '/api/notifications']) {
+      const response = await fetch(base + route, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+      assert.equal(response.status, 403, route);
+      assert.equal((await response.json() as { error: string }).error, 'SHADOW_ONLY');
+      assert.equal(response.headers.get('x-robots-tag'), 'noindex, nofollow');
+    }
+    assert.equal((await fetch(base + '/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 401);
+  } finally {
+    if (child.exitCode === null) { const exited = once(child, 'exit'); child.kill(); await exited; }
+  }
+});

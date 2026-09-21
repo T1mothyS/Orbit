@@ -242,6 +242,7 @@ export async function publishDailyReport(
   mediaOptions: DailyReportMediaOptions & { source?: activityStore.DailyReportSource; mediaAudit?: MediaAuditInput } = {},
 ): Promise<PublishDailyReportResult> {
   validateDailyReportInput(reportDate, markdown);
+  if (process.env.DIGEST_SHADOW_ONLY === 'true') throw new Error('SHADOW_ONLY');
   const { source: sourceOverride, mediaAudit, ...localizationOptions } = mediaOptions;
   if (markdown.includes('<!-- daily-digest.v2 -->')) throw new Error('新版日报必须使用 publish_v2');
   if (sourceOverride === 'cloud' && process.env.DIGEST_PRODUCTION_CONTRACT === 'daily-digest.v2') throw new Error('旧版 Cloud 正式发布已关闭');

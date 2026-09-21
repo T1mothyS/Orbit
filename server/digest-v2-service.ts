@@ -56,6 +56,7 @@ const locks = new Map<string, Promise<unknown>>();
 export async function publishDigestV2(userId: string, runId: string, value: unknown, mode: string, mediaOptions: Partial<Parameters<typeof prepareDigestMedia>[1]> = {}): Promise<Record<string, unknown>> {
   assertDigestV2Enabled();
   if (!['dry_run', 'shadow', 'production'].includes(mode)) throw new Error('INVALID_MODE');
+  if (process.env.DIGEST_SHADOW_ONLY === 'true' && mode === 'production') throw new Error('SHADOW_ONLY');
   const validation = validateDigestRun(userId, runId, value);
   if (!validation.valid) return { status: 'INVALID', ...validation };
   if (mode === 'dry_run') return { status: 'VALIDATED_NOT_PUBLISHED', ...validation };

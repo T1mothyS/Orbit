@@ -566,6 +566,7 @@ export function enqueueNotificationDetailed(input: {
   dedupeKey: string;
   maxAttempts?: number;
 }): EnqueueNotificationResult {
+  if (process.env.DIGEST_SHADOW_ONLY === 'true' && input.channel === 'email') throw new Error('SHADOW_ONLY_EMAIL_DISABLED');
   const existing = queryOne<any>('SELECT * FROM notification_deliveries WHERE dedupe_key = ?', [input.dedupeKey]);
   if (existing) return { notification: rowToNotification(existing), created: false };
   const now = nowIso();

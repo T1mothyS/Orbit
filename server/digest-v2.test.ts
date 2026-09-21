@@ -267,4 +267,18 @@ test('seven fixed synthetic scenarios save only isolated Shadow artifacts', asyn
   assert.equal(activity.exportUserActivity(userId).notifications.length, baseline);
 });
 
+test('dedicated Shadow mode refuses both formal contracts and email queueing', async () => {
+  const run = service.createDigestSnapshotRun(userId, snapshot());
+  const before = activity.exportActivityDb();
+  process.env.DIGEST_SHADOW_ONLY = 'true';
+  process.env.DIGEST_PRODUCTION_CONTRACT = 'daily-digest.v2';
+  try {
+    await assert.rejects(service.publishDigestV2(userId, run.runId, digest(), 'production'), /SHADOW_ONLY/);
+    const legacy = await import('./daily-report-service.js');
+    await assert.rejects(legacy.publishDailyReport(userId, '2026-09-21', '# test'), /SHADOW_ONLY/);
+    assert.throws(() => activity.enqueueNotificationDetailed({ userId, sourceType: 'test', sourceId: 'test', channel: 'email', kind: 'daily_report', title: 'test', body: 'test', scheduledAt: now, dedupeKey: 'shadow-email-must-fail' }), /SHADOW_ONLY_EMAIL_DISABLED/);
+    assert.deepEqual(activity.exportActivityDb(), before);
+  } finally { delete process.env.DIGEST_SHADOW_ONLY; delete process.env.DIGEST_PRODUCTION_CONTRACT; }
+});
+
 test.after(() => { /* Keep isolated evidence in OS temp; no production files are touched. */ });

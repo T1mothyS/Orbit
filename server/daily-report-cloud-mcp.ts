@@ -370,6 +370,7 @@ function summarizeMediaFailures(failures: DailyReportMediaFailure[]): Array<Reco
 }
 
 async function callTool(auth: OAuthBearerContext, name: string, rawArguments: unknown): Promise<Record<string, unknown>> {
+  if (process.env.DIGEST_SHADOW_ONLY === 'true' && !name.endsWith('_v2') && !['daily_report.read_calendar', 'daily_report.read_mail', 'daily_report.read_context', 'daily_report.read_history'].includes(name)) throw new Error('SHADOW_ONLY');
   if (!toolScopeAllowed(auth, name)) throw new DailyReportCloudMcpAuthError(TOOL_SCOPES[name] || []);
   const args = objectValue(rawArguments);
   if (name === 'daily_report.read_inputs_v2') return readDigestV2Inputs(auth.userId, stringValue(args.date));
@@ -660,7 +661,7 @@ async function handleJsonRpc(request: JsonRpcRequest, auth: OAuthBearerContext):
     };
   }
   if (method === 'tools/list') {
-    return { jsonrpc: '2.0', id, result: { tools: toolDefinitions.filter(tool => process.env.DIGEST_V2_ENABLED === 'true' || !tool.name.endsWith('_v2')) } };
+    return { jsonrpc: '2.0', id, result: { tools: toolDefinitions.filter(tool => (process.env.DIGEST_V2_ENABLED === 'true' || !tool.name.endsWith('_v2')) && (process.env.DIGEST_SHADOW_ONLY !== 'true' || tool.name.endsWith('_v2') || ['daily_report.read_calendar', 'daily_report.read_mail', 'daily_report.read_context', 'daily_report.read_history'].includes(tool.name))) } };
   }
   if (method === 'tools/call') {
     const params = objectValue(request.params);
