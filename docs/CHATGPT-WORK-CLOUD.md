@@ -187,6 +187,22 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 
 复现本地验证：`npx tsx --test server/digest-v2.test.ts`。显式测试 R2：`node --env-file=.env.digest-v2-test --import tsx scripts/digest-v2-r2-smoke.ts`（仅专用测试 Bucket，创建/删除/恢复代码自有合成对象）。浏览器 fixture：同样环境执行 `scripts/digest-v2-preview.ts`，另起 Vite 并将 `API_PROXY_TARGET` 指向 fixture 端口；该 fixture 固定仅监听本机、使用临时库和合成账号、不启动发信任务。
 
+### Cloudflare Worker 代抓与来源图标
+
+`server/digest-media-worker.ts` 是独立 Cloudflare module Worker；`server/digest-v2-relay.ts` 是主应用适配器。未配置 relay 时保留现有直抓；同时配置 `DIGEST_MEDIA_RELAY_URL`（精确 HTTPS `/fetch`）及 `DIGEST_MEDIA_RELAY_SECRET` 后，新版媒体的网络下载统一经 Worker。配置不完整或代抓失败不静默回落直抓。显式审核副本规则仍为 `audited_copy`；要验证真正代抓，须移除该条规则的 `sourceFile/sourceSha256`，不能将审核副本伪装为 Worker 成功。
+
+Worker 只接受签名 POST：HMAC-SHA256 绑定原图 URL 与短时有效期，密钥至少32字符；部署变量 `MEDIA_RELAY_HOSTS` 为精确主机清单，`MEDIA_RELAY_SECRET` 使用 Worker secret 保存。请求正文最多4KiB、图片最多5MiB、上游超时10秒，不转发 Cookie/Authorization、不自动跟随重定向、不返回上游 Set-Cookie，不写请求正文日志。只有通过应用许可规则的 URL 才会被应用签名；Worker 主机白名单是第二道限制，不是整域转载许可。403、付费登录、验证码等限制不绕过。
+
+Worker 只代下载字节，主应用仍执行签名检查、安全SVG检查、解码、像素限制、转换、独立备份和R2写入。`sourceTransport=cloudflare_worker` 与 `network/audited_copy` 分开记录。纯校验与 dry_run 不调用 Worker。V1、Local 和既有媒体批次规则不改变。
+
+来源图标由服务端许可配置提供：同一规则设置 `kind: "source_icon"`、准确 `pageHost`、一个明确 `imageUrls`，以及政策和可复核 `licenseRef`。Work 不能添加图标许可；域名匹配不去掉 `www`、不扩展兄弟域名。每期最多20个来源主机，同源图标只下载一次；与最多20张新闻候选共同保存在发布快照中。图标支持PNG/JPEG/WebP、安全SVG，以及嵌入PNG或无压缩32位DIB的ICO；其他ICO编码明确失败。图标最终转为不大于64×64的PNG，网页/邮件在来源链接旁显示16×16；无图标时保留文字链接。图标失败不阻断正文、不显示分类图、不计入真实配图或分类图数量；回执新增 `media.icons`，失败仍单独列出。
+
+新闻照片与来源标识的使用范围分别审核。来源favicon用作小尺寸来源链接标识，不表示合作背书，也不授予新闻照片转载权。路透、彭博等受许可约束的新闻照片，不能仅因下载成功就自动保存到公共Bucket。
+
+部署前在本地编译独立Worker：`npx tsc server/digest-media-worker.ts --target ES2022 --module ESNext --lib ES2022,DOM --skipLibCheck --outDir dist-shadow/worker`，部署生成的模块JS并配置上述变量。无需增加项目运行时依赖或给Worker绑定应用数据库/R2密钥。先测试未签名拒绝、真实图片字节、来源失败，再测试实际应用服务器→Worker→源站→校验/R2→网页和邮件HTML；本机可达不代表服务器可达。自定义Worker域名必须满足Cloudflare有效zone要求，不能假设给外部DNS增加CNAME即可完成；不为测试擅自迁移主站DNS或购买套餐。
+
+回滚：移除应用的两个relay配置恢复原直抓；保留已有发布快照、R2对象和备份，不自动重发。Worker可独立回退版本或停止调用，既有图片URL不依赖Worker继续运行。运行结果只追加到本机时点记录，不将模块上线等同隔离Work验收通过。
+
 ## 历史运行快照（不作为当前状态）
 
 以下内容保留各次运行当时的证据边界。“当前”“尚未”“本轮”均指对应历史时点；2026-09-14 前段的“未正式发布”后来有同日单次受控发布记录，不再用于推断现状。生产、实际 Prompt、定时切换、SMTP 和收件箱须分别现场核对。

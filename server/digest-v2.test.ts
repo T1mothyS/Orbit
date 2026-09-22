@@ -304,3 +304,29 @@ test('audited single-image rules retain attribution and reject siblings, redirec
   const redirected = await prepareDigestMedia(illustrated(), { ...options, rules: [networkRule], fetchOptions: { lookup: async () => [{ address: '93.184.216.34', family: 4 as const }], fetcher: async () => new Response(null, { status: 302, headers: { location: 'https://images.example.com/unapproved.jpg' } }) } });
   assert.equal(redirected[0].fallback, true);
 });
+
+test('source icons use reviewed exact URLs, stay optional, and never count as story images', async () => {
+  const d=illustrated();d.media=[];d.stories[0].media_ids=[];
+  const png=await sharp({create:{width:32,height:32,channels:4,background:'#bb5500'}}).png().toBuffer();
+  const options={storage,mode:'shadow' as const,mediaRoot:path.join(root,'daily-report-media'),rules:[{kind:'source_icon' as const,pageHost:'example.com',imageHosts:['images.example.com'],imageUrls:['https://images.example.com/icon.png'],policy:'EXTERNAL_ALLOWED' as const,licenseRef:'test source identification approval'}],fetchOptions:{fetcher:async()=>new Response(new Uint8Array(png),{headers:{'content-type':'image/png'}}),lookup:async()=>[{address:'93.184.216.34',family:4 as const}]}};
+  const icons=await prepareDigestMedia(d,options);
+  assert.equal(icons.length,1);assert.equal(icons[0].kind,'source_icon');assert.equal(icons[0].mime,'image/png');assert.equal(icons[0].width,32);
+  const publication={digest:d,media:icons,warnings:[],renderer:'test'};
+  for(const email of [true,false]){const html=renderDigestV2(publication,email);assert.ok(html.includes('width="16"'));assert.ok(html.includes('Example source'));assert.ok(!html.includes('<figure'));}
+  assert.ok(decodeDigestPublication(encodeDigestPublication(publication)));
+  const failed=await prepareDigestMedia(d,{...options,fetchOptions:{...options.fetchOptions,fetcher:async()=>new Response('',{status:429})}});
+  assert.ok(failed[0].failure);assert.equal(failed[0].publicUrl,'');assert.ok(!renderDigestV2({...publication,media:failed}).includes('<img '));assert.ok(renderDigestV2({...publication,media:failed}).includes('Example source'));
+});
+
+test('source ICO decoder handles bottom-up BGRA and mask, rejecting malformed ranges and dimensions', async () => {
+  const {transformDigestIcon}=await import('./digest-v2-media.js');
+  const width=8,height=8,stride=4;const dib=Buffer.alloc(40+width*height*4+stride*height);
+  dib.writeUInt32LE(40,0);dib.writeInt32LE(width,4);dib.writeInt32LE(height*2,8);dib.writeUInt16LE(1,12);dib.writeUInt16LE(32,14);
+  for(let i=40;i<40+width*height*4;i+=4){dib[i]=11;dib[i+1]=22;dib[i+2]=33;dib[i+3]=255;}
+  dib[40+width*height*4+(height-1)*stride]=128;
+  const ico=Buffer.alloc(22+dib.length);ico.writeUInt16LE(1,2);ico.writeUInt16LE(1,4);ico[6]=width;ico[7]=height;ico.writeUInt32LE(dib.length,14);ico.writeUInt32LE(22,18);dib.copy(ico,22);
+  const r=await transformDigestIcon(ico);assert.equal(r.info.format,'png');const raw=await sharp(r.data).raw().toBuffer();assert.deepEqual([...raw.subarray(0,8)],[33,22,11,0,33,22,11,255]);
+  const bad=Buffer.from(ico);bad.writeUInt32LE(0xffffffff,18);await assert.rejects(transformDigestIcon(bad),/ICON_INVALID/);
+  const huge=Buffer.from(ico);huge.writeInt32LE(100000,26);await assert.rejects(transformDigestIcon(huge),/ICON_DIMENSIONS/);
+  await assert.rejects(transformDigestIcon(Buffer.from([0])));
+});

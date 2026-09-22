@@ -141,3 +141,10 @@ pwsh -NoProfile -File scripts/run_daily.ps1 -Date YYYY-MM-DD -NoSend
 ```
 
 `-NoSend` 的产物和 Validator 是本地证据；Cloud `dry_run=true` 的 `VALIDATED_NOT_PUBLISHED`、正式接口的 `PUBLISHED`、通知队列、SMTP accepted 和收件箱到达分别属于不同验收层，不能相互替代。跨项目检查必须分别查看两个仓库的 `git status`、`git diff`、敏感信息扫描和版本/记录文件。
+
+
+### Daily Digest V2.5 代抓模块
+
+- `server/digest-media-worker.ts`：独立Cloudflare Worker，验证短时签名并受控下载图片；不持有主应用数据库或R2凭据。
+- `server/digest-v2-relay.ts`：新版媒体下载适配器；许可/解码/存储仍归`digest-v2-media.ts`，来源图标和新闻图分开呈现及统计。
+- 接入与回滚权威说明见[Cloud合同](docs/CHATGPT-WORK-CLOUD.md#cloudflare-worker-代抓与来源图标)，外部连通性和实际部署状态见本机时点记录。

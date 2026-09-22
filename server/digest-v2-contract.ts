@@ -3,7 +3,7 @@ import net from 'node:net';
 import { isValidDateKey } from './date-key.js';
 
 export const DIGEST_V2_VERSION = 'daily-digest.v2';
-export const DIGEST_V2_GENERATION = '2026-09-21.1';
+export const DIGEST_V2_GENERATION = '2026-09-22.2';
 export type CheckStatus = 'complete' | 'partial' | 'failed' | 'not_configured';
 export interface InputItem { id: string; title: string; detail: string }
 export interface InputSection { status: CheckStatus; items: InputItem[] }
