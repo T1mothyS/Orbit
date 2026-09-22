@@ -13,6 +13,7 @@
 Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提示统一维护在 [Cloud 合同新版节](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)，阶段顺序见 [路线图](ROADMAP.md)，验收入口见 [测试矩阵](TEST-MATRIX.md)。本地/R2 证据不能代替连续真实 Shadow 或上线验收。
 
 - [项目成长](../project-evolution/README.md)：顶部入口、历史数据、统计口径、架构快照和离线维护流程。
+- [Daily Digest 小步交付清单](ROADMAP.md#daily-digest-小步交付清单2026-09-22-规划)：第一阶段收口及后续37张任务卡、依赖、结束条件和暂停交接节奏；仅规划，不代表后续阶段已授权实施。
 
 | 文档 | 职责 | 状态 |
 |---|---|---|
