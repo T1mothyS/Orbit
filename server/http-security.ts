@@ -1,4 +1,5 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import { publicDigestUrl } from './digest-v2-contract.js';
 
 interface RateRule {
   name: string;
@@ -85,6 +86,12 @@ export function securityHeaders(isProduction: boolean): RequestHandler {
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     if (isProduction) {
+      let digestImageOrigin = '';
+      const configured = process.env.DIGEST_R2_PUBLIC_ORIGIN || '';
+      if (process.env.DIGEST_V2_ENABLED === 'true' && /^https:\/\/[a-z0-9.-]+\/?$/i.test(configured) && publicDigestUrl(configured)) {
+        const url = new URL(configured);
+        if (process.env.DIGEST_R2_ENV === 'test' || !url.hostname.endsWith('.r2.dev')) digestImageOrigin = ' ' + url.origin;
+      }
       res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
         "base-uri 'self'",
@@ -95,7 +102,7 @@ export function securityHeaders(isProduction: boolean): RequestHandler {
         "object-src 'none'",
         "script-src 'self'",
         "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob:",
+        "img-src 'self' data: blob:" + digestImageOrigin,
         "font-src 'self' data:",
         "connect-src 'self'",
       ].join('; '));

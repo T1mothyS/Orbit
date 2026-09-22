@@ -157,6 +157,11 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 
 ### 图片、许可与 R2
 
+- 开启V2且配置合法R2公开域名时，网页CSP的 `img-src` 只追加这个精确HTTPS origin；不允许通配域名、带路径/凭据的地址或生产 `r2.dev`，脚本和连接策略不扩大。验收必须检查浏览器图片实际加载，不能用R2 HTTP 200代替网页显示。
+
+- 单图审核可增加 `pageUrl`、`imageUrls` 精确地址限制；重定向也必须命中审核地址，不能用同域其他文件替换。`credit` 包含 `caption`、`author`、`sourcePage`、`licenseName`、`licenseUrl`，只能由服务器审核配置提供；网页、邮件HTML与纯文本保留署名、许可证链接和变换说明。历史资料图必须注明拍摄日期及非当日现场，不算分类默认图，也不能声称是当日现场图。
+- 源站在服务器侧不可达时，操作者可提供私有 `sourceFile` 与原始 `sourceSha256`，仅允许绑定一个精确图片URL且具有完整署名的规则。读取前验证普通文件、大小和SHA-256，再执行相同解码/缩放/R2流程；Work不能提交本机路径。回执 `sourceTransport=audited_copy` 与 `network` 分开，审核副本成功不算服务器直连源站成功。原始URL及哈希随产物保留，私有路径不进入产物。回退旧代码前先禁用新增规则，避免旧实现忽略精确限制。
+
 - 服务端许可文件为 JSON 数组：`[{"pageHost":"publisher.example.com","imageHosts":["images.example.com"],"policy":"OWNED_OPEN","licenseRef":"审核证据或授权说明"}]`。支持 `OWNED_OPEN`、`LICENSED`、`EXTERNAL_ALLOWED`，只由操作者配置；Work 的许可声明不能授权。未知或受限来源不抓取，转分类图。需要公开的新闻图片才能进入此流程，私人邮件图片、附件和敏感预览不得加入许可名单。
 - 复用现有下载大小/超时、SSRF、签名验证和内容哈希；新增 HTTPS DNS 地址固定与每次重定向许可校验。JPEG/PNG/WebP 解码，20MP 像素上限、最小 80×80、缩放至最多 1200×900，去元数据并转 JPEG；分类图由程序生成 PNG。未知图片/403/404/超时等进入分类图；R2 不可用则纯文字。
 - 图片内容按哈希去重；每篇文章的媒体 ID、来源、许可、账号产物引用独立保留。默认图显示“分类示意图”，不计入真实新闻配图数量。无允许来源时真实配图成功率必须报告为 0，不能拿默认图代替。

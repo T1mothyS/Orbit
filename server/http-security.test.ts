@@ -43,3 +43,18 @@ test('生产日报 CSP 只允许本站和内联图片来源', () => {
   assert.match(policy, /form-action 'self' https:\/\/chatgpt\.com/);
   assert.doesNotMatch(policy, /img-src[^;]*https:/);
 });
+
+test('V2 CSP permits only a validated exact R2 image origin', () => {
+  const keys=['DIGEST_V2_ENABLED','DIGEST_R2_PUBLIC_ORIGIN','DIGEST_R2_ENV'] as const;
+  const saved=keys.map(k=>process.env[k]);
+  const policy=()=>{const h=new Map<string,string>();securityHeaders(true)({} as any,{setHeader:(k:string,v:string)=>h.set(k,v)} as any,()=>{});return h.get('Content-Security-Policy')!;};
+  try {
+    process.env.DIGEST_V2_ENABLED='true';process.env.DIGEST_R2_ENV='test';
+    process.env.DIGEST_R2_PUBLIC_ORIGIN='https://media.example.com';
+    assert.match(policy(),/img-src 'self' data: blob: https:\/\/media\.example\.com;/);
+    assert.match(policy(),/script-src 'self';/);assert.match(policy(),/connect-src 'self'/);
+    for(const invalid of ['https://*.example.com','https://example.com/path','https://user:pass@example.com','http://example.com','https://127.0.0.1','https://example.com; script-src *']) {process.env.DIGEST_R2_PUBLIC_ORIGIN=invalid;assert.doesNotMatch(policy(),/img-src[^;]*https:/);}
+    process.env.DIGEST_R2_PUBLIC_ORIGIN='https://pub-example.r2.dev';process.env.DIGEST_R2_ENV='production';assert.doesNotMatch(policy(),/img-src[^;]*r2\.dev/);
+    process.env.DIGEST_R2_ENV='test';process.env.DIGEST_V2_ENABLED='false';assert.doesNotMatch(policy(),/img-src[^;]*https:/);
+  } finally {keys.forEach((k,i)=>{if(saved[i]===undefined)delete process.env[k];else process.env[k]=saved[i];});}
+});

@@ -282,3 +282,25 @@ test('dedicated Shadow mode refuses both formal contracts and email queueing', a
 });
 
 test.after(() => { /* Keep isolated evidence in OS temp; no production files are touched. */ });
+
+test('audited single-image rules retain attribution and reject siblings, redirects and changed copies', async () => {
+  const png = await sharp({ create: { width: 320, height: 180, channels: 3, background: '#123456' } }).png().toBuffer();
+  const sourceFile = path.join(root, 'reviewed-source.png'); fs.writeFileSync(sourceFile, png);
+  const sourceSha256 = crypto.createHash('sha256').update(png).digest('hex');
+  const rule = { pageHost: 'example.com', pageUrl: 'https://example.com/story', imageHosts: ['images.example.com'], imageUrls: ['https://images.example.com/image.jpg'], policy: 'LICENSED' as const, licenseRef: 'reviewed file', credit: { caption: '历史资料图 <not today>', author: 'Author & Co', sourcePage: 'https://example.com/license', licenseName: 'CC BY 3.0', licenseUrl: 'https://creativecommons.org/licenses/by/3.0/' }, sourceFile, sourceSha256 };
+  const options = { storage, mode: 'shadow' as const, mediaRoot: path.join(root, 'daily-report-media'), rules: [rule], fetchOptions: { fetcher: async () => { throw new Error('MUST_NOT_FETCH'); } } };
+  const result = await prepareDigestMedia(illustrated(), options);
+  assert.equal(result[0].fallback, false); assert.equal(result[0].sourceTransport, 'audited_copy'); assert.equal(result[0].sourceSha256, sourceSha256);
+  const publication = { digest: illustrated(), media: result, warnings: [], renderer: 'test' };
+  for (const email of [false, true]) { const html = renderDigestV2(publication, email); assert.ok(html.includes('Author &amp; Co')); assert.ok(html.includes('历史资料图 &lt;not today&gt;')); assert.ok(html.includes(rule.credit.licenseUrl)); assert.ok(html.includes('已缩放')); }
+  assert.ok(decodeDigestPublication(encodeDigestPublication(publication))!.media[0].credit);
+  const sibling = illustrated(); sibling.media[0].url = 'https://images.example.com/unapproved.jpg';
+  assert.equal((await prepareDigestMedia(sibling, options))[0].failure, 'LICENSE_NOT_APPROVED');
+  const page = illustrated(); page.evidence[0].url = 'https://example.com/other';
+  assert.equal((await prepareDigestMedia(page, options))[0].failure, 'LICENSE_NOT_APPROVED');
+  fs.writeFileSync(sourceFile, Buffer.from('changed'));
+  assert.equal((await prepareDigestMedia(illustrated(), options))[0].fallback, true);
+  const { sourceFile: _file, sourceSha256: _hash, ...networkRule } = rule;
+  const redirected = await prepareDigestMedia(illustrated(), { ...options, rules: [networkRule], fetchOptions: { lookup: async () => [{ address: '93.184.216.34', family: 4 as const }], fetcher: async () => new Response(null, { status: 302, headers: { location: 'https://images.example.com/unapproved.jpg' } }) } });
+  assert.equal(redirected[0].fallback, true);
+});

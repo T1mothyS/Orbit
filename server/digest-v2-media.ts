@@ -7,11 +7,15 @@ import { S3Client, HeadObjectCommand, PutObjectCommand, GetObjectCommand, Delete
 import { controlledMediaFetch, dailyReportMediaRoot, storeProvidedDailyReportMedia, type ControlledDailyReportMediaOptions } from './daily-report-media-service.js';
 import { publicDigestUrl, type DigestV2 } from './digest-v2-contract.js';
 
-export interface MediaRule { pageHost: string; imageHosts: string[]; policy: 'OWNED_OPEN' | 'LICENSED' | 'EXTERNAL_ALLOWED'; licenseRef: string }
+export interface MediaCredit { caption: string; author: string; sourcePage: string; licenseName: string; licenseUrl: string }
+export interface MediaRule { pageHost: string; imageHosts: string[]; policy: 'OWNED_OPEN' | 'LICENSED' | 'EXTERNAL_ALLOWED'; licenseRef: string; pageUrl?: string; imageUrls?: string[]; credit?: MediaCredit; sourceFile?: string; sourceSha256?: string }
 export interface PreparedImage {
   id: string; evidenceId: string; category: string; sourceUrl: string; licenseRef: string;
   policy: string; publicUrl: string; key: string; filename: string; sha256: string;
   width: number; height: number; bytes: number; mime: string; fallback: boolean; failure: string | null;
+  credit?: MediaCredit;
+  sourceTransport?: 'network' | 'audited_copy';
+  sourceSha256?: string;
 }
 export interface ObjectStorage {
   origin: string;
@@ -65,6 +69,10 @@ export function configuredMediaRules(): MediaRule[] {
     if (!publicDigestUrl(`https://${r.pageHost}`) || !Array.isArray(r.imageHosts) || !r.imageHosts.length
       || r.imageHosts.some((h: string) => !publicDigestUrl(`https://${h}`)) || !['OWNED_OPEN', 'LICENSED', 'EXTERNAL_ALLOWED'].includes(r.policy)
       || typeof r.licenseRef !== 'string' || !r.licenseRef.trim()) throw new Error('MEDIA_RULES_INVALID');
+    if (r.pageUrl !== undefined && (!publicDigestUrl(r.pageUrl) || new URL(r.pageUrl).hostname !== r.pageHost)) throw new Error('MEDIA_RULES_INVALID');
+    if (r.imageUrls !== undefined && (!Array.isArray(r.imageUrls) || !r.imageUrls.length || r.imageUrls.some((u: string) => !publicDigestUrl(u) || !r.imageHosts.includes(new URL(u).hostname)))) throw new Error('MEDIA_RULES_INVALID');
+    if (r.credit !== undefined && (!r.pageUrl || !r.imageUrls || !r.credit || !['caption', 'author', 'licenseName'].every(k => typeof r.credit[k] === 'string' && r.credit[k].trim() && r.credit[k].length <= 500) || !publicDigestUrl(r.credit.sourcePage) || !publicDigestUrl(r.credit.licenseUrl))) throw new Error('MEDIA_RULES_INVALID');
+    if ((r.sourceFile !== undefined || r.sourceSha256 !== undefined) && (typeof r.sourceFile !== 'string' || !path.isAbsolute(r.sourceFile) || !/^[a-f0-9]{64}$/.test(r.sourceSha256 || '') || !r.pageUrl || r.imageUrls?.length !== 1 || !r.credit)) throw new Error('MEDIA_RULES_INVALID');
   }
   return value;
 }
@@ -95,13 +103,24 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
   const images: PreparedImage[] = [];
   for (const m of d.media) {
     const evidence = d.evidence.find(e => e.id === m.evidence_id)!;
-    const rule = rules.find(r => r.pageHost === new URL(evidence.url).hostname && r.imageHosts.includes(new URL(m.url).hostname));
+    const rule = rules.find(r => r.pageHost === new URL(evidence.url).hostname && (!r.pageUrl || r.pageUrl === evidence.url) && r.imageHosts.includes(new URL(m.url).hostname) && (!r.imageUrls || r.imageUrls.includes(m.url)));
     let fallback = false; let failure: string | null = null;
+    let sourceSha256: string | undefined;
     let result: Awaited<ReturnType<typeof transformDigestImage>>;
     try {
       if (!rule) throw new Error('LICENSE_NOT_APPROVED');
       let bytes: Buffer | undefined;
-      await controlledMediaFetch(m.url, { fetcher: fetchDigestImage, ...options.fetchOptions, authorizeUrl: u => { if (u.protocol !== 'https:' || !rule.imageHosts.includes(u.hostname)) throw new Error('LICENSE_REDIRECT_BLOCKED'); }, persistMedia: (body, validated) => { bytes = body; return validated; } });
+      if (rule.sourceFile) {
+        // An operator-reviewed copy is bound to exactly one URL and hash; Work cannot supply paths.
+        if (!rule.pageUrl || rule.imageUrls?.length !== 1 || !rule.sourceSha256 || !rule.credit) throw new Error('SOURCE_COPY_INVALID');
+        const stat = fs.lstatSync(rule.sourceFile);
+        if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 5 * 1024 * 1024) throw new Error('SOURCE_COPY_INVALID');
+        bytes = fs.readFileSync(rule.sourceFile);
+        if (crypto.createHash('sha256').update(bytes).digest('hex') !== rule.sourceSha256) throw new Error('SOURCE_COPY_HASH');
+      } else {
+        await controlledMediaFetch(m.url, { fetcher: fetchDigestImage, ...options.fetchOptions, authorizeUrl: u => { if (u.protocol !== 'https:' || !rule.imageHosts.includes(u.hostname) || (rule.imageUrls && !rule.imageUrls.includes(u.href))) throw new Error('LICENSE_REDIRECT_BLOCKED'); }, persistMedia: (body, validated) => { bytes = body; return validated; } });
+      }
+      sourceSha256 = crypto.createHash('sha256').update(bytes!).digest('hex');
       result = await transformDigestImage(bytes!);
     } catch (e) {
       fallback = true;
@@ -121,7 +140,7 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
       publicUrl = storage.origin + '/' + key;
     } catch { failure = storage ? 'R2_UPLOAD_FAILED' : 'R2_NOT_CONFIGURED'; }
     failure = configurationFailure || failure;
-    images.push({ id: m.id, evidenceId: m.evidence_id, sourceUrl: m.url, category: m.category, licenseRef: fallback ? 'code-owned-category-art' : rule!.licenseRef, policy: fallback ? 'OWNED_OPEN' : rule!.policy, publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback, failure });
+    images.push({ id: m.id, evidenceId: m.evidence_id, sourceUrl: m.url, category: m.category, licenseRef: fallback ? 'code-owned-category-art' : rule!.licenseRef, policy: fallback ? 'OWNED_OPEN' : rule!.policy, publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback, failure, ...(!fallback ? { sourceTransport: rule?.sourceFile ? 'audited_copy' as const : 'network' as const, sourceSha256, ...(rule?.credit ? { credit: { ...rule.credit } } : {}) } : {}) });
   }
   return images;
 }
