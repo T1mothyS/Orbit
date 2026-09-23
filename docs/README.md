@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified commit/version: `87781e1` / `0.31.5-260923.2032`（2026-09-23，以此为 S1-R3b 验收的代码基线；本次文档修订新增验收索引，其他领域保留各节时点，未代表生产或七日 Shadow）。
+- Last verified commit/version: `eee0ac8` / `0.31.5-260923.2032`（2026-09-23，以此为 S1-R4 验收的代码基线；本次文档修订新增测试对象下架索引，其他领域保留各节时点，未代表生产或七日 Shadow）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。
@@ -55,6 +55,7 @@ Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提�
 | [Cloud 历史运行](CHATGPT-WORK-CLOUD.md#cloud-run-history) | AUDIT / VERIFICATION-SNAPSHOT | 推断当前 Work 模式、生产版本或收件箱状态 |
 | [2026-09-23 NASA 单图来源审核](DAILY-DIGEST-MEDIA-SOURCE-AUDIT-20260923.md) | AUDIT-SNAPSHOT / S1-R3a | 推断整站授权、下载/R2 成功或正式发布获准 |
 | [2026-09-23 NASA 单图隔离技术验收](DAILY-DIGEST-MEDIA-R3B-VERIFICATION-20260923.md) | VERIFICATION-SNAPSHOT / S1-R3b | 推断真实 Shadow 引用、正式日报或邮件已完成 |
+| [2026-09-23 媒体引用恢复与测试对象下架](DAILY-DIGEST-MEDIA-R4-RETIREMENT-VERIFICATION-20260923.md) | PARTIAL VERIFICATION-SNAPSHOT / S1-R4 | 推断 CDN 缓存清除或真实媒体下架已完成 |
 | [Decision 0001](decisions/0001-phase-three-foundations.md) | 已接受的历史决策 | 把当时“无 CI”当成今天的结构 |
 
 ## 维护规则
