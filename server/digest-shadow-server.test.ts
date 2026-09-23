@@ -18,7 +18,7 @@ test('isolated entrypoint starts with jobs disabled and blocks non-Shadow writes
     env: { ...process.env, DATA_DIR: path.join(root, 'digest-v2-shadow-data'), PORT: String(port),
       JWT_SECRET: 'synthetic-shadow-integration-secret-123456', APP_URL: 'https://shadow.example.test',
       DIGEST_SHADOW_LOGIN_EMAIL: 'shadow@example.test', DIGEST_SHADOW_PASSWORD_HASH: bcrypt.hashSync('synthetic-test-password', 4),
-      BACKGROUND_JOBS_ENABLED: 'true', SMTP_PASS: 'must-not-enable-delivery' },
+      BACKGROUND_JOBS_ENABLED: 'true', SMTP_PASS: 'must-not-enable-delivery', MAIL_CREDENTIALS_ENCRYPTION_KEY: 'synthetic-shadow-mail-key' },
     stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
   });
   let logs = ''; child.stdout.on('data', data => { logs += String(data); });
@@ -35,6 +35,19 @@ test('isolated entrypoint starts with jobs disabled and blocks non-Shadow writes
     assert.equal(login.status, 200);
     const { token } = await login.json() as { token: string };
     assert.ok(token);
+    assert.equal((await fetch(base + '/api/user-mail-account', { method: 'PUT' })).status, 401);
+    const mailTest = await fetch(base + '/api/user-mail-account/test', { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+    assert.equal(mailTest.status, 200);
+    assert.equal((await mailTest.json() as { result: { configured: boolean } }).result.configured, false);
+    const saveMail = await fetch(base + '/api/user-mail-account', {
+      method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'shadow@qq.com', authCode: 'synthetic-only', enabled: true }),
+    });
+    assert.equal(saveMail.status, 200);
+    assert.equal((await saveMail.json() as { account: { configured: boolean } }).account.configured, true);
+    const deleteMail = await fetch(base + '/api/user-mail-account', { method: 'DELETE', headers: { authorization: `Bearer ${token}` } });
+    assert.equal(deleteMail.status, 200);
+    assert.equal((await deleteMail.json() as { account: { configured: boolean } }).account.configured, false);
     for (const route of ['/api/schedules', '/api/daily-reports/publish', '/api/auth/register', '/api/notifications']) {
       const response = await fetch(base + route, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
       assert.equal(response.status, 403, route);

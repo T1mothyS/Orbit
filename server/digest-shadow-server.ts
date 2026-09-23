@@ -38,7 +38,9 @@ const app = express();
 const allowedPosts = new Set(['/mcp', '/oauth/register', '/oauth/authorize/login', '/oauth/authorize/consent', '/oauth/token', '/oauth/revoke', '/api/auth/login', '/api/auth/logout']);
 app.use((req, res, next) => {
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !(req.method === 'POST' && allowedPosts.has(req.path))) return res.status(403).json({ error: 'SHADOW_ONLY' });
+  const mailAccountSetting = req.path === '/api/user-mail-account' && ['PUT', 'DELETE'].includes(req.method);
+  const mailAccountTest = req.path === '/api/user-mail-account/test' && req.method === 'POST';
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !(req.method === 'POST' && allowedPosts.has(req.path)) && !mailAccountSetting && !mailAccountTest) return res.status(403).json({ error: 'SHADOW_ONLY' });
   next();
 });
 app.use(api.app);
