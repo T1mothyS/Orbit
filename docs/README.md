@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified commit/version: `0.31.0-260921.1951`（2026-09-21，Daily Digest V2.5 本地与测试 R2 工程单元；其他领域保留各节时点，未代表生产或七日 Shadow）。
+- Last verified commit/version: `d3642c6` / `0.31.5-260923.2032`（2026-09-23，仅新增 S1-R3a 单图审核索引并核对该链接；其他领域保留各节时点，未代表生产或七日 Shadow）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。
@@ -53,6 +53,7 @@ Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提�
 | [Settings V2 验证](SETTINGS-V2-VERIFICATION.md) | VERIFICATION-SNAPSHOT | 当前 HEAD 的浏览器验收 |
 | [Calendar Design QA](../design-qa.md) | VERIFICATION-SNAPSHOT | 推断当前左栏布局或当前已验证 |
 | [Cloud 历史运行](CHATGPT-WORK-CLOUD.md#cloud-run-history) | AUDIT / VERIFICATION-SNAPSHOT | 推断当前 Work 模式、生产版本或收件箱状态 |
+| [2026-09-23 NASA 单图来源审核](DAILY-DIGEST-MEDIA-SOURCE-AUDIT-20260923.md) | AUDIT-SNAPSHOT / S1-R3a | 推断整站授权、下载/R2 成功或正式发布获准 |
 | [Decision 0001](decisions/0001-phase-three-foundations.md) | 已接受的历史决策 | 把当时“无 CI”当成今天的结构 |
 
 ## 维护规则
