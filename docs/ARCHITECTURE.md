@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.31.1-260922.0719`（2026-09-22，独立 Shadow 入口与防误发保护；278 项测试通过。其他领域保留各节时点，不代表生产或七日 Shadow）。
+- Last verified commit/version: `0.31.7-260924.1200`（2026-09-24，仅 V3 原活动库存储和写回边界的本地合成验证；其他领域保留各节时点，不代表生产或七日 Shadow）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -79,6 +79,8 @@ Phase 5 的所有权、等价性和迁移验收见 [Phase 5 验证记录](PHASE5
 
 Daily Digest V2.5 使用原活动库中的 `digest_v2_runs`（账号/日期/输入快照/版本与诊断）和 `digest_v2_artifacts`（账号/日期/模式/内容哈希唯一的冻结产物）。`daily_reports`、通知、认证与备份入口复用；Shadow 不写正式表。快照七天过期，长期诊断不保留邮箱正文。媒体在 R2 和原媒体目录分别存内容寻址字节，文章来源/许可保留在账号产物引用中。账号恢复重映射运行与产物 ID，跨账号恢复不允许沿用旧输入运行。具体发布状态、失败恢复、媒体生命周期及限制见 [V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 
+Daily Digest V3 Core 的四类事件记忆实体与三个引用表已增量加入同一个 `activity.db`，由 `activity-store.ts` 接入 `digest-v3-store.ts`；仅有内部存储读写，没有公开接口或自动分类。账号引用使用复合外键，封存版本禁止原位更新。全站数据库快照包含 V3 表；账号级备份/替换恢复尚未支持 V3，有数据时显式拒绝，待 S2-04 补齐。字段、迁移与验收边界见 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md#s2-03-本地存储与迁移2026-09-24)。
+
 server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与写回，schema.ts 和 migrations.ts 拥有按原顺序执行的建表/升级，queries/ 按领域拥有查询。其余三个 store 保持既有领域边界。
 
 数据层使用 sql.js。服务启动时把 SQLite 文件加载到内存，业务修改后导出并写回 data/。当前主要文件为：
@@ -86,7 +88,7 @@ server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与�
 - chat.db：用户、会话、消息、AI 配置、记事、账号私有知识库、偏好与令牌哈希，以及 OAuth、Cloud Context/活动输入和媒体批次元数据；知识正文以 Markdown 为 source，HTML 按读取时安全渲染。日报正文不在此库。
 - schedule.db：日历、分类和日程。
 - reminder.db：周期事务和提醒配置。
-- activity.db：`daily_reports` 日报正文和来源/投递状态、通知队列、完成记录、AI 导入草稿与附件元数据，由 `activity-store.ts` 管理。
+- activity.db：`daily_reports` 日报正文和来源/投递状态、通知队列、完成记录、AI 导入草稿、附件元数据及 V3 事件记忆表，由 `activity-store.ts` 管理。
 
 数据库文件、附件、日报媒体、备份和日志都是运行时资产，不能提交 Git。备份服务在导出和恢复时处理四个数据库及允许的附件/媒体内容；恢复前必须检查版本、冲突和快照路径。
 

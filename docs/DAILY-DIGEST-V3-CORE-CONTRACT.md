@@ -1,12 +1,12 @@
 # Daily Digest V3 Core：事件记忆字段与状态合同
 
-- Status: DESIGN CONTRACT / S2-02 / NO V3 IMPLEMENTATION
-- Scope: Event、Revision、Evidence、Analysis 的最小持久化语义，以及 S2-01 案例的预期映射；不定义 S2-03 的 SQL、S2-05/06 的接口形状或自动匹配算法。
-- Last verified commit/version: `a81408c`（本合同编写前源码与案例基线）/ `0.31.6-260924.0826`（2026-09-24；仅设计合同，应用版本未因此改变）。
+- Status: CONTRACT / S2-02；S2-03 LOCAL STORAGE VERIFIED / NO PUBLIC V3 API
+- Scope: Event、Revision、Evidence、Analysis 的字段与状态，以及 S2-03 在原活动库中的增量存储；不定义 S2-05/06 的对外接口或自动匹配算法。
+- Last verified commit/version: `e44b647`（S2-03 修改前合同基线）/ `0.31.7-260924.1200`（2026-09-24，本地存储实现与合成验证；未部署）。
 - Authority: 当前源码及 [S2-01 固定案例](daily-digest-v3-s2-01-cases.json) 优先；实现时如需改动本合同，应先解释案例与兼容性差异。
 - Update trigger: S2-03 数据结构、S2-06 写入校验、S2-09 修订语义或 S2-10a 纠正流程落地时。
 - Supersedes: 无；[V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)及已有产物保持原语义。
-- Do not use for: 宣称 V3 已有数据库、接口、自动分类器、30 例回归或真实 Shadow 验收。
+- Do not use for: 宣称 V3 已有对外接口、自动分类器、账号级完整备份、30 例回归或真实 Shadow 验收。
 
 ## 共同约束
 
@@ -49,4 +49,14 @@
 | U01–U03（跟踪项无变化） | 两次 FOMC 会议各有自己的 Event/初始 Revision；`Analysis.change_assessment` 固定两版 ID，对共同的 `factKey=federal_funds_target_range` 和相同单位/范围比较，且 `check=complete` 后，才可记录该跟踪项的 `no_material_change`。U03 的缩表上限变化是另一 `factKey`，不得被利率“无变化”覆盖。 |
 | A01–A03（易混淆） | A01 英西语保留翻译关系，但冲突内容标 `needs_review`，不算双重确认或覆盖旧事实；A02 同一次会议的声明与后来纪要保留不同 `documentType` 和 `publishedAt`，新增事实才追加 Revision；A03 同时发布的决定与预测材料各自保留 Evidence，不因时间相同当转载或把预测当决定。 |
 
-本表是对 15 组人工预期的静态合同核对，不是 V3 分类器运行结果。S2-03 才能验证表结构和迁移；S2-12 才能报告 30 条来源的自动回放及连续真实 Shadow 对照。
+本表是对 15 组人工预期的静态合同核对，不是 V3 分类器运行结果。S2-12 才能报告 30 条来源的自动回放及连续真实 Shadow 对照。
+
+## S2-03 本地存储与迁移（2026-09-24）
+
+现有 `activity.db` 在启动时增量创建 `digest_v3_events`、`digest_v3_revisions`、`digest_v3_evidence`、`digest_v3_analyses`，以及修订/分析到证据、分析到比较修订的三个引用表；`schema_meta` 的总版本为 `4`，`digest_v3=1`。迁移在 SQLite 事务中执行，重复启动安全，不读取或改写 V2 报告/产物。主键和外键包含 `user_id`；Event 当前修订还要求属于同一 Event。已保存的 Revision、Evidence、Analysis 禁止原位 UPDATE；Event 可在未来的受控纠正中改变当前指针与生命周期。
+
+内部存储层位于 [digest-v3-store.ts](../server/digest-v3-store.ts)，通过现有 `activity-store.ts` 连接和可靠写回。只提供内部的证据、初始事件、后续修订、分析写入与按账号读取，尚未接入 MCP、HTTP、Work 或日报发布。完整业务校验、幂等提交和用户权限从 S2-05/06 开始；匹配、合并与冻结日报引用仍按路线图后续卡片实现。`sql.js` 导出数据库会重建连接，写回/恢复后重新开启外键检查，避免账号引用约束在首次保存后失效。
+
+目前全站快照包含完整 `activity.db`；账号级导出及替换恢复**尚未纳入 V3 实体**，有 V3 数据时显式拒绝这两项操作，防止静默丢失。管理员按已有全站快照流程删除账号数据时，会清除该账号的 V3 行并保留其他账号。S2-04 负责让账号级备份/恢复完整保留 V3 记录及引用。在它完成前，本存储实现只在合成隔离数据上验证，不能作为真实 V3 写入放行依据。
+
+[S2-03 测试](../server/digest-v3-store.test.ts) 覆盖旧活动库打开、重复迁移、V2 记录保持、四实体写回/重启读取、两个账号相同 ID 隔离、跨账号外键拒绝、不可变更新拒绝、失败写回回滚及账号删除。它不是 S2-01 案例的自动分类回放；S2-12 才能报告那一层结果。

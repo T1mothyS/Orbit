@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import { parseMediaReceipt, type DailyReportMediaReceipt } from './daily-report-media-receipt.js';
+import { DigestV3Store, migrateDigestV3Schema } from './digest-v3-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -116,6 +117,15 @@ function isValidDateOnly(value: string): boolean {
 function persist(): void {
   persistDatabase(DB_PATH);
 }
+
+function snapshotActivityDb(): Uint8Array {
+  // sql.js export recreates its connection; connection-local FK enforcement must be restored.
+  const bytes = db.export();
+  db.run('PRAGMA foreign_keys = ON');
+  return bytes;
+}
+
+export const digestV3Store = new DigestV3Store(() => db, persist);
 
 function queryAll<T>(sql: string, params: unknown[] = []): T[] {
   assertPersistenceReady();
@@ -273,9 +283,11 @@ export async function initActivityDb(): Promise<void> {
   recoverPersistence(DATA_DIR);
   const SQL = await initSqlJs();
   db = fs.existsSync(DB_PATH) ? new SQL.Database(fs.readFileSync(DB_PATH)) : new SQL.Database();
-  registerPersistence(DB_PATH, () => db.export(), bytes => {
+  db.run('PRAGMA foreign_keys = ON');
+  registerPersistence(DB_PATH, snapshotActivityDb, bytes => {
     db.close();
     db = new SQL.Database(bytes);
+    db.run('PRAGMA foreign_keys = ON');
   });
 
   db.run(`
@@ -400,7 +412,8 @@ export async function initActivityDb(): Promise<void> {
     db.run('ALTER TABLE daily_reports ADD COLUMN media_receipt_json TEXT');
   }
   db.run('CREATE INDEX IF NOT EXISTS idx_daily_reports_user_date_source ON daily_reports(user_id, report_date DESC, source, updated_at DESC)');
-  db.run(`INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('version', '3')`);
+  migrateDigestV3Schema(db);
+  db.run(`INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('version', '4')`);
   db.run(`UPDATE notification_deliveries SET status = 'failed', next_retry_at = ? WHERE status = 'sending'`, [nowIso()]);
   persist();
 }
@@ -910,6 +923,7 @@ function addAudit(userId: string, entityType: string, entityId: string, action: 
 }
 
 export function exportUserActivity(userId: string): Record<string, unknown[]> {
+  if (digestV3Store.hasUserData(userId)) throw new Error('V3 事件记录尚不支持账号备份，请先使用全站备份；账号备份将在 S2-04 完成');
   return {
     digestV2Runs: queryAll<any>('SELECT * FROM digest_v2_runs WHERE user_id = ?', [userId]).map(row => ({ ...row, snapshot_json: row.expires_at <= nowIso() ? null : row.snapshot_json })),
     digestV2Artifacts: queryAll<any>('SELECT * FROM digest_v2_artifacts WHERE user_id = ?', [userId]),
@@ -924,7 +938,7 @@ export function exportUserActivity(userId: string): Record<string, unknown[]> {
 
 export function exportActivityDb(): Buffer {
   assertPersistenceReady();
-  return Buffer.from(db.export());
+  return Buffer.from(snapshotActivityDb());
 }
 
 export interface DigestRunRow {
@@ -981,6 +995,7 @@ export function deleteUserActivity(userId: string): {
   processedEmails: number;
 } {
   const attachments = listAttachments(userId);
+  digestV3Store.deleteUserData(userId);
   run('DELETE FROM digest_v2_artifacts WHERE user_id = ?', [userId]);
   run('DELETE FROM digest_v2_runs WHERE user_id = ?', [userId]);
   db.run('DELETE FROM attachments WHERE user_id = ?', [userId]);
@@ -1000,6 +1015,9 @@ export function restoreUserActivity(
   data: Record<string, any[]>,
   mode: 'merge' | 'replace',
 ): { completions: number; notifications: number; dailyReports: number; aiImports: number } {
+  if (mode === 'replace' && digestV3Store.hasUserData(userId)) {
+    throw new Error('V3 事件记录尚不支持账号恢复替换，请先使用全站备份；账号恢复将在 S2-04 完成');
+  }
   if (mode === 'replace') {
     db.run('DELETE FROM digest_v2_artifacts WHERE user_id = ?', [userId]);
     db.run('DELETE FROM digest_v2_runs WHERE user_id = ?', [userId]);

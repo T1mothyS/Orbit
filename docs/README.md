@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified commit/version: `a81408c`（S2-02 合同编写前源码与案例基线）/ `0.31.6-260924.0826`（2026-09-24 本地应用版本；S2-01/02 文档不改变应用行为，未代表隔离站部署、生产或七日 Shadow）。
+- Last verified commit/version: `e44b647`（S2-03 修改前源码基线）/ `0.31.7-260924.1200`（2026-09-24 本地 V3 存储与合成验证；未代表隔离站部署、生产或七日 Shadow）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。
@@ -12,7 +12,7 @@
 
 Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提示统一维护在 [Cloud 合同新版节](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)，阶段顺序见 [路线图](ROADMAP.md)，验收入口见 [测试矩阵](TEST-MATRIX.md)。本地/R2 证据不能代替连续真实 Shadow 或上线验收。
 
-Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 设计语义统一维护在 [S2-02 字段与状态合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；它尚未实现，不改变 V2.5 当前运行合同。
+Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 语义与 S2-03 本地存储边界统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；尚无对外 V3 接口，不改变 V2.5 当前运行合同。
 
 - [项目成长](../project-evolution/README.md)：顶部入口、历史数据、统计口径、架构快照和离线维护流程。
 - [Daily Digest 小步交付清单](ROADMAP.md#daily-digest-小步交付清单2026-09-22-规划)：第一阶段收口及后续37张任务卡、依赖、结束条件和暂停交接节奏；仅规划，不代表后续阶段已授权实施。
@@ -26,7 +26,7 @@ Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 设计语义统一维�
 | [测试矩阵](TEST-MATRIX.md) | 自动化、浏览器、生产各自能证明什么 | LIVING |
 | [UI 规范](UI-GUIDELINES.md) | 布局、主题、交互与响应式要求 | AUTHORITATIVE / LIVING |
 | [Cloud 日报](CHATGPT-WORK-CLOUD.md) | OAuth/MCP、内容、媒体和发布合同；末尾历史区单独标记 | CONTRACT |
-| [V3 Core 事件记忆合同](DAILY-DIGEST-V3-CORE-CONTRACT.md) | S2-02 字段、状态、账号归属、不可变版本与案例映射；未实现 | DESIGN CONTRACT / S2-02 |
+| [V3 Core 事件记忆合同](DAILY-DIGEST-V3-CORE-CONTRACT.md) | S2-02 字段与状态；S2-03 原活动库增量存储与备份限制 | CONTRACT / LOCAL STORAGE |
 | [知识库](LIBRARY.md) | 只读呈现、发布/生命周期 API 与本地加工规则；批次记录仅为历史 | FEATURE / CONTRACT |
 | [CalDAV 单向桥接](CALDAV-BRIDGE.md) | 全量范围、完成与周期历史、来源归并、受控自动化及恢复合同 | CONTRACT / LOCAL VERIFIED |
 | [路线图](ROADMAP.md) | 未来顺序；已完成条目不代替当前验证 | ROADMAP |
