@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "s2-01.v1",
+  "checkedAt": "2026-09-24",
+  "timeRule": "publishedAt is the source page's publication or stated release time, never an inferred event time; date-only values have date precision",
+  "pairs": [
+    {
+      "id": "D01", "expectedCategory": "duplicate", "topic": "Artemis I Orion heat shield cause", "reprintRelation": "NASA official English-Spanish translation; one publisher, not two independent confirmations", "expectedDecision": "one finding with two language variants",
+      "sources": [
+        { "id": "D01-A", "publishedAt": "2024-12-05", "precision": "date", "url": "https://www.nasa.gov/missions/artemis/nasa-identifies-cause-of-artemis-i-orion-heat-shield-char-loss/", "fact": "NASA identifies trapped gas pressure in Avcoat as the cause of unexpected char loss." },
+        { "id": "D01-B", "publishedAt": "2024-12-06", "precision": "date", "url": "https://www.nasa.gov/es/la-nasa-identifica-causa-de-perdida-de-material-del-escudo-termico-de-orion-de-artemis-i/", "fact": "NASA's linked Spanish version reports the same heat shield cause." }
+      ]
+    },
+    {
+      "id": "D02", "expectedCategory": "duplicate", "topic": "NASA Artemis campaign schedule announcement", "reprintRelation": "NASA official English-Spanish translation; same release identifier 24-145", "expectedDecision": "one announcement with two language variants",
+      "sources": [
+        { "id": "D02-A", "publishedAt": "2024-12-05", "precision": "date", "url": "https://www.nasa.gov/news-release/nasa-shares-orion-heat-shield-findings-updates-artemis-moon-missions/", "fact": "NASA announces updated Artemis II and III target schedules along with heat shield findings." },
+        { "id": "D02-B", "publishedAt": "2024-12-05", "precision": "date", "url": "https://www.nasa.gov/news-release/la-nasa-comparte-resultados-del-escudo-termico-de-orion-actualiza-las-misiones-artemis/", "fact": "NASA's linked Spanish release carries the same release identifier and schedule update." }
+      ]
+    },
+    {
+      "id": "D03", "expectedCategory": "duplicate", "topic": "Orion mounted on Artemis I rocket", "reprintRelation": "NASA official English-Spanish translation; same image article", "expectedDecision": "one assembly milestone with two language variants",
+      "sources": [
+        { "id": "D03-A", "publishedAt": "2021-10-22", "precision": "date", "url": "https://www.nasa.gov/image-article/orion-spacecraft-joins-artemis-i-moon-rocket-kennedy/", "fact": "Orion was secured atop the Artemis I SLS rocket on October 21." },
+        { "id": "D03-B", "publishedAt": "2021-10-22", "precision": "date", "url": "https://www.nasa.gov/image-article/la-nave-espacial-orion-se-une-al-cohete-lunar-artemis-i-en-kennedy/", "fact": "NASA's linked Spanish image article reports the same assembly milestone." }
+      ]
+    },
+    {
+      "id": "E01", "expectedCategory": "different_event", "topic": "Two 2024 FOMC rate decisions", "reprintRelation": "none; separate Federal Reserve releases", "expectedDecision": "two dated decisions, never merge by identical headline",
+      "sources": [
+        { "id": "E01-A", "publishedAt": "2024-09-18T14:00:00-04:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20240918a.htm", "fact": "FOMC lowers its target range by 0.50 percentage point to 4.75–5.00%." },
+        { "id": "E01-B", "publishedAt": "2024-11-07T14:00:00-05:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20241107a.htm", "fact": "FOMC makes a separate 0.25-point cut to 4.50–4.75%." }
+      ]
+    },
+    {
+      "id": "E02", "expectedCategory": "different_event", "topic": "NASA Crew-8 and Crew-9 launches", "reprintRelation": "none; separate NASA missions and crews", "expectedDecision": "two launch events despite near-identical headline structure",
+      "sources": [
+        { "id": "E02-A", "publishedAt": "2024-03-03", "precision": "date", "url": "https://www.nasa.gov/news-release/nasas-spacex-crew-8-launches-to-international-space-station/", "fact": "Crew-8 launches with Dominick, Barratt, Epps and Grebenkin." },
+        { "id": "E02-B", "publishedAt": "2024-09-28", "precision": "date", "url": "https://www.nasa.gov/news-release/liftoff-nasas-spacex-crew-9-launches-to-international-space-station/", "fact": "Crew-9 launches with Hague and Gorbunov." }
+      ]
+    },
+    {
+      "id": "E03", "expectedCategory": "different_event", "topic": "Lucy and Psyche spacecraft launches", "reprintRelation": "none; different NASA spacecraft", "expectedDecision": "two launch events with distinct mission identifiers and destinations",
+      "sources": [
+        { "id": "E03-A", "publishedAt": "2021-10-16", "precision": "date", "url": "https://www.nasa.gov/news-release/nasa-ula-launch-lucy-mission-to-fossils-of-planet-formation/", "fact": "Lucy launches to study Jupiter's Trojan asteroids." },
+        { "id": "E03-B", "publishedAt": "2023-10-13", "precision": "date", "url": "https://www.nasa.gov/news-release/nasas-psyche-spacecraft-optical-comms-demo-en-route-to-asteroid/", "fact": "Psyche launches toward the metal-rich asteroid Psyche." }
+      ]
+    },
+    {
+      "id": "P01", "expectedCategory": "progress", "topic": "Artemis I flight", "reprintRelation": "none; separate NASA mission milestones", "expectedDecision": "same mission, add splashdown as a later revision rather than duplicate launch",
+      "sources": [
+        { "id": "P01-A", "publishedAt": "2022-11-16T01:47:00-05:00", "precision": "minute", "url": "https://www.nasa.gov/blogs/missions/2022/11/16/artemis-i-liftoff/", "fact": "Artemis I lifts off with the uncrewed Orion spacecraft." },
+        { "id": "P01-B", "publishedAt": "2022-12-11T13:17:00-05:00", "precision": "minute", "url": "https://www.nasa.gov/blogs/artemis/2022/12/11/artemis-i-flight-day-26-orion-splashes-down-concluding-historic-artemis-i-mission/", "fact": "Orion splashes down, completing Artemis I." }
+      ]
+    },
+    {
+      "id": "P02", "expectedCategory": "progress", "topic": "Boeing Starliner crew flight test", "reprintRelation": "none; separate NASA announcements", "expectedDecision": "same flight test, later return decision changes the expected crew route",
+      "sources": [
+        { "id": "P02-A", "publishedAt": "2024-06-05", "precision": "date", "url": "https://www.nasa.gov/news-release/liftoff-nasa-astronauts-pilot-first-starliner-crewed-test-to-station/", "fact": "Starliner launches with Wilmore and Williams for the crew flight test." },
+        { "id": "P02-B", "publishedAt": "2024-08-24", "precision": "date", "url": "https://www.nasa.gov/news-release/nasa-decides-to-bring-starliner-spacecraft-back-to-earth-without-crew/", "fact": "NASA decides Starliner will return uncrewed and the astronauts will use Crew-9." }
+      ]
+    },
+    {
+      "id": "P03", "expectedCategory": "progress", "topic": "Europa Clipper cruise", "reprintRelation": "none; NASA launch release followed by NASA/JPL mission result", "expectedDecision": "same spacecraft, later Mars flyby radar result is a new milestone",
+      "sources": [
+        { "id": "P03-A", "publishedAt": "2024-10-14", "precision": "date", "url": "https://www.nasa.gov/news-release/liftoff-nasas-europa-clipper-sails-toward-ocean-moon-of-jupiter/", "fact": "Europa Clipper launches toward Jupiter; Mars flyby remains a planned step." },
+        { "id": "P03-B", "publishedAt": "2025-08-01", "precision": "date", "url": "https://www.nasa.gov/missions/europa-clipper/nasas-europa-clipper-radar-instrument-proves-itself-at-mars/", "fact": "NASA/JPL reports the March 2025 Mars flyby radar test succeeded after data analysis." }
+      ]
+    },
+    {
+      "id": "U01", "expectedCategory": "no_material_change", "topic": "FOMC target range, September to November 2023", "reprintRelation": "none; separate policy meetings", "expectedDecision": "tracked target range stays 5.25–5.50%; keep meetings distinct and report no rate change",
+      "sources": [
+        { "id": "U01-A", "publishedAt": "2023-09-20T14:00:00-04:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20230920a.htm", "fact": "FOMC maintains the federal funds target range at 5.25–5.50%." },
+        { "id": "U01-B", "publishedAt": "2023-11-01T14:00:00-04:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20231101a.htm", "fact": "FOMC again maintains the target range at 5.25–5.50%." }
+      ]
+    },
+    {
+      "id": "U02", "expectedCategory": "no_material_change", "topic": "FOMC target range, January to March 2024", "reprintRelation": "none; separate policy meetings", "expectedDecision": "tracked target range stays 5.25–5.50%; keep meetings distinct and report no rate change",
+      "sources": [
+        { "id": "U02-A", "publishedAt": "2024-01-31T14:00:00-05:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20240131a.htm", "fact": "FOMC maintains the target range at 5.25–5.50%." },
+        { "id": "U02-B", "publishedAt": "2024-03-20T14:00:00-04:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20240320a.htm", "fact": "FOMC again maintains the target range at 5.25–5.50%." }
+      ]
+    },
+    {
+      "id": "U03", "expectedCategory": "no_material_change", "topic": "FOMC target range, May to June 2024", "reprintRelation": "none; separate policy meetings", "expectedDecision": "tracked target range stays 5.25–5.50%; other policy text must be assessed separately",
+      "sources": [
+        { "id": "U03-A", "publishedAt": "2024-05-01T14:00:00-04:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20240501a.htm", "fact": "FOMC maintains the target range at 5.25–5.50%; the release also changes the Treasury runoff cap." },
+        { "id": "U03-B", "publishedAt": "2024-06-12T14:00:00-04:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20240612a.htm", "fact": "FOMC maintains the target range at 5.25–5.50%." }
+      ]
+    },
+    {
+      "id": "A01", "expectedCategory": "ambiguous", "topic": "Starliner FAQ language versions with divergent updates", "reprintRelation": "official translation link exists, but English and Spanish page contents diverged after updates", "expectedDecision": "link as translations, flag conflicting return claims and dates for review; do not treat as two confirmations",
+      "sources": [
+        { "id": "A01-A", "publishedAt": "2024-08-20", "precision": "date", "url": "https://www.nasa.gov/centers-and-facilities/kennedy/starliner-faq/", "fact": "English page has later editor notes and says NASA chose uncrewed Starliner return on August 24." },
+        { "id": "A01-B", "publishedAt": "2024-08-23", "precision": "date", "url": "https://www.nasa.gov/es/preguntas-frecuentes-estado-del-retorno-de-la-prueba-de-vuelo-tripulado-boeing-de-la-nasa/", "fact": "Linked Spanish page still contains predecision wording in its body and a conflicting year in an editor note." }
+      ]
+    },
+    {
+      "id": "A02", "expectedCategory": "ambiguous", "topic": "December 2024 FOMC statement and later minutes", "reprintRelation": "none; same meeting, separate publication types", "expectedDecision": "link to the same meeting but preserve distinct statement and minutes evidence with their release times",
+      "sources": [
+        { "id": "A02-A", "publishedAt": "2024-12-18T14:00:00-05:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20241218a.htm", "fact": "FOMC releases the December 18 policy decision." },
+        { "id": "A02-B", "publishedAt": "2025-01-08T14:00:00-05:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20250108a.htm", "fact": "Federal Reserve later releases minutes for the December 17–18 meeting." }
+      ]
+    },
+    {
+      "id": "A03", "expectedCategory": "ambiguous", "topic": "June 2023 FOMC decision and projections", "reprintRelation": "none; same meeting and release time, different artifacts", "expectedDecision": "link to one meeting while preserving decision and projections as distinct evidence",
+      "sources": [
+        { "id": "A03-A", "publishedAt": "2023-06-14T14:00:00-04:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20230614a.htm", "fact": "FOMC statement says the target range remains 5.00–5.25%." },
+        { "id": "A03-B", "publishedAt": "2023-06-14T14:00:00-04:00", "precision": "minute", "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20230614b.htm", "fact": "Separate Federal Reserve release publishes participant economic projections." }
+      ]
+    }
+  ]
+}
