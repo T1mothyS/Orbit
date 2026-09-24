@@ -134,6 +134,7 @@ dry-run 返回 `VALIDATED_NOT_PUBLISHED` 才能进行同正文正式发布。兼
 ### 输入、校验和权限
 
 - `daily_report.read_inputs_v2({date})` 返回账号隔离的 `runId`、输入快照、Context 及 JSON schema。生成日期、时区、截止时间、Context 版本由服务端绑定；合同/生成规则版本由程序记录，模型版本为 `unknown`。Calendar 最多 300、Mail 最多 100、Watchlist 最多 100；达到截断条件显式 `partial`。
+- QQ 邮箱状态分别映射为 `MAIL_NOT_CONFIGURED`（未配置或停用）、`MAIL_READ_FAILED`（读取失败）、`MAIL_INCOMPLETE`（部分读取）；读取成功且无未读时不产生邮箱警告。快照清单、校验/发布回执、内容哈希和新产物沿用同一映射；网页、邮件 HTML 与纯文本显示对应空态。未过期的旧 run 按原 `generationVersion` 维持原警告与内容哈希，重试复用既有产物；既有 Shadow 产物不改写，旧警告码仍可读取。
 - 快照只含日程必要字段、邮件摘要和引用、关注名单。7 天后不可继续验证/发布，并由后台维护清除敏感快照；运行版本、覆盖数量及阶段诊断长期保留。已生成的私有日报仍属于历史产物，不随输入快照过期而删除。旧加密备份中的快照遵守备份保留规则；恢复时再次丢弃已过期快照。
 - `daily_report.validate_v2({runId,digest})` 和 `publish_v2` 的 `dry_run` 只读取快照并纯校验；不访问外站、不处理媒体、不修改业务数据、不入队。过期或跨账号 run 拒绝。所有成功读取的输入 ID 必须逐项覆盖，即使该部分标记 `partial`；错误返回 `path/code`，成功返回稳定 `contentHash`。
 - JSON 权威定义为 [digest-v2-contract.ts](../server/digest-v2-contract.ts) 的 `DIGEST_V2_SCHEMA`。所有顶层字段必填，允许空数组；摘要信号最多 5 条。`check`、`verification`、`change` 分别表示检查完成、证据核对、事件变化，不能互相替代。缺少证据或检查未完成时不得判断“无重大变化”。新闻数量没有最低要求。

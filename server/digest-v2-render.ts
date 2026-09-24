@@ -1,4 +1,4 @@
-import { canonicalJson, publicDigestUrl, validateDigestV2, type DigestV2, type DigestSnapshot, type DigestStory } from './digest-v2-contract.js';
+import { canonicalJson, publicDigestUrl, validateDigestV2, DIGEST_V2_GENERATION, type DigestV2, type DigestStory } from './digest-v2-contract.js';
 import type { PreparedImage } from './digest-v2-media.js';
 
 const marker = '<!-- daily-digest.v2 -->\n';
@@ -21,9 +21,18 @@ function imageCredit(m: PreparedImage, html = true): string {
   const changes = '已缩放、转为JPEG并清除元数据';
   return html ? `${esc(c.caption)} · ${esc(c.author)} · <a href="${esc(c.sourcePage)}" rel="noopener noreferrer">图片来源</a> · <a href="${esc(c.licenseUrl)}" rel="noopener noreferrer">${esc(c.licenseName)}</a> · ${changes}` : `${c.caption} · ${c.author} · ${c.sourcePage} · ${c.licenseName} ${c.licenseUrl} · ${changes}`;
 }
-const warnings: Record<string, string> = { CALENDAR_INCOMPLETE: '本期日程读取不完整，未取得的事项未包含。', MAIL_INCOMPLETE: '本期邮箱读取不完整，未取得的邮件未包含。', WATCHLIST_INCOMPLETE: '本期观察名单检查不完整。' };
-export function snapshotWarnings(snapshot: DigestSnapshot): string[] {
-  return (['calendar', 'mail', 'watchlist'] as const).filter(k => ['failed', 'partial'].includes(snapshot[k].status)).map(k => `${k.toUpperCase()}_INCOMPLETE`);
+const warnings: Record<string, string> = { CALENDAR_INCOMPLETE: '本期日程读取不完整，未取得的事项未包含。', MAIL_NOT_CONFIGURED: '本期未配置日报邮箱，邮件摘要未读取。', MAIL_READ_FAILED: '本期邮箱读取失败，邮件摘要未取得。', MAIL_INCOMPLETE: '本期邮箱读取不完整，未取得的邮件未包含。', WATCHLIST_INCOMPLETE: '本期观察名单检查不完整。' };
+function emptyMailMessage(p: DigestPublication): string {
+  if (p.warnings.includes('MAIL_NOT_CONFIGURED')) return '日报邮箱尚未配置，本期未读取邮件。';
+  if (p.warnings.includes('MAIL_READ_FAILED')) return '邮箱读取失败，未取得可展示的邮件摘要。';
+  if (p.warnings.includes('MAIL_INCOMPLETE')) return '未取得可展示的邮件摘要。';
+  return '本期无新增内容。';
+}
+function emptyMailHtml(p: DigestPublication): string {
+  if (p.renderer === '2026-09-21.1' || p.renderer === '2026-09-22.2') {
+    return p.warnings.includes('MAIL_INCOMPLETE') ? '<p>未取得可展示的邮件摘要。</p>' : '';
+  }
+  return `<p>${emptyMailMessage(p)}</p>`;
 }
 export function renderDigestV2(p: DigestPublication, email = false): string {
   const d = p.digest;
@@ -39,9 +48,9 @@ export function renderDigestV2(p: DigestPublication, email = false): string {
     return `<article style="margin:24px 0"><h3 style="font-size:17px;line-height:1.5">${esc(s.title)}</h3>${images.map(m => `<figure style="margin:12px 0"><img src="${esc(m!.publicUrl)}" alt="${m!.fallback ? '分类示意图' : esc(s.title)}" width="640" style="display:block;width:100%;max-width:640px;height:auto;border-radius:6px"/><figcaption style="font-size:12px;opacity:.7">${imageCredit(m!)}</figcaption></figure>`).join('')}<p>${esc(s.summary)}</p><p style="font-size:12px;opacity:.85">${s.verification === 'verified' ? '证据已核对' : s.verification === 'partial' ? '部分核对' : '尚未核实'} · ${evidence(s.evidence_ids)}</p></article>`;
   }).join('');
   const alerts = p.warnings.filter(w => warnings[w]).map(w => `<p>${warnings[w]}</p>`).join('');
-  return `<div class="digest-v2" style="max-width:680px;margin:0 auto;overflow-wrap:anywhere;line-height:1.8;${email ? 'color:#253247;background:#fff;font-family:Arial,sans-serif;padding:20px' : 'color:inherit'}"><header><p style="font-size:12px;letter-spacing:.08em">DAILY DIGEST · ${esc(d.date)}</p><h1 style="font-size:26px;line-height:1.4">${esc(d.title)}</h1></header>${alerts ? `<aside role="status" style="border-left:4px solid #bd830e;padding:4px 16px"><strong>本期信息不完整</strong>${alerts}</aside>` : ''}${section('Executive Signals · 重点信号', list(d.executive_signals) || '<p>在本期检查范围内，没有选出重大信号。</p>')}${section('个人日程', list(d.calendar.map(x => x.text)) || (p.warnings.includes('CALENDAR_INCOMPLETE') ? '<p>未取得可展示的日程内容。</p>' : ''))}${section('邮件简报与行动', list(d.mail.map(x => x.summary + (x.action ? '；行动：' + x.action : ''))) || (p.warnings.includes('MAIL_INCOMPLETE') ? '<p>未取得可展示的邮件摘要。</p>' : ''))}${section('市场快照', stories(d.market))}${section('Macro Radar · 宏观简报', stories(d.macro))}${section('重要新闻', stories(d.stories))}${section('Watchlist · 持续关注', d.watchlist.map(w => `<p>${esc(w.summary)}<br/><small>${w.check === 'incomplete' ? '检查不完整' : w.change === 'material' ? '重大变化' : w.change === 'nothing_material' ? '本期检查范围内无重大变化' : '尚不能判断'} · ${evidence(w.evidence_ids)}</small></p>`).join(''))}${section('What Matters Next · 后续关注', list(d.what_matters_next))}<footer style="font-size:12px;opacity:.65">daily-digest.v2 · 事实、分析与尚待核实内容请结合来源阅读。</footer></div>`;
+  return `<div class="digest-v2" style="max-width:680px;margin:0 auto;overflow-wrap:anywhere;line-height:1.8;${email ? 'color:#253247;background:#fff;font-family:Arial,sans-serif;padding:20px' : 'color:inherit'}"><header><p style="font-size:12px;letter-spacing:.08em">DAILY DIGEST · ${esc(d.date)}</p><h1 style="font-size:26px;line-height:1.4">${esc(d.title)}</h1></header>${alerts ? `<aside role="status" style="border-left:4px solid #bd830e;padding:4px 16px"><strong>本期信息不完整</strong>${alerts}</aside>` : ''}${section('Executive Signals · 重点信号', list(d.executive_signals) || '<p>在本期检查范围内，没有选出重大信号。</p>')}${section('个人日程', list(d.calendar.map(x => x.text)) || (p.warnings.includes('CALENDAR_INCOMPLETE') ? '<p>未取得可展示的日程内容。</p>' : ''))}${section('邮件简报与行动', list(d.mail.map(x => x.summary + (x.action ? '；行动：' + x.action : ''))) || emptyMailHtml(p))}${section('市场快照', stories(d.market))}${section('Macro Radar · 宏观简报', stories(d.macro))}${section('重要新闻', stories(d.stories))}${section('Watchlist · 持续关注', d.watchlist.map(w => `<p>${esc(w.summary)}<br/><small>${w.check === 'incomplete' ? '检查不完整' : w.change === 'nothing_material' ? '本期检查范围内无重大变化' : w.change === 'material' ? '重大变化' : '尚不能判断'} · ${evidence(w.evidence_ids)}</small></p>`).join(''))}${section('What Matters Next · 后续关注', list(d.what_matters_next))}<footer style="font-size:12px;opacity:.65">daily-digest.v2 · 事实、分析与尚待核实内容请结合来源阅读。</footer></div>`;
 }
 export function digestV2Text(p: DigestPublication): string {
   const d = p.digest;
-  return [d.date, d.title, ...p.warnings.map(w => warnings[w] || ''), '重点信号', ...d.executive_signals, '日程', ...d.calendar.map(x => x.text), '邮件', ...d.mail.map(x => x.summary + '\n' + x.action), ...[...d.market, ...d.macro, ...d.stories].map(x => x.title + '\n' + x.summary), '观察名单', ...d.watchlist.map(x => x.summary + ' · ' + (x.check === 'incomplete' ? '检查不完整' : x.change === 'nothing_material' ? '检查范围内无重大变化' : x.change === 'material' ? '重大变化' : '尚不能判断')), '后续关注', ...d.what_matters_next, '图片署名', ...p.media.filter(m => m.publicUrl && m.kind !== 'source_icon').map(m => imageCredit(m, false)), '来源', ...d.evidence.map(x => x.source + ': ' + x.url)].join('\n\n');
+  return [d.date, d.title, ...p.warnings.map(w => warnings[w] || ''), '重点信号', ...d.executive_signals, '日程', ...d.calendar.map(x => x.text), '邮件', ...d.mail.map(x => x.summary + '\n' + x.action), ...(d.mail.length === 0 && p.renderer === DIGEST_V2_GENERATION ? [emptyMailMessage(p)] : []), ...[...d.market, ...d.macro, ...d.stories].map(x => x.title + '\n' + x.summary), '观察名单', ...d.watchlist.map(x => x.summary + ' · ' + (x.check === 'incomplete' ? '检查不完整' : x.change === 'nothing_material' ? '检查范围内无重大变化' : x.change === 'material' ? '重大变化' : '尚不能判断')), '后续关注', ...d.what_matters_next, '图片署名', ...p.media.filter(m => m.publicUrl && m.kind !== 'source_icon').map(m => imageCredit(m, false)), '来源', ...d.evidence.map(x => x.source + ': ' + x.url)].join('\n\n');
 }

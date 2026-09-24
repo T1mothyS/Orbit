@@ -8,7 +8,7 @@ import http from 'node:http';
 import sharp from 'sharp';
 import { validateDigestV2, digestHash, type DigestV2, type DigestSnapshot } from './digest-v2-contract.js';
 import type { ObjectStorage } from './digest-v2-media.js';
-import { renderDigestV2, encodeDigestPublication, decodeDigestPublication } from './digest-v2-render.js';
+import { renderDigestV2, digestV2Text, encodeDigestPublication, decodeDigestPublication } from './digest-v2-render.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'digest-v2-'));
 process.env.DATA_DIR = root;
@@ -41,7 +41,7 @@ const objects = new Map<string, Buffer>(); let uploads = 0;
 const storage: ObjectStorage = { origin: 'https://images.example.com', async put(key, bytes) { if (!objects.has(key)) { objects.set(key, Buffer.from(bytes)); uploads++; } }, async get(key) { return objects.get(key)!; }, async remove(key) { objects.delete(key); } };
 
 test('v2 contract: zero news, partial personal inputs, stable hash, IDs and validation diagnostics', () => {
-  assert.deepEqual(validateDigestV2(digest(), snapshot()).warnings, ['MAIL_INCOMPLETE']);
+  assert.deepEqual(validateDigestV2(digest(), snapshot()).warnings, ['MAIL_READ_FAILED']);
   assert.equal(validateDigestV2(digest(), snapshot()).valid, true);
   const omitted = digest(); omitted.calendar = [];
   assert.equal(validateDigestV2(omitted, snapshot()).errors[0].code, 'INPUT_OMITTED');
@@ -55,6 +55,60 @@ test('v2 contract: zero news, partial personal inputs, stable hash, IDs and vali
     (d: any) => { d.stories[0].media_ids = ['missing']; }, (d: any) => { d.stories[0].evidence_ids = ['missing']; },
     (d: any) => { d.watchlist = [{ input_id: 'w', summary: '没有变化', check: 'incomplete', change: 'nothing_material', evidence_ids: [] }]; },
   ]) { const d = illustrated(); mutate(d); assert.equal(validateDigestV2(d).valid, false); }
+});
+
+test('mail snapshot state distinguishes unconfigured, failed, partial, and empty success in every receipt', async () => {
+  const date = '2026-10-09';
+  const cases = [
+    { status: 'not_configured', warning: 'MAIL_NOT_CONFIGURED', message: '日报邮箱尚未配置，本期未读取邮件。' },
+    { status: 'failed', warning: 'MAIL_READ_FAILED', message: '邮箱读取失败，未取得可展示的邮件摘要。' },
+    { status: 'partial', warning: 'MAIL_INCOMPLETE', message: '未取得可展示的邮件摘要。' },
+    { status: 'complete', warning: null, message: '本期无新增内容。' },
+  ] as const;
+  for (const entry of cases) {
+    const snap = snapshot(); snap.date = date; snap.mail = { status: entry.status, items: [] };
+    const d = digest(); d.date = date;
+    const run = service.createDigestSnapshotRun(userId, snap);
+    const manifest = JSON.parse(activity.getDigestRun(userId, run.runId)!.manifest_json);
+    assert.deepEqual(manifest.warnings, entry.warning ? [entry.warning] : []);
+    const validated = service.validateDigestRun(userId, run.runId, d);
+    assert.deepEqual(validated.warnings, manifest.warnings);
+    const result = await service.publishDigestV2(userId, run.runId, d, 'shadow');
+    assert.deepEqual(result.warnings, manifest.warnings);
+    const artifact = activity.getDigestArtifact(userId, String(result.artifactId))!;
+    const publication = JSON.parse(artifact.payload_json).publication;
+    assert.deepEqual(publication.warnings, manifest.warnings);
+    for (const email of [false, true]) {
+      const html = renderDigestV2(publication, email);
+      assert.ok(html.includes(entry.message));
+      if (entry.warning) assert.ok(html.includes('本期信息不完整'));
+      else assert.ok(!html.includes('本期信息不完整'));
+    }
+    assert.ok(digestV2Text(publication).includes(entry.message));
+  }
+});
+
+test('an unexpired legacy run keeps its warning hash and frozen artifact on retry', async () => {
+  const date = '2026-10-10';
+  const snap = snapshot(); snap.date = date; snap.mail = { status: 'not_configured', items: [] };
+  const d = digest(); d.date = date;
+  assert.deepEqual(validateDigestV2(d, snap, '2026-09-21.1').warnings, []);
+  assert.deepEqual(validateDigestV2(d, { ...snap, mail: { status: 'failed', items: [] } }, '2026-09-21.1').warnings, ['MAIL_INCOMPLETE']);
+  const runId = crypto.randomUUID();
+  activity.createDigestRun({ id: runId, user_id: userId, report_date: date, snapshot_json: JSON.stringify(snap), manifest_json: JSON.stringify({ generationVersion: '2026-09-22.2', warnings: [] }), created_at: now, expires_at: new Date(Date.now() + 86400000).toISOString() });
+  const validated = service.validateDigestRun(userId, runId, d);
+  assert.deepEqual(validated.warnings, []);
+  assert.equal(validated.contentHash, digestHash({ digest: d, inputWarnings: [] }));
+  const first = await service.publishDigestV2(userId, runId, d, 'shadow');
+  const artifact = activity.getDigestArtifact(userId, String(first.artifactId))!;
+  const publication = JSON.parse(artifact.payload_json).publication;
+  assert.equal(publication.renderer, '2026-09-22.2');
+  assert.ok(renderDigestV2(publication).includes('本期无新增内容。'));
+  assert.ok(!renderDigestV2(publication).includes('日报邮箱尚未配置'));
+  assert.ok(!digestV2Text(publication).includes('日报邮箱尚未配置'));
+  const second = await service.publishDigestV2(userId, runId, d, 'shadow');
+  assert.equal(second.artifactId, first.artifactId);
+  assert.equal(activity.getDigestArtifact(userId, String(first.artifactId))!.payload_json, artifact.payload_json);
 });
 
 test('validate and dry_run are pure; foreign account and expired run are rejected', async () => {

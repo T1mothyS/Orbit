@@ -3,13 +3,24 @@ import net from 'node:net';
 import { isValidDateKey } from './date-key.js';
 
 export const DIGEST_V2_VERSION = 'daily-digest.v2';
-export const DIGEST_V2_GENERATION = '2026-09-22.2';
+export const DIGEST_V2_GENERATION = '2026-09-24.1';
 export type CheckStatus = 'complete' | 'partial' | 'failed' | 'not_configured';
 export interface InputItem { id: string; title: string; detail: string }
 export interface InputSection { status: CheckStatus; items: InputItem[] }
 export interface DigestSnapshot {
   date: string; timezone: string; cutoff: string; contextVersion: number;
   calendar: InputSection; mail: InputSection; watchlist: InputSection;
+}
+export function digestSnapshotWarnings(snapshot: DigestSnapshot, generationVersion = DIGEST_V2_GENERATION): string[] {
+  if (generationVersion === '2026-09-21.1' || generationVersion === '2026-09-22.2') {
+    return (['calendar', 'mail', 'watchlist'] as const).filter(section => ['failed', 'partial'].includes(snapshot[section].status)).map(section => `${section.toUpperCase()}_INCOMPLETE`);
+  }
+  return (['calendar', 'mail', 'watchlist'] as const).flatMap(section => {
+    const status = snapshot[section].status;
+    if (section === 'mail' && status === 'not_configured') return ['MAIL_NOT_CONFIGURED'];
+    if (section === 'mail' && status === 'failed') return ['MAIL_READ_FAILED'];
+    return status === 'failed' || status === 'partial' ? [`${section.toUpperCase()}_INCOMPLETE`] : [];
+  });
 }
 export interface DigestEvidence { id: string; url: string; source: string; published_at: string }
 export interface DigestStory {
@@ -62,7 +73,7 @@ export function canonicalJson(value: unknown): string {
 }
 export function digestHash(value: unknown): string { return crypto.createHash('sha256').update(canonicalJson(value)).digest('hex'); }
 export interface DigestIssue { path: string; code: string }
-export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot) {
+export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, generationVersion = DIGEST_V2_GENERATION) {
   const errors: DigestIssue[] = [];
   const issue = (path: string, code: string) => { if (errors.length < 100) errors.push({ path, code }); };
   function visit(v: unknown, s: Schema, path: string): void {
@@ -122,6 +133,6 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot) {
       if (supplied.some(id => !expected.includes(id))) issue(`$.${section}`, 'UNKNOWN_INPUT');
     }
   }
-  const warnings = snapshot ? ['calendar', 'mail', 'watchlist'].filter(k => ['partial', 'failed'].includes(snapshot[k as 'calendar'].status)).map(k => `${k.toUpperCase()}_INCOMPLETE`) : [];
+  const warnings = snapshot ? digestSnapshotWarnings(snapshot, generationVersion) : [];
   return { valid: errors.length === 0, errors, warnings, contentHash: errors.length ? null : digestHash({ digest: d, inputWarnings: warnings }) };
 }

@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified commit/version: `3c06764` / `0.31.5-260923.2032`（2026-09-24，以此为 S1-R5 汇总的仓库基线；新增阶段证据索引，其他领域保留各节时点，未代表生产或七日 Shadow）。
+- Last verified commit/version: `9e208c7`（S1-R6 修改前基线）/ `0.31.6-260924.0826`（2026-09-24 本地修复；各历史证据仍以各自时点为准，未代表隔离站部署、生产或七日 Shadow）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。
@@ -57,6 +57,7 @@ Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提�
 | [2026-09-23 NASA 单图隔离技术验收](DAILY-DIGEST-MEDIA-R3B-VERIFICATION-20260923.md) | VERIFICATION-SNAPSHOT / S1-R3b | 推断真实 Shadow 引用、正式日报或邮件已完成 |
 | [2026-09-23 媒体引用恢复与测试对象下架](DAILY-DIGEST-MEDIA-R4-RETIREMENT-VERIFICATION-20260923.md) | PARTIAL VERIFICATION-SNAPSHOT / S1-R4 | 推断 CDN 缓存清除或真实媒体下架已完成 |
 | [2026-09-24 第一阶段证据与上线候选](DAILY-DIGEST-S1-R5-READINESS-20260924.md) | READINESS-SNAPSHOT / S1-R5 | 推断第一阶段整体通过、正式上线或真实邮件已验收 |
+| [2026-09-24 邮箱空态修复验收](DAILY-DIGEST-S1-R6-VERIFICATION-20260924.md) | LOCAL VERIFICATION-SNAPSHOT / S1-R6 | 推断隔离服务已升级或真实邮件已到达 |
 | [Decision 0001](decisions/0001-phase-three-foundations.md) | 已接受的历史决策 | 把当时“无 CI”当成今天的结构 |
 
 ## 维护规则

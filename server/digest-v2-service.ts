@@ -6,9 +6,9 @@ import { scheduleDateInTimezone } from './schedule-time.js';
 import { readUserMail } from './user-mail-service.js';
 import { getDailyReportCloudContext } from './daily-report-cloud-store.js';
 import { isValidDateKey } from './date-key.js';
-import { DIGEST_V2_VERSION, DIGEST_V2_GENERATION, DIGEST_V2_SCHEMA, digestHash, validateDigestV2, type DigestSnapshot, type DigestV2, type InputSection } from './digest-v2-contract.js';
+import { DIGEST_V2_VERSION, DIGEST_V2_GENERATION, DIGEST_V2_SCHEMA, digestHash, digestSnapshotWarnings, validateDigestV2, type DigestSnapshot, type DigestV2, type InputSection } from './digest-v2-contract.js';
 import { prepareDigestMedia } from './digest-v2-media.js';
-import { encodeDigestPublication, renderDigestV2, snapshotWarnings, type DigestPublication } from './digest-v2-render.js';
+import { encodeDigestPublication, renderDigestV2, type DigestPublication } from './digest-v2-render.js';
 import { enqueueUserEmailNotificationDetailed } from './notification-service.js';
 import { getDailyReportDeliveryPolicy } from './daily-report-delivery-policy.js';
 import { addLog } from './log-service.js';
@@ -18,7 +18,7 @@ export function createDigestSnapshotRun(userId: string, snapshot: DigestSnapshot
   if (!isValidDateKey(snapshot.date)) throw new Error('INVALID_DATE');
   store.expireDigestSnapshots();
   const id = crypto.randomUUID(); const now = new Date();
-  const manifest = { date: snapshot.date, timezone: snapshot.timezone, cutoff: snapshot.cutoff, contextVersion: snapshot.contextVersion, contractVersion: DIGEST_V2_VERSION, generationVersion: DIGEST_V2_GENERATION, modelVersion: 'unknown', status: 'INPUTS_SNAPSHOTTED', inputCounts: { calendar: snapshot.calendar.items.length, mail: snapshot.mail.items.length, watchlist: snapshot.watchlist.items.length }, warnings: snapshotWarnings(snapshot) };
+  const manifest = { date: snapshot.date, timezone: snapshot.timezone, cutoff: snapshot.cutoff, contextVersion: snapshot.contextVersion, contractVersion: DIGEST_V2_VERSION, generationVersion: DIGEST_V2_GENERATION, modelVersion: 'unknown', status: 'INPUTS_SNAPSHOTTED', inputCounts: { calendar: snapshot.calendar.items.length, mail: snapshot.mail.items.length, watchlist: snapshot.watchlist.items.length }, warnings: digestSnapshotWarnings(snapshot) };
   store.createDigestRun({ id, user_id: userId, report_date: snapshot.date, snapshot_json: JSON.stringify(snapshot), manifest_json: JSON.stringify(manifest), created_at: now.toISOString(), expires_at: new Date(now.getTime() + 7 * 86400000).toISOString() });
   return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA };
 }
@@ -41,15 +41,17 @@ export async function readDigestV2Inputs(userId: string, date: string) {
   const snapshot: DigestSnapshot = { date, timezone, cutoff: new Date().toISOString(), contextVersion: context.version, calendar, mail, watchlist: { status: watch.length > 100 ? 'partial' : 'complete', items: watch.slice(0, 100).map((w, i) => ({ id: `watch-${i}-${digestHash(w).slice(0, 12)}`, title: [w.name, w.symbol].filter(Boolean).join(' '), detail: '' })) } };
   return { ...createDigestSnapshotRun(userId, snapshot), context: context.context };
 }
-function snapshotFor(userId: string, runId: string): DigestSnapshot {
+function snapshotFor(userId: string, runId: string): { snapshot: DigestSnapshot; generationVersion: string } {
   const row = store.getDigestRun(userId, runId);
   if (!row) throw new Error('RUN_NOT_FOUND');
   if (!row.snapshot_json) throw new Error('SNAPSHOT_EXPIRED');
-  return JSON.parse(row.snapshot_json);
+  const manifest = JSON.parse(row.manifest_json);
+  return { snapshot: JSON.parse(row.snapshot_json), generationVersion: manifest.generationVersion || '2026-09-21.1' };
 }
 export function validateDigestRun(userId: string, runId: string, digest: unknown) {
   assertDigestV2Enabled();
-  return validateDigestV2(digest, snapshotFor(userId, runId));
+  const { snapshot, generationVersion } = snapshotFor(userId, runId);
+  return validateDigestV2(digest, snapshot, generationVersion);
 }
 // A single app process owns sql.js. Serialize by account/date across await boundaries.
 const locks = new Map<string, Promise<unknown>>();
@@ -65,7 +67,7 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
   const digest = value as DigestV2;
   const key = `${userId}:${digest.date}`;
   const task = (locks.get(key) || Promise.resolve()).catch(() => {}).then(async () => {
-    const snapshot = snapshotFor(userId, runId);
+    const { generationVersion } = snapshotFor(userId, runId);
     const started = Date.now();
     let phase = 'MEDIA_PREPARING';
     const recordPhase = (status: string, diagnostics: Record<string, unknown> = {}) => {
@@ -82,7 +84,7 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       if (existing) payload = JSON.parse(existing.payload_json);
       else {
         const media = await prepareDigestMedia(digest, { ...mediaOptions, mode: mode as 'shadow' | 'production' });
-        const publication = { digest, warnings: validation.warnings, media, renderer: DIGEST_V2_GENERATION };
+        const publication = { digest, warnings: validation.warnings, media, renderer: generationVersion };
         payload = { publication, status: 'PREPARED', renderHash: digestHash(publication) };
         existing = store.saveDigestArtifact({ id: crypto.randomUUID(), user_id: userId, run_id: runId, report_date: digest.date, mode: mode as 'shadow' | 'production', content_hash: validation.contentHash!, payload_json: JSON.stringify(payload), created_at: new Date().toISOString() });
       }
@@ -110,7 +112,7 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       store.saveDigestArtifact({ ...existing, payload_json: JSON.stringify(payload) });
       recordPhase(payload.status, { emailStatus: payload.emailStatus || 'NOT_QUEUED', renderHash: payload.renderHash });
       addLog('info', 'daily-report', '新版日报运行完成', { event: 'digest_v2_completed', runId, mode, status: payload.status, imageCount: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && !m.fallback).length });
-      return { status: payload.status, artifactId: existing.id, contentHash: validation.contentHash, renderHash: payload.renderHash, warnings: snapshotWarnings(snapshot), emailStatus: payload.emailStatus || 'NOT_QUEUED', previewUrl: mode === 'shadow' ? `/reports/${digest.date}?shadow=${existing.id}` : `/reports/${digest.date}?source=cloud`, media: { icons: payload.publication.media.filter(m => m.kind === 'source_icon' && m.publicUrl && !m.fallback).length, real: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && !m.fallback).length, fallback: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length, failures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })) } };
+      return { status: payload.status, artifactId: existing.id, contentHash: validation.contentHash, renderHash: payload.renderHash, warnings: validation.warnings, emailStatus: payload.emailStatus || 'NOT_QUEUED', previewUrl: mode === 'shadow' ? `/reports/${digest.date}?shadow=${existing.id}` : `/reports/${digest.date}?source=cloud`, media: { icons: payload.publication.media.filter(m => m.kind === 'source_icon' && m.publicUrl && !m.fallback).length, real: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length, fallback: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length, failures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })) } };
     } catch (error) {
       // Keep only bounded, non-sensitive stage diagnostics, never provider error messages.
       try { recordPhase('FAILED', { failedPhase: phase, retryable: true }); } catch { /* Original durable-write failure remains primary. */ }
