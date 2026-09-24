@@ -18,7 +18,7 @@
 | 跟踪项无变化 | 3 | U01–U03：只对**联邦基金利率目标区间**判“无变化”；各次会议仍是不同事件，措辞、经济判断或缩表政策需分别判断。 |
 | 易混淆 | 3 | A01–A03：译文更新不同步、同一会议的声明与数周后纪要、同一时刻的决议与预测材料，保留独立证据并标出冲突或文档类型。 |
 
-JSON 对每组提供 `expectedCategory`、`reprintRelation`、`expectedDecision` 与两条来源的 `publishedAt`、精度、URL 和事实摘要。S2-02 应把这些字段映射到合同与人工纠正流程；S2-12 才有资格报告实际算法回放通过率。这一张只交付人工核实的输入和期望输出，没有运行 V3 自动分类器。
+JSON 对每组提供 `expectedCategory`、`reprintRelation`、`expectedDecision` 与两条来源的 `publishedAt`、精度、URL 和事实摘要。这些字段在 [S2-02 字段与状态合同](DAILY-DIGEST-V3-CORE-CONTRACT.md) 中已有静态映射与人工纠正约束；S2-12 才有资格报告实际算法回放通过率。本案例基线只交付人工核实的输入和期望输出，没有运行 V3 自动分类器。
 
 ## 核对边界
 
