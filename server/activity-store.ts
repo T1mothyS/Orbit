@@ -1,4 +1,4 @@
-import { registerPersistence, persistDatabase, recoverPersistence, assertPersistenceReady } from './persistence.js';
+import { registerPersistence, persistDatabase, recoverPersistence, assertPersistenceReady, withPersistenceTransaction } from './persistence.js';
 import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import fs from 'fs';
 import path from 'path';
@@ -923,8 +923,8 @@ function addAudit(userId: string, entityType: string, entityId: string, action: 
 }
 
 export function exportUserActivity(userId: string): Record<string, unknown[]> {
-  if (digestV3Store.hasUserData(userId)) throw new Error('V3 事件记录尚不支持账号备份，请先使用全站备份；账号备份将在 S2-04 完成');
   return {
+    ...digestV3Store.exportUserData(userId),
     digestV2Runs: queryAll<any>('SELECT * FROM digest_v2_runs WHERE user_id = ?', [userId]).map(row => ({ ...row, snapshot_json: row.expires_at <= nowIso() ? null : row.snapshot_json })),
     digestV2Artifacts: queryAll<any>('SELECT * FROM digest_v2_artifacts WHERE user_id = ?', [userId]),
     completions: queryAll<any>('SELECT * FROM completion_records WHERE user_id = ?', [userId]),
@@ -1015,9 +1015,16 @@ export function restoreUserActivity(
   data: Record<string, any[]>,
   mode: 'merge' | 'replace',
 ): { completions: number; notifications: number; dailyReports: number; aiImports: number } {
-  if (mode === 'replace' && digestV3Store.hasUserData(userId)) {
-    throw new Error('V3 事件记录尚不支持账号恢复替换，请先使用全站备份；账号恢复将在 S2-04 完成');
-  }
+  return withPersistenceTransaction(() => restoreUserActivityInternal(userId, data, mode));
+}
+
+function restoreUserActivityInternal(
+  userId: string,
+  data: Record<string, any[]>,
+  mode: 'merge' | 'replace',
+): { completions: number; notifications: number; dailyReports: number; aiImports: number } {
+  // Validate before touching any legacy rows; an old backup cannot erase V3 records.
+  digestV3Store.validateRestore(userId, data, mode);
   if (mode === 'replace') {
     db.run('DELETE FROM digest_v2_artifacts WHERE user_id = ?', [userId]);
     db.run('DELETE FROM digest_v2_runs WHERE user_id = ?', [userId]);
@@ -1103,6 +1110,7 @@ export function restoreUserActivity(
       [userId, setting.enabled ? 1 : 0, setting.import_token || uuidv4().replace(/-/g, ''), nowIso()],
     );
   }
+  digestV3Store.restoreUserData(userId, data, mode);
   persist();
   return { completions, notifications, dailyReports, aiImports };
 }

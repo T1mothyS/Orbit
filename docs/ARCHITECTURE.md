@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.31.7-260924.1200`（2026-09-24，仅 V3 原活动库存储和写回边界的本地合成验证；其他领域保留各节时点，不代表生产或七日 Shadow）。
+- Last verified commit/version: `0.31.8-260924.1255`（2026-09-24，V3 账号备份恢复的本地合成验证；其他领域保留各节时点，不代表生产或七日 Shadow）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -79,7 +79,7 @@ Phase 5 的所有权、等价性和迁移验收见 [Phase 5 验证记录](PHASE5
 
 Daily Digest V2.5 使用原活动库中的 `digest_v2_runs`（账号/日期/输入快照/版本与诊断）和 `digest_v2_artifacts`（账号/日期/模式/内容哈希唯一的冻结产物）。`daily_reports`、通知、认证与备份入口复用；Shadow 不写正式表。快照七天过期，长期诊断不保留邮箱正文。媒体在 R2 和原媒体目录分别存内容寻址字节，文章来源/许可保留在账号产物引用中。账号恢复重映射运行与产物 ID，跨账号恢复不允许沿用旧输入运行。具体发布状态、失败恢复、媒体生命周期及限制见 [V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 
-Daily Digest V3 Core 的四类事件记忆实体与三个引用表已增量加入同一个 `activity.db`，由 `activity-store.ts` 接入 `digest-v3-store.ts`；仅有内部存储读写，没有公开接口或自动分类。账号引用使用复合外键，封存版本禁止原位更新。全站数据库快照包含 V3 表；账号级备份/替换恢复尚未支持 V3，有数据时显式拒绝，待 S2-04 补齐。字段、迁移与验收边界见 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md#s2-03-本地存储与迁移2026-09-24)。
+Daily Digest V3 Core 的四类事件记忆实体与三个引用表已增量加入同一个 `activity.db`，由 `activity-store.ts` 接入 `digest-v3-store.ts`；仅有内部存储读写，没有公开接口或自动分类。账号引用使用复合外键，封存版本禁止原位更新。全站数据库快照包含 V3 表；账号级备份保存七张表，恢复时校验引用，同账号合并或替换，跨账号重映射全部 V3 ID 和引用。旧账号备份缺少 V3 字段时，可合并，但不能替换已有 V3 数据。字段、迁移与验收边界见 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md#s2-04-账号级备份与恢复2026-09-24)。
 
 server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与写回，schema.ts 和 migrations.ts 拥有按原顺序执行的建表/升级，queries/ 按领域拥有查询。其余三个 store 保持既有领域边界。
 
@@ -92,7 +92,7 @@ server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与�
 
 数据库文件、附件、日报媒体、备份和日志都是运行时资产，不能提交 Git。备份服务在导出和恢复时处理四个数据库及允许的附件/媒体内容；恢复前必须检查版本、冲突和快照路径。
 
-系统快照包含四库、附件和日报媒体；用户备份包含账号范围记录和附件，但不打包日报媒体文件。部署配置由独立部署备份负责。Phase 3 为四库提供原子替换，并为完成、AI 确认和用户恢复提供同步跨库提交及启动 undo 恢复；系统恢复另有文件切换清单。chat.db 的 operation_results 保存按账号隔离的确认结果。未包装的其他多步业务不自动获得跨库事务保证。协议、故障证据、平台限制与降级步骤见 [Phase 3 验收](PHASE3-PERSISTENCE-RECOVERY.md)。
+系统快照包含四库、附件和日报媒体；用户备份包含账号范围记录、附件和所引用的新版日报媒体字节。部署配置由独立部署备份负责。Phase 3 为四库提供原子替换，并为完成、AI 确认和用户恢复提供同步跨库提交及启动 undo 恢复；系统恢复另有文件切换清单。chat.db 的 operation_results 保存按账号隔离的确认结果。未包装的其他多步业务不自动获得跨库事务保证。协议、故障证据、平台限制与降级步骤见 [Phase 3 验收](PHASE3-PERSISTENCE-RECOVERY.md)。
 
 ## 5. 领域边界
 

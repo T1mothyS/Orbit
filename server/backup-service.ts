@@ -10,6 +10,7 @@ import * as db from './db.js';
 import * as scheduleStore from './schedule-store.js';
 import * as reminderStore from './reminder-store.js';
 import * as activityStore from './activity-store.js';
+import { validateDigestV3Backup } from './digest-v3-store.js';
 import * as attachmentService from './attachment-service.js';
 import { dailyReportMediaRoot } from './daily-report-media-service.js';
 import * as dailyReportCloudStore from './daily-report-cloud-store.js';
@@ -72,6 +73,43 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
   const notificationIds = createIdMap((activity.notifications || []).map(row => row.id));
   const reportIds = createIdMap((activity.dailyReports || []).map(row => row.id));
   const digestRunIds = createIdMap((activity.digestV2Runs || []).map(row => row.id));
+  const v3 = validateDigestV3Backup(activity);
+  if (v3) {
+    const eventIds = createIdMap(v3.digestV3Events.map(row => row.id));
+    const revisionIds = createIdMap(v3.digestV3Revisions.map(row => row.id));
+    const evidenceIds = createIdMap(v3.digestV3Evidence.map(row => row.id));
+    const analysisIds = createIdMap(v3.digestV3Analyses.map(row => row.id));
+    const mapped = (ids: Map<string, string>, id: string | null): string | null => id == null ? null : ids.get(id)!;
+    activity.digestV3Events = v3.digestV3Events.map(row => ({ ...row,
+      id: mapped(eventIds, row.id), current_revision_id: mapped(revisionIds, row.current_revision_id),
+      merged_into_event_id: mapped(eventIds, row.merged_into_event_id),
+    }));
+    activity.digestV3Revisions = v3.digestV3Revisions.map(row => ({ ...row,
+      id: mapped(revisionIds, row.id), event_id: mapped(eventIds, row.event_id),
+      previous_revision_id: mapped(revisionIds, row.previous_revision_id),
+      facts_json: JSON.stringify(JSON.parse(row.facts_json).map((fact: any) => ({ ...fact,
+        evidenceIds: fact.evidenceIds.map((id: string) => mapped(evidenceIds, id)),
+      }))),
+    }));
+    activity.digestV3Evidence = v3.digestV3Evidence.map(row => ({ ...row,
+      id: mapped(evidenceIds, row.id), related_evidence_id: mapped(evidenceIds, row.related_evidence_id),
+      supersedes_evidence_id: mapped(evidenceIds, row.supersedes_evidence_id),
+      linked_revision_id: mapped(revisionIds, row.linked_revision_id),
+    }));
+    activity.digestV3Analyses = v3.digestV3Analyses.map(row => ({ ...row,
+      id: mapped(analysisIds, row.id), event_revision_id: mapped(revisionIds, row.event_revision_id),
+      supersedes_analysis_id: mapped(analysisIds, row.supersedes_analysis_id),
+    }));
+    activity.digestV3RevisionEvidence = v3.digestV3RevisionEvidence.map(row => ({ ...row,
+      revision_id: mapped(revisionIds, row.revision_id), evidence_id: mapped(evidenceIds, row.evidence_id),
+    }));
+    activity.digestV3AnalysisEvidence = v3.digestV3AnalysisEvidence.map(row => ({ ...row,
+      analysis_id: mapped(analysisIds, row.analysis_id), evidence_id: mapped(evidenceIds, row.evidence_id),
+    }));
+    activity.digestV3AnalysisComparisons = v3.digestV3AnalysisComparisons.map(row => ({ ...row,
+      analysis_id: mapped(analysisIds, row.analysis_id), revision_id: mapped(revisionIds, row.revision_id),
+    }));
+  }
   activity.digestV2Runs = (activity.digestV2Runs || []).map(row => ({ ...row, id: digestRunIds.get(row.id), snapshot_json: null }));
   activity.digestV2Artifacts = (activity.digestV2Artifacts || []).map(row => {
     const payload = JSON.parse(row.payload_json);
@@ -263,7 +301,11 @@ function validateUserPayload(payload: UserBackupPayload): void {
       if (crypto.createHash('sha256').update(Buffer.from(item.base64, 'base64')).digest('hex') !== item.sha256 || !item.filename.startsWith(item.sha256 + '.')) throw new Error('新版媒体备份校验失败');
     }
   }
-  if (!payload.schedule || !payload.reminder || !payload.activity || !Array.isArray(payload.files)) throw new Error('备份内容不完整');
+  if (!payload.schedule || !payload.reminder || !payload.activity ||
+    typeof payload.activity !== 'object' || Array.isArray(payload.activity) || !Array.isArray(payload.files)) {
+    throw new Error('备份内容不完整');
+  }
+  validateDigestV3Backup(payload.activity);
   if (payload.noteItems !== undefined && !Array.isArray(payload.noteItems)) throw new Error('备份记事内容不完整');
   if (payload.libraryEntries !== undefined && !Array.isArray(payload.libraryEntries)) throw new Error('备份知识库内容不完整');
   if (payload.dailyReportCloudContext !== undefined) {
@@ -297,6 +339,10 @@ export function inspectUserBackup(buffer: Buffer, password: string): Record<stri
       noteItems: (payload.noteItems || []).length,
       libraryEntries: (payload.libraryEntries || []).length,
       dailyReportCloudContext: payload.dailyReportCloudContext && payload.dailyReportCloudContext.version > 0 ? 1 : 0,
+      digestV3Events: (payload.activity.digestV3Events || []).length,
+      digestV3Revisions: (payload.activity.digestV3Revisions || []).length,
+      digestV3Evidence: (payload.activity.digestV3Evidence || []).length,
+      digestV3Analyses: (payload.activity.digestV3Analyses || []).length,
     },
   };
 }
@@ -309,6 +355,7 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
   if (!targetAccount) throw new Error('目标账号不存在');
   const isForeignAccount = String(decrypted.account.email || '').toLowerCase() !== targetAccount.email.toLowerCase();
   const payload = isForeignAccount ? remapForeignUserPayload(decrypted) : decrypted;
+  activityStore.digestV3Store.validateRestore(userId, payload.activity, mode);
   const safetyCopy = createUserBackup(userId, password, true);
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
   atomicWriteFile(path.join(BACKUP_DIR, 'pre-user-restore-' + userId + '-' + Date.now() + '.aicalendar-backup'), safetyCopy);

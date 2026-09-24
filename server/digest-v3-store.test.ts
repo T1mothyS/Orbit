@@ -165,9 +165,16 @@ test('S2-03 restores memory and disk when a V3 write cannot persist', t => {
   assert.equal(store.getEvidence('alice', 'failed-write'), null);
 });
 
-test('S2-03 blocks incomplete user backups and removes only the selected account on deletion', () => {
-  assert.throws(() => activity.exportUserActivity('alice'), /V3 事件记录尚不支持账号备份/);
-  assert.throws(() => activity.restoreUserActivity('alice', {}, 'replace'), /V3 事件记录尚不支持账号恢复替换/);
+test('S2-04 exports V3 rows and protects them from old replace backups', () => {
+  const exported = activity.exportUserActivity('alice');
+  assert.equal(exported.digestV3Events.length, 1);
+  assert.equal(exported.digestV3Revisions.length, 2);
+  assert.equal(exported.digestV3Evidence.length, 3);
+  assert.equal(exported.digestV3Analyses.length, 1);
+  assert.throws(() => activity.restoreUserActivity('alice', {}, 'replace'), /旧备份不含 V3/);
+  assert.equal(store.getEvent('alice', 'shared-event')?.currentRevisionId, 'alice-r2');
+  activity.restoreUserActivity('alice', exported, 'merge');
+  assert.equal(activity.exportUserActivity('alice').digestV3Revisions.length, 2);
   activity.deleteUserActivity('alice');
   assert.equal(store.hasUserData('alice'), false);
   assert.equal(store.getEvent('alice', 'shared-event'), null);

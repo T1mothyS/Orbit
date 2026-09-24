@@ -44,6 +44,83 @@ export interface DigestV3Analysis {
   supersedesAnalysisId?: string | null;
 }
 
+const BACKUP_TABLES = [
+  { key: 'digestV3Events', table: 'digest_v3_events', columns: ['user_id', 'id', 'event_type', 'subject_key', 'occurrence_key', 'title', 'lifecycle', 'current_revision_id', 'merged_into_event_id', 'created_at'], identity: ['id'] },
+  { key: 'digestV3Revisions', table: 'digest_v3_revisions', columns: ['user_id', 'id', 'event_id', 'revision_no', 'previous_revision_id', 'change_kind', 'facts_json', 'recorded_at', 'occurred_at', 'occurred_precision', 'reason', 'decided_by'], identity: ['id'] },
+  { key: 'digestV3Evidence', table: 'digest_v3_evidence', columns: ['user_id', 'id', 'url', 'publisher_key', 'document_type', 'language', 'source_fact', 'published_at', 'published_precision', 'retrieved_at', 'independence_key', 'review_state', 'source_document_key', 'related_evidence_id', 'relation', 'supersedes_evidence_id', 'linked_revision_id'], identity: ['id'] },
+  { key: 'digestV3Analyses', table: 'digest_v3_analyses', columns: ['user_id', 'id', 'event_revision_id', 'analysis_kind', 'body', 'author_kind', 'recorded_at', 'fact_key', 'scope', 'check_state', 'assessment', 'run_id', 'model_id', 'prompt_version', 'supersedes_analysis_id'], identity: ['id'] },
+  { key: 'digestV3RevisionEvidence', table: 'digest_v3_revision_evidence', columns: ['user_id', 'revision_id', 'evidence_id'], identity: ['revision_id', 'evidence_id'] },
+  { key: 'digestV3AnalysisEvidence', table: 'digest_v3_analysis_evidence', columns: ['user_id', 'analysis_id', 'evidence_id'], identity: ['analysis_id', 'evidence_id'] },
+  { key: 'digestV3AnalysisComparisons', table: 'digest_v3_analysis_comparisons', columns: ['user_id', 'analysis_id', 'revision_id'], identity: ['analysis_id', 'revision_id'] },
+] as const;
+
+type BackupRows = Record<string, Array<Record<string, any>>>;
+
+/** Old user backups have no V3 keys. New backups must contain all seven arrays. */
+export function validateDigestV3Backup(data: Record<string, unknown>): BackupRows | null {
+  const present = BACKUP_TABLES.filter(spec => Object.hasOwn(data, spec.key));
+  if (!present.length) return null;
+  if (present.length !== BACKUP_TABLES.length) throw new Error('V3 事件备份缺少关联表');
+  const rows: BackupRows = {};
+  const sourceUsers = new Set<string>();
+  for (const spec of BACKUP_TABLES) {
+    const value = data[spec.key];
+    if (!Array.isArray(value) || value.length > 100_000) throw new Error('V3 事件备份数量无效');
+    const seen = new Set<string>();
+    rows[spec.key] = value.map(item => {
+      if (!item || typeof item !== 'object' || Array.isArray(item) ||
+        spec.columns.some(column => !Object.hasOwn(item, column)) ||
+        spec.identity.some(column => typeof item[column] !== 'string' || !item[column]) ||
+        typeof item.user_id !== 'string' || !item.user_id) {
+        throw new Error('V3 事件备份记录无效');
+      }
+      sourceUsers.add(item.user_id);
+      const key = spec.identity.map(column => item[column]).join('\0');
+      if (seen.has(key)) throw new Error('V3 事件备份 ID 重复');
+      seen.add(key);
+      return item;
+    });
+  }
+  if (sourceUsers.size > 1) throw new Error('V3 事件备份混合了多个账号');
+  const events = new Map(rows.digestV3Events.map(row => [row.id, row]));
+  const revisions = new Map(rows.digestV3Revisions.map(row => [row.id, row]));
+  const evidence = new Map(rows.digestV3Evidence.map(row => [row.id, row]));
+  const analyses = new Map(rows.digestV3Analyses.map(row => [row.id, row]));
+  const requireRef = (map: Map<string, any>, id: unknown) => {
+    if (id != null && (typeof id !== 'string' || !map.has(id))) throw new Error('V3 事件备份引用断裂');
+  };
+  for (const row of events.values()) {
+    const current = revisions.get(row.current_revision_id);
+    if (!current || current.event_id !== row.id) throw new Error('V3 事件备份当前修订断裂');
+    requireRef(events, row.merged_into_event_id);
+  }
+  const revisionEvidence = new Set(rows.digestV3RevisionEvidence.map(row => `${row.revision_id}\0${row.evidence_id}`));
+  for (const row of revisions.values()) {
+    if (!events.has(row.event_id)) throw new Error('V3 事件备份修订断裂');
+    requireRef(revisions, row.previous_revision_id);
+    if (row.previous_revision_id && revisions.get(row.previous_revision_id)?.event_id !== row.event_id) throw new Error('V3 事件备份前版跨事件');
+    let facts: unknown;
+    try { facts = JSON.parse(row.facts_json); } catch { throw new Error('V3 事件备份事实无效'); }
+    if (!Array.isArray(facts) || facts.some(fact => !fact || !Array.isArray(fact.evidenceIds) ||
+      fact.evidenceIds.some((id: unknown) => !evidence.has(String(id)) || !revisionEvidence.has(`${row.id}\0${id}`)))) {
+      throw new Error('V3 事件备份事实引用断裂');
+    }
+  }
+  for (const row of evidence.values()) {
+    requireRef(evidence, row.related_evidence_id);
+    requireRef(evidence, row.supersedes_evidence_id);
+    requireRef(revisions, row.linked_revision_id);
+  }
+  for (const row of analyses.values()) {
+    if (!revisions.has(row.event_revision_id)) throw new Error('V3 事件备份分析断裂');
+    requireRef(analyses, row.supersedes_analysis_id);
+  }
+  for (const row of rows.digestV3RevisionEvidence) { requireRef(revisions, row.revision_id); requireRef(evidence, row.evidence_id); }
+  for (const row of rows.digestV3AnalysisEvidence) { requireRef(analyses, row.analysis_id); requireRef(evidence, row.evidence_id); }
+  for (const row of rows.digestV3AnalysisComparisons) { requireRef(analyses, row.analysis_id); requireRef(revisions, row.revision_id); }
+  return rows;
+}
+
 /** An additive migration inside the existing activity.db. No V2 rows are read or rewritten. */
 export function migrateDigestV3Schema(db: Database): void {
   db.run('BEGIN TRANSACTION');
@@ -333,15 +410,57 @@ export class DigestV3Store {
       !!queryOne(db, `SELECT id FROM digest_v3_analyses WHERE user_id = ? LIMIT 1`, [userId]);
   }
 
+  exportUserData(userId: string): Record<string, unknown[]> {
+    const db = this.getDb();
+    return Object.fromEntries(BACKUP_TABLES.map(spec => [spec.key,
+      queryAll<Record<string, unknown>>(db, `SELECT * FROM ${spec.table} WHERE user_id = ? ORDER BY rowid`, [userId]),
+    ]));
+  }
+
+  validateRestore(userId: string, data: Record<string, unknown>, mode: 'merge' | 'replace'): void {
+    const rows = validateDigestV3Backup(data);
+    if (!rows && mode === 'replace' && this.hasUserData(userId)) {
+      throw new Error('旧备份不含 V3 事件记录，不能替换已有 V3 数据');
+    }
+  }
+
+  restoreUserData(userId: string, data: Record<string, unknown>, mode: 'merge' | 'replace'): void {
+    const rows = validateDigestV3Backup(data);
+    if (!rows) {
+      this.validateRestore(userId, data, mode);
+      return;
+    }
+    this.transaction(db => {
+      db.run('PRAGMA defer_foreign_keys = ON');
+      if (mode === 'replace') this.deleteRows(db, userId);
+      for (const spec of BACKUP_TABLES) {
+        for (const row of rows[spec.key]) {
+          const values = spec.columns.map(column => column === 'user_id' ? userId : row[column]);
+          db.run(`INSERT OR IGNORE INTO ${spec.table} (${spec.columns.join(', ')}) VALUES (${spec.columns.map(() => '?').join(', ')})`, values);
+          const existing = queryOne<Record<string, unknown>>(db,
+            `SELECT * FROM ${spec.table} WHERE user_id = ? AND ${spec.identity.map(column => `${column} = ?`).join(' AND ')}`,
+            [userId, ...spec.identity.map(column => row[column])]);
+          if (!existing || spec.columns.some((column, index) => existing[column] !== values[index])) {
+            throw new Error('V3 事件恢复与目标记录冲突');
+          }
+        }
+      }
+    });
+  }
+
+  private deleteRows(db: Database, userId: string): void {
+    for (const table of [
+      'digest_v3_analysis_comparisons', 'digest_v3_analysis_evidence',
+      'digest_v3_analyses', 'digest_v3_revision_evidence',
+      'digest_v3_evidence', 'digest_v3_revisions', 'digest_v3_events',
+    ]) db.run(`DELETE FROM ${table} WHERE user_id = ?`, [userId]);
+  }
+
   /** Account deletion follows a full system snapshot; delete children before their parents. */
   deleteUserData(userId: string): void {
     if (!this.hasUserData(userId)) return;
     this.transaction(db => {
-      for (const table of [
-        'digest_v3_analysis_comparisons', 'digest_v3_analysis_evidence',
-        'digest_v3_analyses', 'digest_v3_revision_evidence',
-        'digest_v3_evidence', 'digest_v3_revisions', 'digest_v3_events',
-      ]) db.run(`DELETE FROM ${table} WHERE user_id = ?`, [userId]);
+      this.deleteRows(db, userId);
     });
   }
 }

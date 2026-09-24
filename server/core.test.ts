@@ -510,6 +510,103 @@ test('跨账号恢复会重映射关联 ID，替换恢复会清理旧附件文�
   assert.equal(activity.getAttachment(orphan.id, targetUserId), null);
 });
 
+test('S2-04 账号备份恢复 V3 引用，兼容旧备份并拒绝断裂引用', () => {
+  const source = 'v3-backup-source';
+  const target = 'v3-backup-target';
+  const legacyTarget = 'v3-legacy-target';
+  const now = '2026-09-24T04:00:00.000Z';
+  const password = 'v3-backup-password';
+  for (const [id, email] of [[source, 'v3-source@example.test'], [target, 'v3-target@example.test'], [legacyTarget, 'v3-legacy@example.test']]) {
+    db.createUser({ id, email, password_hash: 'synthetic', role: 'user', disabled: 0, created_at: now, updated_at: now });
+  }
+  const v3 = activity.digestV3Store;
+  const baseEvidence = (userId: string) => ({
+    id: 'source-1', userId, url: 'https://example.test/source-1', publisherKey: 'example',
+    documentType: 'release', language: 'en', sourceFact: 'launch confirmed',
+    publishedAt: '2026-09-24', publishedPrecision: 'date' as const, retrievedAt: now,
+    independenceKey: 'source-1', reviewState: 'verified' as const,
+  });
+  const firstRevision = (userId: string) => ({
+    id: 'revision-1', userId, eventId: 'event-1', revisionNo: 1,
+    previousRevisionId: null, changeKind: 'initial' as const,
+    facts: [{ factKey: 'launch', value: 'confirmed', unit: null, scope: 'mission', evidenceIds: ['source-1'] }],
+    evidenceIds: ['source-1'], recordedAt: now,
+  });
+  const firstEvent = (userId: string, title: string) => ({
+    id: 'event-1', userId, eventType: 'mission', subjectKey: 'mission', occurrenceKey: 'launch',
+    title, lifecycle: 'active' as const, currentRevisionId: 'revision-1', createdAt: now,
+  });
+  v3.addEvidence(baseEvidence(source));
+  v3.createEvent(firstEvent(source, 'source event'), firstRevision(source));
+  v3.addEvidence({ ...baseEvidence(source), id: 'source-2', sourceFact: 'updated detail',
+    relatedEvidenceId: 'source-1', relation: 'update', linkedRevisionId: 'revision-1' });
+  v3.appendRevision({ ...firstRevision(source), id: 'revision-2', revisionNo: 2,
+    previousRevisionId: 'revision-1', changeKind: 'progress', evidenceIds: ['source-2'],
+    facts: [{ factKey: 'launch', value: 'complete', unit: null, scope: 'mission', evidenceIds: ['source-2'] }] });
+  v3.addAnalysis({ id: 'analysis-1', userId: source, eventRevisionId: 'revision-2',
+    comparedRevisionIds: ['revision-1'], evidenceIds: ['source-2'], analysisKind: 'change_assessment',
+    body: 'The launch progressed.', authorKind: 'ai', recordedAt: now,
+    factKey: 'launch', scope: 'mission', check: 'complete', assessment: 'material' });
+  v3.addEvidence(baseEvidence(target));
+  v3.createEvent(firstEvent(target, 'target existing event'), firstRevision(target));
+
+  const encrypted = backups.createUserBackup(source, password);
+  const inspected = backups.inspectUserBackup(encrypted, password) as any;
+  assert.equal(inspected.counts.digestV3Events, 1);
+  assert.equal(inspected.counts.digestV3Revisions, 2);
+  assert.equal(inspected.counts.digestV3Evidence, 2);
+  assert.equal(inspected.counts.digestV3Analyses, 1);
+  const merged = backups.restoreUserBackup(target, encrypted, password, 'merge') as any;
+  assert.equal(merged.idsRemapped, true);
+  const targetRows = activity.exportUserActivity(target) as Record<string, any[]>;
+  const copied = targetRows.digestV3Events.find(row => row.title === 'source event');
+  assert.ok(copied);
+  assert.notEqual(copied.id, 'event-1');
+  assert.equal(v3.getEvent(target, 'event-1')?.title, 'target existing event');
+  const copiedRevision = v3.getRevision(target, copied.current_revision_id)!;
+  assert.equal(copiedRevision.revisionNo, 2);
+  assert.equal(copiedRevision.eventId, copied.id);
+  const copiedEvidenceId = copiedRevision.evidenceIds[0];
+  assert.equal(v3.getEvidence(target, copiedEvidenceId)?.sourceFact, 'updated detail');
+  assert.equal(copiedRevision.facts[0].evidenceIds[0], copiedEvidenceId);
+  const copiedAnalysis = targetRows.digestV3Analyses.find(row => row.event_revision_id === copiedRevision.id);
+  assert.equal(v3.getAnalysis(target, copiedAnalysis.id)?.comparedRevisionIds?.length, 1);
+  assert.equal(v3.getAnalysis(source, 'analysis-1')?.body, 'The launch progressed.');
+
+  v3.addEvidence({ ...baseEvidence(source), id: 'extra-source', sourceFact: 'temporary' });
+  backups.restoreUserBackup(source, encrypted, password, 'replace');
+  assert.equal(v3.getEvidence(source, 'extra-source'), null);
+  assert.equal(v3.getRevision(source, 'revision-2')?.facts[0].evidenceIds[0], 'source-2');
+  const expectedActivity = backups.decryptBackup<any>(encrypted, password).activity;
+  const restoredActivity = activity.exportUserActivity(source) as Record<string, any[]>;
+  for (const key of Object.keys(expectedActivity).filter(key => key.startsWith('digestV3'))) {
+    assert.deepEqual(restoredActivity[key], expectedActivity[key]);
+  }
+
+  const oldPayload = backups.decryptBackup<any>(encrypted, password);
+  for (const key of Object.keys(oldPayload.activity).filter(key => key.startsWith('digestV3'))) delete oldPayload.activity[key];
+  const oldBackup = backups.encryptBackup(oldPayload, password);
+  assert.equal((backups.inspectUserBackup(oldBackup, password) as any).counts.digestV3Events, 0);
+  const before = activity.exportUserActivity(source);
+  assert.throws(() => backups.restoreUserBackup(source, oldBackup, password, 'replace'), /旧备份不含 V3/);
+  assert.deepEqual(activity.exportUserActivity(source), before);
+  backups.restoreUserBackup(source, oldBackup, password, 'merge');
+  assert.equal(v3.getEvent(source, 'event-1')?.currentRevisionId, 'revision-2');
+  backups.restoreUserBackup(legacyTarget, oldBackup, password, 'replace');
+  assert.equal(v3.hasUserData(legacyTarget), false);
+  const conflicting = backups.decryptBackup<any>(encrypted, password);
+  conflicting.activity.digestV3Events[0].title = 'conflicting title';
+  const beforeConflict = activity.exportUserActivity(source);
+  assert.throws(() => backups.restoreUserBackup(source, backups.encryptBackup(conflicting, password), password, 'merge'), /恢复与目标记录冲突/);
+  assert.deepEqual(activity.exportUserActivity(source), beforeConflict);
+  const broken = backups.decryptBackup<any>(encrypted, password);
+  broken.activity.digestV3AnalysisEvidence[0].evidence_id = 'missing-evidence';
+  assert.throws(() => backups.inspectUserBackup(backups.encryptBackup(broken, password), password), /引用断裂/);
+  const partial = backups.decryptBackup<any>(encrypted, password);
+  delete partial.activity.digestV3Analyses;
+  assert.throws(() => backups.inspectUserBackup(backups.encryptBackup(partial, password), password), /缺少关联表/);
+});
+
 test('全站恢复统一替换四个数据库和附件且不遗留暂存文件', () => {
   const previousKey = process.env.BACKUP_ENCRYPTION_KEY;
   const previousMaintenance = process.env.MAINTENANCE_MODE;

@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.31.7-260924.1200`（2026-09-24，仅 V3 Core 原活动库增量存储的本地合成验证；其他领域保留各节时点，不代表生产或七日 Shadow）。
+- Last verified commit/version: `0.31.8-260924.1255`（2026-09-24，V3 Core 账号备份恢复的本地合成验证；其他领域保留各节时点，不代表生产或七日 Shadow）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -50,7 +50,7 @@ CalDAV 入口为 `server/routes/caldav.ts`；`caldav-service` 共享手动/后�
 
 新版 V2.5 的独立 Cloud 分支由 `server/digest-v2-{contract,service,media,fetch,render}.ts` 实现，MCP 入口仍在 `daily-report-cloud-mcp.ts`。输入运行与隔离产物在原 `activity.db` 的 `digest_v2_runs`、`digest_v2_artifacts`；production 才写原日报/通知表。阅读复用 `reports-read.ts` 与 `DailyReportsPage.tsx`，R2 字节镜像进入原媒体/备份边界。V1 Local 图示仍适用于原链路，不能作为新版合同。详细字段、开关和 Shadow 边界见 [V2.5 合同](docs/CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 
-V3 Core 的 S2-03 存储位于同一个 `activity.db`：`server/digest-v3-store.ts` 管理 Event/Revision/Evidence/Analysis 与引用表，`activity-store.ts` 负责初始化和可靠写回。当前仅供内部使用；没有 V3 MCP/HTTP、自动匹配或账号级 V3 备份恢复，详见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#s2-03-本地存储与迁移2026-09-24)。
+V3 Core 的 S2-03 存储位于同一个 `activity.db`：`server/digest-v3-store.ts` 管理 Event/Revision/Evidence/Analysis 与引用表，`activity-store.ts` 负责初始化和可靠写回。S2-04 通过原 `backup-service.ts` 账号备份和恢复七张表，同账号替换、旧备份与跨账号 ID 重映射均有保护。当前仅供内部使用；没有 V3 MCP/HTTP 或自动匹配，详见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#s2-04-账号级备份与恢复2026-09-24)。
 
 ```mermaid
 flowchart LR
