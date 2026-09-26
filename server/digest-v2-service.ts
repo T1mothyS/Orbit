@@ -8,7 +8,7 @@ import { getDailyReportCloudContext } from './daily-report-cloud-store.js';
 import { isValidDateKey } from './date-key.js';
 import { DIGEST_V2_VERSION, DIGEST_V2_GENERATION, DIGEST_V2_SCHEMA, digestHash, digestSnapshotWarnings, validateDigestV2, type DigestSnapshot, type DigestV2, type InputSection } from './digest-v2-contract.js';
 import { prepareDigestMedia } from './digest-v2-media.js';
-import { encodeDigestPublication, renderDigestV2, type DigestPublication } from './digest-v2-render.js';
+import { digestV2Cover, encodeDigestPublication, renderDigestV2, type DigestPublication } from './digest-v2-render.js';
 import { enqueueUserEmailNotificationDetailed } from './notification-service.js';
 import { getDailyReportDeliveryPolicy } from './daily-report-delivery-policy.js';
 import { addLog } from './log-service.js';
@@ -133,5 +133,5 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
 }
 export function digestArtifactView(row: store.DigestArtifactRow) {
   const payload = JSON.parse(row.payload_json); const p = payload.publication as DigestPublication;
-  return { id: row.id, date: row.report_date, headline: p.digest.title, heroImageUrl: null, excerpt: p.digest.executive_signals.join('；'), contentHash: row.content_hash, publishedAt: row.created_at, updatedAt: row.created_at, source: 'cloud', deliveryStatus: 'CANDIDATE', emailStatus: 'DISABLED', emailNotificationId: null, markdown: encodeDigestPublication(p), html: renderDigestV2(p), shadow: true };
+  return { id: row.id, date: row.report_date, ...digestV2Cover(p), contentHash: row.content_hash, publishedAt: row.created_at, updatedAt: row.created_at, source: 'cloud', deliveryStatus: 'CANDIDATE', emailStatus: 'DISABLED', emailNotificationId: null, markdown: encodeDigestPublication(p), html: renderDigestV2(p), shadow: true };
 }

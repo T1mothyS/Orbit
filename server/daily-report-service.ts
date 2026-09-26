@@ -1,6 +1,5 @@
 import crypto from 'node:crypto';
-import { decodeDigestPublication } from './digest-v2-render.js';
-import { publicDigestUrl } from './digest-v2-contract.js';
+import { decodeDigestPublication, digestV2Cover } from './digest-v2-render.js';
 import * as db from './db.js';
 import * as activityStore from './activity-store.js';
 import { enqueueUserEmailNotificationDetailed } from './notification-service.js';
@@ -26,6 +25,9 @@ export interface DailyReportView {
   date: string;
   headline: string | null;
   heroImageUrl: string | null;
+  heroImageCredit: string | null;
+  heroImageSourceUrl: string | null;
+  heroImageLicenseUrl: string | null;
   markdown?: string;
   html?: string;
   excerpt: string;
@@ -147,9 +149,10 @@ function legacyExcerpt(markdown: string): string {
   return (candidate?.cleaned || PREVIEW_FALLBACK).slice(0, 240);
 }
 
-function reportPresentation(markdown: string): { headline: string | null; heroImageUrl: string | null; excerpt: string } {
+function reportPresentation(markdown: string): Pick<DailyReportView, 'headline' | 'heroImageUrl' | 'heroImageCredit' | 'heroImageSourceUrl' | 'heroImageLicenseUrl' | 'excerpt'> {
   const v2 = decodeDigestPublication(markdown);
-  if (v2) return { headline: v2.digest.title, heroImageUrl: v2.media.find(m => publicDigestUrl(m.publicUrl))?.publicUrl || null, excerpt: v2.digest.executive_signals.join('；').slice(0, 240) || v2.digest.title };
+  if (v2) return digestV2Cover(v2);
+  const noCredit = { heroImageCredit: null, heroImageSourceUrl: null, heroImageLicenseUrl: null };
   const digest = parseDailyDigestMarkdown(markdown);
   if (digest) {
     const featured = selectDailyDigestFeaturedStory(digest, { requireImage: false });
@@ -158,9 +161,10 @@ function reportPresentation(markdown: string): { headline: string | null; heroIm
       headline: featured?.headline || null,
       heroImageUrl: featured?.imageUrl ? dailyReportMediaPath(featured.imageUrl) : null,
       excerpt: `${PREVIEW_FALLBACK}${featured?.summary ? `：${featured.summary}` : overview ? `：${overview}` : ''}`.slice(0, 240),
+      ...noCredit,
     };
   }
-  return { headline: null, heroImageUrl: null, excerpt: legacyExcerpt(markdown) };
+  return { headline: null, heroImageUrl: null, excerpt: legacyExcerpt(markdown), ...noCredit };
 }
 
 export function toDailyReportView(record: activityStore.DailyReportRecord, includeContent = true): DailyReportView {
@@ -171,6 +175,9 @@ export function toDailyReportView(record: activityStore.DailyReportRecord, inclu
     date: record.reportDate,
     headline: presentation.headline,
     heroImageUrl: presentation.heroImageUrl,
+    heroImageCredit: presentation.heroImageCredit,
+    heroImageSourceUrl: presentation.heroImageSourceUrl,
+    heroImageLicenseUrl: presentation.heroImageLicenseUrl,
     ...(includeContent ? { markdown: record.markdown, html: renderMarkdown(record.markdown) } : {}),
     excerpt: presentation.excerpt,
     contentHash: record.contentHash,

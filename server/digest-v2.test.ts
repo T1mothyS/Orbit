@@ -8,7 +8,7 @@ import http from 'node:http';
 import sharp from 'sharp';
 import { validateDigestV2, digestHash, DIGEST_V2_GENERATION, type DigestV2, type DigestSnapshot } from './digest-v2-contract.js';
 import type { ObjectStorage } from './digest-v2-media.js';
-import { renderDigestV2, digestV2Text, encodeDigestPublication, decodeDigestPublication } from './digest-v2-render.js';
+import { renderDigestV2, digestV2Text, digestV2Cover, encodeDigestPublication, decodeDigestPublication } from './digest-v2-render.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'digest-v2-'));
 process.env.DATA_DIR = root;
@@ -78,6 +78,30 @@ test('new digest layout gives the lead a large image, other stories side images,
   assert.ok(!legacy.includes('digest-v2-story--lead'));
   assert.ok(!legacy.includes('此条暂无可用配图'));
   assert.ok(digestV2Text({ ...publication, renderer: '2026-09-24.1' }).includes('本期无新增内容。'));
+});
+
+test('report list uses the lead news title and image instead of the draft title or a source icon', () => {
+  const d = illustrated(); d.title = 'Daily Digest V2.5｜2026-09-21 · 逐条配图验收';
+  d.executive_signals = ['与头条无关的市场信号'];
+  const photo = { id: 'm1', publicUrl: 'https://images.example.com/lead.jpg', fallback: false, credit: { caption: '公司资料照片，非新闻现场', author: 'Photographer', sourcePage: 'https://example.com/photo', licenseName: 'CC BY', licenseUrl: 'https://example.com/license' } } as any;
+  const cover = digestV2Cover({ digest: d, media: [{ ...photo, id: 'icon', kind: 'source_icon' }, photo], warnings: [], renderer: DIGEST_V2_GENERATION });
+  assert.equal(cover.headline, '有来源的新闻');
+  assert.equal(cover.excerpt, '一项可核验的新变化');
+  assert.equal(cover.heroImageUrl, photo.publicUrl);
+  assert.equal(cover.heroImageCredit, '公司资料照片，非新闻现场 · Photographer · CC BY');
+  assert.equal(cover.heroImageSourceUrl, 'https://example.com/photo');
+  assert.equal(cover.heroImageLicenseUrl, 'https://example.com/license');
+  const publication = { digest: d, media: [photo], warnings: [], renderer: DIGEST_V2_GENERATION };
+  assert.ok(renderDigestV2(publication).includes('<h1 style="font-size:26px;line-height:1.4">今日重点新闻</h1>'));
+  assert.ok(!renderDigestV2(publication).includes(d.title));
+  assert.ok(digestV2Text(publication).includes('今日重点新闻'));
+  assert.ok(!digestV2Text(publication).includes(d.title));
+  assert.ok(renderDigestV2({ ...publication, renderer: '2026-09-24.1' }).includes(d.title));
+  const fallback = digestV2Cover({ digest: d, media: [{ id: 'story-art', storyId: 's1', publicUrl: 'https://images.example.com/art.png', fallback: true } as any], warnings: [], renderer: DIGEST_V2_GENERATION });
+  assert.equal(fallback.heroImageCredit, '原创编辑插画，非新闻现场图片');
+  const empty = digestV2Cover({ digest: digest(), media: [], warnings: [], renderer: DIGEST_V2_GENERATION });
+  assert.equal(empty.heroImageUrl, null);
+  assert.ok(renderDigestV2({ digest: digest(), media: [], warnings: [], renderer: DIGEST_V2_GENERATION }).includes('今日情报简报'));
 });
 
 test('mail snapshot state distinguishes unconfigured, failed, partial, and empty success in every receipt', async () => {
@@ -167,6 +191,10 @@ test('media: decode, resize, strip metadata, reject bad or small images, fallbac
   const published = await service.publishDigestV2(userId, imageRun.runId, withImage, 'shadow', options);
   assert.deepEqual(published.imageCoverage, { total: 1, real: 1, illustration: 0, missing: 0 });
   assert.equal((published.media as any).real, 1);
+  const listItem = service.digestArtifactView(activity.getDigestArtifact(userId, String(published.artifactId))!);
+  assert.equal(listItem.headline, '有来源的新闻');
+  assert.equal(listItem.heroImageUrl, real[0].publicUrl);
+  assert.equal(listItem.excerpt, '一项可核验的新变化');
   const count = uploads; await prepareDigestMedia(illustrated(), options); assert.equal(uploads, count);
   objects.delete(real[0].key); await restoreDigestObjects(real, storage, options.mediaRoot); assert.ok(objects.has(real[0].key));
   for (const status of [403, 404, 500]) {
