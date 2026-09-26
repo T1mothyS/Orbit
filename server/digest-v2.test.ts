@@ -6,7 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import http from 'node:http';
 import sharp from 'sharp';
-import { validateDigestV2, digestHash, type DigestV2, type DigestSnapshot } from './digest-v2-contract.js';
+import { validateDigestV2, digestHash, DIGEST_V2_GENERATION, type DigestV2, type DigestSnapshot } from './digest-v2-contract.js';
 import type { ObjectStorage } from './digest-v2-media.js';
 import { renderDigestV2, digestV2Text, encodeDigestPublication, decodeDigestPublication } from './digest-v2-render.js';
 
@@ -55,6 +55,29 @@ test('v2 contract: zero news, partial personal inputs, stable hash, IDs and vali
     (d: any) => { d.stories[0].media_ids = ['missing']; }, (d: any) => { d.stories[0].evidence_ids = ['missing']; },
     (d: any) => { d.watchlist = [{ input_id: 'w', summary: '没有变化', check: 'incomplete', change: 'nothing_material', evidence_ids: [] }]; },
   ]) { const d = illustrated(); mutate(d); assert.equal(validateDigestV2(d).valid, false); }
+});
+
+test('new digest layout gives the lead a large image, other stories side images, and shows missing images', () => {
+  const d = illustrated();
+  d.evidence.push({ id: 'e2', url: 'https://example.com/second', source: 'Second source', published_at: now });
+  d.media.push({ id: 'm2', evidence_id: 'e2', url: 'https://images.example.com/second.jpg', category: 'Market' });
+  d.stories.push({ id: 's2', title: '次要新闻', summary: '另一条消息', evidence_ids: ['e2'], media_ids: ['m2'], verification: 'verified' });
+  d.stories.push({ id: 's3', title: '缺图新闻', summary: '图片仍待补齐', evidence_ids: ['e2'], media_ids: [], verification: 'partial' });
+  const media = d.media.map(m => ({ id: m.id, publicUrl: m.url, fallback: false, kind: undefined, credit: { caption: m.id, author: 'Test', sourcePage: 'https://example.com/story', licenseName: 'Test', licenseUrl: 'https://example.com/license' } })) as any;
+  const publication = { digest: d, media, warnings: [], renderer: DIGEST_V2_GENERATION };
+  for (const email of [false, true]) {
+    const html = renderDigestV2(publication, email);
+    assert.equal((html.match(/digest-v2-story--lead/g) || []).length, 1);
+    assert.equal((html.match(/digest-v2-story--compact/g) || []).length, 1);
+    assert.equal((html.match(/digest-v2-story--no-image/g) || []).length, 1);
+    assert.ok(html.includes('width="640"'));
+    assert.ok(html.includes('width="116"'));
+    assert.ok(html.includes('此条暂无可用配图'));
+  }
+  const legacy = renderDigestV2({ ...publication, renderer: '2026-09-24.1' });
+  assert.ok(!legacy.includes('digest-v2-story--lead'));
+  assert.ok(!legacy.includes('此条暂无可用配图'));
+  assert.ok(digestV2Text({ ...publication, renderer: '2026-09-24.1' }).includes('本期无新增内容。'));
 });
 
 test('mail snapshot state distinguishes unconfigured, failed, partial, and empty success in every receipt', async () => {
@@ -139,6 +162,11 @@ test('media: decode, resize, strip metadata, reject bad or small images, fallbac
   const options = { storage, mode: 'shadow' as const, mediaRoot: path.join(root, 'daily-report-media'), rules: [{ pageHost: 'example.com', imageHosts: ['images.example.com'], policy: 'OWNED_OPEN' as const, licenseRef: 'test open source' }], fetchOptions: { fetcher, lookup: async () => [{ address: '93.184.216.34', family: 4 as const }] } };
   const real = await prepareDigestMedia(illustrated(), options);
   assert.equal(real[0].fallback, false); assert.ok(real[0].publicUrl);
+  const withImage = illustrated(); withImage.date = '2026-10-11';
+  const imageRun = service.createDigestSnapshotRun(userId, { ...snapshot(), date: withImage.date });
+  const published = await service.publishDigestV2(userId, imageRun.runId, withImage, 'shadow', options);
+  assert.deepEqual(published.imageCoverage, { total: 1, real: 1, illustration: 0, missing: 0 });
+  assert.equal((published.media as any).real, 1);
   const count = uploads; await prepareDigestMedia(illustrated(), options); assert.equal(uploads, count);
   objects.delete(real[0].key); await restoreDigestObjects(real, storage, options.mediaRoot); assert.ok(objects.has(real[0].key));
   for (const status of [403, 404, 500]) {
@@ -155,6 +183,25 @@ test('media: decode, resize, strip metadata, reject bad or small images, fallbac
   const shared = illustrated(); shared.media.push({ ...shared.media[0], id: 'm2' }); shared.stories[0].media_ids.push('m2');
   const refs = await prepareDigestMedia(shared, options);
   assert.equal(refs.length, 2); assert.equal(refs[0].sha256, refs[1].sha256); assert.notEqual(refs[0].id, refs[1].id);
+});
+
+test('new Shadow gives every story without a licensed photo a distinct, labeled original illustration', async () => {
+  const d = illustrated(); d.date = '2026-10-12'; d.media = []; d.stories[0].media_ids = [];
+  d.stories.push({ id: 's2', title: '另一条新闻', summary: '第二条可核验消息', evidence_ids: ['e1'], media_ids: [], verification: 'partial' });
+  const run = service.createDigestSnapshotRun(userId, { ...snapshot(), date: d.date });
+  const receipt = await service.publishDigestV2(userId, run.runId, d, 'shadow', { storage, rules: [], mediaRoot: path.join(root, 'daily-report-media') });
+  assert.deepEqual(receipt.imageCoverage, { total: 2, real: 0, illustration: 2, missing: 0 });
+  assert.equal((receipt.media as any).fallback, 2);
+  const artifact = activity.getDigestArtifact(userId, String(receipt.artifactId))!;
+  const publication = JSON.parse(artifact.payload_json).publication;
+  assert.equal(publication.media.length, 2);
+  assert.equal(new Set(publication.media.map((m: any) => m.sha256)).size, 2);
+  assert.ok(publication.media.every((m: any) => m.storyId && m.fallback && m.publicUrl && m.licenseRef === 'code-owned-editorial-illustration'));
+  const html = renderDigestV2(publication);
+  assert.ok(html.includes('digest-v2-story--lead'));
+  assert.ok(html.includes('digest-v2-story--compact'));
+  assert.equal((html.match(/原创编辑插画，非新闻现场图片/g) || []).length, 2);
+  assert.ok(!html.includes('此条暂无可用配图'));
 });
 
 test('interrupted media-save, report-save and queue steps recover without duplicate deliveries', async t => {
@@ -191,6 +238,7 @@ test('shadow is isolated, retry is idempotent, renderer escapes injection and ba
   const d = illustrated(); d.stories[0].title = '<img src=x onerror=alert(1)>';
   const results = await Promise.all(Array.from({ length: 3 }, () => service.publishDigestV2(userId, run.runId, d, 'shadow', { storage, rules: [] })));
   assert.equal(new Set(results.map(r => r.artifactId)).size, 1);
+  assert.deepEqual(results[0].imageCoverage, { total: 1, real: 0, illustration: 1, missing: 0 });
   assert.equal(activity.listDailyReports(userId).length, reportCount);
   assert.equal(activity.exportUserActivity(userId).notifications.length, notificationCount);
   const artifact = activity.getDigestArtifact(userId, String(results[0].artifactId))!;

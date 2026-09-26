@@ -101,7 +101,7 @@ pwsh -NoProfile -File scripts/prepare-protected-tool-release.ps1 `
 - 目标 Linux 独立目录按锁文件安装生产依赖，验证 sharp 解码与格式转换后，以 `node server/digest-shadow-server.js` 运行。安装与服务使用资源限制，不能在生产目录构建或安装。
 - 独立 Nginx 站点只代理测试回环端口；单独证书，不替换原站点。语法检查后平滑 reload，前后检查原站点 health 与进程，测试账号验证登录及 OAuth/MCP。
 - 回退只停用测试服务及其 Nginx 站点，保留数据与媒体恢复证据；不重启生产应用。配置、地址及部署快照只写被忽略的本机 runbook。
-- HTTP、Linux sharp、R2、OAuth、Work 调用、连续七日期与邮箱渲染分别验收。部署成功不代表 Cloud Shadow 完成。
+- HTTP、Linux sharp、R2、OAuth、Work 调用、逐条新闻配图与邮箱渲染分别验收；定向图片改进后在两个不同真实日期复核内容、图片和跨期运行。部署成功不代表 Cloud Shadow 完成。
 
 ## 固化的历史教训（通用）
 

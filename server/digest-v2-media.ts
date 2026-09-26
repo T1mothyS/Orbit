@@ -18,6 +18,7 @@ export interface PreparedImage {
   kind?: 'source_icon';
   sourceHost?: string;
   sourceSha256?: string;
+  storyId?: string;
 }
 export interface ObjectStorage {
   origin: string;
@@ -125,13 +126,28 @@ export async function transformDigestIcon(bytes: Buffer) {
   return image.resize({ width: 64, height: 64, fit: 'inside', withoutEnlargement: true }).png().toBuffer({ resolveWithObject: true });
 }
 const categories = ['AI', 'Semiconductor', 'Banking', 'Macro', 'Gaming', 'China', 'International', 'Company', 'Market'];
-async function fallbackImage(category: string) {
+async function fallbackImage(category: string, seed = '') {
   const index = Math.max(0, categories.indexOf(category));
-  // Code-owned neutral category artwork; no external image or claims about a news scene.
-  const svg = `<svg width="960" height="320" xmlns="http://www.w3.org/2000/svg"><rect width="960" height="320" fill="#e9edf2"/><path d="M0 270 L${160 + index * 25} 150 L470 225 L720 70 L960 160" fill="none" stroke="#617c96" stroke-width="18"/><text x="48" y="80" font-size="36" fill="#34475b" font-family="sans-serif">${categories[index]}</text></svg>`;
+  // Original abstract editorial art. Shapes are decorative, never a chart of observed values.
+  const digest = crypto.createHash('sha256').update(`${category}:${seed}`).digest();
+  const palettes = [
+    ['#e5edf5', '#1b4d6b', '#5a96b5'], ['#e9edf5', '#284b7c', '#8faed2'],
+    ['#edf1e8', '#365c43', '#8aa779'], ['#f4ece6', '#805444', '#c49a7f'],
+    ['#f0eaf3', '#614c78', '#a889b8'], ['#f4eee3', '#725529', '#c19d5b'],
+    ['#e5f1f0', '#245f60', '#80aead'], ['#edf0f3', '#425669', '#91a5b5'],
+    ['#edf1e8', '#52673b', '#a1b47b'],
+  ];
+  const [background, foreground, accent] = palettes[index];
+  const blocks = Array.from({ length: 5 }, (_, i) => {
+    const x = 500 + i * 78;
+    const y = 54 + digest[i] % 140;
+    const height = 230 - y + digest[i + 5] % 50;
+    return `<rect x="${x}" y="${y}" width="42" height="${height}" rx="21" fill="${i % 2 ? foreground : accent}" opacity="${(0.35 + digest[i + 10] / 510).toFixed(2)}"/>`;
+  }).join('');
+  const svg = `<svg width="960" height="320" xmlns="http://www.w3.org/2000/svg"><rect width="960" height="320" fill="${background}"/><circle cx="775" cy="155" r="138" fill="${accent}" opacity=".13"/>${blocks}<path d="M0 270 C210 ${205 + digest[15] % 55}, 300 ${205 + digest[16] % 55}, 520 290 L0 320Z" fill="${accent}" opacity=".22"/><text x="48" y="72" font-size="18" letter-spacing="3" fill="${foreground}" font-family="sans-serif">EDITORIAL ILLUSTRATION</text><text x="48" y="180" font-size="60" font-weight="700" fill="${foreground}" font-family="sans-serif">${categories[index]}</text><path d="M48 207 H330" stroke="${accent}" stroke-width="8" stroke-linecap="round"/></svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer({ resolveWithObject: true });
 }
-export async function prepareDigestMedia(d: DigestV2, options: { storage?: ObjectStorage | null; rules?: MediaRule[]; fetchOptions?: ControlledDailyReportMediaOptions; mode: 'shadow' | 'production'; mediaRoot?: string }) {
+export async function prepareDigestMedia(d: DigestV2, options: { storage?: ObjectStorage | null; rules?: MediaRule[]; fetchOptions?: ControlledDailyReportMediaOptions; mode: 'shadow' | 'production'; mediaRoot?: string; storyIllustrations?: boolean }) {
   let storage: ObjectStorage | null = null;
   let configurationFailure: string | null = null;
   let rules: MediaRule[] = [];
@@ -175,7 +191,8 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
     } catch (e) {
       fallback = true;
       failure = rule ? 'SOURCE_OR_IMAGE_FAILED' : 'LICENSE_NOT_APPROVED';
-      result = await fallbackImage(m.category);
+      const story = [...d.market, ...d.macro, ...d.stories].find(s => s.media_ids.includes(m.id));
+      result = await fallbackImage(m.category, story ? `${story.id}:${story.title}` : '');
     }
     const mime = fallback || m.kind === 'source_icon' ? 'image/png' : 'image/jpeg';
     const sha256 = crypto.createHash('sha256').update(result.data).digest('hex');
@@ -193,6 +210,28 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
     } catch { failure = storage ? 'R2_UPLOAD_FAILED' : 'R2_NOT_CONFIGURED'; }
     failure = configurationFailure || failure;
     images.push({ ...(m.kind ? { kind: m.kind, sourceHost: new URL(evidence.url).hostname } : {}), id: m.id, evidenceId: m.evidence_id, sourceUrl: m.url, category: m.category, licenseRef: fallback ? 'code-owned-category-art' : rule!.licenseRef, policy: fallback ? 'OWNED_OPEN' : rule!.policy, publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback, failure, ...(!fallback ? { sourceTransport: rule?.sourceFile ? 'audited_copy' as const : transport || 'network' as const, sourceSha256, ...(rule?.credit ? { credit: { ...rule.credit } } : {}) } : {}) });
+  }
+  if (options.storyIllustrations) {
+    const stories = [...d.market, ...d.macro, ...d.stories];
+    for (const story of stories) {
+      if (images.length >= 40) break;
+      if (story.media_ids.some(id => images.some(m => m.id === id && m.publicUrl))) continue;
+      const category = d.market.includes(story) ? 'Market' : d.macro.includes(story) ? 'Macro' : 'International';
+      const result = await fallbackImage(category, `${story.id}:${story.title}`);
+      const mime = 'image/png';
+      const sha256 = crypto.createHash('sha256').update(result.data).digest('hex');
+      const filename = `${sha256}.png`;
+      const key = `fallback/${filename}`;
+      storeProvidedDailyReportMedia(filename, result.data, mime, root);
+      let publicUrl = '';
+      let failure: string | null = null;
+      try {
+        if (!storage) throw new Error('R2_NOT_CONFIGURED');
+        await storage.put(key, result.data, mime, sha256);
+        publicUrl = storage.origin + '/' + key;
+      } catch { failure = storage ? 'R2_UPLOAD_FAILED' : 'R2_NOT_CONFIGURED'; }
+      images.push({ id: `story-illustration:${sha256}`, storyId: story.id, evidenceId: story.evidence_ids[0] || '', sourceUrl: '', category, licenseRef: 'code-owned-editorial-illustration', policy: 'OWNED_OPEN', publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback: true, failure });
+    }
   }
   return images;
 }

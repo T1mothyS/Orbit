@@ -83,7 +83,7 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       let payload: { publication: DigestPublication; reportId?: string; status: string; renderHash: string; emailStatus?: string };
       if (existing) payload = JSON.parse(existing.payload_json);
       else {
-        const media = await prepareDigestMedia(digest, { ...mediaOptions, mode: mode as 'shadow' | 'production' });
+        const media = await prepareDigestMedia(digest, { ...mediaOptions, mode: mode as 'shadow' | 'production', storyIllustrations: generationVersion === DIGEST_V2_GENERATION });
         const publication = { digest, warnings: validation.warnings, media, renderer: generationVersion };
         payload = { publication, status: 'PREPARED', renderHash: digestHash(publication) };
         existing = store.saveDigestArtifact({ id: crypto.randomUUID(), user_id: userId, run_id: runId, report_date: digest.date, mode: mode as 'shadow' | 'production', content_hash: validation.contentHash!, payload_json: JSON.stringify(payload), created_at: new Date().toISOString() });
@@ -111,8 +111,17 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       } else payload.status = 'SHADOW_SAVED';
       store.saveDigestArtifact({ ...existing, payload_json: JSON.stringify(payload) });
       recordPhase(payload.status, { emailStatus: payload.emailStatus || 'NOT_QUEUED', renderHash: payload.renderHash });
-      addLog('info', 'daily-report', '新版日报运行完成', { event: 'digest_v2_completed', runId, mode, status: payload.status, imageCount: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && !m.fallback).length });
-      return { status: payload.status, artifactId: existing.id, contentHash: validation.contentHash, renderHash: payload.renderHash, warnings: validation.warnings, emailStatus: payload.emailStatus || 'NOT_QUEUED', previewUrl: mode === 'shadow' ? `/reports/${digest.date}?shadow=${existing.id}` : `/reports/${digest.date}?source=cloud`, media: { icons: payload.publication.media.filter(m => m.kind === 'source_icon' && m.publicUrl && !m.fallback).length, real: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length, fallback: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length, failures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })) } };
+      const mediaById = new Map(payload.publication.media.map(m => [m.id, m]));
+      const newsItems = [...digest.market, ...digest.macro, ...digest.stories];
+      const coverage = { total: newsItems.length, real: 0, illustration: 0, missing: 0 };
+      for (const story of newsItems) {
+        const images = [...story.media_ids.map(id => mediaById.get(id)), ...payload.publication.media.filter(m => m.storyId === story.id)].filter(m => m && m.kind !== 'source_icon' && m.publicUrl);
+        if (images.some(m => !m!.fallback)) coverage.real++;
+        else if (images.length) coverage.illustration++;
+        else coverage.missing++;
+      }
+      addLog('info', 'daily-report', '新版日报运行完成', { event: 'digest_v2_completed', runId, mode, status: payload.status, imageCount: coverage.real, missingImageCount: coverage.missing });
+      return { status: payload.status, artifactId: existing.id, contentHash: validation.contentHash, renderHash: payload.renderHash, warnings: validation.warnings, emailStatus: payload.emailStatus || 'NOT_QUEUED', previewUrl: mode === 'shadow' ? `/reports/${digest.date}?shadow=${existing.id}` : `/reports/${digest.date}?source=cloud`, imageCoverage: coverage, media: { icons: payload.publication.media.filter(m => m.kind === 'source_icon' && m.publicUrl && !m.fallback).length, real: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && !m.fallback).length, fallback: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length, failures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })) } };
     } catch (error) {
       // Keep only bounded, non-sensitive stage diagnostics, never provider error messages.
       try { recordPhase('FAILED', { failedPhase: phase, retryable: true }); } catch { /* Original durable-write failure remains primary. */ }
