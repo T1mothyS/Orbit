@@ -239,6 +239,8 @@
 .daily-report-markdown table { min-width: 520px; width: 100%; border-collapse: collapse; font-size: 12px; }
 .daily-report-markdown th, .daily-report-markdown td { padding: 8px 10px; border: 1px solid var(--td-component-stroke); text-align: left; vertical-align: top; }
 .daily-report-markdown th { background: var(--td-bg-color-component); font-weight: 700; }
+.daily-report-markdown .digest-v2-story table { min-width: 0; font-size: inherit; }
+.daily-report-markdown .digest-v2-story td { padding: 0; border: 0; }
 .daily-report-markdown .daily-report-unsafe-link { color: var(--td-text-color-secondary); text-decoration: line-through; }
 .daily-report-markdown .daily-report-card-grid { width: 100%; }
 .daily-report-markdown .daily-report-card-grid > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
