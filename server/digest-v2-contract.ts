@@ -3,7 +3,8 @@ import net from 'node:net';
 import { isValidDateKey } from './date-key.js';
 
 export const DIGEST_V2_VERSION = 'daily-digest.v2';
-export const DIGEST_V2_GENERATION = '2026-09-26.1';
+export const DIGEST_V2_GENERATION = '2026-09-27.1';
+export const DIGEST_V2_ILLUSTRATED_GENERATIONS = ['2026-09-26.1', DIGEST_V2_GENERATION];
 export type CheckStatus = 'complete' | 'partial' | 'failed' | 'not_configured';
 export interface InputItem { id: string; title: string; detail: string }
 export interface InputSection { status: CheckStatus; items: InputItem[] }
@@ -37,21 +38,22 @@ export interface DigestV2 {
   watchlist: Array<{ input_id: string; summary: string; check: 'complete' | 'incomplete'; change: 'material' | 'nothing_material' | 'unknown'; evidence_ids: string[] }>;
   what_matters_next: string[]; evidence: DigestEvidence[]; media: DigestMedia[];
 }
-type Schema = { type: 'object' | 'array' | 'string'; properties?: Record<string, Schema>; required?: string[]; additionalProperties?: false; items?: Schema; maxItems?: number; minLength?: number; maxLength?: number; enum?: readonly string[]; format?: 'id' | 'url' | 'date' | 'timestamp' };
+type Schema = { type: 'object' | 'array' | 'string'; description?: string; properties?: Record<string, Schema>; required?: string[]; additionalProperties?: false; items?: Schema; maxItems?: number; minLength?: number; maxLength?: number; enum?: readonly string[]; format?: 'id' | 'url' | 'date' | 'timestamp' };
 const str = (maxLength = 2000): Schema => ({ type: 'string', maxLength });
+const prose = (maxLength = 2000): Schema => ({ ...str(maxLength), description: '正文每句选择一到两处短重点，用成对 ** 包围原文词组；优先对象、关键数字、结论和行动。不要整句加粗，不要加入 HTML 或其他 Markdown。' });
 const id: Schema = { ...str(100), minLength: 1, format: 'id' };
 const array = (items: Schema, maxItems = 100): Schema => ({ type: 'array', items, maxItems });
 const obj = (properties: Record<string, Schema>): Schema => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const refs = array(id, 20);
-const story = obj({ id, title: { ...str(250), minLength: 1 }, summary: { ...str(4000), minLength: 1 }, evidence_ids: refs, media_ids: refs, verification: { ...str(), enum: ['verified', 'partial', 'unverified'] } });
+const story = obj({ id, title: { ...str(250), minLength: 1 }, summary: { ...prose(4000), minLength: 1 }, evidence_ids: refs, media_ids: refs, verification: { ...str(), enum: ['verified', 'partial', 'unverified'] } });
 export const DIGEST_V2_SCHEMA = obj({
   schema_version: { ...str(), enum: [DIGEST_V2_VERSION] }, date: { ...str(), format: 'date' }, title: { ...str(200), minLength: 1 },
-  executive_signals: array({ ...str(500), minLength: 1 }, 5), calendar: array(obj({ input_id: id, text: { ...str(), minLength: 1 } }), 300),
-  mail: array(obj({ input_id: id, summary: { ...str(3000), minLength: 1 }, action: str() })),
+  executive_signals: array({ ...prose(500), minLength: 1 }, 5), calendar: array(obj({ input_id: id, text: { ...prose(), minLength: 1 } }), 300),
+  mail: array(obj({ input_id: id, summary: { ...prose(3000), minLength: 1 }, action: prose() })),
   market: array(story, 30), macro: array(story, 30), stories: array(story, 30),
-  watchlist: array(obj({ input_id: id, summary: str(), check: { ...str(), enum: ['complete', 'incomplete'] }, change: { ...str(), enum: ['material', 'nothing_material', 'unknown'] }, evidence_ids: refs })),
-  what_matters_next: array(str(1000), 20),
-  evidence: array(obj({ id, url: { ...str(2048), format: 'url' }, source: { ...str(200), minLength: 1 }, published_at: { ...str(40), format: 'timestamp' } }), 200),
+  watchlist: array(obj({ input_id: id, summary: prose(), check: { ...str(), enum: ['complete', 'incomplete'] }, change: { ...str(), enum: ['material', 'nothing_material', 'unknown'] }, evidence_ids: refs })),
+  what_matters_next: array(prose(1000), 20),
+  evidence: array(obj({ id, url: { ...str(2048), format: 'url' }, source: { ...str(200), minLength: 1, description: '只填写媒体或机构名称，不加入核验状态、图片处理过程、时间说明或网址。' }, published_at: { ...str(40), format: 'timestamp' } }), 200),
   media: array(obj({ id, evidence_id: id, url: { ...str(2048), format: 'url' }, category: { ...str(), enum: ['AI', 'Semiconductor', 'Banking', 'Macro', 'Gaming', 'China', 'International', 'Company', 'Market'] } }), 20),
 });
 
@@ -97,6 +99,11 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
       if (s.format === 'timestamp' && v !== '' && (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(v) || !Number.isFinite(Date.parse(v)))) issue(path, 'TIMESTAMP');
       if (s.format === 'url' && !publicDigestUrl(v)) issue(path, 'URL');
       if (/(?:\bBearer\s+[A-Za-z0-9._~-]{16,}|\b(?:password|api[_-]?key|secret)\s*[:=]\s*\S{8,}|[A-Za-z]:\\)/i.test(v)) issue(path, 'SENSITIVE_CONTENT');
+      if (generationVersion === DIGEST_V2_GENERATION && s.description?.startsWith('正文')) {
+        const parts = v.split('**');
+        if (parts.length % 2 === 0 || parts.some((part, i) => i % 2 === 1 && (!part.trim() || part.length > 80))) issue(path, 'EMPHASIS_INVALID');
+        if (v.split(/[。！？；!?\n]+/u).some(sentence => sentence.replace(/\*\*/g, '').trim().length >= 20 && !sentence.includes('**'))) issue(path, 'EMPHASIS_REQUIRED');
+      }
     }
   }
   if (Buffer.byteLength(JSON.stringify(value) || '') > 750_000) issue('$', 'SIZE_LIMIT');

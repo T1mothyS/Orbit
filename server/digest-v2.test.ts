@@ -70,7 +70,8 @@ test('new digest layout gives the lead a large image, other stories side images,
     assert.equal((html.match(/digest-v2-story--lead/g) || []).length, 1);
     assert.equal((html.match(/digest-v2-story--compact/g) || []).length, 1);
     assert.equal((html.match(/digest-v2-story--no-image/g) || []).length, 1);
-    assert.ok(html.includes('width="640"'));
+    assert.ok(html.includes('class="digest-v2-cover"'));
+    assert.ok(html.includes('width="680"'));
     assert.ok(html.includes('width="116"'));
     assert.ok(html.includes('此条暂无可用配图'));
   }
@@ -92,7 +93,7 @@ test('report list uses the lead news title and image instead of the draft title 
   assert.equal(cover.heroImageSourceUrl, 'https://example.com/photo');
   assert.equal(cover.heroImageLicenseUrl, 'https://example.com/license');
   const publication = { digest: d, media: [photo], warnings: [], renderer: DIGEST_V2_GENERATION };
-  assert.ok(renderDigestV2(publication).includes('<h1 style="font-size:26px;line-height:1.4">今日重点新闻</h1>'));
+  assert.ok(renderDigestV2(publication).includes('>今日重点新闻</h1>'));
   assert.ok(!renderDigestV2(publication).includes(d.title));
   assert.ok(digestV2Text(publication).includes('今日重点新闻'));
   assert.ok(!digestV2Text(publication).includes(d.title));
@@ -102,6 +103,56 @@ test('report list uses the lead news title and image instead of the draft title 
   const empty = digestV2Cover({ digest: digest(), media: [], warnings: [], renderer: DIGEST_V2_GENERATION });
   assert.equal(empty.heroImageUrl, null);
   assert.ok(renderDigestV2({ digest: digest(), media: [], warnings: [], renderer: DIGEST_V2_GENERATION }).includes('今日情报简报'));
+});
+
+test('editorial digest renders selective emphasis, one opening cover, numbered sources and concise credits', () => {
+  const d = illustrated();
+  d.executive_signals = ['美国**长端国债收益率**仍高，**高无风险利率**约束估值。'];
+  d.stories[0].summary = '**Akamai与Anthropic**宣布合作，图片仅作背景，不代表公告现场。';
+  d.evidence[0] = { id: 'e1', url: 'https://example.com/story', source: 'Example source', published_at: '' };
+  d.evidence.push({ id: 'e2', url: 'https://photos.example.com/image', source: 'Photo archive', published_at: now });
+  d.media[0].evidence_id = 'e2';
+  d.stories[0].evidence_ids = ['e1', 'e2'];
+  d.market = [{ id: 'market', title: '市场跟踪', summary: '同一来源显示**利率继续走高**，需要关注估值变化。', evidence_ids: ['e1'], media_ids: [], verification: 'verified' }];
+  const photo = { id: 'm1', publicUrl: 'https://images.example.com/lead.jpg', fallback: false, credit: { caption: '资料照片，非公告现场', author: 'Photographer', sourcePage: 'https://photos.example.com/image', licenseName: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/' } } as any;
+  const icon = { id: 'source-icon:example.com', kind: 'source_icon', sourceHost: 'example.com', publicUrl: 'https://images.example.com/icon.png', fallback: false } as any;
+  const p = { digest: d, media: [photo, icon], warnings: [], renderer: DIGEST_V2_GENERATION };
+  assert.equal(validateDigestV2(d).valid, true);
+  for (const email of [false, true]) {
+    const html = renderDigestV2(p, email);
+    assert.ok(html.indexOf('class="digest-v2-cover"') < html.indexOf('>今日重点新闻</h1>'));
+    assert.equal((html.match(/lead\.jpg/g) || []).length, 1);
+    assert.ok(html.includes('<strong>长端国债收益率</strong>'));
+    assert.ok(html.includes('href="#digest-source-1"'));
+    assert.ok(html.includes('id="digest-source-1"'));
+    assert.equal((html.match(/id="digest-source-1"/g) || []).length, 1);
+    assert.ok(html.includes('icon.png'));
+    assert.ok(html.includes('Example source · 发布时间：时间未知'));
+    assert.ok(html.includes('>原文链接</a>'));
+    assert.ok(html.includes('Photographer'));
+    assert.ok(html.includes('已编辑'));
+    assert.ok(!html.includes('证据已核对'));
+    assert.ok(!html.includes('发布时间未提供'));
+    assert.ok(!html.includes('已缩放'));
+    assert.ok(!html.includes('Photo archive · 发布时间'));
+  }
+  assert.ok(!digestV2Text(p).includes('**'));
+  assert.ok(digestV2Cover(p).excerpt.includes('Akamai与Anthropic'));
+  assert.ok(!digestV2Cover(p).excerpt.includes('**'));
+  const missing = structuredClone(d); missing.stories[0].summary = '这是一段足够长但完全没有标出重点的正文内容。';
+  assert.ok(validateDigestV2(missing).errors.some(issue => issue.code === 'EMPHASIS_REQUIRED'));
+  const halfMarked = structuredClone(d); halfMarked.stories[0].summary = '第一句说明了**关键事实**。第二句足够长却完全没有标出任何重点内容，读者无法快速抓住核心变化。';
+  assert.ok(validateDigestV2(halfMarked).errors.some(issue => issue.code === 'EMPHASIS_REQUIRED'));
+  const broken = structuredClone(d); broken.stories[0].summary = '这一段有**没有结束的标记';
+  assert.ok(validateDigestV2(broken).errors.some(issue => issue.code === 'EMPHASIS_INVALID'));
+  const escaped = structuredClone(p); escaped.digest.stories[0].summary = '**<img src=x onerror=alert(1)>** 后续内容。';
+  assert.ok(renderDigestV2(escaped).includes('<strong>&lt;img src=x onerror=alert(1)&gt;</strong>'));
+  assert.ok(!renderDigestV2(escaped).includes('<img src=x'));
+  const oldDigest = structuredClone(d);
+  oldDigest.stories[0].summary = '这是旧版已经保存的较长正文，其中没有任何新的加粗标记。';
+  const oldPublication = { ...p, digest: oldDigest, renderer: '2026-09-26.1' };
+  assert.ok(decodeDigestPublication(encodeDigestPublication(oldPublication)));
+  assert.ok(renderDigestV2(oldPublication).includes('发布时间未提供'));
 });
 
 test('mail snapshot state distinguishes unconfigured, failed, partial, and empty success in every receipt', async () => {
@@ -382,7 +433,7 @@ test('seven fixed synthetic scenarios save only isolated Shadow artifacts', asyn
       d.mail = [{ input_id: 'mail-1', summary: '合成邮件摘要', action: '整理资料' }];
     }
     if (name === 'major-news') d.executive_signals = ['合成重大事件，不代表真实新闻'];
-    if (name === 'data-revision') d.stories[0].summary = '合成数据：前值 1.0，修订值 1.1；不构成真实数据发布。';
+    if (name === 'data-revision') d.stories[0].summary = '合成数据：前值 1.0，**修订值 1.1**；不构成真实数据发布。';
     if (name === 'source-failure') d.stories[0].verification = 'unverified';
     const run = service.createDigestSnapshotRun(userId, snap);
     const result = await service.publishDigestV2(userId, run.runId, d, 'shadow', { storage: name === 'all-images-failure' ? null : storage, rules: [] });

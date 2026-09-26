@@ -1,4 +1,4 @@
-import { canonicalJson, publicDigestUrl, validateDigestV2, DIGEST_V2_GENERATION, type DigestV2, type DigestStory } from './digest-v2-contract.js';
+import { canonicalJson, publicDigestUrl, validateDigestV2, DIGEST_V2_GENERATION, DIGEST_V2_ILLUSTRATED_GENERATIONS, type DigestV2, type DigestStory, type DigestEvidence } from './digest-v2-contract.js';
 import type { MediaCredit, PreparedImage } from './digest-v2-media.js';
 
 const marker = '<!-- daily-digest.v2 -->\n';
@@ -8,7 +8,7 @@ export function decodeDigestPublication(value: string): DigestPublication | null
   if (!value.startsWith(marker) || value.length > 900_000) return null;
   try {
     const parsed = JSON.parse(value.slice(marker.length));
-    if (!validateDigestV2(parsed.digest).valid || !Array.isArray(parsed.media) || parsed.media.length > 40 || !Array.isArray(parsed.warnings)) return null;
+    if (typeof parsed.renderer !== 'string' || !validateDigestV2(parsed.digest, undefined, parsed.renderer).valid || !Array.isArray(parsed.media) || parsed.media.length > 40 || !Array.isArray(parsed.warnings)) return null;
     if (parsed.warnings.some((s: unknown) => typeof s !== 'string') || parsed.media.some((m: any) => !m || typeof m.id !== 'string' || typeof m.publicUrl !== 'string' || typeof m.fallback !== 'boolean')) return null;
     return parsed;
   } catch { return null; }
@@ -36,7 +36,7 @@ export function digestV2Cover(p: DigestPublication) {
   const credit = image && !image.fallback ? validImageCredit(image) : null;
   return {
     headline: story?.title || p.digest.title,
-    excerpt: (story?.summary || p.digest.executive_signals[0] || p.digest.title).slice(0, 240),
+    excerpt: plainEmphasis(story?.summary || p.digest.executive_signals[0] || p.digest.title).slice(0, 240),
     heroImageUrl: image?.publicUrl || null,
     heroImageCredit: image ? image.fallback ? imageCredit(image, false) : credit ? `${credit.caption} · ${credit.author} · ${credit.licenseName}` : '新闻配图，来源见详情' : null,
     heroImageSourceUrl: credit?.sourcePage || null,
@@ -57,10 +57,79 @@ function emptyMailHtml(p: DigestPublication): string {
   return `<p>${emptyMailMessage(p)}</p>`;
 }
 function digestDisplayTitle(p: DigestPublication): string {
-  if (p.renderer !== DIGEST_V2_GENERATION) return p.digest.title;
+  if (!DIGEST_V2_ILLUSTRATED_GENERATIONS.includes(p.renderer)) return p.digest.title;
   return [...p.digest.stories, ...p.digest.market, ...p.digest.macro].length ? '今日重点新闻' : '今日情报简报';
 }
+const plainEmphasis = (value: string): string => value.replace(/\*\*/g, '');
+const emphasis = (value: string): string => value.split('**').map((part, i) => i % 2 ? `<strong>${esc(part)}</strong>` : esc(part)).join('');
+function conciseImageCredit(image: PreparedImage): string {
+  if (image.fallback) return imageCredit(image);
+  const c = validImageCredit(image);
+  if (!c) return '新闻配图';
+  return `${esc(c.caption)} · ${esc(c.author)} · <a href="${esc(c.sourcePage)}" rel="noopener noreferrer">图片来源</a> · <a href="${esc(c.licenseUrl)}" rel="noopener noreferrer">${esc(c.licenseName)}</a> · 已编辑`;
+}
+function plainImageCredit(image: PreparedImage): string {
+  if (image.fallback) return imageCredit(image, false);
+  const c = validImageCredit(image);
+  if (!c) return '新闻配图';
+  return `${c.caption} · ${c.author} · ${c.sourcePage} · ${c.licenseName} ${c.licenseUrl} · 已编辑`;
+}
+function evidenceTime(value: string): string {
+  return value ? esc(value.replace('T', ' ').replace(/Z$/, ' UTC').replace(/([+-]\d\d:\d\d)$/, ' $1')) : '时间未知';
+}
+function renderEditorialDigestV2(p: DigestPublication, email: boolean): string {
+  const d = p.digest;
+  const section = (title: string, body: string) => `<section style="margin:28px 0"><h2 style="font-size:18px;border-bottom:1px solid #b9c2ce;padding-bottom:10px">${title}</h2>${body || '<p>本期无新增内容。</p>'}</section>`;
+  const list = (items: string[]) => items.length ? `<ul style="padding-left:24px">${items.map(item => `<li style="margin:8px 0">${emphasis(item)}</li>`).join('')}</ul>` : '';
+  const mediaEvidenceIds = new Set(d.media.map(item => item.evidence_id));
+  const sources = new Map<string, { number: number; evidence: DigestEvidence }>();
+  const citedIds = (ids: string[]) => {
+    const newsIds = ids.filter(id => !mediaEvidenceIds.has(id));
+    return newsIds.length ? newsIds : ids;
+  };
+  const citations = (ids: string[]) => citedIds(ids).map(id => {
+    const evidence = d.evidence.find(item => item.id === id);
+    if (!evidence || !publicDigestUrl(evidence.url)) return '';
+    if (!sources.has(id)) sources.set(id, { number: sources.size + 1, evidence });
+    const number = sources.get(id)!.number;
+    return `<sup style="font-size:11px;white-space:nowrap"><a href="#digest-source-${number}" aria-label="跳转到来源 ${number}" style="color:${email ? '#285eaa' : 'var(--td-brand-color, #285eaa)'}">[${number}]</a></sup>`;
+  }).join('');
+  const sourceIcon = (evidence: DigestEvidence) => {
+    const host = new URL(evidence.url).hostname;
+    const icon = p.media.find(media => media.kind === 'source_icon' && media.sourceHost === host && !media.fallback && publicDigestUrl(media.publicUrl));
+    if (icon) return `<img src="${esc(icon.publicUrl)}" alt="" width="16" height="16" style="display:inline-block;width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-right:6px"/>`;
+    const initial = evidence.source.match(/[A-Za-z]/)?.[0]?.toUpperCase() || Array.from(evidence.source.trim())[0] || '文';
+    return `<span aria-hidden="true" style="display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;font-size:11px;font-weight:700;border:1px solid #9aa9bd;border-radius:4px;vertical-align:middle;margin-right:6px">${esc(initial)}</span>`;
+  };
+  const imageFor = (story: DigestStory) => imageForStory(p, story);
+  const coverStory = [...d.stories, ...d.market, ...d.macro].find(story => imageFor(story));
+  const coverImage = coverStory && imageFor(coverStory);
+  const imageAlt = (image: PreparedImage, story: DigestStory) => image.fallback ? '原创编辑插画，非新闻现场' : image.credit?.caption || story.title;
+  const stories = (items: DigestStory[], news = false) => {
+    const leadId = news ? items.find(story => imageFor(story))?.id : undefined;
+    return items.map(story => {
+      const image = imageFor(story);
+      const lead = story.id === leadId;
+      const title = `<h3 style="margin:0 0 8px;font-size:${lead ? '24px' : '17px'};line-height:1.4">${esc(story.title)}</h3>`;
+      const summary = `<p style="margin:8px 0 0">${emphasis(story.summary)}${citations(story.evidence_ids)}</p>`;
+      const frame = `class="digest-v2-story${lead ? ' digest-v2-story--lead' : ' digest-v2-story--compact'}" style="margin:24px 0;padding-top:16px;border-top:1px solid #c9d0d8"`;
+      if (!image) return `<article class="digest-v2-story digest-v2-story--no-image" style="margin:24px 0;padding-top:16px;border-top:1px solid #c9d0d8">${title}<p style="font-size:12px;opacity:.7">此条暂无可用配图</p>${summary}</article>`;
+      if (image === coverImage) return `<article ${frame}>${title}${summary}</article>`;
+      const credit = `<figcaption style="font-size:11px;line-height:1.5;opacity:.75;overflow-wrap:anywhere">${conciseImageCredit(image)}</figcaption>`;
+      if (lead) return `<article ${frame}>${title}<figure style="margin:14px 0"><img src="${esc(image.publicUrl)}" alt="${esc(imageAlt(image, story))}" width="640" style="display:block;width:100%;max-width:640px;height:auto;max-height:360px;object-fit:cover;border-radius:6px"/>${credit}</figure>${summary}</article>`;
+      return `<article ${frame}><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;table-layout:fixed;border-collapse:collapse"><tr><td valign="top" style="min-width:0;padding-right:14px;overflow-wrap:anywhere">${title}${summary}</td><td valign="top" width="116" style="width:116px"><img src="${esc(image.publicUrl)}" alt="${esc(imageAlt(image, story))}" width="116" height="82" style="display:block;width:116px;height:82px;object-fit:cover;border-radius:5px"/></td></tr></table>${credit}</article>`;
+    }).join('');
+  };
+  const alerts = p.warnings.filter(warning => warnings[warning]).map(warning => `<p>${warnings[warning]}</p>`).join('');
+  const coverStyle = email ? 'height:auto;max-height:440px;aspect-ratio:16/9' : 'height:70svh;min-height:360px;max-height:720px';
+  const cover = coverImage && coverStory ? `<figure class="digest-v2-cover" style="margin:0 0 8px"><img src="${esc(coverImage.publicUrl)}" alt="${esc(imageAlt(coverImage, coverStory))}" width="680" style="display:block;width:100%;${coverStyle};object-fit:cover;border-radius:6px"/></figure>` : '';
+  const coverCredit = coverImage ? `<p style="font-size:11px;line-height:1.5;opacity:.75;margin:4px 0 0">${conciseImageCredit(coverImage)}</p>` : '';
+  const body = `${section('Executive Signals · 重点信号', list(d.executive_signals) || '<p>在本期检查范围内，没有选出重大信号。</p>')}${section('个人日程', list(d.calendar.map(item => item.text)) || (p.warnings.includes('CALENDAR_INCOMPLETE') ? '<p>未取得可展示的日程内容。</p>' : ''))}${section('邮件简报与行动', d.mail.length ? `<ul style="padding-left:24px">${d.mail.map(item => `<li style="margin:8px 0">${emphasis(item.summary)}${item.action ? `<br/><span>行动：${emphasis(item.action)}</span>` : ''}</li>`).join('')}</ul>` : emptyMailHtml(p))}${section('市场快照', stories(d.market))}${section('Macro Radar · 宏观简报', stories(d.macro))}${section('重要新闻', stories(d.stories, true))}${section('Watchlist · 持续关注', d.watchlist.map(item => `<p>${emphasis(item.summary)}${citations(item.evidence_ids)}<br/><small>${item.check === 'incomplete' ? '检查不完整' : item.change === 'nothing_material' ? '本期检查范围内无重大变化' : item.change === 'material' ? '重大变化' : '尚不能判断'}</small></p>`).join(''))}${section('What Matters Next · 后续关注', list(d.what_matters_next))}`;
+  const references = sources.size ? section('来源', `<ol style="padding-left:24px">${[...sources.values()].map(({ number, evidence }) => `<li id="digest-source-${number}" style="margin:10px 0;font-size:13px;scroll-margin-top:20px">${sourceIcon(evidence)}${esc(evidence.source)} · 发布时间：${evidenceTime(evidence.published_at)} · <a href="${esc(evidence.url)}" rel="noopener noreferrer" style="color:${email ? '#285eaa' : 'var(--td-brand-color, #285eaa)'}">原文链接</a></li>`).join('')}</ol>`) : '';
+  return `<div class="digest-v2" style="max-width:680px;margin:0 auto;overflow-wrap:anywhere;line-height:1.8;${email ? 'color:#253247;background:#fff;font-family:Arial,sans-serif;padding:20px' : 'color:inherit'}">${cover}<header><h1 style="font-size:26px;line-height:1.4;margin:12px 0 2px">${esc(digestDisplayTitle(p))}</h1><p style="font-size:12px;letter-spacing:.08em;margin:0">DAILY DIGEST · ${esc(d.date)}</p></header>${coverCredit}${alerts ? `<aside role="status" style="border-left:4px solid #bd830e;padding:4px 16px"><strong>本期信息不完整</strong>${alerts}</aside>` : ''}${body}${references}</div>`;
+}
 export function renderDigestV2(p: DigestPublication, email = false): string {
+  if (p.renderer === DIGEST_V2_GENERATION) return renderEditorialDigestV2(p, email);
   const d = p.digest;
   const section = (title: string, body: string) => `<section style="margin:28px 0"><h2 style="font-size:18px;border-bottom:1px solid #b9c2ce;padding-bottom:10px">${title}</h2>${body || '<p>本期无新增内容。</p>'}</section>`;
   const list = (items: string[]) => items.length ? `<ul style="padding-left:24px">${items.map(x => `<li style="margin:8px 0">${esc(x)}</li>`).join('')}</ul>` : '';
@@ -75,7 +144,7 @@ export function renderDigestV2(p: DigestPublication, email = false): string {
   }).join('');
   const imageFor = (story: DigestStory) => imageForStory(p, story);
   const stories = (items: DigestStory[], news = false) => {
-    if (p.renderer !== DIGEST_V2_GENERATION) return legacyStories(items);
+    if (p.renderer !== '2026-09-26.1') return legacyStories(items);
     const leadId = news ? items.find(s => imageFor(s))?.id : undefined;
     return items.map(s => {
       const image = imageFor(s);
@@ -95,5 +164,22 @@ export function renderDigestV2(p: DigestPublication, email = false): string {
 }
 export function digestV2Text(p: DigestPublication): string {
   const d = p.digest;
+  if (p.renderer === DIGEST_V2_GENERATION) {
+    const mediaEvidenceIds = new Set(d.media.map(item => item.evidence_id));
+    const sources = new Map<string, DigestEvidence>();
+    const refs = (ids: string[]) => {
+      const newsIds = ids.filter(id => !mediaEvidenceIds.has(id));
+      return (newsIds.length ? newsIds : ids).map(id => {
+        const evidence = d.evidence.find(item => item.id === id);
+        if (!evidence) return '';
+        if (!sources.has(id)) sources.set(id, evidence);
+        return `[${[...sources.keys()].indexOf(id) + 1}]`;
+      }).join('');
+    };
+    const stories = [...d.market, ...d.macro, ...d.stories].map(story => story.title + '\n' + plainEmphasis(story.summary) + refs(story.evidence_ids));
+    const watchlist = d.watchlist.map(item => plainEmphasis(item.summary) + refs(item.evidence_ids));
+    const sourceList = [...sources.values()].map((item, index) => `[${index + 1}] ${item.source} · 发布时间：${item.published_at ? item.published_at.replace('T', ' ') : '时间未知'} · ${item.url}`);
+    return [d.date, digestDisplayTitle(p), ...p.warnings.map(w => warnings[w] || ''), '重点信号', ...d.executive_signals.map(plainEmphasis), '日程', ...d.calendar.map(item => plainEmphasis(item.text)), '邮件', ...d.mail.map(item => plainEmphasis(item.summary) + (item.action ? '\n行动：' + plainEmphasis(item.action) : '')), ...(d.mail.length ? [] : [emptyMailMessage(p)]), '新闻', ...stories, '观察名单', ...watchlist, '后续关注', ...d.what_matters_next.map(plainEmphasis), '来源', ...sourceList, '图片署名', ...p.media.filter(media => media.publicUrl && media.kind !== 'source_icon').map(plainImageCredit)].join('\n\n');
+  }
   return [d.date, digestDisplayTitle(p), ...p.warnings.map(w => warnings[w] || ''), '重点信号', ...d.executive_signals, '日程', ...d.calendar.map(x => x.text), '邮件', ...d.mail.map(x => x.summary + '\n' + x.action), ...(d.mail.length === 0 && p.renderer !== '2026-09-21.1' && p.renderer !== '2026-09-22.2' ? [emptyMailMessage(p)] : []), ...[...d.market, ...d.macro, ...d.stories].map(x => x.title + '\n' + x.summary), '观察名单', ...d.watchlist.map(x => x.summary + ' · ' + (x.check === 'incomplete' ? '检查不完整' : x.change === 'nothing_material' ? '检查范围内无重大变化' : x.change === 'material' ? '重大变化' : '尚不能判断')), '后续关注', ...d.what_matters_next, '图片署名', ...p.media.filter(m => m.publicUrl && m.kind !== 'source_icon').map(m => imageCredit(m, false)), '来源', ...d.evidence.map(x => x.source + ': ' + x.url)].join('\n\n');
 }

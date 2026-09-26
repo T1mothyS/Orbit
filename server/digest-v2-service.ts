@@ -6,7 +6,7 @@ import { scheduleDateInTimezone } from './schedule-time.js';
 import { readUserMail } from './user-mail-service.js';
 import { getDailyReportCloudContext } from './daily-report-cloud-store.js';
 import { isValidDateKey } from './date-key.js';
-import { DIGEST_V2_VERSION, DIGEST_V2_GENERATION, DIGEST_V2_SCHEMA, digestHash, digestSnapshotWarnings, validateDigestV2, type DigestSnapshot, type DigestV2, type InputSection } from './digest-v2-contract.js';
+import { DIGEST_V2_VERSION, DIGEST_V2_GENERATION, DIGEST_V2_ILLUSTRATED_GENERATIONS, DIGEST_V2_SCHEMA, digestHash, digestSnapshotWarnings, validateDigestV2, type DigestSnapshot, type DigestV2, type InputSection } from './digest-v2-contract.js';
 import { prepareDigestMedia } from './digest-v2-media.js';
 import { digestV2Cover, encodeDigestPublication, renderDigestV2, type DigestPublication } from './digest-v2-render.js';
 import { enqueueUserEmailNotificationDetailed } from './notification-service.js';
@@ -20,7 +20,7 @@ export function createDigestSnapshotRun(userId: string, snapshot: DigestSnapshot
   const id = crypto.randomUUID(); const now = new Date();
   const manifest = { date: snapshot.date, timezone: snapshot.timezone, cutoff: snapshot.cutoff, contextVersion: snapshot.contextVersion, contractVersion: DIGEST_V2_VERSION, generationVersion: DIGEST_V2_GENERATION, modelVersion: 'unknown', status: 'INPUTS_SNAPSHOTTED', inputCounts: { calendar: snapshot.calendar.items.length, mail: snapshot.mail.items.length, watchlist: snapshot.watchlist.items.length }, warnings: digestSnapshotWarnings(snapshot) };
   store.createDigestRun({ id, user_id: userId, report_date: snapshot.date, snapshot_json: JSON.stringify(snapshot), manifest_json: JSON.stringify(manifest), created_at: now.toISOString(), expires_at: new Date(now.getTime() + 7 * 86400000).toISOString() });
-  return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA };
+  return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA, editorialGuidance: '仅在正文中用 **原文短词组** 标重点；每句一到两处，优先关键对象、数字、结论或行动。标题不加标记，不能整句加粗。图片是否为现场只在图注说明，正文不重复。来源和发布时间由服务端生成角标与文末引用，不要写入摘要。' };
 }
 export async function readDigestV2Inputs(userId: string, date: string) {
   assertDigestV2Enabled();
@@ -83,7 +83,7 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       let payload: { publication: DigestPublication; reportId?: string; status: string; renderHash: string; emailStatus?: string };
       if (existing) payload = JSON.parse(existing.payload_json);
       else {
-        const media = await prepareDigestMedia(digest, { ...mediaOptions, mode: mode as 'shadow' | 'production', storyIllustrations: generationVersion === DIGEST_V2_GENERATION });
+        const media = await prepareDigestMedia(digest, { ...mediaOptions, mode: mode as 'shadow' | 'production', storyIllustrations: DIGEST_V2_ILLUSTRATED_GENERATIONS.includes(generationVersion) });
         const publication = { digest, warnings: validation.warnings, media, renderer: generationVersion };
         payload = { publication, status: 'PREPARED', renderHash: digestHash(publication) };
         existing = store.saveDigestArtifact({ id: crypto.randomUUID(), user_id: userId, run_id: runId, report_date: digest.date, mode: mode as 'shadow' | 'production', content_hash: validation.contentHash!, payload_json: JSON.stringify(payload), created_at: new Date().toISOString() });
