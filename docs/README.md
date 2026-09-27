@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified version: `0.31.15-260927.1121`（2026-09-27 D03 五张真实 Shadow 图片的镜像与独立备份哈希已核对，D02 日程和关注项输入读取有本地合成回归；不代表真实媒体下架、正式生产、发信或跨日期有新闻配图验收）。
+- Last verified version: `0.31.16-260927.1155`（2026-09-27，D02 第一轮内容基线与 D07 固定公开来源本地闭环；不代表真实媒体下架、正式生产、发信或跨日期有新闻配图验收）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。
@@ -10,9 +10,9 @@
 
 ## 当前规范与合同
 
-Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提示统一维护在 [Cloud 合同新版节](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)，阶段顺序见 [路线图](ROADMAP.md)，验收入口见 [测试矩阵](TEST-MATRIX.md)。2026-09-27 起优先内容质量基线，本地开发与生产分层放行；七个真实日期不是统一前置，本地/R2 证据仍不能代替真实集成或上线验收。
+Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提示统一维护在 [Cloud 合同新版节](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)，阶段顺序见 [路线图](ROADMAP.md)，验收入口见 [测试矩阵](TEST-MATRIX.md)。2026-09-27 的 D02 第一轮内容质量基线已列出缺陷与无法确认项；本地开发与生产分层放行，七个真实日期不是统一前置，本地/R2 证据仍不能代替真实集成或上线验收。
 
-Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 语义、S2-03 本地存储和 S2-04 账号备份恢复边界统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；尚无对外 V3 接口，不改变 V2.5 当前运行合同。
+Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 语义、S2-03 本地存储、S2-04 账号备份恢复及 D07 固定来源本地闭环边界统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；尚无对外 V3 接口，不改变 V2.5 当前运行合同。
 
 - [项目成长](../project-evolution/README.md)：顶部入口、历史数据、统计口径、架构快照和离线维护流程。
 - [Daily Digest 15 张里程碑卡](ROADMAP.md#daily-digest-15-张里程碑卡2026-09-26-调整)：涵盖 V2.5 收口、V3 Core、Scheduled Events 与 Research/Thesis/Radar/Flash；按成果验收，一张卡可跨多次实施。除已单独授权完成的本地成果外，后续阶段仍须分别授权。
@@ -50,6 +50,7 @@ Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 语义、S2-03 本地�
 | 文档 | 分类 | 不能用于 |
 |---|---|---|
 | [2026-09-27 Daily Digest 计划与实现审计](DAILY-DIGEST-PLAN-AUDIT-20260927.md) | AUDIT-SNAPSHOT / PLAN-REVISED | 将结构校验当内容质量，或将后续本地开发放行当生产验收 |
+| [2026-09-27 D02 第一轮内容质量基线](DAILY-DIGEST-D02-QUALITY-BASELINE-20260927.md) | REVIEW-SNAPSHOT / PARTIAL | 把同日修订算新日期、把空新闻格式合法当检索充分、把 P01 固定回放当真实日报或自动匹配 |
 | [2026-09-05 Phase 1 审计](PHASE-1-AUDIT.md) | AUDIT-SNAPSHOT | 直接引用为当前文件规模/风险状态 |
 | [2026-09-19 收口增量审计](CLOSEOUT-AUDIT-20260919.md) | AUDIT-SNAPSHOT | 推断依赖告警已修复、生产已部署或完整安全认证 |
 | [2026-09-19 格式与安全修复](FORMAT-SECURITY-REPAIR-20260919.md) | VERIFICATION-SNAPSHOT | 推断生产已部署、真实邮件已验收或绝对无 bug |

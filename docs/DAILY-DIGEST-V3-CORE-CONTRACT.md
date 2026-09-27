@@ -1,12 +1,12 @@
 # Daily Digest V3 Core：事件记忆字段与状态合同
 
-- Status: CONTRACT / S2-02；S2-03/04 LOCAL VERIFIED / NO PUBLIC V3 API
-- Scope: Event、Revision、Evidence、Analysis 的字段与状态、原活动库增量存储及账号级备份恢复；不定义 S2-05/06 的对外接口或自动匹配算法。
-- Last verified commit/version: `b040b01`（S2-04 修改前基线）/ `0.31.8-260924.1255`（2026-09-24，本地备份恢复合成验证；未部署）。
+- Status: CONTRACT / S2-02；S2-03/04 LOCAL VERIFIED；D07 固定来源本地闭环 / NO PUBLIC V3 API
+- Scope: Event、Revision、Evidence、Analysis 的字段与状态、原活动库增量存储、账号级备份恢复及 D07 本地人工审核演示；不定义对外接口或自动匹配算法。
+- Last verified version: `0.31.16-260927.1155`（2026-09-27，D07 固定来源本地闭环；无对外接口或部署）。S2-04 历史基线为 `b040b01` / `0.31.8-260924.1255`。
 - Authority: 当前源码及 [S2-01 固定案例](daily-digest-v3-s2-01-cases.json) 优先；实现时如需改动本合同，应先解释案例与兼容性差异。
 - Update trigger: V3 数据结构或备份合同、S2-06 写入校验、S2-09 修订语义或 S2-10a 纠正流程落地时。
 - Supersedes: 无；[V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)及已有产物保持原语义。
-- Do not use for: 宣称 V3 已有对外接口、自动分类器、30 例回归或真实 Shadow 验收。
+- Do not use for: 宣称 V3 已有对外接口、自动分类器、30 例回归、正式日报冻结引用或真实 Shadow 验收。
 
 ## 共同约束
 
@@ -55,7 +55,7 @@
 
 现有 `activity.db` 在启动时增量创建 `digest_v3_events`、`digest_v3_revisions`、`digest_v3_evidence`、`digest_v3_analyses`，以及修订/分析到证据、分析到比较修订的三个引用表；`schema_meta` 的总版本为 `4`，`digest_v3=1`。迁移在 SQLite 事务中执行，重复启动安全，不读取或改写 V2 报告/产物。主键和外键包含 `user_id`；Event 当前修订还要求属于同一 Event。已保存的 Revision、Evidence、Analysis 禁止原位 UPDATE；Event 可在未来的受控纠正中改变当前指针与生命周期。
 
-内部存储层位于 [digest-v3-store.ts](../server/digest-v3-store.ts)，通过现有 `activity-store.ts` 连接和可靠写回。只提供内部的证据、初始事件、后续修订、分析写入与按账号读取，尚未接入 MCP、HTTP、Work 或日报发布。完整业务校验、幂等提交和用户权限从 S2-05/06 开始；匹配、合并与冻结日报引用仍按路线图后续卡片实现。`sql.js` 导出数据库会重建连接，写回/恢复后重新开启外键检查，避免账号引用约束在首次保存后失效。
+内部存储层位于 [digest-v3-store.ts](../server/digest-v3-store.ts)，通过现有 `activity-store.ts` 连接和可靠写回。只提供内部的证据、初始事件、后续修订、分析写入与按账号读取，尚未接入 MCP、HTTP、Work 或日报发布。D07 已对固定人工审核来源补局部业务校验和同进程幂等；完整外部输入、身份、分页和并发合同仍未建立。匹配、合并与冻结日报引用按路线图后续卡片实现。`sql.js` 导出数据库会重建连接，写回/恢复后重新开启外键检查，避免账号引用约束在首次保存后失效。
 
 全站快照包含完整 `activity.db`。管理员按已有全站快照流程删除账号数据时，会清除该账号的 V3 行并保留其他账号。账号级备份恢复规则见下一节；本地合成验证不能作为真实 V3 写入或生产恢复的放行依据。
 
@@ -68,3 +68,11 @@
 同账号合并保持既有行，重复导入相同行幂等；同 ID 内容冲突时报错并回滚。替换恢复清除目标账号的 V3 行后重建全部行和引用，四库恢复事务失败时回滚。跨账号恢复为 Event/Revision/Evidence/Analysis 生成新 ID，并重写所有外键、比较引用和 `facts_json` 中的证据 ID；目标账号既有记录不会被当作来源引用。旧备份可合并到已有 V3 数据的账号，或替换没有 V3 数据的账号；旧备份替换已有 V3 数据会在修改前拒绝，防止静默删除。恢复前仍创建既有的加密安全副本。
 
 [S2-04 测试](../server/core.test.ts) 用隔离账号核对加密备份检查、同账号替换、跨账号重映射、引用读回、旧备份兼容和断裂引用拒绝；[存储测试](../server/digest-v3-store.test.ts) 检查旧备份替换保护与合并幂等。未进行生产备份恢复演练，也没有 V3 对外写入或真实 Shadow。
+
+## D07 固定来源本地纵向闭环（2026-09-27）
+
+[本地流程](../server/digest-v3-local-flow.ts) 只接受调用方明确给出的 Event 身份和 `initial`/`progress` 前版决定，不寻找、合并或自动匹配事件。用户身份由本地调用方传入，未来公开接口必须由认证层确定，不能把该参数直接暴露给外部。来源由人工核对后提供有界事实摘要；运行时拒绝私网/非 HTTPS URL、敏感文本、未知字段、晚于截点的发布时间、同截点日精度不确定项、旧版本冲突与复用请求键改变内容。同一提交将 Evidence、Event/Revision、Analysis 在原 `activity.db` 事务中保存，写回失败回退；重试按账号与请求键派生固定 ID，保存内容一致时复用。上述幂等仅在现有单进程 `sql.js` 边界内验证，跨进程协调仍未实现。
+
+[固定 P01 脚本](../scripts/digest-v3-local-preview.ts) 从 S2-01 的两条 NASA 官方来源，在新建系统临时目录中写入发射初版和溅落进展版，生成两张独立 HTML。预览按账号与精确 Event/Revision/Analysis/Evidence ID 读取，显示先前事实、本次新增事实、来源链接及分析，并对截点和引用校验；它不写 V2/正式日报表、不产生通知，也不构成 D09 冻结发布。脚本不抓取网页，来源事实的本轮人工核对和 D02 内容边界见[质量基线](DAILY-DIGEST-D02-QUALITY-BASELINE-20260927.md)。[专项测试](../server/digest-v3-local-flow.test.ts) 验旧库迁移、两版保留、同键重试、错误来源/截点/跨账号引用、持久化故障与账号恢复。D07 其余条件及 D08 闸门仍以[路线图](ROADMAP.md#daily-digest-15-张里程碑卡2026-09-26-调整)为准。
+
+这一步的产品收益是让读者在同一条任务下看到“先前已发射、现在已溅落”的新增事实，并可逐条返回两份来源核对；初版预览仍保持当时的发射含义，不因后来进展漂移。它只验证人工指定关系下的解释能力，不衡量自动找全新闻或自动合并准确率。

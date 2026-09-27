@@ -259,7 +259,11 @@ export class DigestV3Store {
   }
 
   addEvidence(value: DigestV3Evidence): void {
-    this.transaction(db => db.run(`
+    this.transaction(db => this.insertEvidence(db, value));
+  }
+
+  private insertEvidence(db: Database, value: DigestV3Evidence): void {
+    db.run(`
       INSERT INTO digest_v3_evidence
         (user_id, id, url, publisher_key, document_type, language, source_fact,
          published_at, published_precision, retrieved_at, independence_key, review_state,
@@ -269,7 +273,7 @@ export class DigestV3Store {
       value.sourceFact, value.publishedAt, value.publishedPrecision, value.retrievedAt,
       value.independenceKey, value.reviewState, value.sourceDocumentKey ?? null,
       value.relatedEvidenceId ?? null, value.relation ?? null, value.supersedesEvidenceId ?? null,
-      value.linkedRevisionId ?? null]));
+      value.linkedRevisionId ?? null]);
   }
 
   getEvidence(userId: string, id: string): DigestV3Evidence | null {
@@ -293,14 +297,18 @@ export class DigestV3Store {
       throw new Error('V3 初始事件与修订不一致');
     }
     this.transaction(db => {
-      db.run(`INSERT INTO digest_v3_events
-        (user_id, id, event_type, subject_key, occurrence_key, title, lifecycle,
-         current_revision_id, merged_into_event_id, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [event.userId, event.id, event.eventType, event.subjectKey, event.occurrenceKey,
-        event.title, event.lifecycle, event.currentRevisionId, event.mergedIntoEventId ?? null, event.createdAt]);
+      this.insertEvent(db, event);
       this.insertRevision(db, first);
     });
+  }
+
+  private insertEvent(db: Database, event: DigestV3Event): void {
+    db.run(`INSERT INTO digest_v3_events
+      (user_id, id, event_type, subject_key, occurrence_key, title, lifecycle,
+       current_revision_id, merged_into_event_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [event.userId, event.id, event.eventType, event.subjectKey, event.occurrenceKey,
+      event.title, event.lifecycle, event.currentRevisionId, event.mergedIntoEventId ?? null, event.createdAt]);
   }
 
   appendRevision(value: DigestV3Revision): void {
@@ -366,21 +374,57 @@ export class DigestV3Store {
       new Set(value.comparedRevisionIds ?? []).size !== (value.comparedRevisionIds ?? []).length) {
       throw new Error('V3 分析引用重复');
     }
+    this.transaction(db => this.insertAnalysis(db, value));
+  }
+
+  private insertAnalysis(db: Database, value: DigestV3Analysis): void {
+    db.run(`INSERT INTO digest_v3_analyses
+      (user_id, id, event_revision_id, analysis_kind, body, author_kind, recorded_at,
+       fact_key, scope, check_state, assessment, run_id, model_id, prompt_version, supersedes_analysis_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [value.userId, value.id, value.eventRevisionId, value.analysisKind, value.body,
+      value.authorKind, value.recordedAt, value.factKey ?? null, value.scope ?? null,
+      value.check ?? null, value.assessment ?? null, value.runId ?? null,
+      value.modelId ?? null, value.promptVersion ?? null, value.supersedesAnalysisId ?? null]);
+    for (const evidenceId of value.evidenceIds) db.run(
+      'INSERT INTO digest_v3_analysis_evidence (user_id, analysis_id, evidence_id) VALUES (?, ?, ?)',
+      [value.userId, value.id, evidenceId]);
+    for (const revisionId of value.comparedRevisionIds ?? []) db.run(
+      'INSERT INTO digest_v3_analysis_comparisons (user_id, analysis_id, revision_id) VALUES (?, ?, ?)',
+      [value.userId, value.id, revisionId]);
+  }
+
+  /** One reviewed local submission is durable as a unit, including every exact citation. */
+  saveReviewedChain(value: { evidence: DigestV3Evidence; event?: DigestV3Event; revision: DigestV3Revision; analysis: DigestV3Analysis }): void {
+    const { evidence, event, revision, analysis } = value;
+    if (evidence.userId !== revision.userId || analysis.userId !== revision.userId ||
+      analysis.eventRevisionId !== revision.id ||
+      analysis.evidenceIds.length !== 1 || analysis.evidenceIds[0] !== evidence.id ||
+      revision.evidenceIds.length !== 1 || revision.evidenceIds[0] !== evidence.id ||
+      (event && (event.userId !== revision.userId || event.id !== revision.eventId ||
+        event.currentRevisionId !== revision.id || revision.revisionNo !== 1 ||
+        revision.previousRevisionId !== null || revision.changeKind !== 'initial'))) {
+      throw new Error('V3 本地链路引用不一致');
+    }
     this.transaction(db => {
-      db.run(`INSERT INTO digest_v3_analyses
-        (user_id, id, event_revision_id, analysis_kind, body, author_kind, recorded_at,
-         fact_key, scope, check_state, assessment, run_id, model_id, prompt_version, supersedes_analysis_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [value.userId, value.id, value.eventRevisionId, value.analysisKind, value.body,
-        value.authorKind, value.recordedAt, value.factKey ?? null, value.scope ?? null,
-        value.check ?? null, value.assessment ?? null, value.runId ?? null,
-        value.modelId ?? null, value.promptVersion ?? null, value.supersedesAnalysisId ?? null]);
-      for (const evidenceId of value.evidenceIds) db.run(
-        'INSERT INTO digest_v3_analysis_evidence (user_id, analysis_id, evidence_id) VALUES (?, ?, ?)',
-        [value.userId, value.id, evidenceId]);
-      for (const revisionId of value.comparedRevisionIds ?? []) db.run(
-        'INSERT INTO digest_v3_analysis_comparisons (user_id, analysis_id, revision_id) VALUES (?, ?, ?)',
-        [value.userId, value.id, revisionId]);
+      this.insertEvidence(db, evidence);
+      if (event) {
+        this.insertEvent(db, event);
+      } else {
+        const current = queryOne<{ current_revision_id: string; revision_no: number }>(db,
+          `SELECT e.current_revision_id, r.revision_no FROM digest_v3_events e
+           JOIN digest_v3_revisions r ON r.user_id = e.user_id AND r.id = e.current_revision_id
+           WHERE e.user_id = ? AND e.id = ? AND e.lifecycle = 'active'`,
+          [revision.userId, revision.eventId]);
+        if (!current || current.current_revision_id !== revision.previousRevisionId ||
+          revision.revisionNo !== current.revision_no + 1 || revision.changeKind !== 'progress') {
+          throw new Error('V3 修订版本冲突');
+        }
+      }
+      this.insertRevision(db, revision);
+      if (!event) db.run('UPDATE digest_v3_events SET current_revision_id = ? WHERE user_id = ? AND id = ?',
+        [revision.id, revision.userId, revision.eventId]);
+      this.insertAnalysis(db, analysis);
     });
   }
 
