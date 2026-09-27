@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "d08-dual-axis-oracle.v1",
+  "note": "Scoring only. A01's return claim and editor-note year remain unresolved; the source-document relation is not a second confirmation.",
+  "pairs": {
+    "D01": { "eventRelation": "same_event", "factChange": "no_material_change" },
+    "D02": { "eventRelation": "same_event", "factChange": "no_material_change" },
+    "D03": { "eventRelation": "same_event", "factChange": "no_material_change" },
+    "E01": { "eventRelation": "different_event", "factChange": "material_change" },
+    "E02": { "eventRelation": "different_event", "factChange": "not_comparable" },
+    "E03": { "eventRelation": "different_event", "factChange": "not_comparable" },
+    "P01": { "eventRelation": "same_event", "factChange": "material_change" },
+    "P02": { "eventRelation": "same_event", "factChange": "material_change" },
+    "P03": { "eventRelation": "same_event", "factChange": "material_change" },
+    "U01": { "eventRelation": "different_event", "factChange": "no_material_change", "factKey": "federal_funds_target_range", "scope": "federal_funds", "unit": "%" },
+    "U02": { "eventRelation": "different_event", "factChange": "no_material_change", "factKey": "federal_funds_target_range", "scope": "federal_funds", "unit": "%" },
+    "U03": { "eventRelation": "different_event", "factChange": "no_material_change", "factKey": "federal_funds_target_range", "scope": "federal_funds", "unit": "%" },
+    "A01": { "eventRelation": "same_event", "factChange": "unknown" },
+    "A02": { "eventRelation": "same_event", "factChange": "unknown" },
+    "A03": { "eventRelation": "same_event", "factChange": "unknown" }
+  }
+}

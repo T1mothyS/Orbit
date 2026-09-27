@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "d08-holdout.v1",
+  "note": "Synthetic holdout fixed before first evaluation. Answers are read only by the scorer; the matcher receives projected sources with opaque IDs.",
+  "pairs": [
+    { "id": "H01", "expected": { "eventRelation": "different_event", "factChange": "no_material_change" }, "sources": [
+      { "url": "https://example.org/fomc/2025-01-29-statement", "publishedAt": "2025-01-29", "event": ["meeting", "fomc", "2025-01-29"], "documentType": "statement", "sourceFact": "The January meeting kept the tracked target range at 4.25–4.50%.", "facts": [["federal_funds_target_range", "4.25-4.50", "federal_funds", "%"]] },
+      { "url": "https://example.org/fomc/2025-03-19-statement", "publishedAt": "2025-03-19", "event": ["meeting", "fomc", "2025-03-19"], "documentType": "statement", "sourceFact": "The March meeting kept the tracked target range at 4.25–4.50%.", "facts": [["federal_funds_target_range", "4.25-4.50", "federal_funds", "%"]] }
+    ] },
+    { "id": "H02", "expected": { "eventRelation": "same_event", "factChange": "material_change" }, "sources": [
+      { "url": "https://example.org/mission/aurora-launch", "publishedAt": "2025-01-01", "event": ["mission", "aurora", "flight-2025"], "documentType": "release", "sourceFact": "Aurora launched.", "facts": [["flight_phase", "launched", "aurora"]] },
+      { "url": "https://example.org/mission/aurora-orbit", "publishedAt": "2025-01-03", "event": ["mission", "aurora", "flight-2025"], "documentType": "release", "sourceFact": "Aurora entered orbit.", "facts": [["flight_phase", "orbit", "aurora"]] }
+    ] },
+    { "id": "H03", "expected": { "eventRelation": "different_event", "factChange": "not_comparable" }, "sources": [
+      { "url": "https://example.org/mission/aurora-two", "publishedAt": "2025-02-01", "event": ["mission", "aurora-2", "launch-2025-02-01"], "documentType": "release", "sourceFact": "Aurora-2 launched.", "facts": [["launch_status", "launched", "aurora-2"]] },
+      { "url": "https://example.org/mission/borealis-two", "publishedAt": "2025-02-01", "event": ["mission", "borealis-2", "launch-2025-02-01"], "documentType": "release", "sourceFact": "Borealis-2 launched.", "facts": [["launch_status", "launched", "borealis-2"]] }
+    ] },
+    { "id": "H04", "expected": { "eventRelation": "same_event", "factChange": "unknown" }, "sources": [
+      { "url": "https://example.org/mission/translation-en", "publishedAt": "2025-02-01", "event": ["mission", "aurora", "flight-2025"], "documentType": "faq", "sourceDocumentKey": "aurora-faq", "sourceFact": "The official English note says the return is approved.", "facts": [["return_status", "approved", "aurora"]] },
+      { "url": "https://example.org/es/mission/translation-es", "publishedAt": "2025-02-02", "event": ["mission", "aurora", "flight-2025"], "documentType": "faq", "sourceDocumentKey": "aurora-faq", "sourceFact": "The linked Spanish body still says the return is pending.", "facts": [["return_status", "pending", "aurora"]] }
+    ] },
+    { "id": "H05", "expected": { "eventRelation": "same_event", "factChange": "no_material_change" }, "sources": [
+      { "url": "https://example.org/mission/heat-test-en", "publishedAt": "2025-02-01", "event": ["finding", "borealis", "heat-test-2025"], "documentType": "article", "sourceDocumentKey": "borealis-heat-test", "sourceFact": "Official report identifies sensor drift.", "facts": [["test_cause", "sensor_drift", "borealis"]] },
+      { "url": "https://example.org/es/mission/heat-test-es", "publishedAt": "2025-02-02", "event": ["finding", "borealis", "heat-test-2025"], "documentType": "article", "sourceDocumentKey": "borealis-heat-test", "sourceFact": "Linked translation identifies the same sensor drift.", "facts": [["test_cause", "sensor_drift", "borealis"]] }
+    ] },
+    { "id": "H06", "expected": { "eventRelation": "same_event", "factChange": "unknown" }, "sources": [
+      { "url": "https://example.org/meeting/2025-05-01-decision", "publishedAt": "2025-05-01", "event": ["meeting", "council", "2025-05-01"], "documentType": "decision", "sourceFact": "Council issued a decision.", "facts": [["decision_issued", true, "council-2025-05-01"]] },
+      { "url": "https://example.org/meeting/2025-05-01-projections", "publishedAt": "2025-05-01", "event": ["meeting", "council", "2025-05-01"], "documentType": "projections", "sourceFact": "Council separately published projections.", "facts": [["projections_published", true, "council-2025-05-01"]] }
+    ] },
+    { "id": "H07", "expected": { "eventRelation": "different_event", "factChange": "not_comparable" }, "sources": [
+      { "url": "https://example.org/mission/aurora-test-one", "publishedAt": "2025-01-01", "event": ["mission", "aurora", "test-flight-1"], "documentType": "release", "sourceFact": "Aurora test flight one launched.", "facts": [["launch_status", "launched", "aurora-test-flight-1"]] },
+      { "url": "https://example.org/mission/aurora-test-two", "publishedAt": "2025-03-01", "event": ["mission", "aurora", "test-flight-2"], "documentType": "release", "sourceFact": "Aurora test flight two launched.", "facts": [["launch_status", "launched", "aurora-test-flight-2"]] }
+    ] }
+  ]
+}

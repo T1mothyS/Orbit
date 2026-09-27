@@ -10,11 +10,11 @@ const seed = 20260927;
 const userId = 'seven-day-simulation';
 const outputRoot = path.resolve('dist-shadow');
 type Section = 'market' | 'macro' | 'stories';
-type Candidate = {
+export type Candidate = {
   id: string; sourceId: string; eventKey: string; section: Section; title: string; summary: string;
   publishedDay: number; publishedHour?: number; relation: string; selected: boolean; reason: string;
 };
-type PlannedDay = { day: number; date: string; cutoff: string; snapshot: DigestSnapshot; candidates: Candidate[] };
+export type PlannedDay = { day: number; date: string; cutoff: string; snapshot: DigestSnapshot; candidates: Candidate[] };
 
 const candidateDays: Candidate[][] = [
   [
@@ -60,11 +60,11 @@ function random(seedValue: number): () => number {
 }
 function dateOf(day: number): string { return `2020-01-${String(day).padStart(2, '0')}`; }
 function cutoffOf(day: number): string { return `${dateOf(day)}T12:00:00.000Z`; }
-function publishedAt(candidate: Candidate): string {
+export function publishedAt(candidate: Candidate): string {
   return `${dateOf(candidate.publishedDay)}T${String(candidate.publishedHour ?? 9).padStart(2, '0')}:00:00.000Z`;
 }
 function sourceUrl(candidate: Candidate): string { return `https://example.com/simulation/${candidate.sourceId}`; }
-function makePlan(): PlannedDay[] {
+export function makePlan(): PlannedDay[] {
   const next = random(seed);
   return candidateDays.map((fixtures, index) => {
     const day = index + 1;
@@ -275,6 +275,8 @@ async function run(): Promise<void> {
     formalReports: 0, notifications: 0 }));
 }
 
-if (process.argv[2] === '--verify') await verifyFreshProcess(process.argv[3]);
-else if (process.argv.length === 2) await run();
-else throw new Error('UNKNOWN_SIMULATION_ARGUMENT');
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv[2] === '--verify') await verifyFreshProcess(process.argv[3]);
+  else if (process.argv.length === 2) await run();
+  else throw new Error('UNKNOWN_SIMULATION_ARGUMENT');
+}
