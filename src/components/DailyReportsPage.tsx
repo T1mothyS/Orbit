@@ -256,7 +256,7 @@ export function DailyReportsPage() {
                   >
                     {latest.heroImageUrl && <img className="daily-report-featured-hero" src={latest.heroImageUrl} alt="" aria-hidden="true" />}
                     <div className="daily-report-featured-body">
-                      <div className="daily-report-featured-kicker">{viewMode === 'shadow' ? '今日重点新闻 · 新版隔离预览' : viewMode === 'received' ? 'FRONT PAGE · 最新日报' : 'CANDIDATE DESK · 最新候选'}</div>
+                      <div className="daily-report-featured-kicker">{viewMode === 'shadow' ? '最新日报 · 新版隔离预览' : viewMode === 'received' ? 'FRONT PAGE · 最新日报' : 'CANDIDATE DESK · 最新候选'}</div>
                       <div className="daily-report-card-topline">
                         <span className="daily-report-card-date">{formatReportDate(latest.date)}</span>
                         <span className="daily-report-source-meta">
