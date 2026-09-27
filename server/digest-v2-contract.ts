@@ -3,8 +3,9 @@ import net from 'node:net';
 import { isValidDateKey } from './date-key.js';
 
 export const DIGEST_V2_VERSION = 'daily-digest.v2';
-export const DIGEST_V2_GENERATION = '2026-09-27.1';
-export const DIGEST_V2_ILLUSTRATED_GENERATIONS = ['2026-09-26.1', DIGEST_V2_GENERATION];
+export const DIGEST_V2_GENERATION = '2026-09-27.2';
+export const DIGEST_V2_EDITORIAL_GENERATIONS = ['2026-09-27.1', DIGEST_V2_GENERATION];
+export const DIGEST_V2_ILLUSTRATED_GENERATIONS = ['2026-09-26.1', ...DIGEST_V2_EDITORIAL_GENERATIONS];
 export type CheckStatus = 'complete' | 'partial' | 'failed' | 'not_configured';
 export interface InputItem { id: string; title: string; detail: string }
 export interface InputSection { status: CheckStatus; items: InputItem[] }
@@ -77,6 +78,7 @@ export function digestHash(value: unknown): string { return crypto.createHash('s
 export interface DigestIssue { path: string; code: string }
 export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, generationVersion = DIGEST_V2_GENERATION) {
   const errors: DigestIssue[] = [];
+  const reviewIssues: DigestIssue[] = [];
   const issue = (path: string, code: string) => { if (errors.length < 100) errors.push({ path, code }); };
   function visit(v: unknown, s: Schema, path: string): void {
     if (s.type === 'object') {
@@ -99,7 +101,7 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
       if (s.format === 'timestamp' && v !== '' && (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(v) || !Number.isFinite(Date.parse(v)))) issue(path, 'TIMESTAMP');
       if (s.format === 'url' && !publicDigestUrl(v)) issue(path, 'URL');
       if (/(?:\bBearer\s+[A-Za-z0-9._~-]{16,}|\b(?:password|api[_-]?key|secret)\s*[:=]\s*\S{8,}|[A-Za-z]:\\)/i.test(v)) issue(path, 'SENSITIVE_CONTENT');
-      if (generationVersion === DIGEST_V2_GENERATION && s.description?.startsWith('正文')) {
+      if (DIGEST_V2_EDITORIAL_GENERATIONS.includes(generationVersion) && s.description?.startsWith('正文')) {
         const parts = v.split('**');
         if (parts.length % 2 === 0 || parts.some((part, i) => i % 2 === 1 && (!part.trim() || part.length > 80))) issue(path, 'EMPHASIS_INVALID');
         if (v.split(/[。！？；!?\n]+/u).some(sentence => sentence.replace(/\*\*/g, '').trim().length >= 20 && !sentence.includes('**'))) issue(path, 'EMPHASIS_REQUIRED');
@@ -108,11 +110,30 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
   }
   if (Buffer.byteLength(JSON.stringify(value) || '') > 750_000) issue('$', 'SIZE_LIMIT');
   else visit(value, DIGEST_V2_SCHEMA, '$');
-  if (errors.length) return { valid: false, errors, warnings: [] as string[], contentHash: null };
+  if (errors.length) return { valid: false, errors, warnings: [] as string[], reviewIssues, contentHash: null };
   const d = value as DigestV2;
   const unique = (ids: string[], path: string) => { if (new Set(ids).size !== ids.length) issue(path, 'DUPLICATE_ID'); };
   const stories = [...d.market, ...d.macro, ...d.stories];
   unique(stories.map(x => x.id), '$.stories'); unique(d.evidence.map(x => x.id), '$.evidence'); unique(d.media.map(x => x.id), '$.media');
+  if (generationVersion === DIGEST_V2_GENERATION) {
+    const normalized = (value: string) => value.normalize('NFKC').replace(/\*\*/g, '').replace(/\s+/gu, ' ').trim().toLowerCase();
+    const seen = new Set<string>();
+    for (const section of ['market', 'macro', 'stories'] as const) {
+      d[section].forEach((item, i) => {
+        const key = `${normalized(item.title)}\0${normalized(item.summary)}`;
+        if (seen.has(key)) issue(`$.${section}[${i}]`, 'DUPLICATE_STORY_CONTENT');
+        else seen.add(key);
+      });
+    }
+    if (snapshot) {
+      const cutoff = Date.parse(snapshot.cutoff);
+      if (!Number.isFinite(cutoff)) issue('$.snapshot.cutoff', 'CUTOFF_INVALID');
+      else d.evidence.forEach((item, i) => {
+        if (item.published_at && Date.parse(item.published_at) > cutoff) issue(`$.evidence[${i}].published_at`, 'EVIDENCE_AFTER_CUTOFF');
+      });
+      if (!stories.length) reviewIssues.push({ path: '$.stories', code: 'NEWS_SELECTION_REVIEW_REQUIRED' });
+    }
+  }
   const eids = new Set(d.evidence.map(x => x.id)); const mids = new Set(d.media.map(x => x.id));
   for (const [i, s] of [...stories, ...d.watchlist].entries()) {
     unique(s.evidence_ids, `$.references[${i}]`);
@@ -141,5 +162,5 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
     }
   }
   const warnings = snapshot ? digestSnapshotWarnings(snapshot, generationVersion) : [];
-  return { valid: errors.length === 0, errors, warnings, contentHash: errors.length ? null : digestHash({ digest: d, inputWarnings: warnings }) };
+  return { valid: errors.length === 0, errors, warnings, reviewIssues, contentHash: errors.length ? null : digestHash({ digest: d, inputWarnings: warnings }) };
 }

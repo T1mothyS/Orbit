@@ -138,6 +138,7 @@ dry-run 返回 `VALIDATED_NOT_PUBLISHED` 才能进行同正文正式发布。兼
 - 快照只含日程必要字段、邮件摘要和引用、关注名单。7 天后不可继续验证/发布，并由后台维护清除敏感快照；运行版本、覆盖数量及阶段诊断长期保留。已生成的私有日报仍属于历史产物，不随输入快照过期而删除。旧加密备份中的快照遵守备份保留规则；恢复时再次丢弃已过期快照。
 - `daily_report.validate_v2({runId,digest})` 和 `publish_v2` 的 `dry_run` 只读取快照并纯校验；不访问外站、不处理媒体、不修改业务数据、不入队。过期或跨账号 run 拒绝。所有成功读取的输入 ID 必须逐项覆盖，即使该部分标记 `partial`；错误返回 `path/code`，成功返回稳定 `contentHash`。
 - JSON 权威定义为 [digest-v2-contract.ts](../server/digest-v2-contract.ts) 的 `DIGEST_V2_SCHEMA`。所有顶层字段必填，允许空数组；摘要信号最多 5 条。`check`、`verification`、`change` 分别表示检查完成、证据核对、事件变化，不能互相替代。缺少证据或检查未完成时不得判断“无重大变化”。新闻数量没有最低要求。
+- 新建 run 使用 `2026-09-27.2` 规则：`evidence.published_at` 非空且晚于服务端截点时报 `EVIDENCE_AFTER_CUTOFF`；三个新闻栏目中不同 ID 的同标题、同正文（忽略 `**` 和空白差别）报 `DUPLICATE_STORY_CONTENT`。这两项是确定性硬错误，不联网核查来源、不做同事件语义匹配。三栏新闻均空仍合法，但校验/发布回执单列 `reviewIssues` 中的 `NEWS_SELECTION_REVIEW_REQUIRED`，提示另核有界候选和排除依据；它不是输入失败 `warnings`，不改变内容哈希或邮件正文。缺精确来源时间继续留空，不得猜测。旧 run 与已存产物按冻结 `generationVersion`/`renderer` 保持原行为。
 - 读取需原有 Calendar/Mail/Context/History scopes；校验需 Calendar/Mail/Context；发布另需 publish 和 media_prepare。仍绑定当前 OAuth 账号。`DIGEST_V2_ENABLED=false` 隐藏新增工具并拒绝调用，不改变旧工具清单。
 
 ### 发布与阅读
@@ -191,7 +192,9 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 
 2026-09-27 验收补充：以上跨日期运行证明集成，不单凭次数判定内容合格。内容评审与本地/生产分层放行统一见 [路线图](ROADMAP.md#d02-内容质量闸门2026-09-27-审计修订) 和 [测试矩阵](TEST-MATRIX.md#daily-digest-内容与运行验收分层)。当前 `validate_v2` 只做结构、引用及输入覆盖等检查，不联网核实事实，也未阻断已知发表时间晚于截点或不同 ID 的同内容新闻；空新闻通过不能证明检索充分。时间/重复诊断和加粗降为提示是后续实现候选，本次没有改变 schema、工具、运行中 Prompt 或现行加粗硬校验。
 
-复现本地验证：`npx tsx --test server/digest-v2.test.ts`。显式测试 R2：`node --env-file=.env.digest-v2-test --import tsx scripts/digest-v2-r2-smoke.ts`（仅专用测试 Bucket，创建/删除/恢复代码自有合成对象）。浏览器 fixture：同样环境执行 `scripts/digest-v2-preview.ts`，另起 Vite 并将 `API_PROXY_TARGET` 指向 fixture 端口；该 fixture 固定仅监听本机、使用临时库和合成账号、不启动发信任务。
+2026-09-27 后续 D02 本地增量：上述“未阻断时间/重复”的描述是前次审计时点结论；新 `2026-09-27.2` 已实现已知来源时间和相同内容的最小硬检查，以及空新闻审阅提示。固定历史回放和缺证边界见 [D02 定向回放快照](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)。本次没有改 Work 任务、重新生成真实日报、部署或调整加粗硬校验；`reviewIssues` 不能代替真实候选记录。
+
+复现本地验证：`npx tsx --test server/digest-v2.test.ts server/digest-v2-quality.test.ts`。显式测试 R2：`node --env-file=.env.digest-v2-test --import tsx scripts/digest-v2-r2-smoke.ts`（仅专用测试 Bucket，创建/删除/恢复代码自有合成对象）。浏览器 fixture：同样环境执行 `scripts/digest-v2-preview.ts`，另起 Vite 并将 `API_PROXY_TARGET` 指向 fixture 端口；该 fixture 固定仅监听本机、使用临时库和合成账号、不启动发信任务。
 
 ### Cloudflare Worker 代抓与来源图标
 

@@ -215,8 +215,10 @@ test('mail snapshot state distinguishes unconfigured, failed, partial, and empty
     assert.deepEqual(manifest.warnings, entry.warning ? [entry.warning] : []);
     const validated = service.validateDigestRun(userId, run.runId, d);
     assert.deepEqual(validated.warnings, manifest.warnings);
+    assert.deepEqual(validated.reviewIssues, [{ path: '$.stories', code: 'NEWS_SELECTION_REVIEW_REQUIRED' }]);
     const result = await service.publishDigestV2(userId, run.runId, d, 'shadow');
     assert.deepEqual(result.warnings, manifest.warnings);
+    assert.deepEqual(result.reviewIssues, validated.reviewIssues);
     const artifact = activity.getDigestArtifact(userId, String(result.artifactId))!;
     const publication = JSON.parse(artifact.payload_json).publication;
     assert.deepEqual(publication.warnings, manifest.warnings);
@@ -257,7 +259,9 @@ test('validate and dry_run are pure; foreign account and expired run are rejecte
   const run = service.createDigestSnapshotRun(userId, snapshot());
   const before = activity.exportActivityDb(); const files = fs.readdirSync(root);
   assert.equal(service.validateDigestRun(userId, run.runId, digest()).valid, true);
-  assert.equal((await service.publishDigestV2(userId, run.runId, digest(), 'dry_run')).status, 'VALIDATED_NOT_PUBLISHED');
+  const dryRun = await service.publishDigestV2(userId, run.runId, digest(), 'dry_run');
+  assert.equal(dryRun.status, 'VALIDATED_NOT_PUBLISHED');
+  assert.deepEqual(dryRun.reviewIssues, [{ path: '$.stories', code: 'NEWS_SELECTION_REVIEW_REQUIRED' }]);
   assert.deepEqual(activity.exportActivityDb(), before); assert.deepEqual(fs.readdirSync(root), files);
   assert.throws(() => service.validateDigestRun('other', run.runId, digest()), /RUN_NOT_FOUND/);
   activity.createDigestRun({ id: 'expired', user_id: userId, report_date: snapshot().date, snapshot_json: JSON.stringify(snapshot()), manifest_json: '{}', created_at: '2020-01-01', expires_at: '2020-01-02' });

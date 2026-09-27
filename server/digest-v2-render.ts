@@ -1,4 +1,4 @@
-import { canonicalJson, publicDigestUrl, validateDigestV2, DIGEST_V2_GENERATION, DIGEST_V2_ILLUSTRATED_GENERATIONS, type DigestV2, type DigestStory, type DigestEvidence } from './digest-v2-contract.js';
+import { canonicalJson, publicDigestUrl, validateDigestV2, DIGEST_V2_EDITORIAL_GENERATIONS, DIGEST_V2_ILLUSTRATED_GENERATIONS, type DigestV2, type DigestStory, type DigestEvidence } from './digest-v2-contract.js';
 import type { MediaCredit, PreparedImage } from './digest-v2-media.js';
 
 const marker = '<!-- daily-digest.v2 -->\n';
@@ -129,7 +129,7 @@ function renderEditorialDigestV2(p: DigestPublication, email: boolean): string {
   return `<div class="digest-v2" style="max-width:680px;margin:0 auto;overflow-wrap:anywhere;line-height:1.8;${email ? 'color:#253247;background:#fff;font-family:Arial,sans-serif;padding:20px' : 'color:inherit'}">${cover}<header><h1 style="font-size:26px;line-height:1.4;margin:12px 0 2px">${esc(digestDisplayTitle(p))}</h1><p style="font-size:12px;letter-spacing:.08em;margin:0">DAILY DIGEST · ${esc(d.date)}</p></header>${coverCredit}${alerts ? `<aside role="status" style="border-left:4px solid #bd830e;padding:4px 16px"><strong>本期信息不完整</strong>${alerts}</aside>` : ''}${body}${references}</div>`;
 }
 export function renderDigestV2(p: DigestPublication, email = false): string {
-  if (p.renderer === DIGEST_V2_GENERATION) return renderEditorialDigestV2(p, email);
+  if (DIGEST_V2_EDITORIAL_GENERATIONS.includes(p.renderer)) return renderEditorialDigestV2(p, email);
   const d = p.digest;
   const section = (title: string, body: string) => `<section style="margin:28px 0"><h2 style="font-size:18px;border-bottom:1px solid #b9c2ce;padding-bottom:10px">${title}</h2>${body || '<p>本期无新增内容。</p>'}</section>`;
   const list = (items: string[]) => items.length ? `<ul style="padding-left:24px">${items.map(x => `<li style="margin:8px 0">${esc(x)}</li>`).join('')}</ul>` : '';
@@ -164,7 +164,7 @@ export function renderDigestV2(p: DigestPublication, email = false): string {
 }
 export function digestV2Text(p: DigestPublication): string {
   const d = p.digest;
-  if (p.renderer === DIGEST_V2_GENERATION) {
+  if (DIGEST_V2_EDITORIAL_GENERATIONS.includes(p.renderer)) {
     const mediaEvidenceIds = new Set(d.media.map(item => item.evidence_id));
     const sources = new Map<string, DigestEvidence>();
     const refs = (ids: string[]) => {
