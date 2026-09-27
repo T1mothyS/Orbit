@@ -57,6 +57,50 @@ test('v2 contract: zero news, partial personal inputs, stable hash, IDs and vali
   ]) { const d = illustrated(); mutate(d); assert.equal(validateDigestV2(d).valid, false); }
 });
 
+test('input reader covers synthetic account calendar and watchlist, and rejects omitted IDs', async () => {
+  const schedules = await import('./schedule-store.js');
+  const cloudContext = await import('./daily-report-cloud-store.js');
+  const inputUserId = 'digest-input-reader-user';
+  const otherUserId = 'digest-input-reader-other';
+  const date = '2026-10-14';
+  for (const id of [inputUserId, otherUserId]) {
+    db.createUser({ id, email: `${id}@example.com`, password_hash: 'test', role: 'user', disabled: 0, created_at: now, updated_at: now });
+  }
+  const makeSchedule = (id: string, owner: string, unscheduled = false) => schedules.createSchedule({
+    id, user_id: owner, calendar_id: 'personal', type: 'todo', title: id,
+    start_time: `${date}T09:00:00`, all_day: false, category: 'other', priority: 'medium',
+    is_completed: false, is_repeated: false, reminders: [], is_high_risk: false, is_unscheduled: unscheduled,
+  });
+  makeSchedule('owned-calendar-input', inputUserId);
+  makeSchedule('other-account-calendar-input', otherUserId);
+  makeSchedule('unscheduled-calendar-input', inputUserId, true);
+  cloudContext.replaceDailyReportCloudContext(inputUserId, { watchlist: { stocks: [{ name: '合成关注项', symbol: 'TEST' }] } });
+
+  const run = await service.readDigestV2Inputs(inputUserId, date);
+  assert.equal(run.snapshot.calendar.status, 'complete');
+  assert.deepEqual(run.snapshot.calendar.items.map(item => item.id), ['owned-calendar-input']);
+  assert.equal(run.snapshot.watchlist.status, 'complete');
+  assert.equal(run.snapshot.watchlist.items.length, 1);
+  assert.equal(run.snapshot.watchlist.items[0].title, '合成关注项 TEST');
+  assert.equal(run.snapshot.mail.status, 'not_configured');
+  assert.deepEqual(run.manifest.warnings, ['MAIL_NOT_CONFIGURED']);
+
+  const d = digest();
+  d.date = date;
+  d.calendar = [{ input_id: run.snapshot.calendar.items[0].id, text: '合成日程已覆盖' }];
+  d.watchlist = [{ input_id: run.snapshot.watchlist.items[0].id, summary: '合成关注项待核验', check: 'incomplete', change: 'unknown', evidence_ids: [] }];
+  assert.equal(service.validateDigestRun(inputUserId, run.runId, d).valid, true);
+  const missingCalendar = structuredClone(d); missingCalendar.calendar = [];
+  assert.ok(service.validateDigestRun(inputUserId, run.runId, missingCalendar).errors.some(issue => issue.code === 'INPUT_OMITTED'));
+  const missingWatchlist = structuredClone(d); missingWatchlist.watchlist = [];
+  assert.ok(service.validateDigestRun(inputUserId, run.runId, missingWatchlist).errors.some(issue => issue.code === 'INPUT_OMITTED'));
+  const foreign = structuredClone(d); foreign.calendar[0].input_id = 'other-account-calendar-input';
+  assert.ok(service.validateDigestRun(inputUserId, run.runId, foreign).errors.some(issue => issue.code === 'UNKNOWN_INPUT'));
+  const result = await service.publishDigestV2(inputUserId, run.runId, d, 'shadow');
+  assert.equal(result.status, 'SHADOW_SAVED');
+  assert.equal(result.emailStatus, 'NOT_QUEUED');
+});
+
 test('new digest layout gives the lead a large image, other stories side images, and shows missing images', () => {
   const d = illustrated();
   d.evidence.push({ id: 'e2', url: 'https://example.com/second', source: 'Second source', published_at: now });
