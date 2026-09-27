@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified version: `0.32.0-260927.1443`（2026-09-27，D13 Research/Thesis 本地合成闭环；真实 Agent、Work、生产与发信未验）。
+- Last verified version: `0.33.0-260927.1606`（2026-09-27，D07 登录态本地接口闭环；真实 Agent、Work、生产与发信未验）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。
@@ -12,7 +12,7 @@
 
 Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提示统一维护在 [Cloud 合同新版节](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)，阶段顺序见 [路线图](ROADMAP.md)，验收入口见 [测试矩阵](TEST-MATRIX.md)。D02 的[第一轮内容基线](DAILY-DIGEST-D02-QUALITY-BASELINE-20260927.md)、[定向校验回放](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)与[七期合成压缩回放](DAILY-DIGEST-SEVEN-DAY-SIMULATION-20260927.md)分开记录；本地开发与生产分层放行，七个真实日期不是统一前置，合成回放不能代替真实集成或上线验收。
 
-Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 语义、S2-03 本地存储、S2-04 账号备份恢复及 D07 固定来源本地闭环边界统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；尚无通用 V3 对外写入口，不改变 V2.5 当前运行合同。
+Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 语义、S2-03 本地存储、S2-04 账号备份恢复及 D07 登录态本地接口边界统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；尚无 Work/MCP 写入或自动匹配，不改变 V2.5 当前运行合同。D08 离线开工清单见[路线图](ROADMAP.md#d08-离线匹配开工清单2026-09-27本轮未实施)。
 
 D13 Research/Thesis 的本地状态、登录态接口、观点确认和备份边界见[研究与观点合同](DAILY-DIGEST-RESEARCH-THESIS.md)；真实 Agent 和 Work 结果回传尚未接通。
 

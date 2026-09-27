@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { publicDigestUrl } from './digest-v2-contract.js';
-import type { DigestV3Analysis, DigestV3Event, DigestV3Evidence, DigestV3Fact, DigestV3Revision, DigestV3Store } from './digest-v3-store.js';
+import { DigestV3Conflict, type DigestV3Analysis, type DigestV3Event, type DigestV3Evidence, type DigestV3Fact, type DigestV3Revision, type DigestV3Store } from './digest-v3-store.js';
 
 type ObjectValue = Record<string, unknown>;
 const idPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/;
@@ -25,6 +25,8 @@ function instant(value: unknown): string {
   }
   return value;
 }
+export function validatedV3Cutoff(value: unknown): string { return new Date(instant(value)).toISOString(); }
+export function validatedV3Id(value: unknown): string { return text(value, 100, true); }
 function sourceTime(value: unknown, precision: unknown, cutoff: string): string | null {
   if (value === null && precision === 'unknown') return null;
   if (precision === 'date') {
@@ -118,14 +120,14 @@ export function recordReviewedV3Source(store: DigestV3Store, userId: string, raw
       !same(oldRevision.evidenceIds, [evidenceId]) || oldAnalysis.eventRevisionId !== revisionId ||
       oldAnalysis.body !== body || !same(oldAnalysis.evidenceIds, [evidenceId]) ||
       !same(oldAnalysis.comparedRevisionIds, analysis.comparedRevisionIds)) {
-      throw new Error('V3 幂等键与已有内容冲突');
+      throw new DigestV3Conflict('V3 幂等键与已有内容冲突');
     }
     return { eventId, evidenceId, revisionId, analysisId, status: 'existing' as const };
   }
-  if (store.getRevision(userId, revisionId) || store.getAnalysis(userId, analysisId)) throw new Error('V3 幂等记录不完整');
-  if (isInitial && store.getEvent(userId, eventId)) throw new Error('V3 事件已存在，需要明确进展决定');
+  if (store.getRevision(userId, revisionId) || store.getAnalysis(userId, analysisId)) throw new DigestV3Conflict('V3 幂等记录不完整');
+  if (isInitial && store.getEvent(userId, eventId)) throw new DigestV3Conflict('V3 事件已存在，需要明确进展决定');
   if (!isInitial && (!current || current.lifecycle !== 'active' || !previous || previous.eventId !== eventId ||
-    current.currentRevisionId !== expectedRevisionId)) throw new Error('V3 修订版本冲突');
+    current.currentRevisionId !== expectedRevisionId)) throw new DigestV3Conflict('V3 修订版本冲突');
   store.saveReviewedChain({ evidence, event, revision, analysis });
   return { eventId, evidenceId, revisionId, analysisId, status: 'created' as const };
 }
@@ -150,6 +152,11 @@ export function renderLocalDigestV3Preview(store: DigestV3Store, userId: string,
   const previous = revision.previousRevisionId ? store.getRevision(userId, revision.previousRevisionId) : null;
   if (revision.previousRevisionId && (!previous || previous.eventId !== event.id ||
     Date.parse(previous.recordedAt) > Date.parse(cutoff))) throw new Error('V3 预览前版引用无效');
+  if ((revision.changeKind === 'initial' && (revision.previousRevisionId !== null || revision.revisionNo !== 1)) ||
+    (revision.changeKind === 'progress' && (!previous || previous.revisionNo + 1 !== revision.revisionNo)) ||
+    !same(analysis.comparedRevisionIds ?? [], previous ? [previous.id] : [])) {
+    throw new Error('V3 预览版本链引用无效');
+  }
   const evidence = revision.evidenceIds.map(id => store.getEvidence(userId, id));
   const earlierEvidence = previous?.evidenceIds.map(id => store.getEvidence(userId, id)) ?? [];
   if ([...evidence, ...earlierEvidence].some(item => !item || item.reviewState !== 'verified' ||

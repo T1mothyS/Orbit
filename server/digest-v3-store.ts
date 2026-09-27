@@ -44,6 +44,8 @@ export interface DigestV3Analysis {
   supersedesAnalysisId?: string | null;
 }
 
+export class DigestV3Conflict extends Error {}
+
 const BACKUP_TABLES = [
   { key: 'digestV3Events', table: 'digest_v3_events', columns: ['user_id', 'id', 'event_type', 'subject_key', 'occurrence_key', 'title', 'lifecycle', 'current_revision_id', 'merged_into_event_id', 'created_at'], identity: ['id'] },
   { key: 'digestV3Revisions', table: 'digest_v3_revisions', columns: ['user_id', 'id', 'event_id', 'revision_no', 'previous_revision_id', 'change_kind', 'facts_json', 'recorded_at', 'occurred_at', 'occurred_precision', 'reason', 'decided_by'], identity: ['id'] },
@@ -319,7 +321,7 @@ export class DigestV3Store {
          WHERE e.user_id = ? AND e.id = ? AND e.lifecycle = 'active'`, [value.userId, value.eventId]);
       if (!current || current.current_revision_id !== value.previousRevisionId ||
         value.revisionNo !== current.revision_no + 1 || value.changeKind === 'initial') {
-        throw new Error('V3 修订版本冲突');
+        throw new DigestV3Conflict('V3 修订版本冲突');
       }
       this.insertRevision(db, value);
       db.run('UPDATE digest_v3_events SET current_revision_id = ? WHERE user_id = ? AND id = ?',
@@ -353,6 +355,58 @@ export class DigestV3Store {
       subjectKey: row.subject_key, occurrenceKey: row.occurrence_key, title: row.title,
       lifecycle: row.lifecycle, currentRevisionId: row.current_revision_id,
       mergedIntoEventId: row.merged_into_event_id, createdAt: row.created_at };
+  }
+
+  listEventsAtCutoff(userId: string, cutoff: string, limit: number, offset: number) {
+    const db = this.getDb();
+    const where = `e.user_id = ? AND e.created_at <= ? AND EXISTS (
+      SELECT 1 FROM digest_v3_revisions r WHERE r.user_id = e.user_id
+      AND r.event_id = e.id AND r.recorded_at <= ?)`;
+    const total = queryOne<{ count: number }>(db,
+      `SELECT COUNT(*) AS count FROM digest_v3_events e WHERE ${where}`, [userId, cutoff, cutoff])!.count;
+    const rows = queryAll<Record<string, any>>(db,
+      `SELECT e.id, e.event_type, e.subject_key, e.occurrence_key, e.title, e.created_at,
+        (SELECT r.id FROM digest_v3_revisions r WHERE r.user_id = e.user_id
+          AND r.event_id = e.id AND r.recorded_at <= ? ORDER BY r.revision_no DESC LIMIT 1) AS latest_revision_id
+       FROM digest_v3_events e WHERE ${where}
+       ORDER BY e.created_at DESC, e.id LIMIT ? OFFSET ?`,
+      [cutoff, userId, cutoff, cutoff, limit, offset]);
+    return { total, events: rows.map(row => ({ id: row.id, eventType: row.event_type,
+      subjectKey: row.subject_key, occurrenceKey: row.occurrence_key, title: row.title,
+      createdAt: row.created_at, latestRevisionIdAtCutoff: row.latest_revision_id })) };
+  }
+
+  /** Read the account history visible at a cutoff without exposing a later current pointer. */
+  getEventHistory(userId: string, eventId: string, cutoff: string, limit: number, offset: number) {
+    const db = this.getDb();
+    const event = this.getEvent(userId, eventId);
+    if (!event || event.createdAt > cutoff) return null;
+    const latest = queryOne<{ id: string }>(db,
+      `SELECT id FROM digest_v3_revisions WHERE user_id = ? AND event_id = ? AND recorded_at <= ?
+       ORDER BY revision_no DESC LIMIT 1`, [userId, eventId, cutoff]);
+    if (!latest) return null;
+    const count = queryOne<{ count: number }>(db,
+      `SELECT COUNT(*) AS count FROM digest_v3_revisions
+       WHERE user_id = ? AND event_id = ? AND recorded_at <= ?`, [userId, eventId, cutoff])!;
+    const rows = queryAll<{ id: string }>(db,
+      `SELECT id FROM digest_v3_revisions WHERE user_id = ? AND event_id = ? AND recorded_at <= ?
+       ORDER BY revision_no DESC LIMIT ? OFFSET ?`, [userId, eventId, cutoff, limit, offset]);
+    const history = rows.map(row => {
+      const revision = this.getRevision(userId, row.id)!;
+      const evidence = revision.evidenceIds.map(id => {
+        const item = this.getEvidence(userId, id);
+        if (!item || item.retrievedAt > cutoff) throw new Error('V3 历史证据引用无效');
+        return item;
+      });
+      const analysisIds = queryAll<{ id: string }>(db,
+        `SELECT id FROM digest_v3_analyses WHERE user_id = ? AND event_revision_id = ? AND recorded_at <= ?
+         ORDER BY recorded_at, id`, [userId, revision.id, cutoff]);
+      const analyses = analysisIds.map(item => this.getAnalysis(userId, item.id)!);
+      return { revision, evidence, analyses };
+    });
+    const identity = { id: event.id, eventType: event.eventType, subjectKey: event.subjectKey,
+      occurrenceKey: event.occurrenceKey, title: event.title, createdAt: event.createdAt };
+    return { event: identity, latestRevisionIdAtCutoff: latest.id, total: count.count, history };
   }
 
   getRevision(userId: string, id: string): DigestV3Revision | null {
@@ -418,7 +472,7 @@ export class DigestV3Store {
           [revision.userId, revision.eventId]);
         if (!current || current.current_revision_id !== revision.previousRevisionId ||
           revision.revisionNo !== current.revision_no + 1 || revision.changeKind !== 'progress') {
-          throw new Error('V3 修订版本冲突');
+          throw new DigestV3Conflict('V3 修订版本冲突');
         }
       }
       this.insertRevision(db, revision);

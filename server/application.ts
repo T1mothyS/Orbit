@@ -29,6 +29,7 @@ import { createNotesRouter } from './routes/notes.js';
 import { createGuidesRouter } from './routes/guides.js';
 import { createSearchRouter } from './routes/search.js';
 import { createResearchRouter } from './routes/research.js';
+import { createDigestV3Router } from './routes/digest-v3.js';
 import { createStoreInitializer } from './runtime/stores.js';
 
 import { createApp, registerSpaFallback } from './app.js';
@@ -75,6 +76,7 @@ app.use(createLogsRouter({ authenticate, requireAdmin }));
 
 app.use(createSearchRouter({ authenticate }));
 app.use(createResearchRouter({ authenticate }));
+app.use(createDigestV3Router({ authenticate }));
 
 // 健康检查
 app.get("/api/health", (req, res) => {

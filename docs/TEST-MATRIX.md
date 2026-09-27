@@ -4,7 +4,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified version: `0.32.0-260927.1443`（2026-09-27，D13 本地合成测试与浏览器检查；真实 Agent、Work、生产与发信仍分别验收）。
+- Last verified version: `0.33.0-260927.1606`（2026-09-27，D07 登录态接口合成测试；真实 Agent、Work、生产与发信仍分别验收）。
 - CalDAV 补充验证：2026-09-18，隔离 POC 与主应用回归；仅覆盖下述独立入口，真机尚未验证。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
@@ -49,9 +49,9 @@ D03 媒体恢复增量：合成测试检查同日报两条引用共用一个 R2 
 
 S1-R6 邮箱空态回归使用合成快照，分别检查 `not_configured`、`failed`、`partial`、`complete` 且零未读在输入清单、校验/Shadow 回执、网页、邮件 HTML 和纯文本中的区别；另查旧版 generation 的未过期 run 重试保持内容哈希与同一产物。不读取真实邮箱、不发信；真实邮箱客户端仍须单独验收。
 
-S2-03/04 存储与备份：`npx tsx --test server/digest-v3-store.test.ts server/core.test.ts` 使用临时旧版 `activity.db` 和隔离账号，验证重复迁移、旧记录保留、四类实体写回/重启、账号隔离、不可变版本、写回失败回滚、账号加密备份、同账号替换、跨账号 ID 与引用重映射、旧备份兼容、断裂引用拒绝。它不验证 V3 对外接口、案例自动分类、生产恢复演练或真实 Shadow；这些仍属后续层级。
+S2-03/04 存储与备份：`npx tsx --test server/digest-v3-store.test.ts server/core.test.ts` 使用临时旧版 `activity.db` 和隔离账号，验证重复迁移、旧记录保留、四类实体写回/重启、账号隔离、不可变版本、写回失败回滚、账号加密备份、同账号替换、跨账号 ID 与引用重映射、旧备份兼容、断裂引用拒绝。这组存储测试本身不验证 D07 HTTP 接口、案例自动分类、生产恢复演练或真实 Shadow；这些按各自层级验收。
 
-D07 固定来源本地闭环：`npx tsx --test server/digest-v3-local-flow.test.ts server/digest-v3-store.test.ts` 用临时旧版库及 S2-01 P01 两条 NASA 来源，检查 Evidence→初版 Event/Revision→进展 Revision→Analysis→精确引用 HTML、原版不漂移、请求键幂等、截点与 URL 拒绝、跨账号预览拒绝、持久化失败整链回退及账号替换恢复。`npx tsx scripts/digest-v3-local-preview.ts` 另在新建系统临时目录输出发射前后两页供浏览器查看；无网络抓取、Work、正式发布、邮件或提醒。此路径没有自动匹配、通用分页、对外认证与跨进程并发保障，不能据此放行 D08 或生产。
+D07 登录态本地闭环：`npx tsx --test server/digest-v3-api.test.ts server/digest-v3-local-flow.test.ts server/digest-v3-store.test.ts` 用临时库与 S2-01 P01 两条 NASA 来源，检查登录/账号隔离、明确人工确认、初版→进展、按截点分页事件列表与历史、精确引用 HTML、原版不漂移、同键同内容重试、同键改内容与旧版 `409`、非法 URL/参数 `400`、错误或跨账号引用 `404`、持久化失败后同键重试及账号替换恢复。`npx tsx scripts/digest-v3-local-preview.ts` 另在新建系统临时目录输出发射前后两页；无实时网络抓取、Work、正式发布、邮件或提醒。此路径没有自动匹配、跨进程并发或生产/真实 Shadow 证据，不能据此放行 D08 或生产。
 
 D02 定向校验增量：`npx tsx --test server/digest-v2-quality.test.ts server/digest-v2.test.ts` 用绑定截点的合成稿验证晚发来源被拒、变更 ID 但正文相同的新闻被拒、共享来源而出现明确新进展仍可通过；空新闻保持合法并返回 `reviewIssues`，旧 `2026-09-27.1` 冻结稿和强调渲染仍可读。9/23、9/26 遗漏及 9/27 空态只按当时已有脱敏证据回放；真实运行没有在本轮重做，候选/排除日志的完整性仍受限。[固定回放结论](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)不等于新闻检索质量通过。
 
