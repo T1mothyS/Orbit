@@ -6,6 +6,7 @@ import { digestMediaFetcher } from './digest-v2-relay.js';
 import { S3Client, HeadObjectCommand, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { controlledMediaFetch, dailyReportMediaRoot, storeProvidedDailyReportMedia, type ControlledDailyReportMediaOptions } from './daily-report-media-service.js';
 import { publicDigestUrl, type DigestV2 } from './digest-v2-contract.js';
+import { isValidDateKey } from './date-key.js';
 
 export interface MediaCredit { caption: string; author: string; sourcePage: string; licenseName: string; licenseUrl: string }
 export interface MediaRule { pageHost: string; imageHosts: string[]; policy: 'OWNED_OPEN' | 'LICENSED' | 'EXTERNAL_ALLOWED'; licenseRef: string; pageUrl?: string; imageUrls?: string[]; credit?: MediaCredit; sourceFile?: string; sourceSha256?: string; kind?: 'source_icon' }
@@ -47,7 +48,7 @@ export function configuredR2(): ObjectStorage | null {
         if (existing.Metadata?.sha256 !== sha256 || existing.ContentLength !== bytes.length) throw new Error('R2_HASH_CONFLICT');
         return;
       } catch (e: any) { if (e?.$metadata?.httpStatusCode !== 404) throw e; }
-      await send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: mime, Metadata: { sha256 }, CacheControl: 'public, max-age=31536000, immutable' }));
+      await send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: mime, Metadata: { sha256 }, CacheControl: key.startsWith('tmp/') ? 'no-store' : 'public, max-age=31536000, immutable' }));
     },
     async get(key) {
       const result: any = await send(new GetObjectCommand({ Bucket: bucket, Key: key }));
@@ -148,6 +149,7 @@ async function fallbackImage(category: string, seed = '') {
   return sharp(Buffer.from(svg)).png().toBuffer({ resolveWithObject: true });
 }
 export async function prepareDigestMedia(d: DigestV2, options: { storage?: ObjectStorage | null; rules?: MediaRule[]; fetchOptions?: ControlledDailyReportMediaOptions; mode: 'shadow' | 'production'; mediaRoot?: string; storyIllustrations?: boolean }) {
+  if (!isValidDateKey(d.date)) throw new Error('INVALID_DATE');
   let storage: ObjectStorage | null = null;
   let configurationFailure: string | null = null;
   let rules: MediaRule[] = [];
@@ -199,7 +201,8 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
     const filename = `${sha256}.${mime === 'image/png' ? 'png' : 'jpg'}`;
     // Durable local mirror participates in existing system backup, independently of R2.
     storeProvidedDailyReportMedia(filename, result.data, mime, root);
-    const key = `${fallback ? 'fallback' : options.mode === 'production' ? 'published' : 'tmp'}/${filename}`;
+    // A later Shadow date must not inherit an earlier date's tmp/ expiration.
+    const key = fallback ? `fallback/${filename}` : options.mode === 'production' ? `published/${filename}` : `tmp/${d.date}/${filename}`;
     let publicUrl = '';
     try {
       if (!storage) throw new Error('R2_NOT_CONFIGURED');
@@ -236,10 +239,16 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
   return images;
 }
 export async function restoreDigestObjects(images: PreparedImage[], storage: ObjectStorage, root = dailyReportMediaRoot()) {
+  const unique = new Map<string, { item: PreparedImage; bytes: Buffer }>();
   for (const item of images) {
-    if (!/^[a-f0-9]{64}\.(jpg|png)$/.test(item.filename) || !/^(published|fallback|tmp)\/[a-f0-9]{64}\.(jpg|png)$/.test(item.key)) throw new Error('MEDIA_BACKUP_PATH');
+    const expected = item.key.match(/^(?:published|fallback|tmp(?:\/\d{4}-\d{2}-\d{2})?)\/([a-f0-9]{64}\.(?:jpg|png))$/)?.[1];
+    if (!expected || expected !== item.filename || !item.filename.startsWith(`${item.sha256}.`)
+      || (item.filename.endsWith('.png') ? item.mime !== 'image/png' : item.mime !== 'image/jpeg')) throw new Error('MEDIA_BACKUP_PATH');
     const bytes = fs.readFileSync(path.join(root, item.filename));
-    if (crypto.createHash('sha256').update(bytes).digest('hex') !== item.sha256) throw new Error('MEDIA_BACKUP_HASH');
+    if (bytes.length !== item.bytes || crypto.createHash('sha256').update(bytes).digest('hex') !== item.sha256) throw new Error('MEDIA_BACKUP_HASH');
+    unique.set(item.key, { item, bytes });
+  }
+  for (const { item, bytes } of unique.values()) {
     await storage.put(item.key, bytes, item.mime, item.sha256);
     if (crypto.createHash('sha256').update(await storage.get(item.key)).digest('hex') !== item.sha256) throw new Error('MEDIA_RESTORE_HASH');
   }

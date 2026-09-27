@@ -244,7 +244,10 @@ test('media: decode, resize, strip metadata, reject bad or small images, fallbac
   assert.equal((published.media as any).real, 1);
   const listItem = service.digestArtifactView(activity.getDigestArtifact(userId, String(published.artifactId))!);
   assert.equal(listItem.headline, '有来源的新闻');
-  assert.equal(listItem.heroImageUrl, real[0].publicUrl);
+  const publishedMedia = JSON.parse(activity.getDigestArtifact(userId, String(published.artifactId))!.payload_json).publication.media[0];
+  assert.equal(publishedMedia.filename, real[0].filename);
+  assert.notEqual(publishedMedia.key, real[0].key);
+  assert.equal(listItem.heroImageUrl, publishedMedia.publicUrl);
   assert.equal(listItem.excerpt, '一项可核验的新变化');
   const count = uploads; await prepareDigestMedia(illustrated(), options); assert.equal(uploads, count);
   objects.delete(real[0].key); await restoreDigestObjects(real, storage, options.mediaRoot); assert.ok(objects.has(real[0].key));
@@ -262,6 +265,18 @@ test('media: decode, resize, strip metadata, reject bad or small images, fallbac
   const shared = illustrated(); shared.media.push({ ...shared.media[0], id: 'm2' }); shared.stories[0].media_ids.push('m2');
   const refs = await prepareDigestMedia(shared, options);
   assert.equal(refs.length, 2); assert.equal(refs[0].sha256, refs[1].sha256); assert.notEqual(refs[0].id, refs[1].id);
+  assert.equal(refs[0].key, refs[1].key, 'same-date references share one object');
+  const later = illustrated(); later.date = '2026-10-12';
+  const laterRefs = await prepareDigestMedia(later, options);
+  assert.equal(laterRefs[0].filename, refs[0].filename, 'local content-addressed mirror stays shared');
+  assert.notEqual(laterRefs[0].key, refs[0].key, 'later date gets its own tmp expiration');
+  assert.match(laterRefs[0].key, /^tmp\/2026-10-12\//);
+  objects.delete(refs[0].key); objects.delete(laterRefs[0].key);
+  await restoreDigestObjects([...refs, ...laterRefs], storage, options.mediaRoot);
+  assert.ok(objects.has(refs[0].key)); assert.ok(objects.has(laterRefs[0].key));
+  const beforeBadRestore = uploads;
+  await assert.rejects(restoreDigestObjects([refs[0], { ...laterRefs[0], key: `tmp/2026-10-12/${'0'.repeat(64)}.jpg` }], storage, options.mediaRoot), /MEDIA_BACKUP_PATH/);
+  assert.equal(uploads, beforeBadRestore, 'a bad later reference cannot cause an earlier upload');
 });
 
 test('new Shadow gives every story without a licensed photo a distinct, labeled original illustration', async () => {
@@ -350,11 +365,20 @@ test('production is gated and repeated/concurrent publication does not duplicate
   await assert.rejects(service.publishDigestV2(userId, run.runId, digest(), 'production'), /V2_PRODUCTION_DISABLED/);
 });
 
-test('user backup restores V2 runs, immutable publications and independently stored image bytes', () => {
+test('user backup restores V2 runs, immutable publications and independently stored image bytes', async () => {
+  for (const date of ['2026-10-20', '2026-10-21']) {
+    const d = illustrated(); d.date = date;
+    const run = service.createDigestSnapshotRun(userId, { ...snapshot(), date });
+    await service.publishDigestV2(userId, run.runId, d, 'shadow', { storage, rules: [] });
+  }
   const before = activity.exportUserActivity(userId);
   const saved = backup.createUserBackup(userId, 'restore-test-password');
   const decoded: any = backup.decryptBackup(saved, 'restore-test-password');
-  const first = decoded.digestMedia[0];
+  const references = before.digestV2Artifacts.flatMap((row: any) => JSON.parse(row.payload_json).publication.media.map((media: any) => media.filename));
+  const sharedFilename = references.find((filename: string, index: number) => references.indexOf(filename) !== index);
+  assert.ok(sharedFilename, 'separate artifacts share a content-addressed local media file');
+  assert.equal(decoded.digestMedia.filter((item: any) => item.filename === sharedFilename).length, 1);
+  const first = decoded.digestMedia.find((item: any) => item.filename === sharedFilename);
   const imagePath = path.join(root, 'daily-report-media', first.filename);
   assert.ok(fs.existsSync(imagePath), 'fixture must use isolated media root');
   fs.renameSync(imagePath, imagePath + '.held');
