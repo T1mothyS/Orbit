@@ -80,6 +80,25 @@ test('D07 login API keeps reviewed P01 history, exact previews, conflicts and re
     assert.equal(firstResponse.status, 201);
     const first = await firstResponse.json() as any;
     const firstRecordedAt = activity.digestV3Store.getRevision(alice.id, first.revisionId)!.recordedAt;
+    const firstCitation = { reportDate: firstRecordedAt.slice(0, 10), reportVersionKey: 'morning-draft', citationKey: 'lead',
+      eventId: first.eventId, revisionId: first.revisionId, analysisId: first.analysisId,
+      evidenceIds: [first.evidenceId], cutoff: firstRecordedAt };
+    const freeze = (token: string, citation: unknown, confirmReviewed = true) =>
+      request('/frozen-citations', token, { confirmReviewed, citation });
+    assert.equal((await freeze(aliceToken, firstCitation, false)).status, 400);
+    assert.equal((await freeze(bobToken, firstCitation)).status, 400);
+    assert.equal((await freeze(aliceToken, { ...firstCitation, evidenceIds: ['missing-evidence'] })).status, 400);
+    assert.equal((await freeze(aliceToken, { ...firstCitation, cutoff: '2020-01-01T00:00:00Z' })).status, 400);
+    const frozenResponse = await freeze(aliceToken, firstCitation);
+    assert.equal(frozenResponse.status, 201);
+    const frozen = await frozenResponse.json() as any;
+    assert.equal((await freeze(aliceToken, firstCitation)).status, 200);
+    assert.equal((await freeze(aliceToken, { ...firstCitation, analysisId: 'wrong-analysis' })).status, 409);
+    assert.equal((await request(`/frozen-citations/${frozen.freezeId}`, bobToken)).status, 404);
+    const beforeProgress = await (await request(`/frozen-citations/${frozen.freezeId}`, aliceToken)).json() as any;
+    assert.equal(beforeProgress.snapshot.revision.facts[0].value, 'liftoff');
+    assert.equal(beforeProgress.snapshot.evidence[0].sourceFact, launch.fact);
+    assert.equal(beforeProgress.snapshotSha256, frozen.snapshotSha256);
     assert.equal((await submit(aliceToken, firstInput)).status, 200);
     assert.equal((await submit(aliceToken, { ...firstInput, analysis: { body: '同键变更分析内容' } })).status, 409);
     assert.equal((await submit(aliceToken, { ...firstInput, fact: { ...firstInput.fact, value: 'changed' } })).status, 409);
@@ -91,6 +110,11 @@ test('D07 login API keeps reviewed P01 history, exact previews, conflicts and re
     const secondResponse = await submit(aliceToken, secondInput);
     assert.equal(secondResponse.status, 201);
     const second = await secondResponse.json() as any;
+    const afterProgress = await (await request(`/frozen-citations/${frozen.freezeId}`, aliceToken)).json() as any;
+    assert.deepEqual(afterProgress, beforeProgress, 'a later revision must not rewrite an older local report citation');
+    await activity.initActivityDb();
+    assert.deepEqual(await (await request(`/frozen-citations/${frozen.freezeId}`, aliceToken)).json(),
+      beforeProgress, 'the frozen snapshot must survive reopening activity.db');
     const laterCutoff = new Date().toISOString();
     const earlierEvents = await (await request(eventsPath(firstRecordedAt), aliceToken)).json() as any;
     assert.equal(earlierEvents.total, 1);
@@ -130,7 +154,9 @@ test('D07 login API keeps reviewed P01 history, exact previews, conflicts and re
     assert.equal(activity.exportUserActivity(alice.id).digestV3Revisions.length, 2);
 
     const backup = activity.exportUserActivity(alice.id);
+    assert.equal(backup.digestV3FrozenCitations.length, 1);
     activity.restoreUserActivity(alice.id, backup, 'replace');
+    assert.deepEqual(await (await request(`/frozen-citations/${frozen.freezeId}`, aliceToken)).json(), beforeProgress);
     assert.equal((await (await request(previewPath(first.revisionId, first.analysisId, laterCutoff), aliceToken)).text()), firstPreview);
     assert.equal((await (await request(historyPath(new Date().toISOString()), aliceToken)).json() as any).total, 2);
     assert.equal(backup.dailyReports.length, 0);
@@ -153,6 +179,29 @@ test('D07 login API keeps reviewed P01 history, exact previews, conflicts and re
     assert.equal((await submit(aliceToken, faultInput)).status, 201);
     assert.equal((await submit(aliceToken, faultInput)).status, 200);
     assert.equal(activity.exportUserActivity(alice.id).digestV3Revisions.length, 3);
+
+    const secondCitation = { ...firstCitation, citationKey: 'followup',
+      revisionId: second.revisionId, analysisId: second.analysisId,
+      evidenceIds: [first.evidenceId, second.evidenceId], cutoff: new Date().toISOString() };
+    const frozenBeforeFault = activity.exportActivityDb();
+    const diskBeforeFault = fs.readFileSync(path.join(root, 'activity.db'));
+    const rename = fs.renameSync;
+    const frozenMock = t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => {
+      if (String(to) === path.join(root, 'activity.db')) throw new Error('SYNTHETIC_D09_DISK_FAILURE');
+      return rename(from, to);
+    });
+    try { assert.equal((await freeze(aliceToken, secondCitation)).status, 500); }
+    finally { frozenMock.mock.restore(); }
+    assert.deepEqual(activity.exportActivityDb(), frozenBeforeFault);
+    assert.deepEqual(fs.readFileSync(path.join(root, 'activity.db')), diskBeforeFault);
+    assert.equal(activity.exportUserActivity(alice.id).digestV3FrozenCitations.length, 1);
+    assert.equal((await freeze(aliceToken, secondCitation)).status, 201);
+    assert.equal(activity.exportUserActivity(alice.id).digestV3FrozenCitations.length, 2);
+    const laterEdition = { ...secondCitation, reportVersionKey: 'evening-draft', citationKey: 'lead' };
+    assert.equal((await freeze(aliceToken, laterEdition)).status, 201);
+    assert.equal(activity.exportUserActivity(alice.id).digestV3FrozenCitations.length, 3);
+    assert.equal(activity.exportUserActivity(alice.id).dailyReports.length, 0);
+    assert.equal(activity.exportUserActivity(alice.id).notifications.length, 0);
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   }

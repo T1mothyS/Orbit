@@ -1,12 +1,12 @@
 # Daily Digest V3 Core：事件记忆字段与状态合同
 
-- Status: CONTRACT / S2-02；S2-03/04 LOCAL VERIFIED；D07 登录态本地接口闭环；D08 事实状态安全修复后仍为只读离线建议
-- Scope: Event、Revision、Evidence、Analysis 的字段与状态、原活动库增量存储、账号级备份恢复、D07 受控提交和 D08 只读离线匹配建议；不定义 Work 写入。
-- Last verified version: `0.35.1-260927.1806`（2026-09-27，D08 阶段事实安全修复；无 Work 接入或部署）。S2-04 历史基线为 `b040b01` / `0.31.8-260924.1255`。
+- Status: CONTRACT / S2-02；S2-03/04 与 D07 本地验证；D08 仅只读离线建议；D09 第一步本地精确引用冻结已验证
+- Scope: Event、Revision、Evidence、Analysis 的字段与状态、原活动库增量存储、账号级备份恢复、D07 受控提交、D08 只读离线建议及 D09 人工引用冻结；不定义 Work 写入。
+- Last verified version: `0.36.0-260928.0729`（2026-09-28，D09 第一步本地引用冻结；无 Work 接入或部署）。S2-04 历史基线为 `b040b01` / `0.31.8-260924.1255`。
 - Authority: 当前源码及 [S2-01 固定案例](daily-digest-v3-s2-01-cases.json) 优先；实现时如需改动本合同，应先解释案例与兼容性差异。
 - Update trigger: V3 数据结构或备份合同、S2-06 写入校验、S2-09 修订语义或 S2-10a 纠正流程落地时。
 - Supersedes: 无；[V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)及已有产物保持原语义。
-- Do not use for: 宣称 V3 已接入 Work/MCP、已通用抓取原网页、正式日报冻结引用或真实 Shadow 验收。
+- Do not use for: 宣称 V3 已接入 Work/MCP、已通用抓取原网页、正式日报发布引用已接入或真实 Shadow 验收。
 
 ## 共同约束
 
@@ -21,7 +21,7 @@
 | `Evidence` | `id`、`userId`、`url`、`publisherKey`、`documentType`、`language`、`sourceFact`、`publishedAt`/`precision`、`retrievedAt`、`independenceKey`、`reviewState`。`url` 指具体来源页，`sourceFact` 是有界的来源事实摘要，不能混入 AI 推断。 | `sourceDocumentKey` 用于同一发布物的多语言/转载归并；`relatedEvidenceId` + `relation = translation | reprint | update` 表示派生关系；`supersedesEvidenceId` 用于同 URL 页面后来更正/重新核对；`linkedRevisionId` 允许后来核对的译文关联既存修订，不改写修订本身。相同 `independenceKey` 只能算一条独立来源；同机构不同文件也要保留各自 Evidence。既存 Evidence 封存后不覆盖。 |
 | `Analysis` | `id`、`userId`、`eventRevisionId`、`evidenceIds[]`、`analysisKind = interpretation | change_assessment | hypothesis`、`body`、`authorKind = ai | user`、`recordedAt`。分析只能引用已保存、同账号的精确 Revision/Evidence 版本；`body` 不作为 `facts[]` 或来源证据。 | `comparedRevisionIds[]` 在跨事件比较时固定所比较的版本；`change_assessment` 另记 `factKey`、`scope`、`check = complete | incomplete`、`assessment = material | no_material_change | unknown`，只有检查完整且来源充分才可判无变化。`runId`、`modelId`、`promptVersion` 用于 AI 生成溯源；`supersedesAnalysisId` 表示新解释替换旧解释，但旧记录保留。保存 Analysis 不等于用户确认 Thesis/Proposal，不触发日程写入或提醒。 |
 
-`Evidence` 保存的是某次核对所见，不是外部网页永远不变的保证；同 URL 更新时追加新 Evidence 并连接 `supersedesEvidenceId`。`Revision.evidenceIds[]` 只引用当时的 Evidence，`Analysis` 只引用当时的 Revision/Evidence；新 Revision 不会让旧 Analysis 自动成为当前解释。未来日报发布时必须冻结这些 ID（S2-11），以免后续网页更新、分析重做或事件合并改写历史含义。已有 `digest_v2_runs`、`digest_v2_artifacts` 与 V2 发布快照不回填、不重写为 V3 实体。
+`Evidence` 保存的是某次核对所见，不是外部网页永远不变的保证；同 URL 更新时追加新 Evidence 并连接 `supersedesEvidenceId`。`Revision.evidenceIds[]` 只引用当时的 Evidence，`Analysis` 只引用当时的 Revision/Evidence；新 Revision 不会让旧 Analysis 自动成为当前解释。D09 第一步已为本地日报版本提供独立冻结记录；正式日报发布接入仍待后续授权。已有 `digest_v2_runs`、`digest_v2_artifacts` 与 V2 发布快照不回填、不重写为 V3 实体。
 
 `independenceKey` 按原始采编/发布链划分，不简单等于域名或机构名：同一 NASA 发布物的译文共用一个键；同一美联储会议的决议和预测是不同文件，但是否能互相佐证同一事实，仍须按各自事实范围判断。
 
@@ -75,9 +75,9 @@
 
 ## S2-03 本地存储与迁移（2026-09-24）
 
-现有 `activity.db` 在启动时增量创建 `digest_v3_events`、`digest_v3_revisions`、`digest_v3_evidence`、`digest_v3_analyses`，以及修订/分析到证据、分析到比较修订的三个引用表；`schema_meta` 的总版本为 `4`，`digest_v3=1`。迁移在 SQLite 事务中执行，重复启动安全，不读取或改写 V2 报告/产物。主键和外键包含 `user_id`；Event 当前修订还要求属于同一 Event。已保存的 Revision、Evidence、Analysis 禁止原位 UPDATE；Event 可在未来的受控纠正中改变当前指针与生命周期。
+2026-09-24 基线在 `activity.db` 增量创建 `digest_v3_events`、`digest_v3_revisions`、`digest_v3_evidence`、`digest_v3_analyses`，以及三个引用表；当时 `digest_v3=1`。2026-09-28 的 D09 增量增加一张冻结引用表，当前 `schema_meta` 总版本仍为 `4`，`digest_v3=2`。迁移在 SQLite 事务中执行，重复启动安全，不读取或改写 V2 报告/产物。主键和外键包含 `user_id`；Event 当前修订还要求属于同一 Event。已保存的 Revision、Evidence、Analysis 和冻结引用禁止原位 UPDATE；Event 可在未来的受控纠正中改变当前指针与生命周期。
 
-内部存储层位于 [digest-v3-store.ts](../server/digest-v3-store.ts)，通过现有 `activity-store.ts` 连接和可靠写回。D07 的登录态 HTTP 接口提供人工审核提交、按截点分页读取及精确预览；MCP、Work 写入和日报发布未接入。匹配、合并与正式冻结日报引用按路线图后续卡片实现。`sql.js` 导出数据库会重建连接，写回/恢复后重新开启外键检查，避免账号引用约束在首次保存后失效。
+内部存储层位于 [digest-v3-store.ts](../server/digest-v3-store.ts)，通过现有 `activity-store.ts` 连接和可靠写回。D07 的登录态 HTTP 接口提供人工审核提交、按截点分页读取及精确预览；D09 第一步增加本地引用冻结与读取；MCP、Work 写入和日报发布未接入。人工纠正/恢复与正式日报引用接入按路线图后续步骤实现。`sql.js` 导出数据库会重建连接，写回/恢复后重新开启外键检查，避免账号引用约束在首次保存后失效。
 
 全站快照包含完整 `activity.db`。管理员按已有全站快照流程删除账号数据时，会清除该账号的 V3 行并保留其他账号。账号级备份恢复规则见下一节；本地合成验证不能作为真实 V3 写入或生产恢复的放行依据。
 
@@ -85,9 +85,9 @@
 
 ## S2-04 账号级备份与恢复（2026-09-24）
 
-账号加密备份沿用原格式版本 `1`，在 `activity` 中增加四类 V3 记录及三个引用表的完整行集；旧备份没有这七个字段仍可读取。检查备份时，七个字段必须全有或全无，逐项验证 ID、账号归属一致、当前修订、前一修订、事实中的证据 ID、来源关系、分析及三个引用表。新备份即使没有 V3 数据，也包含七个空数组，使替换恢复的语义明确。
+2026-09-24 的 S2-04 基线沿用账号加密备份格式版本 `1`，在 `activity` 中保存四类 V3 记录及三个引用表；旧备份没有这七个字段仍可读取。当前备份在此基础上增加第八组 `digestV3FrozenCitations`；旧七组备份仍可读取和合并，但不能替换已有冻结记录。检查备份时，原七组必须全有或全无，冻结组可缺省为旧格式；冻结行额外验证账号、精确引用、证据集合、快照结构与 SHA-256。当前导出即使没有 V3 数据，也包含八个空数组。
 
-同账号合并保持既有行，重复导入相同行幂等；同 ID 内容冲突时报错并回滚。替换恢复清除目标账号的 V3 行后重建全部行和引用，四库恢复事务失败时回滚。跨账号恢复为 Event/Revision/Evidence/Analysis 生成新 ID，并重写所有外键、比较引用和 `facts_json` 中的证据 ID；目标账号既有记录不会被当作来源引用。旧备份可合并到已有 V3 数据的账号，或替换没有 V3 数据的账号；旧备份替换已有 V3 数据会在修改前拒绝，防止静默删除。恢复前仍创建既有的加密安全副本。
+同账号合并保持既有行，重复导入相同行幂等；同 ID 内容冲突时报错并回滚。替换恢复清除目标账号的 V3 行后重建全部行和引用，四库恢复事务失败时回滚。跨账号恢复为 Event/Revision/Evidence/Analysis/冻结引用生成新 ID，并重写所有外键、比较引用、`facts_json` 中的证据 ID 和冻结记录的证据 ID；日报版本键也重映射，快照正文与其哈希保持原义。旧备份可合并到已有 V3 数据的账号，或替换没有 V3 数据的账号；旧备份替换已有 V3 数据会在修改前拒绝，防止静默删除。恢复前仍创建既有的加密安全副本。
 
 [S2-04 测试](../server/core.test.ts) 用隔离账号核对加密备份检查、同账号替换、跨账号重映射、引用读回、旧备份兼容和断裂引用拒绝；[存储测试](../server/digest-v3-store.test.ts) 检查旧备份替换保护与合并幂等。未进行生产备份恢复演练，也没有 V3 对外写入或真实 Shadow。
 
@@ -110,4 +110,12 @@
 | `GET /api/digest-v3/events/:id/history?cutoff=...&limit=50&offset=0` | 必须给带时区截点；服务端规范为 UTC，只返回该账号在截点前已记录的版本、各版精确 Evidence 与 Analysis。按修订号倒序分页，`limit` 为 1–100，返回 `total` 和 `latestRevisionIdAtCutoff`，不以今日 `currentRevisionId` 冒充历史指针。跨账号或截点前不存在为 `404`；未知参数或无效分页为 `400`。 |
 | `GET /api/digest-v3/events/:id/preview?revisionId=...&analysisId=...&cutoff=...` | 返回 `text/html` 的本地隔离预览；Event/Revision/Analysis、前版及 Evidence 必须精确同账号、同链且不晚于截点。错误或跨账号引用 `404`，格式错误 `400`。不写正式日报、通知或邮件。 |
 
-同一进程中，服务端先校验字段、公开 HTTPS 来源、发布时间和截点，再在原 `activity.db` 事务中保存整条 Evidence→Event/Revision→Analysis 链。固定请求键派生稳定 ID；同键改来源、事实、事件身份、前版或分析会冲突。旧版指针在事务内再检查，写回失败走现有回退。账号备份与恢复仍使用 S2-04 的七组记录，不引入接口专属状态。此闭环只在现有单进程 `sql.js` 运行模型内验证；跨进程协调、真实 Work 身份与结果回传、自动匹配、D09 冻结发布及生产恢复另行验收。
+同一进程中，服务端先校验字段、公开 HTTPS 来源、发布时间和截点，再在原 `activity.db` 事务中保存整条 Evidence→Event/Revision→Analysis 链。固定请求键派生稳定 ID；同键改来源、事实、事件身份、前版或分析会冲突。旧版指针在事务内再检查，写回失败走现有回退。D07 当时的账号备份只用 S2-04 七组记录，不引入接口专属状态；D09 后当前备份为八组。此闭环只在现有单进程 `sql.js` 运行模型内验证；跨进程协调、真实 Work 身份与结果回传、自动匹配、正式发布引用接入及生产恢复另行验收。
+
+## D09 第一步：人工核验引用冻结（2026-09-28）
+
+`POST /api/digest-v3/frozen-citations` 只接受登录态 `{ "confirmReviewed": true, "citation": { "reportDate": "YYYY-MM-DD", "reportVersionKey": "morning-draft", "citationKey": "lead", "cutoff": "带时区时间", "eventId": "...", "revisionId": "...", "analysisId": "...", "evidenceIds": ["..."] } }`。`reportVersionKey` 标识**一份本地日报草稿的具体版本**，同一天的晚间增量稿使用另一键；`citationKey` 标识该版内的一处引用。二者由人工调用方提供，目前没有正式日报 ID 绑定。账号取认证身份，不能在请求中指定。`GET /api/digest-v3/frozen-citations/:id` 只向所属账号返回冻结行与快照，响应为 `no-store`。
+
+创建时复用 D07 精确预览校验：Event/Revision/Analysis 及前版必须同账号、同链、在截点前，来源均为已人工核验的公开 HTTPS 页面且取回时间不晚于截点；还要求 Revision 由用户决定、Analysis 由用户编写，显式提交的 Evidence ID 集合与本版和前版完全一致。截点不能晚于本地核对时间。成功后按 `(账号, reportVersionKey, citationKey)` 锁定引用位，保存 Event/Revision/Analysis/前版/全部 Evidence 的精确 ID、截点、事件身份与当时生命周期、两版有界事实、分析正文、来源核验状态及有界来源元数据快照与 SHA-256；不保存整个外部网页。相同内容重试 `200 existing`，换 ID、截点、证据或日期 `409`，引用错误/跨账号/未来截点 `400`，持久化故障 `500` 且整笔回退。后续读取只从冻结行返回内容，不按今日 Event 指针或网页重新解释旧版。
+
+冻结行位于原 `activity.db`，复合外键保护 Event/Revision/Analysis，保存时在事务内再核对前版及证据集合，数据库禁止原位更新。账号加密备份保存第八组行；同账号替换和跨账号重映射、旧七组备份保护与断裂/篡改拒绝均有本地合成测试。此步没有人工合并、拆回、更正或恢复操作，也没有把冻结行接到 `daily_reports`、V2.5/Work/MCP、正式发布、通知或发信。D08 建议仍完全不进入写路径。

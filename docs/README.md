@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified version: `0.35.1-260927.1806`（2026-09-27，D08 阶段事实安全修复；真实 Agent、Work、生产与发信未验）。
+- Last verified version: `0.36.0-260928.0729`（2026-09-28，D09 第一步本地引用冻结；真实 Agent、Work、生产与发信未验）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。
@@ -12,7 +12,7 @@
 
 Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提示统一维护在 [Cloud 合同新版节](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)，阶段顺序见 [路线图](ROADMAP.md)，验收入口见 [测试矩阵](TEST-MATRIX.md)。D02 的[第一轮内容基线](DAILY-DIGEST-D02-QUALITY-BASELINE-20260927.md)、[定向校验回放](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)与[七期合成压缩回放](DAILY-DIGEST-SEVEN-DAY-SIMULATION-20260927.md)分开记录；本地开发与生产分层放行，七个真实日期不是统一前置，合成回放不能代替真实集成或上线验收。
 
-Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis、S2-03 存储、S2-04 账号备份恢复、D07 登录态接口及 D08 只读离线双轴判断统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；D08 的 [第一轮](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md)、[第二轮](DAILY-DIGEST-D08-OFFLINE-EVALUATION-R2-20260927.md)与[事实状态安全回归](DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)分别记录逐例结果。当前只对有界短摘录做限定抽取，仍无通用网页抓取、Work/MCP 写入，不改变 V2.5 当前运行合同。
+Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis、存储/账号备份、D07 登录态接口、D08 只读离线建议和 D09 第一步本地引用冻结统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；D08 的 [第一轮](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md)、[第二轮](DAILY-DIGEST-D08-OFFLINE-EVALUATION-R2-20260927.md)与[事实状态安全回归](DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)分别记录逐例结果。当前只对有界短摘录做限定抽取，仍无通用网页抓取、Work/MCP 写入、D09 人工纠正或正式日报接入，不改变 V2.5 当前运行合同。
 
 D13 Research/Thesis 的本地状态、登录态接口、观点确认和备份边界见[研究与观点合同](DAILY-DIGEST-RESEARCH-THESIS.md)；真实 Agent 和 Work 结果回传尚未接通。
 
@@ -28,7 +28,7 @@ D13 Research/Thesis 的本地状态、登录态接口、观点确认和备份边
 | [测试矩阵](TEST-MATRIX.md) | 自动化、浏览器、生产各自能证明什么 | LIVING |
 | [UI 规范](UI-GUIDELINES.md) | 布局、主题、交互与响应式要求 | AUTHORITATIVE / LIVING |
 | [Cloud 日报](CHATGPT-WORK-CLOUD.md) | OAuth/MCP、内容、媒体和发布合同；末尾历史区单独标记 | CONTRACT |
-| [V3 Core 事件记忆合同](DAILY-DIGEST-V3-CORE-CONTRACT.md) | S2-02 字段与状态；S2-03/04 原活动库存储与备份；D07 接口；D08 离线双轴判断 | CONTRACT / LOCAL VERIFIED |
+| [V3 Core 事件记忆合同](DAILY-DIGEST-V3-CORE-CONTRACT.md) | S2-02 字段与状态；原活动库存储与备份；D07 接口；D08 离线双轴建议；D09 第一步本地引用冻结 | CONTRACT / LOCAL VERIFIED |
 | [D13 研究与观点合同](DAILY-DIGEST-RESEARCH-THESIS.md) | Research 历史、Proposal 草稿、用户确认的 Thesis、账号备份及触发受限项 | CONTRACT / LOCAL SYNTHETIC |
 | [知识库](LIBRARY.md) | 只读呈现、发布/生命周期 API 与本地加工规则；批次记录仅为历史 | FEATURE / CONTRACT |
 | [CalDAV 单向桥接](CALDAV-BRIDGE.md) | 全量范围、完成与周期历史、来源归并、受控自动化及恢复合同 | CONTRACT / LOCAL VERIFIED |

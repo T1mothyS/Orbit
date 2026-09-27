@@ -83,6 +83,8 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
     v3RevisionIds = revisionIds;
     const evidenceIds = createIdMap(v3.digestV3Evidence.map(row => row.id));
     const analysisIds = createIdMap(v3.digestV3Analyses.map(row => row.id));
+    const frozenIds = createIdMap(v3.digestV3FrozenCitations.map(row => row.id));
+    const frozenReportKeys = createIdMap(v3.digestV3FrozenCitations.map(row => row.report_version_key));
     const mapped = (ids: Map<string, string>, id: string | null): string | null => id == null ? null : ids.get(id)!;
     activity.digestV3Events = v3.digestV3Events.map(row => ({ ...row,
       id: mapped(eventIds, row.id), current_revision_id: mapped(revisionIds, row.current_revision_id),
@@ -112,6 +114,13 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
     }));
     activity.digestV3AnalysisComparisons = v3.digestV3AnalysisComparisons.map(row => ({ ...row,
       analysis_id: mapped(analysisIds, row.analysis_id), revision_id: mapped(revisionIds, row.revision_id),
+    }));
+    activity.digestV3FrozenCitations = v3.digestV3FrozenCitations.map(row => ({ ...row,
+      id: mapped(frozenIds, row.id), report_version_key: `restored:${mapped(frozenReportKeys, row.report_version_key)}`,
+      event_id: mapped(eventIds, row.event_id),
+      revision_id: mapped(revisionIds, row.revision_id), analysis_id: mapped(analysisIds, row.analysis_id),
+      previous_revision_id: mapped(revisionIds, row.previous_revision_id),
+      evidence_ids_json: JSON.stringify(JSON.parse(row.evidence_ids_json).map((id: string) => mapped(evidenceIds, id)).sort()),
     }));
   }
   if (research) {
@@ -371,6 +380,7 @@ export function inspectUserBackup(buffer: Buffer, password: string): Record<stri
       digestV3Revisions: (payload.activity.digestV3Revisions || []).length,
       digestV3Evidence: (payload.activity.digestV3Evidence || []).length,
       digestV3Analyses: (payload.activity.digestV3Analyses || []).length,
+      digestV3FrozenCitations: (payload.activity.digestV3FrozenCitations || []).length,
       researchRuns: (payload.activity.researchRuns || []).length,
       thesisProposals: (payload.activity.thesisProposals || []).length,
       thesisVersions: (payload.activity.thesisVersions || []).length,

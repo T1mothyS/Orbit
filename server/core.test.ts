@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import type { CreditCardConfig, GenericReminderConfig, SimConfig } from './reminder-store.js';
+import { freezeReviewedV3Citation, recordReviewedV3Source } from './digest-v3-local-flow.js';
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aicalendar-test-'));
 process.env.DATA_DIR = tempDir;
@@ -605,6 +606,75 @@ test('S2-04 账号备份恢复 V3 引用，兼容旧备份并拒绝断裂引用'
   const partial = backups.decryptBackup<any>(encrypted, password);
   delete partial.activity.digestV3Analyses;
   assert.throws(() => backups.inspectUserBackup(backups.encryptBackup(partial, password), password), /缺少关联表/);
+});
+
+test('D09 frozen citations survive encrypted same-account and cross-account restore', () => {
+  const source = 'd09-source';
+  const target = 'd09-target';
+  const now = '2026-09-27T04:00:00.000Z';
+  const password = 'd09-backup-password';
+  for (const [id, emailAddress] of [[source, 'd09-source@example.test'], [target, 'd09-target@example.test']]) {
+    db.createUser({ id, email: emailAddress, password_hash: 'synthetic', role: 'user',
+      disabled: 0, created_at: now, updated_at: now });
+  }
+  const submission = (requestKey: string, value: string) => ({
+    requestKey, cutoff: now, eventId: 'shared-d09-event',
+    event: { eventType: 'mission', subjectKey: 'nasa:artemis-i',
+      occurrenceKey: 'flight:artemis-i', title: `${value} title` },
+    source: { url: 'https://www.nasa.gov/missions/artemis-i/', publisherKey: 'nasa',
+      documentType: 'mission_blog', language: 'en', sourceFact: `${value} source`,
+      publishedAt: '2022-11-16', publishedPrecision: 'date', independenceKey: requestKey },
+    fact: { factKey: 'mission_milestone', value, unit: null, scope: 'artemis-i-flight' },
+    analysis: { body: `${value} analysis` },
+  });
+  const v3 = activity.digestV3Store;
+  const first = recordReviewedV3Source(v3, source, submission('d09-source-key', 'liftoff'), () => new Date(now));
+  recordReviewedV3Source(v3, target, submission('d09-target-key', 'other-account'), () => new Date(now));
+  const freeze = freezeReviewedV3Citation(v3, source, {
+    reportDate: '2026-09-27', reportVersionKey: 'morning-draft', citationKey: 'lead', cutoff: now,
+    eventId: first.eventId, revisionId: first.revisionId, analysisId: first.analysisId,
+    evidenceIds: [first.evidenceId],
+  }, () => new Date(now));
+  const original = v3.getFrozenCitation(source, freeze.freezeId)!;
+  const encrypted = backups.createUserBackup(source, password);
+  assert.equal((backups.inspectUserBackup(encrypted, password) as any).counts.digestV3FrozenCitations, 1);
+  const restored = backups.restoreUserBackup(target, encrypted, password, 'merge') as any;
+  assert.equal(restored.idsRemapped, true);
+  const targetRows = activity.exportUserActivity(target) as Record<string, any[]>;
+  assert.equal(targetRows.digestV3FrozenCitations.length, 1);
+  const mapped = v3.getFrozenCitation(target, targetRows.digestV3FrozenCitations[0].id)!;
+  assert.notEqual(mapped.id, original.id);
+  assert.notEqual(mapped.reportVersionKey, original.reportVersionKey);
+  assert.notEqual(mapped.revisionId, original.revisionId);
+  assert.notEqual(mapped.evidenceIds[0], original.evidenceIds[0]);
+  assert.equal(mapped.snapshotSha256, original.snapshotSha256);
+  assert.deepEqual(mapped.snapshot, original.snapshot);
+  assert.equal(v3.getRevision(target, mapped.revisionId)?.eventId, mapped.eventId);
+  assert.equal(v3.getEvidence(target, mapped.evidenceIds[0])?.sourceFact, 'liftoff source');
+  assert.equal(v3.getFrozenCitation(target, original.id), null);
+
+  backups.restoreUserBackup(source, encrypted, password, 'replace');
+  assert.deepEqual(v3.getFrozenCitation(source, original.id), original);
+  const oldSeven = backups.decryptBackup<any>(encrypted, password);
+  delete oldSeven.activity.digestV3FrozenCitations;
+  const oldSevenEncrypted = backups.encryptBackup(oldSeven, password);
+  assert.equal((backups.inspectUserBackup(oldSevenEncrypted, password) as any).counts.digestV3FrozenCitations, 0);
+  const before = activity.exportUserActivity(source);
+  assert.throws(() => backups.restoreUserBackup(source, oldSevenEncrypted, password, 'replace'), /不含 V3 冻结引用/);
+  assert.deepEqual(activity.exportUserActivity(source), before);
+  const broken = backups.decryptBackup<any>(encrypted, password);
+  broken.activity.digestV3FrozenCitations[0].evidence_ids_json = '["missing"]';
+  assert.throws(() => backups.inspectUserBackup(backups.encryptBackup(broken, password), password), /冻结引用备份无效/);
+  const changed = backups.decryptBackup<any>(encrypted, password);
+  changed.activity.digestV3FrozenCitations[0].snapshot_json = '{}';
+  assert.throws(() => backups.inspectUserBackup(backups.encryptBackup(changed, password), password), /冻结引用备份无效/);
+  const unsafe = backups.decryptBackup<any>(encrypted, password);
+  const unsafeRow = unsafe.activity.digestV3FrozenCitations[0];
+  const unsafeSnapshot = JSON.parse(unsafeRow.snapshot_json);
+  unsafeSnapshot.evidence[0].url = 'http://127.0.0.1/private';
+  unsafeRow.snapshot_json = JSON.stringify(unsafeSnapshot);
+  unsafeRow.snapshot_sha256 = crypto.createHash('sha256').update(unsafeRow.snapshot_json).digest('hex');
+  assert.throws(() => backups.inspectUserBackup(backups.encryptBackup(unsafe, password), password), /冻结引用备份无效/);
 });
 
 test('全站恢复统一替换四个数据库和附件且不遗留暂存文件', () => {

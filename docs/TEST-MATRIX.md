@@ -4,7 +4,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified version: `0.35.1-260927.1806`（2026-09-27，D08 阶段事实安全修复；真实 Agent、Work、生产与发信仍分别验收）。
+- Last verified version: `0.36.0-260928.0729`（2026-09-28，D09 第一步本地引用冻结；真实 Agent、Work、生产与发信仍分别验收）。
 - CalDAV 补充验证：2026-09-18，隔离 POC 与主应用回归；仅覆盖下述独立入口，真机尚未验证。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
@@ -52,6 +52,8 @@ S1-R6 邮箱空态回归使用合成快照，分别检查 `not_configured`、`fa
 S2-03/04 存储与备份：`npx tsx --test server/digest-v3-store.test.ts server/core.test.ts` 使用临时旧版 `activity.db` 和隔离账号，验证重复迁移、旧记录保留、四类实体写回/重启、账号隔离、不可变版本、写回失败回滚、账号加密备份、同账号替换、跨账号 ID 与引用重映射、旧备份兼容、断裂引用拒绝。这组存储测试本身不验证 D07 HTTP 接口、案例自动分类、生产恢复演练或真实 Shadow；这些按各自层级验收。
 
 D07 登录态本地闭环：`npx tsx --test server/digest-v3-api.test.ts server/digest-v3-local-flow.test.ts server/digest-v3-store.test.ts` 用临时库与 S2-01 P01 两条 NASA 来源，检查登录/账号隔离、明确人工确认、初版→进展、按截点分页事件列表与历史、精确引用 HTML、原版不漂移、同键同内容重试、同键改内容与旧版 `409`、非法 URL/参数 `400`、错误或跨账号引用 `404`、持久化失败后同键重试及账号替换恢复。`npx tsx scripts/digest-v3-local-preview.ts` 另在新建系统临时目录输出发射前后两页；无实时网络抓取、Work、正式发布、邮件或提醒。此路径没有自动匹配、跨进程并发或生产/真实 Shadow 证据，不能据此放行 D08 或生产。
+
+D09 第一步本地引用冻结：`npx tsx --test server/digest-v3-api.test.ts server/core.test.ts server/digest-v3-store.test.ts` 覆盖登录确认、账号隔离、截点/精确 Evidence 集合及 Event/Revision/Analysis 链校验、同日不同日报版本、旧引用在进展和数据库重开后不漂移、同键冲突、持久化故障时内存/磁盘双回滚、账号加密备份同账号替换与跨账号 ID 重映射、旧七组备份保护及断裂/篡改拒绝。冻结的只是人工审核 D07 数据与有界来源摘要；没有真实网页全量归档、D08 自动消费、人工纠正/恢复、正式日报/邮件或生产恢复演练。本轮没有 UI 改动，四尺寸浏览器验收留给有界面的 D09 后续步骤。
 
 D08 第一轮离线匹配：`npm run digest:eval-offline` 用 S2-01 固定 15 组、独立预留 7 组合成样例及七期模拟的 21 条**原始候选**生成只读建议和逐例报告，输出到被忽略的 `dist-shadow/d08-offline-*`。`npx tsx --test server/digest-v3-offline-match.test.ts` 验不同会议同指标值不合并、冲突译文保持待核、非阶段矛盾不冒充进展、答案字段拒绝与顺序不变。报告分别统计事件关系与事实变化、五类矩阵、错合并、漏匹配、不确定及保留样例，并记录输入/答案/规则哈希。固定来源的事件身份和结构化事实仍由人工抽取；七期改写转载仍待定。该验证不读写活动库，不代表原网页自动抽取、真实 Work/Shadow、正式发布或 D09 放行。结果见 [D08 快照](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md)。
 

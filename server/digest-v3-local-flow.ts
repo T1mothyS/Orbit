@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { publicDigestUrl } from './digest-v2-contract.js';
-import { DigestV3Conflict, type DigestV3Analysis, type DigestV3Event, type DigestV3Evidence, type DigestV3Fact, type DigestV3Revision, type DigestV3Store } from './digest-v3-store.js';
+import { DigestV3Conflict, frozenCitationHash, type DigestV3Analysis, type DigestV3Event, type DigestV3Evidence, type DigestV3Fact, type DigestV3Revision, type DigestV3Store } from './digest-v3-store.js';
 
 type ObjectValue = Record<string, unknown>;
 const idPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$/;
@@ -136,16 +136,16 @@ function escaped(value: string): string {
   return value.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
 }
 
-/** Exact-ID preview only. This is not a V2 publication or a frozen V3 digest. */
-export function renderLocalDigestV3Preview(store: DigestV3Store, userId: string,
-  refs: { eventId: string; revisionId: string; analysisId: string; cutoff: string }): string {
+function resolveReviewedCitation(store: DigestV3Store, userId: string,
+  refs: { eventId: string; revisionId: string; analysisId: string; cutoff: string }) {
   text(userId, 100, true);
   for (const id of [refs.eventId, refs.revisionId, refs.analysisId]) text(id, 100, true);
   const cutoff = instant(refs.cutoff);
   const event = store.getEvent(userId, refs.eventId);
   const revision = store.getRevision(userId, refs.revisionId);
   const analysis = store.getAnalysis(userId, refs.analysisId);
-  if (!event || !revision || !analysis || event.lifecycle !== 'active' || revision.eventId !== event.id ||
+  if (!event || !revision || !analysis || event.lifecycle !== 'active' ||
+    Date.parse(event.createdAt) > Date.parse(cutoff) || revision.eventId !== event.id ||
     !['initial', 'progress'].includes(revision.changeKind) || analysis.analysisKind !== 'interpretation' ||
     analysis.eventRevisionId !== revision.id || Date.parse(revision.recordedAt) > Date.parse(cutoff) ||
     Date.parse(analysis.recordedAt) > Date.parse(cutoff)) throw new Error('V3 预览引用无效或晚于截点');
@@ -163,6 +163,87 @@ export function renderLocalDigestV3Preview(store: DigestV3Store, userId: string,
     !publicDigestUrl(item.url) || Date.parse(item.retrievedAt) > Date.parse(cutoff) ||
     (item.publishedAt && sourceTime(item.publishedAt, item.publishedPrecision, cutoff) === null)) ||
     !same(analysis.evidenceIds, revision.evidenceIds)) throw new Error('V3 预览来源引用无效');
+  return { cutoff, event, revision, analysis, previous, evidence: evidence as DigestV3Evidence[],
+    earlierEvidence: earlierEvidence as DigestV3Evidence[] };
+}
+
+/** Freeze a manually reviewed D07 chain for one local report citation slot. */
+export function freezeReviewedV3Citation(store: DigestV3Store, userId: string, raw: unknown,
+  clock: () => Date = () => new Date()) {
+  text(userId, 100, true);
+  const input = object(raw, ['reportDate', 'reportVersionKey', 'citationKey', 'eventId', 'revisionId', 'analysisId', 'evidenceIds', 'cutoff']);
+  const reportDate = input.reportDate;
+  if (typeof reportDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(reportDate) ||
+    !Number.isFinite(Date.parse(`${reportDate}T00:00:00Z`)) ||
+    new Date(`${reportDate}T00:00:00Z`).toISOString().slice(0, 10) !== reportDate) {
+    throw new Error('V3 日报日期无效');
+  }
+  const reportVersionKey = text(input.reportVersionKey, 100, true);
+  const citationKey = text(input.citationKey, 100, true);
+  const eventId = text(input.eventId, 100, true);
+  const revisionId = text(input.revisionId, 100, true);
+  const analysisId = text(input.analysisId, 100, true);
+  const cutoff = validatedV3Cutoff(input.cutoff);
+  if (Date.parse(cutoff) > clock().getTime()) throw new Error('V3 截点晚于本地核对时间');
+  if (!Array.isArray(input.evidenceIds) || !input.evidenceIds.length || input.evidenceIds.length > 100) {
+    throw new Error('V3 冻结证据引用无效');
+  }
+  const suppliedIds = input.evidenceIds.map(id => text(id, 100, true));
+  if (new Set(suppliedIds).size !== suppliedIds.length) throw new Error('V3 冻结证据引用重复');
+  const id = `v3-freeze-${crypto.createHash('sha256').update(`${userId}\0${reportVersionKey}\0${citationKey}`).digest('hex').slice(0, 24)}`;
+  const existing = store.getFrozenCitation(userId, id);
+  if (existing) {
+    if (existing.reportDate !== reportDate || existing.reportVersionKey !== reportVersionKey ||
+      existing.citationKey !== citationKey ||
+      existing.cutoff !== cutoff || existing.eventId !== eventId ||
+      existing.revisionId !== revisionId || existing.analysisId !== analysisId ||
+      !same(existing.evidenceIds, [...suppliedIds].sort())) {
+      throw new DigestV3Conflict('V3 日报引用位已冻结且内容不同');
+    }
+    return { freezeId: id, status: 'existing' as const, snapshotSha256: existing.snapshotSha256 };
+  }
+  const { event, revision, analysis, previous, evidence, earlierEvidence } = resolveReviewedCitation(
+    store, userId, { eventId, revisionId, analysisId, cutoff });
+  if (revision.decidedBy !== 'user' || analysis.authorKind !== 'user') {
+    throw new Error('V3 冻结仅接受人工核验记录');
+  }
+  const allEvidence = [...new Map([...earlierEvidence, ...evidence].map(item => [item.id, item])).values()]
+    .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const evidenceIds = allEvidence.map(item => item.id);
+  if (!same([...suppliedIds].sort(), evidenceIds)) throw new Error('V3 冻结证据引用不匹配');
+  const frozenFacts = (facts: DigestV3Fact[]) => facts.map(fact => ({
+    factKey: fact.factKey, value: fact.value, unit: fact.unit, scope: fact.scope,
+    evidenceIndexes: fact.evidenceIds.map(evidenceId => evidenceIds.indexOf(evidenceId)),
+  }));
+  const frozenRevision = (value: DigestV3Revision) => ({ revisionNo: value.revisionNo,
+    changeKind: value.changeKind, recordedAt: value.recordedAt, facts: frozenFacts(value.facts) });
+  const snapshot = {
+    schemaVersion: 1,
+    event: { eventType: event.eventType, subjectKey: event.subjectKey,
+      occurrenceKey: event.occurrenceKey, title: event.title, lifecycle: event.lifecycle,
+      createdAt: event.createdAt },
+    revision: frozenRevision(revision), previousRevision: previous ? frozenRevision(previous) : null,
+    analysis: { analysisKind: analysis.analysisKind, body: analysis.body,
+      authorKind: analysis.authorKind, recordedAt: analysis.recordedAt },
+    evidence: allEvidence.map(item => ({ url: item.url, publisherKey: item.publisherKey,
+      documentType: item.documentType, language: item.language, sourceFact: item.sourceFact,
+      publishedAt: item.publishedAt, publishedPrecision: item.publishedPrecision,
+      retrievedAt: item.retrievedAt, independenceKey: item.independenceKey,
+      reviewState: item.reviewState })),
+  };
+  const createdAt = clock().toISOString();
+  const snapshotSha256 = frozenCitationHash(JSON.stringify(snapshot));
+  store.saveFrozenCitation({ id, userId, reportDate, reportVersionKey, citationKey, cutoff, eventId, revisionId,
+    analysisId, previousRevisionId: previous?.id ?? null, evidenceIds,
+    snapshot, snapshotSha256, createdAt });
+  return { freezeId: id, status: 'created' as const, snapshotSha256 };
+}
+
+/** Exact-ID preview only. This is not a V2 publication or a frozen V3 digest. */
+export function renderLocalDigestV3Preview(store: DigestV3Store, userId: string,
+  refs: { eventId: string; revisionId: string; analysisId: string; cutoff: string }): string {
+  const { cutoff, event, revision, analysis, previous, evidence, earlierEvidence } =
+    resolveReviewedCitation(store, userId, refs);
   const factText = (value: DigestV3Fact) => `${value.factKey}：${String(value.value)}${value.unit ? ` ${value.unit}` : ''}`;
   const previousHtml = previous ? `<div class="prior"><span>上次记录 · Revision ${previous.revisionNo}</span><p>${escaped(previous.facts.map(factText).join('；'))}</p></div>` : '';
   const links = [...earlierEvidence.map(item => ({ item: item!, label: '此前来源' })),

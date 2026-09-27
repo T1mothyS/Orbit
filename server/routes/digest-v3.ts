@@ -1,7 +1,7 @@
 import { Router, type RequestHandler, type Response } from 'express';
 import { digestV3Store } from '../activity-store.js';
 import { publicDigestUrl } from '../digest-v2-contract.js';
-import { recordReviewedV3Source, renderLocalDigestV3Preview, validatedV3Cutoff, validatedV3Id } from '../digest-v3-local-flow.js';
+import { freezeReviewedV3Citation, recordReviewedV3Source, renderLocalDigestV3Preview, validatedV3Cutoff, validatedV3Id } from '../digest-v3-local-flow.js';
 import { DigestV3Conflict } from '../digest-v3-store.js';
 
 function fields(value: unknown, allowed: string[]): Record<string, unknown> {
@@ -39,6 +39,24 @@ export function createDigestV3Router({ authenticate }: { authenticate: RequestHa
       const result = recordReviewedV3Source(digestV3Store, (req as any).user.userId, body.submission);
       res.setHeader('Cache-Control', 'no-store');
       res.status(result.status === 'created' ? 201 : 200).json(result);
+    } catch (error) { fail(res, error); }
+  });
+
+  app.post('/api/digest-v3/frozen-citations', authenticate, (req, res) => {
+    try {
+      const body = fields(req.body, ['confirmReviewed', 'citation']);
+      if (body.confirmReviewed !== true) throw new Error('V3 需要明确确认已人工核对引用');
+      const result = freezeReviewedV3Citation(digestV3Store, (req as any).user.userId, body.citation);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(result.status === 'created' ? 201 : 200).json(result);
+    } catch (error) { fail(res, error); }
+  });
+
+  app.get('/api/digest-v3/frozen-citations/:id', authenticate, (req, res) => {
+    try {
+      const citation = digestV3Store.getFrozenCitation((req as any).user.userId, validatedV3Id(req.params.id));
+      if (!citation) return res.status(404).json({ error: 'V3 冻结引用不存在' });
+      res.setHeader('Cache-Control', 'no-store').json(citation);
     } catch (error) { fail(res, error); }
   });
 

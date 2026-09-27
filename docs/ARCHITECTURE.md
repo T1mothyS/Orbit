@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.33.0-260927.1606`（2026-09-27，D07 登录态本地接口闭环；其他领域保留各节时点，不代表生产或真实 Work）。
+- Last verified commit/version: `0.36.0-260928.0729`（2026-09-28，D09 第一步本地引用冻结；其他领域保留各节时点，不代表生产或真实 Work）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -80,7 +80,7 @@ Phase 5 的所有权、等价性和迁移验收见 [Phase 5 验证记录](PHASE5
 
 Daily Digest V2.5 使用原活动库中的 `digest_v2_runs`（账号/日期/输入快照/版本与诊断）和 `digest_v2_artifacts`（账号/日期/模式/内容哈希唯一的冻结产物）。`daily_reports`、通知、认证与备份入口复用；Shadow 不写正式表。快照七天过期，长期诊断不保留邮箱正文。媒体在 R2 和原媒体目录分别存内容寻址字节，文章来源/许可保留在账号产物引用中。账号恢复重映射运行与产物 ID，跨账号恢复不允许沿用旧输入运行。具体发布状态、失败恢复、媒体生命周期及限制见 [V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 
-Daily Digest V3 Core 的四类事件记忆实体与三个引用表已增量加入同一个 `activity.db`，由 `activity-store.ts` 接入 `digest-v3-store.ts`；D07 登录态路由提供受控提交、按截点分页历史和精确引用预览，没有 Work/MCP 写入或自动分类。D13 研究详情可按登录账号读取其绑定的精确修订和来源。账号引用使用复合外键，封存版本禁止原位更新。全站数据库快照包含 V3 表；账号级备份保存七张表，恢复时校验引用，同账号合并或替换，跨账号重映射全部 V3 ID 和引用。旧账号备份缺少 V3 字段时，可合并，但不能替换已有 V3 数据。字段、迁移与验收边界见 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md#d07-登录态本地接口2026-09-27)。
+Daily Digest V3 Core 的四类事件记忆实体、三个引用表和 D09 本地冻结引用表已增量加入同一个 `activity.db`，由 `activity-store.ts` 接入 `digest-v3-store.ts`；D07 登录态路由提供受控提交、按截点分页历史和精确预览，D09 增加按本地日报具体版本的冻结和读取，没有 Work/MCP 写入、自动分类或正式发布接入。D13 研究详情可按登录账号读取其绑定的精确修订和来源。账号引用使用复合外键，封存版本和冻结记录禁止原位更新。全站数据库快照包含 V3 表；账号级备份当前保存八组行，恢复时校验引用，同账号合并或替换，跨账号重映射 V3 ID、引用与日报版本键。旧七组备份可合并，但不能替换已有冻结记录；完全不含 V3 的旧备份不能替换已有 V3 数据。字段、迁移与验收边界见 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md#d09-第一步人工核验引用冻结2026-09-28)。
 
 D13 Research/Thesis 在同一 `activity.db` 增量保存运行、草稿及用户确认版本，由 `digest-research-store.ts` 接入现有可靠写回和账号备份。`routes/research.ts` 仅提供登录态当前账号接口，`/research` 只读历史并提交明确观点决定；未对 Work OAuth 或日报只读令牌开放写权限。触发 Workspace Agent 目前只有合成协议测试，不在运行路径。合同与受限项见 [研究与观点](DAILY-DIGEST-RESEARCH-THESIS.md)。
 

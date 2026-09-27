@@ -74,10 +74,10 @@ function revision(userId: string, id: string, evidenceId: string): DigestV3Revis
 test('S2-03 migrates an old activity.db additively and is repeatable', async () => {
   await activity.initActivityDb();
   assert.equal(sqlValue("SELECT value FROM schema_meta WHERE key = 'version'"), '4');
-  assert.equal(sqlValue("SELECT value FROM schema_meta WHERE key = 'digest_v3'"), '1');
+  assert.equal(sqlValue("SELECT value FROM schema_meta WHERE key = 'digest_v3'"), '2');
   assert.equal(activity.getLatestDailyReportCandidate('legacy-user', '2026-09-23', 'cloud')?.markdown, 'legacy body');
   assert.equal(activity.getDigestRun('legacy-user', 'legacy-run')?.id, 'legacy-run');
-  assert.equal(sqlValue("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name LIKE 'digest_v3_%'"), 7);
+  assert.equal(sqlValue("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name LIKE 'digest_v3_%'"), 8);
   await activity.initActivityDb();
   assert.equal(activity.getLatestDailyReportCandidate('legacy-user', '2026-09-23', 'cloud')?.contentHash, 'legacy-hash');
   assert.equal(sqlValue("SELECT count(*) FROM digest_v3_events"), 0);

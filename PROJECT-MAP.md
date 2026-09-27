@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified version: `0.35.1-260927.1806`（2026-09-27，D08 阶段事实安全修复；不代表真实 Agent、Work、生产或发信验收）。
+- Last verified version: `0.36.0-260928.0729`（2026-09-28，D09 第一步本地引用冻结；不代表真实 Agent、Work、生产或发信验收）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -50,7 +50,7 @@ CalDAV 入口为 `server/routes/caldav.ts`；`caldav-service` 共享手动/后�
 
 新版 V2.5 的独立 Cloud 分支由 `server/digest-v2-{contract,service,media,fetch,render}.ts` 实现，MCP 入口仍在 `daily-report-cloud-mcp.ts`。输入运行与隔离产物在原 `activity.db` 的 `digest_v2_runs`、`digest_v2_artifacts`；production 才写原日报/通知表。阅读复用 `reports-read.ts` 与 `DailyReportsPage.tsx`，R2 字节镜像进入原媒体/备份边界。V1 Local 图示仍适用于原链路，不能作为新版合同。详细字段、开关和 Shadow 边界见 [V2.5 合同](docs/CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 
-V3 Core 的 S2-03 存储位于同一个 `activity.db`：`server/digest-v3-store.ts` 管理 Event/Revision/Evidence/Analysis 与引用表，`activity-store.ts` 负责初始化和可靠写回。S2-04 通过原 `backup-service.ts` 账号备份和恢复七张表，同账号替换、旧备份与跨账号 ID 重映射均有保护。D07 的 `digest-v3-local-flow.ts` 对人工审核来源做原子写入和精确预览，`routes/digest-v3.ts` 提供登录态的受控提交、按账号/截点分页历史和精确引用预览。D08 的 `digest-v3-offline-match.ts` 只在隔离回放里给双轴建议，`digest-v3-offline-extract.ts` 只对有界短摘录作限定规则抽取并保留事实支持文本；两者均不写活动库。详见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#d08-有界事实状态与支持片段2026-09-27)与[阶段事实安全评测](docs/DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)。没有 Work/MCP 写入、正式日报发布或真实 Shadow 自动匹配。
+V3 Core 位于同一个 `activity.db`：`server/digest-v3-store.ts` 管理 Event/Revision/Evidence/Analysis、引用表与 D09 本地冻结行，`activity-store.ts` 负责初始化和可靠写回。原 `backup-service.ts` 账号备份当前包含八组 V3 行，兼容旧七组备份并保护已有冻结记录；同账号替换和跨账号 ID 重映射均有本地验证。D07 的 `digest-v3-local-flow.ts` 对人工审核来源做原子写入和精确预览，`routes/digest-v3.ts` 提供登录态的受控提交、按账号/截点分页历史，以及 D09 具体日报版本的引用冻结/读取。D08 的 `digest-v3-offline-match.ts` 只在隔离回放里给双轴建议，`digest-v3-offline-extract.ts` 只对有界短摘录作限定规则抽取并保留事实支持文本；两者均不写活动库。详见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#d09-第一步人工核验引用冻结2026-09-28)与[阶段事实安全评测](docs/DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)。没有人工纠正/恢复、Work/MCP 写入、正式日报发布或真实 Shadow 自动匹配。
 
 D13 本地 Research/Thesis 位于同一活动库：`server/digest-research-store.ts` 管理研究历史、提案与确认版本，登录态 API 位于 `server/routes/research.ts`，网页 `/research` 从日报页进入。账号级备份/恢复包含三张新表；Workspace Agent 触发仅有合成协议探针，真实 Work 与结果回传尚未接通。完整边界见 [研究与观点合同](docs/DAILY-DIGEST-RESEARCH-THESIS.md)。
 
@@ -87,7 +87,7 @@ flowchart LR
 | `/api/daily-report/delivery-policy` | 登录用户 | 读取/保存本地与 Cloud 来源接收设置 | 只影响下一次正式发布后的网页和邮件接收；不暂停任务，不删除候选或历史 |
 | `/api/daily-reports`、`/reports/:date` | 登录用户 | 查看正式日报、候选对照和来源日期详情 | 登录态、当前账号隔离；正式列表与候选视图分开；同日 Local/Cloud 可切换对照 |
 | `/api/research/*`、`/research` | 登录用户 | 研究历史、租约领取、草稿与用户确认观点 | 当前账号隔离；AI 结果只能形成草稿，Work OAuth 尚无写权限；无提醒或正式日报副作用 |
-| `/api/digest-v3/*` | 登录用户 | 人工审核来源提交、事件截点历史与精确引用预览 | 账号由登录认证确定；初版/进展显式决定，幂等键和前版冲突保护；不接 Work/MCP、自动匹配或正式日报 |
+| `/api/digest-v3/*` | 登录用户 | 人工审核来源提交、事件截点历史、精确预览及本地日报版本的引用冻结/读取 | 账号由登录认证确定；初版/进展显式决定，冻结引用位与截点校验；不接 Work/MCP、自动匹配或正式日报 |
 | `/api/note-items` | 登录用户 | AI 记事 CRUD、颜色、完成/恢复、原位提示词优化/单步撤回、两步合并和导出所需数据 | JWT 身份与 `user_id` 所有权；优化/撤回必须匹配 `expectedContent + expectedRevision`；正文手动 PATCH 清除当前撤回但不减少累计次数；颜色/完成更新保留状态；合并原子追加正文并清理目标的当前撤回 |
 | `/api/library`、`/library` | 登录用户 | Fragment/Article 列表、搜索、阅读、评论和导出 | 当前账号隔离；正文、类型、标签和关系只读；Markdown 由服务端安全渲染 |
 | `/api/integrations/library` 及生命周期子路径 | 本地 Markdown 迁移脚本 | 使用独立 Knowledge Publish Token 执行 `publish/retire/restore/purge` | 只保存 token 哈希；`sourceId + user_id` 定位文章；不拥有登录、读取列表、评论、日程或记事权限 |

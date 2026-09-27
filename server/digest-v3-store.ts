@@ -1,4 +1,6 @@
+import crypto from 'node:crypto';
 import type { Database } from 'sql.js';
+import { publicDigestUrl } from './digest-v2-contract.js';
 import { assertPersistenceReady } from './persistence.js';
 
 export interface DigestV3Evidence {
@@ -46,7 +48,51 @@ export interface DigestV3Analysis {
 
 export class DigestV3Conflict extends Error {}
 
-const BACKUP_TABLES = [
+export interface DigestV3FrozenCitation {
+  id: string; userId: string; reportDate: string; reportVersionKey: string; citationKey: string; cutoff: string;
+  eventId: string; revisionId: string; analysisId: string; previousRevisionId: string | null;
+  evidenceIds: string[]; snapshot: Record<string, unknown>; snapshotSha256: string; createdAt: string;
+}
+
+export function frozenCitationHash(json: string): string {
+  return crypto.createHash('sha256').update(json).digest('hex');
+}
+function sameStrings(a: string[], b: string[]): boolean { return JSON.stringify(a) === JSON.stringify(b); }
+
+function frozenSnapshotValid(value: unknown, evidenceCount: number): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const snapshot = value as Record<string, any>;
+  const record = (item: unknown): item is Record<string, any> =>
+    !!item && typeof item === 'object' && !Array.isArray(item);
+  const revision = (item: unknown) => record(item) && Number.isSafeInteger(item.revisionNo) &&
+    typeof item.changeKind === 'string' && typeof item.recordedAt === 'string' &&
+    Array.isArray(item.facts) && item.facts.every((fact: unknown) => record(fact) &&
+      typeof fact.factKey === 'string' && typeof fact.scope === 'string' &&
+      Array.isArray(fact.evidenceIndexes) && fact.evidenceIndexes.length > 0 &&
+      fact.evidenceIndexes.every((index: unknown) => Number.isSafeInteger(index) &&
+        Number(index) >= 0 && Number(index) < evidenceCount));
+  return evidenceCount > 0 && evidenceCount <= 100 && snapshot.schemaVersion === 1 && record(snapshot.event) &&
+    ['eventType', 'subjectKey', 'occurrenceKey', 'title', 'createdAt'].every(key =>
+      typeof snapshot.event[key] === 'string') && snapshot.event.lifecycle === 'active' &&
+    revision(snapshot.revision) && (snapshot.previousRevision === null || revision(snapshot.previousRevision)) &&
+    record(snapshot.analysis) && typeof snapshot.analysis.body === 'string' &&
+    snapshot.analysis.body.length <= 1500 &&
+    typeof snapshot.analysis.recordedAt === 'string' &&
+    Array.isArray(snapshot.evidence) && snapshot.evidence.length === evidenceCount &&
+    snapshot.evidence.every((item: unknown) => record(item) &&
+      ['url', 'publisherKey', 'documentType', 'language', 'sourceFact', 'retrievedAt', 'independenceKey']
+        .every(key => typeof item[key] === 'string') &&
+      item.url.length <= 2048 && publicDigestUrl(item.url) && item.sourceFact.length <= 1000 &&
+      item.reviewState === 'verified' &&
+      (item.publishedAt === null || typeof item.publishedAt === 'string'));
+}
+
+const FROZEN_BACKUP_TABLE = { key: 'digestV3FrozenCitations', table: 'digest_v3_frozen_citations',
+  columns: ['user_id', 'id', 'report_date', 'report_version_key', 'citation_key', 'cutoff', 'event_id', 'revision_id',
+    'analysis_id', 'previous_revision_id', 'evidence_ids_json', 'snapshot_json', 'snapshot_sha256', 'created_at'],
+  identity: ['id'] } as const;
+
+const CORE_BACKUP_TABLES = [
   { key: 'digestV3Events', table: 'digest_v3_events', columns: ['user_id', 'id', 'event_type', 'subject_key', 'occurrence_key', 'title', 'lifecycle', 'current_revision_id', 'merged_into_event_id', 'created_at'], identity: ['id'] },
   { key: 'digestV3Revisions', table: 'digest_v3_revisions', columns: ['user_id', 'id', 'event_id', 'revision_no', 'previous_revision_id', 'change_kind', 'facts_json', 'recorded_at', 'occurred_at', 'occurred_precision', 'reason', 'decided_by'], identity: ['id'] },
   { key: 'digestV3Evidence', table: 'digest_v3_evidence', columns: ['user_id', 'id', 'url', 'publisher_key', 'document_type', 'language', 'source_fact', 'published_at', 'published_precision', 'retrieved_at', 'independence_key', 'review_state', 'source_document_key', 'related_evidence_id', 'relation', 'supersedes_evidence_id', 'linked_revision_id'], identity: ['id'] },
@@ -55,18 +101,19 @@ const BACKUP_TABLES = [
   { key: 'digestV3AnalysisEvidence', table: 'digest_v3_analysis_evidence', columns: ['user_id', 'analysis_id', 'evidence_id'], identity: ['analysis_id', 'evidence_id'] },
   { key: 'digestV3AnalysisComparisons', table: 'digest_v3_analysis_comparisons', columns: ['user_id', 'analysis_id', 'revision_id'], identity: ['analysis_id', 'revision_id'] },
 ] as const;
+const BACKUP_TABLES = [...CORE_BACKUP_TABLES, FROZEN_BACKUP_TABLE] as const;
 
 type BackupRows = Record<string, Array<Record<string, any>>>;
 
-/** Old user backups have no V3 keys. New backups must contain all seven arrays. */
+/** Old user backups have no V3 keys; pre-D09 V3 backups have seven arrays. */
 export function validateDigestV3Backup(data: Record<string, unknown>): BackupRows | null {
-  const present = BACKUP_TABLES.filter(spec => Object.hasOwn(data, spec.key));
-  if (!present.length) return null;
-  if (present.length !== BACKUP_TABLES.length) throw new Error('V3 事件备份缺少关联表');
+  const present = CORE_BACKUP_TABLES.filter(spec => Object.hasOwn(data, spec.key));
+  if (!present.length && !Object.hasOwn(data, FROZEN_BACKUP_TABLE.key)) return null;
+  if (present.length !== CORE_BACKUP_TABLES.length) throw new Error('V3 事件备份缺少关联表');
   const rows: BackupRows = {};
   const sourceUsers = new Set<string>();
   for (const spec of BACKUP_TABLES) {
-    const value = data[spec.key];
+    const value = spec === FROZEN_BACKUP_TABLE && !Object.hasOwn(data, spec.key) ? [] : data[spec.key];
     if (!Array.isArray(value) || value.length > 100_000) throw new Error('V3 事件备份数量无效');
     const seen = new Set<string>();
     rows[spec.key] = value.map(item => {
@@ -120,6 +167,38 @@ export function validateDigestV3Backup(data: Record<string, unknown>): BackupRow
   for (const row of rows.digestV3RevisionEvidence) { requireRef(revisions, row.revision_id); requireRef(evidence, row.evidence_id); }
   for (const row of rows.digestV3AnalysisEvidence) { requireRef(analyses, row.analysis_id); requireRef(evidence, row.evidence_id); }
   for (const row of rows.digestV3AnalysisComparisons) { requireRef(analyses, row.analysis_id); requireRef(revisions, row.revision_id); }
+  for (const row of rows.digestV3FrozenCitations) {
+    const revision = revisions.get(row.revision_id);
+    const analysis = analyses.get(row.analysis_id);
+    const previous = row.previous_revision_id == null ? null : revisions.get(row.previous_revision_id);
+    if (!events.has(row.event_id) || !revision || revision.event_id !== row.event_id ||
+      !analysis || analysis.event_revision_id !== row.revision_id ||
+      (row.previous_revision_id != null && (!previous || previous.event_id !== row.event_id)) ||
+      revision.previous_revision_id !== row.previous_revision_id ||
+      typeof row.report_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(row.report_date) ||
+      typeof row.report_version_key !== 'string' || !row.report_version_key ||
+      typeof row.citation_key !== 'string' || !row.citation_key ||
+      typeof row.cutoff !== 'string' || !Number.isFinite(Date.parse(row.cutoff)) ||
+      typeof row.created_at !== 'string' || !Number.isFinite(Date.parse(row.created_at)) ||
+      typeof row.snapshot_json !== 'string' ||
+      row.snapshot_sha256 !== frozenCitationHash(row.snapshot_json)) {
+      throw new Error('V3 冻结引用备份无效');
+    }
+    let ids: unknown;
+    let snapshot: unknown;
+    try { ids = JSON.parse(row.evidence_ids_json); snapshot = JSON.parse(row.snapshot_json); }
+    catch { throw new Error('V3 冻结引用备份无效'); }
+    const expected = [...new Set([
+      ...rows.digestV3RevisionEvidence.filter(link => link.revision_id === row.revision_id ||
+        link.revision_id === row.previous_revision_id).map(link => link.evidence_id),
+    ])].sort();
+    if (!Array.isArray(ids) || ids.length !== expected.length ||
+      ids.some((id, index) => id !== expected[index] || !evidence.has(id)) ||
+      !frozenSnapshotValid(snapshot, ids.length) ||
+      (row.previous_revision_id !== null) !== ((snapshot as Record<string, unknown>).previousRevision !== null)) {
+      throw new Error('V3 冻结引用备份无效');
+    }
+  }
   return rows;
 }
 
@@ -208,6 +287,20 @@ export function migrateDigestV3Schema(db: Database): void {
         FOREIGN KEY (user_id, analysis_id) REFERENCES digest_v3_analyses(user_id, id),
         FOREIGN KEY (user_id, revision_id) REFERENCES digest_v3_revisions(user_id, id)
       );
+      CREATE TABLE IF NOT EXISTS digest_v3_frozen_citations (
+        user_id TEXT NOT NULL, id TEXT NOT NULL, report_date TEXT NOT NULL, report_version_key TEXT NOT NULL,
+        citation_key TEXT NOT NULL, cutoff TEXT NOT NULL, event_id TEXT NOT NULL,
+        revision_id TEXT NOT NULL, analysis_id TEXT NOT NULL, previous_revision_id TEXT,
+        evidence_ids_json TEXT NOT NULL, snapshot_json TEXT NOT NULL,
+        snapshot_sha256 TEXT NOT NULL, created_at TEXT NOT NULL,
+        PRIMARY KEY (user_id, id), UNIQUE (user_id, report_version_key, citation_key),
+        FOREIGN KEY (user_id, event_id) REFERENCES digest_v3_events(user_id, id),
+        FOREIGN KEY (user_id, revision_id) REFERENCES digest_v3_revisions(user_id, id),
+        FOREIGN KEY (user_id, analysis_id) REFERENCES digest_v3_analyses(user_id, id),
+        FOREIGN KEY (user_id, previous_revision_id) REFERENCES digest_v3_revisions(user_id, id)
+      );
+      CREATE TRIGGER IF NOT EXISTS digest_v3_frozen_citation_immutable BEFORE UPDATE ON digest_v3_frozen_citations
+        BEGIN SELECT RAISE(ABORT, 'digest_v3_frozen_citation_immutable'); END;
       CREATE TRIGGER IF NOT EXISTS digest_v3_revision_immutable BEFORE UPDATE ON digest_v3_revisions
         BEGIN SELECT RAISE(ABORT, 'digest_v3_revision_immutable'); END;
       CREATE TRIGGER IF NOT EXISTS digest_v3_evidence_immutable BEFORE UPDATE ON digest_v3_evidence
@@ -216,7 +309,7 @@ export function migrateDigestV3Schema(db: Database): void {
         BEGIN SELECT RAISE(ABORT, 'digest_v3_analysis_immutable'); END;
       CREATE TRIGGER IF NOT EXISTS digest_v3_event_identity_immutable BEFORE UPDATE OF user_id, id ON digest_v3_events
         BEGIN SELECT RAISE(ABORT, 'digest_v3_event_identity_immutable'); END;
-      INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('digest_v3', '1');
+      INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('digest_v3', '2');
     `);
     db.run('COMMIT');
   } catch (error) {
@@ -501,11 +594,63 @@ export class DigestV3Store {
       supersedesAnalysisId: row.supersedes_analysis_id };
   }
 
+  getFrozenCitation(userId: string, id: string): DigestV3FrozenCitation | null {
+    const row = queryOne<Record<string, any>>(this.getDb(),
+      'SELECT * FROM digest_v3_frozen_citations WHERE user_id = ? AND id = ?', [userId, id]);
+    if (!row) return null;
+    if (frozenCitationHash(row.snapshot_json) !== row.snapshot_sha256) throw new Error('V3 冻结引用校验失败');
+    return { id: row.id, userId: row.user_id, reportDate: row.report_date,
+      reportVersionKey: row.report_version_key,
+      citationKey: row.citation_key, cutoff: row.cutoff, eventId: row.event_id,
+      revisionId: row.revision_id, analysisId: row.analysis_id,
+      previousRevisionId: row.previous_revision_id, evidenceIds: JSON.parse(row.evidence_ids_json),
+      snapshot: JSON.parse(row.snapshot_json), snapshotSha256: row.snapshot_sha256,
+      createdAt: row.created_at };
+  }
+
+  saveFrozenCitation(value: DigestV3FrozenCitation): void {
+    const snapshotJson = JSON.stringify(value.snapshot);
+    if (frozenCitationHash(snapshotJson) !== value.snapshotSha256 ||
+      !frozenSnapshotValid(value.snapshot, value.evidenceIds.length)) {
+      throw new Error('V3 冻结引用校验失败');
+    }
+    this.transaction(db => {
+      const existing = queryOne<{ id: string }>(db,
+        'SELECT id FROM digest_v3_frozen_citations WHERE user_id = ? AND report_version_key = ? AND citation_key = ?',
+        [value.userId, value.reportVersionKey, value.citationKey]);
+      if (existing) throw new DigestV3Conflict('V3 日报引用位已冻结');
+      const revision = queryOne<{ event_id: string; previous_revision_id: string | null }>(db,
+        'SELECT event_id, previous_revision_id FROM digest_v3_revisions WHERE user_id = ? AND id = ?',
+        [value.userId, value.revisionId]);
+      const analysis = queryOne<{ event_revision_id: string }>(db,
+        'SELECT event_revision_id FROM digest_v3_analyses WHERE user_id = ? AND id = ?',
+        [value.userId, value.analysisId]);
+      const links = queryAll<{ evidence_id: string }>(db,
+        `SELECT DISTINCT evidence_id FROM digest_v3_revision_evidence
+         WHERE user_id = ? AND (revision_id = ? OR revision_id = ?)
+         ORDER BY evidence_id`, [value.userId, value.revisionId, value.previousRevisionId]);
+      if (!revision || revision.event_id !== value.eventId ||
+        revision.previous_revision_id !== value.previousRevisionId ||
+        !analysis || analysis.event_revision_id !== value.revisionId ||
+        !sameStrings(value.evidenceIds, links.map(link => link.evidence_id))) {
+        throw new Error('V3 冻结引用校验失败');
+      }
+      db.run(`INSERT INTO digest_v3_frozen_citations
+        (user_id, id, report_date, report_version_key, citation_key, cutoff, event_id, revision_id,
+         analysis_id, previous_revision_id, evidence_ids_json, snapshot_json, snapshot_sha256, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [value.userId, value.id, value.reportDate, value.reportVersionKey, value.citationKey, value.cutoff,
+        value.eventId, value.revisionId, value.analysisId, value.previousRevisionId,
+        JSON.stringify(value.evidenceIds), snapshotJson, value.snapshotSha256, value.createdAt]);
+    });
+  }
+
   hasUserData(userId: string): boolean {
     const db = this.getDb();
     return !!queryOne(db, `SELECT id FROM digest_v3_events WHERE user_id = ? LIMIT 1`, [userId]) ||
       !!queryOne(db, `SELECT id FROM digest_v3_evidence WHERE user_id = ? LIMIT 1`, [userId]) ||
-      !!queryOne(db, `SELECT id FROM digest_v3_analyses WHERE user_id = ? LIMIT 1`, [userId]);
+      !!queryOne(db, `SELECT id FROM digest_v3_analyses WHERE user_id = ? LIMIT 1`, [userId]) ||
+      !!queryOne(db, `SELECT id FROM digest_v3_frozen_citations WHERE user_id = ? LIMIT 1`, [userId]);
   }
 
   exportUserData(userId: string): Record<string, unknown[]> {
@@ -519,6 +664,10 @@ export class DigestV3Store {
     const rows = validateDigestV3Backup(data);
     if (!rows && mode === 'replace' && this.hasUserData(userId)) {
       throw new Error('旧备份不含 V3 事件记录，不能替换已有 V3 数据');
+    }
+    if (rows && mode === 'replace' && !Object.hasOwn(data, FROZEN_BACKUP_TABLE.key) &&
+      queryOne(this.getDb(), 'SELECT id FROM digest_v3_frozen_citations WHERE user_id = ? LIMIT 1', [userId])) {
+      throw new Error('旧备份不含 V3 冻结引用，不能替换已有冻结记录');
     }
   }
 
@@ -548,6 +697,7 @@ export class DigestV3Store {
 
   private deleteRows(db: Database, userId: string): void {
     for (const table of [
+      'digest_v3_frozen_citations',
       'digest_v3_analysis_comparisons', 'digest_v3_analysis_evidence',
       'digest_v3_analyses', 'digest_v3_revision_evidence',
       'digest_v3_evidence', 'digest_v3_revisions', 'digest_v3_events',
