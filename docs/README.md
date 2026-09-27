@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified version: `0.31.18-260927.1318`（2026-09-27，七期合成日报压缩回放；不代表真实媒体下架、正式生产、发信或七次真实 Work 运行）。
+- Last verified version: `0.32.0-260927.1443`（2026-09-27，D13 Research/Thesis 本地合成闭环；真实 Agent、Work、生产与发信未验）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。
@@ -12,7 +12,9 @@
 
 Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提示统一维护在 [Cloud 合同新版节](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)，阶段顺序见 [路线图](ROADMAP.md)，验收入口见 [测试矩阵](TEST-MATRIX.md)。D02 的[第一轮内容基线](DAILY-DIGEST-D02-QUALITY-BASELINE-20260927.md)、[定向校验回放](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)与[七期合成压缩回放](DAILY-DIGEST-SEVEN-DAY-SIMULATION-20260927.md)分开记录；本地开发与生产分层放行，七个真实日期不是统一前置，合成回放不能代替真实集成或上线验收。
 
-Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 语义、S2-03 本地存储、S2-04 账号备份恢复及 D07 固定来源本地闭环边界统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；尚无对外 V3 接口，不改变 V2.5 当前运行合同。
+Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 语义、S2-03 本地存储、S2-04 账号备份恢复及 D07 固定来源本地闭环边界统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；尚无通用 V3 对外写入口，不改变 V2.5 当前运行合同。
+
+D13 Research/Thesis 的本地状态、登录态接口、观点确认和备份边界见[研究与观点合同](DAILY-DIGEST-RESEARCH-THESIS.md)；真实 Agent 和 Work 结果回传尚未接通。
 
 - [项目成长](../project-evolution/README.md)：顶部入口、历史数据、统计口径、架构快照和离线维护流程。
 - [Daily Digest 15 张里程碑卡](ROADMAP.md#daily-digest-15-张里程碑卡2026-09-26-调整)：涵盖 V2.5 收口、V3 Core、Scheduled Events 与 Research/Thesis/Radar/Flash；按成果验收，一张卡可跨多次实施。除已单独授权完成的本地成果外，后续阶段仍须分别授权。
@@ -27,6 +29,7 @@ Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 语义、S2-03 本地�
 | [UI 规范](UI-GUIDELINES.md) | 布局、主题、交互与响应式要求 | AUTHORITATIVE / LIVING |
 | [Cloud 日报](CHATGPT-WORK-CLOUD.md) | OAuth/MCP、内容、媒体和发布合同；末尾历史区单独标记 | CONTRACT |
 | [V3 Core 事件记忆合同](DAILY-DIGEST-V3-CORE-CONTRACT.md) | S2-02 字段与状态；S2-03 原活动库增量存储；S2-04 账号备份恢复 | CONTRACT / LOCAL VERIFIED |
+| [D13 研究与观点合同](DAILY-DIGEST-RESEARCH-THESIS.md) | Research 历史、Proposal 草稿、用户确认的 Thesis、账号备份及触发受限项 | CONTRACT / LOCAL SYNTHETIC |
 | [知识库](LIBRARY.md) | 只读呈现、发布/生命周期 API 与本地加工规则；批次记录仅为历史 | FEATURE / CONTRACT |
 | [CalDAV 单向桥接](CALDAV-BRIDGE.md) | 全量范围、完成与周期历史、来源归并、受控自动化及恢复合同 | CONTRACT / LOCAL VERIFIED |
 | [路线图](ROADMAP.md) | 未来顺序；已完成条目不代替当前验证 | ROADMAP |

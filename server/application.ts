@@ -28,6 +28,7 @@ import { createLibraryRouter } from './routes/library.js';
 import { createNotesRouter } from './routes/notes.js';
 import { createGuidesRouter } from './routes/guides.js';
 import { createSearchRouter } from './routes/search.js';
+import { createResearchRouter } from './routes/research.js';
 import { createStoreInitializer } from './runtime/stores.js';
 
 import { createApp, registerSpaFallback } from './app.js';
@@ -73,6 +74,7 @@ export const app = createApp({
 app.use(createLogsRouter({ authenticate, requireAdmin }));
 
 app.use(createSearchRouter({ authenticate }));
+app.use(createResearchRouter({ authenticate }));
 
 // 健康检查
 app.get("/api/health", (req, res) => {

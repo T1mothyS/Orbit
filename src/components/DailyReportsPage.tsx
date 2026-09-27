@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, FileText, Mail, MoreHorizontal, RefreshCw } from 'lucide-react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
 
@@ -192,6 +192,7 @@ export function DailyReportsPage() {
           <p>{viewMode === 'shadow' ? '新版隔离预览，仅供对照，不进入正式日报或邮件。' : viewMode === 'received' ? '正式接收的日报会进入网页和邮件；来源由设置控制。' : '候选日报已经写入生产服务器，但当前未进入正式网页和邮件。'}</p>
         </div>
         <div className="daily-report-toolbar-actions">
+          <Link className="daily-report-toolbar-button" to="/research">研究与观点</Link>
           <div className="daily-report-view-toggle" role="tablist" aria-label="日报查看范围">
             <button type="button" role="tab" aria-selected={viewMode === 'received'} className={viewMode === 'received' ? 'active' : undefined} onClick={() => switchView('received')}>正式日报</button>
             <button type="button" role="tab" aria-selected={viewMode === 'candidates'} className={viewMode === 'candidates' ? 'active' : undefined} onClick={() => switchView('candidates')}>候选对照</button>

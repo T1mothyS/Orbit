@@ -15,6 +15,7 @@ const AiAssistantPage = lazy(() => import('./pages/AiAssistantPage').then(module
 const ReminderPage = lazy(() => import('./components/ReminderPage').then(module => ({ default: module.ReminderPage })));
 const DailyReportsPage = lazy(() => import('./components/DailyReportsPage').then(module => ({ default: module.DailyReportsPage })));
 const DailyReportReaderPage = lazy(() => import('./components/DailyReportsPage').then(module => ({ default: module.DailyReportReaderPage })));
+const ResearchPage = lazy(() => import('./components/ResearchPage').then(module => ({ default: module.ResearchPage })));
 const LibraryPage = lazy(() => import('./components/LibraryPage').then(module => ({ default: module.LibraryPage })));
 const ToolsPage = lazy(() => import('./pages/ToolsPage').then(module => ({ default: module.ToolsPage })));
 const ProjectEvolutionPage = lazy(() => import('./pages/ProjectEvolutionPage').then(module => ({ default: module.ProjectEvolutionPage })));
@@ -71,6 +72,7 @@ function App() {
           <Route path="/reminders" element={<AppContent />} />
           <Route path="/import" element={<Navigate to="/assistant?tool=email-import" replace />} />
           <Route path="/reports" element={<AppContent />} />
+          <Route path="/research" element={<AppContent />} />
           <Route path="/reports/:date" element={<FeatureBoundary key={location.pathname}><DailyReportReaderPage /></FeatureBoundary>} />
           <Route path="/library" element={<AppContent />} />
           <Route path="/library/:id" element={<AppContent />} />
@@ -93,8 +95,9 @@ function AppContent() {
   const navigate = useNavigate();
   const isToolsPage = location.pathname === '/tools' || location.pathname === '/tools/';
   const isProjectPage = location.pathname === '/project' || location.pathname === '/project/';
+  const isResearchPage = location.pathname === '/research' || location.pathname === '/research/';
   const isLibraryReader = /^\/library\/[^/]+\/?$/.test(location.pathname);
-  const activeSection: 'today' | 'schedule' | 'assistant' | 'reminders' | 'reports' | 'library' | null = isToolsPage || isProjectPage ? null : location.pathname.startsWith('/reports') ? 'reports' : location.pathname.startsWith('/library') ? 'library' : location.pathname === '/schedule' ? 'schedule' : location.pathname === '/assistant' ? 'assistant' : location.pathname === '/reminders' ? 'reminders' : 'today';
+  const activeSection: 'today' | 'schedule' | 'assistant' | 'reminders' | 'reports' | 'library' | null = isToolsPage || isProjectPage ? null : isResearchPage || location.pathname.startsWith('/reports') ? 'reports' : location.pathname.startsWith('/library') ? 'library' : location.pathname === '/schedule' ? 'schedule' : location.pathname === '/assistant' ? 'assistant' : location.pathname === '/reminders' ? 'reminders' : 'today';
   const changeSection = (section: 'today' | 'schedule' | 'assistant' | 'reminders' | 'reports' | 'library') => navigate(section === 'schedule' ? '/schedule' : section === 'assistant' ? '/assistant' : section === 'reminders' ? '/reminders' : section === 'reports' ? '/reports' : section === 'library' ? '/library' : '/today');
 
   // 设置弹窗打开/关闭时更新 Tab 标题
@@ -126,7 +129,7 @@ function AppContent() {
           <SchedulePage user={user} />
         ) : activeSection === 'assistant' ? <AiAssistantPage /> : activeSection === 'reminders' ? (
           <ReminderPage />
-        ) : activeSection === 'reports' ? <DailyReportsPage /> : activeSection === 'library' ? <LibraryPage /> : <ActionCenterPage />}
+        ) : isResearchPage ? <ResearchPage /> : activeSection === 'reports' ? <DailyReportsPage /> : activeSection === 'library' ? <LibraryPage /> : <ActionCenterPage />}
         </FeatureBoundary>
       </AppShell>
 

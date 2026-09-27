@@ -11,6 +11,7 @@ import * as scheduleStore from './schedule-store.js';
 import * as reminderStore from './reminder-store.js';
 import * as activityStore from './activity-store.js';
 import { validateDigestV3Backup } from './digest-v3-store.js';
+import { validateResearchBackup } from './digest-research-store.js';
 import * as attachmentService from './attachment-service.js';
 import { dailyReportMediaRoot } from './daily-report-media-service.js';
 import * as dailyReportCloudStore from './daily-report-cloud-store.js';
@@ -73,10 +74,13 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
   const notificationIds = createIdMap((activity.notifications || []).map(row => row.id));
   const reportIds = createIdMap((activity.dailyReports || []).map(row => row.id));
   const digestRunIds = createIdMap((activity.digestV2Runs || []).map(row => row.id));
+  const research = validateResearchBackup(activity);
   const v3 = validateDigestV3Backup(activity);
+  let v3RevisionIds = new Map<string, string>();
   if (v3) {
     const eventIds = createIdMap(v3.digestV3Events.map(row => row.id));
     const revisionIds = createIdMap(v3.digestV3Revisions.map(row => row.id));
+    v3RevisionIds = revisionIds;
     const evidenceIds = createIdMap(v3.digestV3Evidence.map(row => row.id));
     const analysisIds = createIdMap(v3.digestV3Analyses.map(row => row.id));
     const mapped = (ids: Map<string, string>, id: string | null): string | null => id == null ? null : ids.get(id)!;
@@ -108,6 +112,26 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
     }));
     activity.digestV3AnalysisComparisons = v3.digestV3AnalysisComparisons.map(row => ({ ...row,
       analysis_id: mapped(analysisIds, row.analysis_id), revision_id: mapped(revisionIds, row.revision_id),
+    }));
+  }
+  if (research) {
+    const runIds = createIdMap(research.researchRuns.map(row => row.id));
+    const proposalIds = createIdMap(research.thesisProposals.map(row => row.id));
+    const versionIds = createIdMap(research.thesisVersions.map(row => row.id));
+    const mapped = (ids: Map<string, string>, id: string | null): string | null => id == null ? null : ids.get(id)!;
+    activity.researchRuns = research.researchRuns.map(row => ({ ...row,
+      id: mapped(runIds, row.id), candidate_key: `restored:${mapped(runIds, row.id)}`,
+      event_revision_id: mapped(v3RevisionIds, row.event_revision_id),
+      status: row.status === 'claimed' ? 'pending' : row.status,
+      lease_token_hash: null, lease_until: null,
+    }));
+    activity.thesisProposals = research.thesisProposals.map(row => ({ ...row,
+      id: mapped(proposalIds, row.id), run_id: mapped(runIds, row.run_id),
+      base_version_id: mapped(versionIds, row.base_version_id),
+    }));
+    activity.thesisVersions = research.thesisVersions.map(row => ({ ...row,
+      id: mapped(versionIds, row.id), proposal_id: mapped(proposalIds, row.proposal_id),
+      previous_version_id: mapped(versionIds, row.previous_version_id),
     }));
   }
   activity.digestV2Runs = (activity.digestV2Runs || []).map(row => ({ ...row, id: digestRunIds.get(row.id), snapshot_json: null }));
@@ -305,7 +329,11 @@ function validateUserPayload(payload: UserBackupPayload): void {
     typeof payload.activity !== 'object' || Array.isArray(payload.activity) || !Array.isArray(payload.files)) {
     throw new Error('备份内容不完整');
   }
-  validateDigestV3Backup(payload.activity);
+  const v3Rows = validateDigestV3Backup(payload.activity);
+  const researchRows = validateResearchBackup(payload.activity);
+  const v3User = v3Rows?.digestV3Events[0]?.user_id || v3Rows?.digestV3Revisions[0]?.user_id || v3Rows?.digestV3Evidence[0]?.user_id;
+  const researchUser = researchRows?.researchRuns[0]?.user_id;
+  if (v3User && researchUser && v3User !== researchUser) throw new Error('研究备份与事件记录账号不一致');
   if (payload.noteItems !== undefined && !Array.isArray(payload.noteItems)) throw new Error('备份记事内容不完整');
   if (payload.libraryEntries !== undefined && !Array.isArray(payload.libraryEntries)) throw new Error('备份知识库内容不完整');
   if (payload.dailyReportCloudContext !== undefined) {
@@ -343,6 +371,9 @@ export function inspectUserBackup(buffer: Buffer, password: string): Record<stri
       digestV3Revisions: (payload.activity.digestV3Revisions || []).length,
       digestV3Evidence: (payload.activity.digestV3Evidence || []).length,
       digestV3Analyses: (payload.activity.digestV3Analyses || []).length,
+      researchRuns: (payload.activity.researchRuns || []).length,
+      thesisProposals: (payload.activity.thesisProposals || []).length,
+      thesisVersions: (payload.activity.thesisVersions || []).length,
     },
   };
 }
@@ -356,6 +387,7 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
   const isForeignAccount = String(decrypted.account.email || '').toLowerCase() !== targetAccount.email.toLowerCase();
   const payload = isForeignAccount ? remapForeignUserPayload(decrypted) : decrypted;
   activityStore.digestV3Store.validateRestore(userId, payload.activity, mode);
+  activityStore.digestResearchStore.validateRestore(userId, payload.activity, mode);
   const safetyCopy = createUserBackup(userId, password, true);
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
   atomicWriteFile(path.join(BACKUP_DIR, 'pre-user-restore-' + userId + '-' + Date.now() + '.aicalendar-backup'), safetyCopy);

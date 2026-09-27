@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import { parseMediaReceipt, type DailyReportMediaReceipt } from './daily-report-media-receipt.js';
 import { DigestV3Store, migrateDigestV3Schema } from './digest-v3-store.js';
+import { DigestResearchStore, migrateResearchSchema } from './digest-research-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,6 +127,7 @@ function snapshotActivityDb(): Uint8Array {
 }
 
 export const digestV3Store = new DigestV3Store(() => db, persist);
+export const digestResearchStore = new DigestResearchStore(() => db, persist);
 
 function queryAll<T>(sql: string, params: unknown[] = []): T[] {
   assertPersistenceReady();
@@ -413,6 +415,7 @@ export async function initActivityDb(): Promise<void> {
   }
   db.run('CREATE INDEX IF NOT EXISTS idx_daily_reports_user_date_source ON daily_reports(user_id, report_date DESC, source, updated_at DESC)');
   migrateDigestV3Schema(db);
+  migrateResearchSchema(db);
   db.run(`INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('version', '4')`);
   db.run(`UPDATE notification_deliveries SET status = 'failed', next_retry_at = ? WHERE status = 'sending'`, [nowIso()]);
   persist();
@@ -925,6 +928,7 @@ function addAudit(userId: string, entityType: string, entityId: string, action: 
 export function exportUserActivity(userId: string): Record<string, unknown[]> {
   return {
     ...digestV3Store.exportUserData(userId),
+    ...digestResearchStore.exportUserData(userId),
     digestV2Runs: queryAll<any>('SELECT * FROM digest_v2_runs WHERE user_id = ?', [userId]).map(row => ({ ...row, snapshot_json: row.expires_at <= nowIso() ? null : row.snapshot_json })),
     digestV2Artifacts: queryAll<any>('SELECT * FROM digest_v2_artifacts WHERE user_id = ?', [userId]),
     completions: queryAll<any>('SELECT * FROM completion_records WHERE user_id = ?', [userId]),
@@ -995,6 +999,7 @@ export function deleteUserActivity(userId: string): {
   processedEmails: number;
 } {
   const attachments = listAttachments(userId);
+  digestResearchStore.deleteUserData(userId);
   digestV3Store.deleteUserData(userId);
   run('DELETE FROM digest_v2_artifacts WHERE user_id = ?', [userId]);
   run('DELETE FROM digest_v2_runs WHERE user_id = ?', [userId]);
@@ -1025,6 +1030,7 @@ function restoreUserActivityInternal(
 ): { completions: number; notifications: number; dailyReports: number; aiImports: number } {
   // Validate before touching any legacy rows; an old backup cannot erase V3 records.
   digestV3Store.validateRestore(userId, data, mode);
+  digestResearchStore.validateRestore(userId, data, mode);
   if (mode === 'replace') {
     db.run('DELETE FROM digest_v2_artifacts WHERE user_id = ?', [userId]);
     db.run('DELETE FROM digest_v2_runs WHERE user_id = ?', [userId]);
@@ -1110,7 +1116,10 @@ function restoreUserActivityInternal(
       [userId, setting.enabled ? 1 : 0, setting.import_token || uuidv4().replace(/-/g, ''), nowIso()],
     );
   }
+  // Research may reference exact V3 revisions; clear dependents before V3 replacement.
+  if (mode === 'replace') digestResearchStore.deleteUserData(userId);
   digestV3Store.restoreUserData(userId, data, mode);
+  digestResearchStore.restoreUserData(userId, data, mode);
   persist();
   return { completions, notifications, dailyReports, aiImports };
 }

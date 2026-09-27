@@ -4,7 +4,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified version: `0.31.18-260927.1318`（2026-09-27，七期合成日报压缩回放；真实七期 Work、媒体到期、正式生产与发信仍分别验收）。
+- Last verified version: `0.32.0-260927.1443`（2026-09-27，D13 本地合成测试与浏览器检查；真实 Agent、Work、生产与发信仍分别验收）。
 - CalDAV 补充验证：2026-09-18，隔离 POC 与主应用回归；仅覆盖下述独立入口，真机尚未验证。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
@@ -56,6 +56,8 @@ D07 固定来源本地闭环：`npx tsx --test server/digest-v3-local-flow.test.
 D02 定向校验增量：`npx tsx --test server/digest-v2-quality.test.ts server/digest-v2.test.ts` 用绑定截点的合成稿验证晚发来源被拒、变更 ID 但正文相同的新闻被拒、共享来源而出现明确新进展仍可通过；空新闻保持合法并返回 `reviewIssues`，旧 `2026-09-27.1` 冻结稿和强调渲染仍可读。9/23、9/26 遗漏及 9/27 空态只按当时已有脱敏证据回放；真实运行没有在本轮重做，候选/排除日志的完整性仍受限。[固定回放结论](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)不等于新闻检索质量通过。
 
 七期压缩模拟：`npm run digest:simulate-seven-days` 用固定种子生成七个合成日期和个人输入，在新建的忽略目录中运行原始草稿纯校验、人工标准答案筛选后的七期 Shadow、D1/D3 人工 V3 进展预览、同键重试、账号恢复及新进程读回。结果、逐条候选理由和预览留在命令输出的 `dist-shadow/seven-day-*`；[本次快照](DAILY-DIGEST-SEVEN-DAY-SIMULATION-20260927.md)记录 21 候选/13 人工入选、D2 同文拦截、D6 晚发拦截、D4 空新闻提示。跨日期语义重复仍可通过 V2 校验，不能把人工排除计作自动去重；未调用真实输入读取器、Work、外部媒体、R2、SMTP 或正式发布，也不验证 `tmp/` 经过七个自然日的到期。
+
+D13 研究与观点：`npx tsx --test server/digest-research.test.ts server/digest-research-trigger.test.ts` 检查合成候选幂等、同账号 V3 修订绑定、十分钟租约/旧令牌、研究结果到 Proposal 草稿、Thesis 显式确认与拒绝、跨账号和并发冲突、旧库再打开、写回失败回退、加密备份及跨账号引用重映射。`scripts/digest-research-browser-smoke.cjs` 使用构建页与合成登录 API，检查四尺寸明暗主题、长文本、确认、空态、错误态和横向溢出。`202` 触发探针只证明请求与回执合同，不证明真实 Workspace Agent 已排队、执行或回传正文；后续真实通道、OAuth、生产恢复与研究准确性仍受限，详见[研究与观点合同](DAILY-DIGEST-RESEARCH-THESIS.md)。
 
 2026-09-21 验证边界：真实 R2 测试成功，七类固定场景为合成测试。浏览器检查四尺寸、明暗主题、登录深链接、隔离列表与无发信入口；截图工具受限项目需在交付记录中注明。2026-09-26 的三个真实日期已暴露持续缺图；后续优先验收逐条新闻图片覆盖、重点/普通图片层级及改进后两个不同真实日期的 Work Shadow。Work 权限/实际 Prompt、OAuth 跨期、生产媒体域名/CDN 清除和真实邮箱仍分别验收；任何关键层未完成，都不能报告 V2.5 整体完成。
 
