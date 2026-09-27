@@ -61,6 +61,10 @@ D08 阶段状态安全回归：`npx tsx --test server/digest-v3-offline-extract.
 
 D02 定向校验增量：`npx tsx --test server/digest-v2-quality.test.ts server/digest-v2.test.ts` 用绑定截点的合成稿验证晚发来源被拒、变更 ID 但正文相同的新闻被拒、共享来源而出现明确新进展仍可通过；空新闻保持合法并返回 `reviewIssues`，旧 `2026-09-27.1` 冻结稿和强调渲染仍可读。9/23、9/26 遗漏及 9/27 空态只按当时已有脱敏证据回放；真实运行没有在本轮重做，候选/排除日志的完整性仍受限。[固定回放结论](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)不等于新闻检索质量通过。
 
+隔离定时验收增加跨截点检查：同一日期的 10:57 早版不能满足 18:00 以后目标截点；按日期、目标截点、合同版本、来源检索与成功输入覆盖共同判断。实际增量运行须记录研究窗口、候选及排除/失败、`read_inputs_v2` 新快照、校验和 Shadow 新修订或沿用理由；同日修订不增加日期计数。零新闻 `reviewIssues` 及空数组通过不能证明无重要新闻；无检索或关键来源失败列受限。隔离服务的部署、Work 研究、输入快照、校验、保存、图片及邮件状态逐层计证，不把任一层成功写成正式发布或发信。
+
+9/27 晚间实际回放：已在独立服务 `2026-09-27.2` 运行同日新快照、Work 公开研究、5/5 成功 Mail 输入覆盖与最终 Shadow 校验/保存；预览回读纠正来源错链和已知听证日期，1 条新闻用 1 张标注插画，真实照片 0，候选许可失败 1。正式列表为空、邮件未入队；下次自动 18:00 触发和广泛来源召回仍未验证。逐层证据与中间错误见[晚间隔离快照](DAILY-DIGEST-V25-EVENING-INCREMENTAL-20260927.md)。
+
 七期压缩模拟：`npm run digest:simulate-seven-days` 用固定种子生成七个合成日期和个人输入，在新建的忽略目录中运行原始草稿纯校验、人工标准答案筛选后的七期 Shadow、D1/D3 人工 V3 进展预览、同键重试、账号恢复及新进程读回。结果、逐条候选理由和预览留在命令输出的 `dist-shadow/seven-day-*`；[本次快照](DAILY-DIGEST-SEVEN-DAY-SIMULATION-20260927.md)记录 21 候选/13 人工入选、D2 同文拦截、D6 晚发拦截、D4 空新闻提示。跨日期语义重复仍可通过 V2 校验，不能把人工排除计作自动去重；未调用真实输入读取器、Work、外部媒体、R2、SMTP 或正式发布，也不验证 `tmp/` 经过七个自然日的到期。
 
 D13 研究与观点：`npx tsx --test server/digest-research.test.ts server/digest-research-trigger.test.ts` 检查合成候选幂等、同账号 V3 修订绑定、十分钟租约/旧令牌、研究结果到 Proposal 草稿、Thesis 显式确认与拒绝、跨账号和并发冲突、旧库再打开、写回失败回退、加密备份及跨账号引用重映射。`scripts/digest-research-browser-smoke.cjs` 使用构建页与合成登录 API，检查四尺寸明暗主题、长文本、确认、空态、错误态和横向溢出。`202` 触发探针只证明请求与回执合同，不证明真实 Workspace Agent 已排队、执行或回传正文；后续真实通道、OAuth、生产恢复与研究准确性仍受限，详见[研究与观点合同](DAILY-DIGEST-RESEARCH-THESIS.md)。

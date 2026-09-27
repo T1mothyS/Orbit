@@ -55,6 +55,7 @@ D13 Research/Thesis 的本地状态、登录态接口、观点确认和备份边
 | [2026-09-27 Daily Digest 计划与实现审计](DAILY-DIGEST-PLAN-AUDIT-20260927.md) | AUDIT-SNAPSHOT / PLAN-REVISED | 将结构校验当内容质量，或将后续本地开发放行当生产验收 |
 | [2026-09-27 D02 第一轮内容质量基线](DAILY-DIGEST-D02-QUALITY-BASELINE-20260927.md) | REVIEW-SNAPSHOT / PARTIAL | 把同日修订算新日期、把空新闻格式合法当检索充分、把 P01 固定回放当真实日报或自动匹配 |
 | [2026-09-27 D02 定向校验与固定证据回放](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md) | VERIFICATION-SNAPSHOT / CONTENT-PARTIAL | 把合成校验通过当真实 Work 选题改善，或把空新闻提示当检索充分性证明 |
+| [2026-09-27 V2.5 晚间增量隔离验收](DAILY-DIGEST-V25-EVENING-INCREMENTAL-20260927.md) | VERIFICATION-SNAPSHOT / ISOLATED | 把上午早版当晚间检查、把同日修订算新日期，或把 1 条部分核实新闻与插画覆盖当整体内容/许可放行 |
 | [2026-09-27 七期合成日报压缩回放](DAILY-DIGEST-SEVEN-DAY-SIMULATION-20260927.md) | VERIFICATION-SNAPSHOT / SYNTHETIC | 把人工标准答案筛选当自动去重，或把七期模拟当七个真实日期及 R2 七日到期 |
 | [2026-09-27 D08 第一轮离线匹配评测](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md) | VERIFICATION-SNAPSHOT / OFFLINE | 把人工抽取的结构化字段或合成样例满分当真实 Work 自动匹配、D09 或生产放行 |
 | [2026-09-27 D08 第二轮冻结规则盲测](DAILY-DIGEST-D08-OFFLINE-EVALUATION-R2-20260927.md) | VERIFICATION-SNAPSHOT / OFFLINE | 用零错合并掩盖会议字段抽取失败和真实进展漏判；本轮继续 D08 |

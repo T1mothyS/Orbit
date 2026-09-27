@@ -194,6 +194,8 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 
 2026-09-27 后续 D02 本地增量：上述“未阻断时间/重复”的描述是前次审计时点结论；新 `2026-09-27.2` 已实现已知来源时间和相同内容的最小硬检查，以及空新闻审阅提示。固定历史回放和缺证边界见 [D02 定向回放快照](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)。本次没有改 Work 任务、重新生成真实日报、部署或调整加粗硬校验；`reviewIssues` 不能代替真实候选记录。
 
+2026-09-27 晚间隔离定时验收规则：每次按 Asia/Shanghai 的真实日报日期与实际运行时间确定目标截点，18:00 定时运行的截点不得早于 18:00；迟到或补跑须写实际时间。已有 Shadow 只有同时满足日期、目标截点、合同与 `generationVersion`、公开检索范围和成功个人输入覆盖、逐条来源与图片许可证据，才能用于本轮内容结论。上午早版不能替代晚间检查。自前一内容截点至本轮截点必须留检索时段、候选来源、纳入或排除理由及失败项；未检索或关键来源失败不得写“无重要新闻”。若发现重要新增或遗漏，仅保存同日新 Shadow 修订并保留旧稿；同日修订不增加真实日期数。没有合格新增时可沿用原稿，但必须保存增量检查证据；缺目标截点或关键证据时标受限，不宣布内容验收通过。`read_inputs_v2` 会创建隔离输入快照与 runId，不称为严格零写入。D02 校验可提示空新闻人工复核，不能代替上述来源研究。隔离服务从已运行的 `0.31.14-260927.1103` 单独切到 `0.31.18-260927.1825`，仅纳入 D02 校验差异；未启用 V3/D13 新写入路由。该规则只作用于隔离 Work/Shadow，不改变正式 16:40 Work、主站生产、发布或发信。
+
 复现本地验证：`npx tsx --test server/digest-v2.test.ts server/digest-v2-quality.test.ts`。显式测试 R2：`node --env-file=.env.digest-v2-test --import tsx scripts/digest-v2-r2-smoke.ts`（仅专用测试 Bucket，创建/删除/恢复代码自有合成对象）。浏览器 fixture：同样环境执行 `scripts/digest-v2-preview.ts`，另起 Vite 并将 `API_PROXY_TARGET` 指向 fixture 端口；该 fixture 固定仅监听本机、使用临时库和合成账号、不启动发信任务。
 
 ### Cloudflare Worker 代抓与来源图标
