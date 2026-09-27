@@ -121,7 +121,19 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
         else coverage.missing++;
       }
       addLog('info', 'daily-report', '新版日报运行完成', { event: 'digest_v2_completed', runId, mode, status: payload.status, imageCount: coverage.real, missingImageCount: coverage.missing });
-      return { status: payload.status, artifactId: existing.id, contentHash: validation.contentHash, renderHash: payload.renderHash, warnings: validation.warnings, emailStatus: payload.emailStatus || 'NOT_QUEUED', previewUrl: mode === 'shadow' ? `/reports/${digest.date}?shadow=${existing.id}` : `/reports/${digest.date}?source=cloud`, imageCoverage: coverage, media: { icons: payload.publication.media.filter(m => m.kind === 'source_icon' && m.publicUrl && !m.fallback).length, real: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && !m.fallback).length, fallback: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length, failures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })) } };
+      return {
+        status: payload.status, artifactId: existing.id, contentHash: validation.contentHash, renderHash: payload.renderHash,
+        warnings: validation.warnings, reviewIssues: validation.reviewIssues,
+        emailStatus: payload.emailStatus || 'NOT_QUEUED',
+        previewUrl: mode === 'shadow' ? `/reports/${digest.date}?shadow=${existing.id}` : `/reports/${digest.date}?source=cloud`,
+        imageCoverage: coverage,
+        media: {
+          icons: payload.publication.media.filter(m => m.kind === 'source_icon' && m.publicUrl && !m.fallback).length,
+          real: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && !m.fallback).length,
+          fallback: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length,
+          failures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })),
+        },
+      };
     } catch (error) {
       // Keep only bounded, non-sensitive stage diagnostics, never provider error messages.
       try { recordPhase('FAILED', { failedPhase: phase, retryable: true }); } catch { /* Original durable-write failure remains primary. */ }
