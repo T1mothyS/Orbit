@@ -10,7 +10,7 @@
 
 ## 当前规范与合同
 
-Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提示统一维护在 [Cloud 合同新版节](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)，阶段顺序见 [路线图](ROADMAP.md)，验收入口见 [测试矩阵](TEST-MATRIX.md)。本地/R2 证据不能代替连续真实 Shadow 或上线验收。
+Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提示统一维护在 [Cloud 合同新版节](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)，阶段顺序见 [路线图](ROADMAP.md)，验收入口见 [测试矩阵](TEST-MATRIX.md)。2026-09-27 起优先内容质量基线，本地开发与生产分层放行；七个真实日期不是统一前置，本地/R2 证据仍不能代替真实集成或上线验收。
 
 Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 语义、S2-03 本地存储和 S2-04 账号备份恢复边界统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；尚无对外 V3 接口，不改变 V2.5 当前运行合同。
 
@@ -49,6 +49,7 @@ Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis 语义、S2-03 本地�
 
 | 文档 | 分类 | 不能用于 |
 |---|---|---|
+| [2026-09-27 Daily Digest 计划与实现审计](DAILY-DIGEST-PLAN-AUDIT-20260927.md) | AUDIT-SNAPSHOT / PLAN-REVISED | 将结构校验当内容质量，或将后续本地开发放行当生产验收 |
 | [2026-09-05 Phase 1 审计](PHASE-1-AUDIT.md) | AUDIT-SNAPSHOT | 直接引用为当前文件规模/风险状态 |
 | [2026-09-19 收口增量审计](CLOSEOUT-AUDIT-20260919.md) | AUDIT-SNAPSHOT | 推断依赖告警已修复、生产已部署或完整安全认证 |
 | [2026-09-19 格式与安全修复](FORMAT-SECURITY-REPAIR-20260919.md) | VERIFICATION-SNAPSHOT | 推断生产已部署、真实邮件已验收或绝对无 bug |

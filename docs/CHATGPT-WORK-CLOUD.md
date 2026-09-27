@@ -189,6 +189,8 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 
 先执行普通日、零重大新闻、大新闻、数据修订、来源失败、个人输入失败、图片全部失败这七类固定样本。合成样本只能证明工程分支。2026-09-22、09-23、09-26 三个真实日期已足以证明当前持续缺图，不等待更多日期才修复。改进后至少在两个不同真实日期进行真实 Work Shadow，逐条统计新闻总数、真实相关图片数、其他明确标注的视觉素材数和缺图数，并与旧版对照遗漏、重复、证据、耗时及 OAuth 跨期续用；另用固定样本验证图片失败时的明确降级。记录 Work 实际 Prompt、工具权限和合同版本。额外七日观察用于发现长期波动，不作为修复缺图或完成本轮定向验收的硬性前置。真实桌面/手机邮箱测试需单独授权测试发信，邮件浏览器预览不等于收件箱显示。
 
+2026-09-27 验收补充：以上跨日期运行证明集成，不单凭次数判定内容合格。内容评审与本地/生产分层放行统一见 [路线图](ROADMAP.md#d02-内容质量闸门2026-09-27-审计修订) 和 [测试矩阵](TEST-MATRIX.md#daily-digest-内容与运行验收分层)。当前 `validate_v2` 只做结构、引用及输入覆盖等检查，不联网核实事实，也未阻断已知发表时间晚于截点或不同 ID 的同内容新闻；空新闻通过不能证明检索充分。时间/重复诊断和加粗降为提示是后续实现候选，本次没有改变 schema、工具、运行中 Prompt 或现行加粗硬校验。
+
 复现本地验证：`npx tsx --test server/digest-v2.test.ts`。显式测试 R2：`node --env-file=.env.digest-v2-test --import tsx scripts/digest-v2-r2-smoke.ts`（仅专用测试 Bucket，创建/删除/恢复代码自有合成对象）。浏览器 fixture：同样环境执行 `scripts/digest-v2-preview.ts`，另起 Vite 并将 `API_PROXY_TARGET` 指向 fixture 端口；该 fixture 固定仅监听本机、使用临时库和合成账号、不启动发信任务。
 
 ### Cloudflare Worker 代抓与来源图标
