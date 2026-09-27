@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified version: `0.35.0-260927.1717`（2026-09-27，D08 第二轮离线评测；不代表真实 Agent、Work、生产或发信验收）。
+- Last verified version: `0.35.1-260927.1806`（2026-09-27，D08 阶段事实安全修复；不代表真实 Agent、Work、生产或发信验收）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -50,7 +50,7 @@ CalDAV 入口为 `server/routes/caldav.ts`；`caldav-service` 共享手动/后�
 
 新版 V2.5 的独立 Cloud 分支由 `server/digest-v2-{contract,service,media,fetch,render}.ts` 实现，MCP 入口仍在 `daily-report-cloud-mcp.ts`。输入运行与隔离产物在原 `activity.db` 的 `digest_v2_runs`、`digest_v2_artifacts`；production 才写原日报/通知表。阅读复用 `reports-read.ts` 与 `DailyReportsPage.tsx`，R2 字节镜像进入原媒体/备份边界。V1 Local 图示仍适用于原链路，不能作为新版合同。详细字段、开关和 Shadow 边界见 [V2.5 合同](docs/CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 
-V3 Core 的 S2-03 存储位于同一个 `activity.db`：`server/digest-v3-store.ts` 管理 Event/Revision/Evidence/Analysis 与引用表，`activity-store.ts` 负责初始化和可靠写回。S2-04 通过原 `backup-service.ts` 账号备份和恢复七张表，同账号替换、旧备份与跨账号 ID 重映射均有保护。D07 的 `digest-v3-local-flow.ts` 对人工审核来源做原子写入和精确预览，`routes/digest-v3.ts` 提供登录态的受控提交、按账号/截点分页历史和精确引用预览。D08 的 `digest-v3-offline-match.ts` 只在隔离回放里给双轴建议，`digest-v3-offline-extract.ts` 只对有界短摘录作限定规则抽取；两者均不写活动库。详见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#d08-第二轮遗漏未知值与有界抽取合同2026-09-27)与[第二轮评测](docs/DAILY-DIGEST-D08-OFFLINE-EVALUATION-R2-20260927.md)。没有 Work/MCP 写入、正式日报发布或真实 Shadow 自动匹配。
+V3 Core 的 S2-03 存储位于同一个 `activity.db`：`server/digest-v3-store.ts` 管理 Event/Revision/Evidence/Analysis 与引用表，`activity-store.ts` 负责初始化和可靠写回。S2-04 通过原 `backup-service.ts` 账号备份和恢复七张表，同账号替换、旧备份与跨账号 ID 重映射均有保护。D07 的 `digest-v3-local-flow.ts` 对人工审核来源做原子写入和精确预览，`routes/digest-v3.ts` 提供登录态的受控提交、按账号/截点分页历史和精确引用预览。D08 的 `digest-v3-offline-match.ts` 只在隔离回放里给双轴建议，`digest-v3-offline-extract.ts` 只对有界短摘录作限定规则抽取并保留事实支持文本；两者均不写活动库。详见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#d08-有界事实状态与支持片段2026-09-27)与[阶段事实安全评测](docs/DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)。没有 Work/MCP 写入、正式日报发布或真实 Shadow 自动匹配。
 
 D13 本地 Research/Thesis 位于同一活动库：`server/digest-research-store.ts` 管理研究历史、提案与确认版本，登录态 API 位于 `server/routes/research.ts`，网页 `/research` 从日报页进入。账号级备份/恢复包含三张新表；Workspace Agent 触发仅有合成协议探针，真实 Work 与结果回传尚未接通。完整边界见 [研究与观点合同](docs/DAILY-DIGEST-RESEARCH-THESIS.md)。
 

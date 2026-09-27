@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "d08-r3-oracle.v1",
+  "note": "Scorer-only human labels for fictional snippets. null means the field must remain unknown; it is never passed to the extractor.",
+  "sources": [
+    { "id": "u01", "subjectKey": "crew-41", "flightPhase": null, "crewCount": null },
+    { "id": "u02", "subjectKey": "crew-41", "flightPhase": null, "crewCount": null },
+    { "id": "u03", "subjectKey": "crew-41", "flightPhase": null, "crewCount": null },
+    { "id": "u04", "subjectKey": "crew-42", "flightPhase": null, "crewCount": null },
+    { "id": "u05", "subjectKey": "crew-41", "flightPhase": "launched", "crewCount": null },
+    { "id": "u06", "subjectKey": "crew-41", "flightPhase": "docked", "crewCount": null },
+    { "id": "u07", "subjectKey": "crew-41", "flightPhase": "docked", "crewCount": null },
+    { "id": "u08", "subjectKey": "crew-41", "flightPhase": null, "crewCount": null },
+    { "id": "u09", "subjectKey": "crew-41", "flightPhase": null, "crewCount": null },
+    { "id": "u10", "subjectKey": "crew-41", "flightPhase": "launched", "crewCount": 5 },
+    { "id": "u11", "subjectKey": "crew-41", "flightPhase": null, "crewCount": null },
+    { "id": "u12", "subjectKey": "crew-42", "flightPhase": null, "crewCount": null },
+    { "id": "u13", "subjectKey": "crew-41", "flightPhase": "docked", "crewCount": null },
+    { "id": "u14", "subjectKey": "crew-41", "flightPhase": "splashdown", "crewCount": null },
+    { "id": "u15", "subjectKey": "crew-41", "flightPhase": "launched", "crewCount": null },
+    { "id": "u16", "subjectKey": "crew-41", "flightPhase": "launched", "crewCount": null },
+    { "id": "u17", "subjectKey": "crew-41", "flightPhase": null, "crewCount": null },
+    { "id": "u18", "subjectKey": "crew-41", "flightPhase": "docked", "crewCount": 3 },
+    { "id": "u19", "subjectKey": "crew-41", "flightPhase": null, "crewCount": null },
+    { "id": "u20", "subjectKey": "crew-41", "flightPhase": null, "crewCount": null }
+  ]
+}

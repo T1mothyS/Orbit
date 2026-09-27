@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extractOfflineV3Source, type BoundedV3Source } from '../server/digest-v3-offline-extract.js';
+import { extractOfflineV3Source, type BoundedV3Source } from '../server/digest-v3-offline-extract-r2.js';
 import { suggestOfflineV3Match, type EventRelation, type FactChange, type OfflineV3Source,
   type OfflineV3Suggestion } from '../server/digest-v3-offline-match.js';
 
@@ -13,7 +13,7 @@ const files = {
   manual: 'docs/digest-v3-d08-r2-manual-fields.json',
   oracle: 'docs/digest-v3-d08-r2-oracle.json',
   matcher: 'server/digest-v3-offline-match.ts',
-  extractor: 'server/digest-v3-offline-extract.ts',
+  extractor: 'server/digest-v3-offline-extract-r2.ts',
 };
 const frozen = {
   matcher: 'd5779f29abb0e97c444923c532c632bb33a5c78c209e52775ef28c06dd713e94',

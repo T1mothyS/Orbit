@@ -1,6 +1,6 @@
 {
   "name": "smart-schedule-agent",
-  "version": "0.35.0-260927.1717",
+  "version": "0.35.1-260927.1806",
   "description": "璺ㄥ钩鍙版櫤鑳芥棩绋嬭〃 Agent 搴旂敤",
   "author": "Smart Schedule Team",
   "license": "MIT",
@@ -34,7 +34,8 @@
     "evolution:check": "tsx scripts/generate-project-evolution.ts",
     "evolution:history": "tsx scripts/generate-project-evolution.ts --history",
     "tools:check": "tsx scripts/check-protected-tools.ts",
-    "digest:eval-offline-r2": "tsx scripts/digest-v3-d08-round2-evaluate.ts"
+    "digest:eval-offline-r2": "tsx scripts/digest-v3-d08-round2-evaluate.ts",
+    "digest:eval-offline-r3": "tsx scripts/digest-v3-d08-fact-safety-evaluate.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1136.0",

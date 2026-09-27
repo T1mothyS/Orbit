@@ -4,7 +4,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified version: `0.35.0-260927.1717`（2026-09-27，D08 第二轮离线建议与回归；真实 Agent、Work、生产与发信仍分别验收）。
+- Last verified version: `0.35.1-260927.1806`（2026-09-27，D08 阶段事实安全修复；真实 Agent、Work、生产与发信仍分别验收）。
 - CalDAV 补充验证：2026-09-18，隔离 POC 与主应用回归；仅覆盖下述独立入口，真机尚未验证。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
@@ -55,7 +55,9 @@ D07 登录态本地闭环：`npx tsx --test server/digest-v3-api.test.ts server/
 
 D08 第一轮离线匹配：`npm run digest:eval-offline` 用 S2-01 固定 15 组、独立预留 7 组合成样例及七期模拟的 21 条**原始候选**生成只读建议和逐例报告，输出到被忽略的 `dist-shadow/d08-offline-*`。`npx tsx --test server/digest-v3-offline-match.test.ts` 验不同会议同指标值不合并、冲突译文保持待核、非阶段矛盾不冒充进展、答案字段拒绝与顺序不变。报告分别统计事件关系与事实变化、五类矩阵、错合并、漏匹配、不确定及保留样例，并记录输入/答案/规则哈希。固定来源的事件身份和结构化事实仍由人工抽取；七期改写转载仍待定。该验证不读写活动库，不代表原网页自动抽取、真实 Work/Shadow、正式发布或 D09 放行。结果见 [D08 快照](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md)。
 
-D08 第二轮离线盲测：`npm run digest:eval-offline-r2` 在核对匹配器和限定抽取器冻结 SHA-256 后，读 12 条保留官方短摘录、13 组评分答案；先分别生成“人工结构化”和“独立抽取”只读建议，再把双轴输出交给评分器。`npx tsx --test server/digest-v3-offline-match.test.ts server/digest-v3-offline-extract.test.ts` 覆盖遗漏、新增、矛盾、双未知、时间精度、字段拒绝和第一轮回归。输出 `dist-shadow/d08-r2-offline-*/result.json` 记录逐例与来源级抽取；[第二轮快照](DAILY-DIGEST-D08-OFFLINE-EVALUATION-R2-20260927.md)记录双轨分母和真实漏判。本轮仍是手工保存的短摘录，不声称通用网页抓取、真实 Work/Shadow、活动库写入或 D09 放行。
+D08 第二轮离线盲测：`npm run digest:eval-offline-r2` 在核对匹配器和 R2 原抽取器副本的冻结 SHA-256 后，读 12 条保留官方短摘录、13 组评分答案；先分别生成“人工结构化”和“独立抽取”只读建议，再把双轴输出交给评分器。`npx tsx --test server/digest-v3-offline-match.test.ts server/digest-v3-offline-round2.test.ts` 覆盖遗漏、新增、矛盾、双未知、时间精度和第一轮回归。输出 `dist-shadow/d08-r2-offline-*/result.json` 记录逐例与来源级抽取；[第二轮快照](DAILY-DIGEST-D08-OFFLINE-EVALUATION-R2-20260927.md)记录双轨分母和真实漏判。本轮仍是手工保存的短摘录，不声称通用网页抓取、真实 Work/Shadow、活动库写入或 D09 放行。
+
+D08 阶段状态安全回归：`npx tsx --test server/digest-v3-offline-extract.test.ts scripts/digest-v3-d08-fact-safety-evaluate.test.ts` 先覆盖已复现的否定/计划误判、条件、历史背景、多阶段混述、逐项支持片段和未知值不生成进展。`npm run digest:eval-offline-r3` 检查当前抽取器冻结哈希，再对 20 条规则冻结后编写的合成短摘录评分；原始字段与评分答案分文件，输出 `dist-shadow/d08-r3-fact-safety-*/result.json`，按错误事实、漏取和不确定分别计数。第二轮历史脚本固定引用 `digest-v3-offline-extract-r2.ts`，历史冻结哈希及结果不变。[第三轮快照](DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)记录逐例漏取和支持边界；该合成集不构成真实页面、Work/Shadow、发布或 D09 自动应用的验收。
 
 D02 定向校验增量：`npx tsx --test server/digest-v2-quality.test.ts server/digest-v2.test.ts` 用绑定截点的合成稿验证晚发来源被拒、变更 ID 但正文相同的新闻被拒、共享来源而出现明确新进展仍可通过；空新闻保持合法并返回 `reviewIssues`，旧 `2026-09-27.1` 冻结稿和强调渲染仍可读。9/23、9/26 遗漏及 9/27 空态只按当时已有脱敏证据回放；真实运行没有在本轮重做，候选/排除日志的完整性仍受限。[固定回放结论](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)不等于新闻检索质量通过。
 
