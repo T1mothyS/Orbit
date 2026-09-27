@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified version: `0.34.0-260927.1641`（2026-09-27，D08 第一轮离线评测；真实 Agent、Work、生产与发信未验）。
+- Last verified version: `0.35.0-260927.1717`（2026-09-27，D08 第二轮离线评测；真实 Agent、Work、生产与发信未验）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。
@@ -12,7 +12,7 @@
 
 Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提示统一维护在 [Cloud 合同新版节](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)，阶段顺序见 [路线图](ROADMAP.md)，验收入口见 [测试矩阵](TEST-MATRIX.md)。D02 的[第一轮内容基线](DAILY-DIGEST-D02-QUALITY-BASELINE-20260927.md)、[定向校验回放](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)与[七期合成压缩回放](DAILY-DIGEST-SEVEN-DAY-SIMULATION-20260927.md)分开记录；本地开发与生产分层放行，七个真实日期不是统一前置，合成回放不能代替真实集成或上线验收。
 
-Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis、S2-03 存储、S2-04 账号备份恢复、D07 登录态接口及 D08 只读离线双轴判断统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；D08 的逐例结果与限制见[第一轮评测](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md)。尚无 Work/MCP 写入或真实来源自动抽取，不改变 V2.5 当前运行合同。
+Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis、S2-03 存储、S2-04 账号备份恢复、D07 登录态接口及 D08 只读离线双轴判断统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；D08 的 [第一轮](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md)和[第二轮](DAILY-DIGEST-D08-OFFLINE-EVALUATION-R2-20260927.md)分别记录逐例结果。第二轮仅从有界官方短摘录做限定抽取，仍无通用网页抓取、Work/MCP 写入，不改变 V2.5 当前运行合同。
 
 D13 Research/Thesis 的本地状态、登录态接口、观点确认和备份边界见[研究与观点合同](DAILY-DIGEST-RESEARCH-THESIS.md)；真实 Agent 和 Work 结果回传尚未接通。
 
@@ -57,6 +57,7 @@ D13 Research/Thesis 的本地状态、登录态接口、观点确认和备份边
 | [2026-09-27 D02 定向校验与固定证据回放](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md) | VERIFICATION-SNAPSHOT / CONTENT-PARTIAL | 把合成校验通过当真实 Work 选题改善，或把空新闻提示当检索充分性证明 |
 | [2026-09-27 七期合成日报压缩回放](DAILY-DIGEST-SEVEN-DAY-SIMULATION-20260927.md) | VERIFICATION-SNAPSHOT / SYNTHETIC | 把人工标准答案筛选当自动去重，或把七期模拟当七个真实日期及 R2 七日到期 |
 | [2026-09-27 D08 第一轮离线匹配评测](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md) | VERIFICATION-SNAPSHOT / OFFLINE | 把人工抽取的结构化字段或合成样例满分当真实 Work 自动匹配、D09 或生产放行 |
+| [2026-09-27 D08 第二轮冻结规则盲测](DAILY-DIGEST-D08-OFFLINE-EVALUATION-R2-20260927.md) | VERIFICATION-SNAPSHOT / OFFLINE | 用零错合并掩盖会议字段抽取失败和真实进展漏判；本轮继续 D08 |
 | [2026-09-05 Phase 1 审计](PHASE-1-AUDIT.md) | AUDIT-SNAPSHOT | 直接引用为当前文件规模/风险状态 |
 | [2026-09-19 收口增量审计](CLOSEOUT-AUDIT-20260919.md) | AUDIT-SNAPSHOT | 推断依赖告警已修复、生产已部署或完整安全认证 |
 | [2026-09-19 格式与安全修复](FORMAT-SECURITY-REPAIR-20260919.md) | VERIFICATION-SNAPSHOT | 推断生产已部署、真实邮件已验收或绝对无 bug |

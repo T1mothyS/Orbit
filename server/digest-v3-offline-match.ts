@@ -19,7 +19,9 @@ export type OfflineV3Suggestion = {
   candidateEventId: string | null;
   evidenceIds: string[];
   comparedFactKeys: string[];
-  unmatchedFactKeys: string[];
+  addedFactKeys: string[];
+  omittedFactKeys: string[];
+  unknownFactKeys: string[];
   reasons: string[];
   mayReferenceSameEvent: boolean;
 };
@@ -48,6 +50,20 @@ function validateSource(value: OfflineV3Source): void {
         ['string', 'number', 'boolean'].includes(typeof fact.value)))) {
     throw new Error('D08 source projection is incomplete');
   }
+  if (value.publishedPrecision === 'unknown' ? value.publishedAt !== null
+    : value.publishedPrecision === 'date'
+      ? typeof value.publishedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.publishedAt) ||
+        !validDate(value.publishedAt)
+      : (value.publishedPrecision !== 'minute' && value.publishedPrecision !== 'second') ||
+        typeof value.publishedAt !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value.publishedAt) ||
+        !validDate(value.publishedAt.slice(0, 10)) || !Number.isFinite(Date.parse(value.publishedAt))) {
+    throw new Error('D08 source publication precision is invalid');
+  }
+}
+function validDate(value: string): boolean {
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function factIdentity(fact: OfflineV3Source['facts'][number]): string {
@@ -69,8 +85,21 @@ function eventId(source: OfflineV3Source): string {
   const { eventType, subjectKey, occurrenceKey } = source.event;
   return `d08-event-${crypto.createHash('sha256').update(JSON.stringify([eventType, subjectKey, occurrenceKey])).digest('hex').slice(0, 20)}`;
 }
+function definitelyLater(earlier: OfflineV3Source, later: OfflineV3Source): boolean {
+  if (!earlier.publishedAt || !later.publishedAt) return false;
+  if (earlier.publishedPrecision === 'date' && later.publishedPrecision === 'date') {
+    return earlier.publishedAt < later.publishedAt;
+  }
+  // A date-only source has no timezone or time of day. Mixed precision is not enough to order updates.
+  if (earlier.publishedPrecision === 'date' || later.publishedPrecision === 'date') return false;
+  const endOfEarlier = Date.parse(earlier.publishedAt) +
+    (earlier.publishedPrecision === 'minute' ? 59_999 : 999);
+  return endOfEarlier < Date.parse(later.publishedAt);
+}
 function canonicalOrder(a: OfflineV3Source, b: OfflineV3Source): [OfflineV3Source, OfflineV3Source] {
-  const key = (source: OfflineV3Source) => `${source.publishedAt ?? '9999'}\0${source.url}\0${source.id}`;
+  if (definitelyLater(a, b)) return [a, b];
+  if (definitelyLater(b, a)) return [b, a];
+  const key = (source: OfflineV3Source) => `${source.url}\0${source.id}`;
   return key(a) <= key(b) ? [a, b] : [b, a];
 }
 
@@ -103,61 +132,63 @@ export function suggestOfflineV3Match(first: OfflineV3Source, second: OfflineV3S
   const before = valuesByFact(earlier);
   const after = valuesByFact(later);
   const keys = [...new Set([...before.keys(), ...after.keys()])].sort();
-  const compared = keys.filter(key => before.has(key) && after.has(key));
-  const unmatched = keys.filter(key => !before.has(key) || !after.has(key));
-  const internalConflict = [...before.values(), ...after.values()].some(values => values.size > 1);
-  const conflict = compared.some(key => {
+  const known = (values: Set<string> | undefined) => !!values && values.size === 1 && !values.has('null');
+  const compared = keys.filter(key => known(before.get(key)) && known(after.get(key)));
+  const added = keys.filter(key => !before.has(key) && known(after.get(key)));
+  const omitted = keys.filter(key => known(before.get(key)) && !after.has(key));
+  const unknown = keys.filter(key => before.get(key)?.has('null') || after.get(key)?.has('null'));
+  const internalConflict = [...before.values(), ...after.values()].some(values =>
+    [...values].filter(value => value !== 'null').length > 1);
+  const changed = compared.filter(key => {
     const left = before.get(key)!;
     const right = after.get(key)!;
-    return left.size !== 1 || right.size !== 1 || [...left][0] !== [...right][0];
-  }) || internalConflict;
-  const comparableChanged = compared.some(key => {
-    const left = before.get(key)!;
-    const right = after.get(key)!;
-    return left.size === 1 && right.size === 1 && [...left][0] !== [...right][0];
+    return [...left][0] !== [...right][0];
   });
-  const comparableUnchanged = compared.some(key => {
-    const left = before.get(key)!;
-    const right = after.get(key)!;
-    return left.size === 1 && right.size === 1 && [...left][0] === [...right][0];
-  });
-  const stageOrder: Record<string, number> = { initial: 1, launched: 2, progress: 3, orbit: 3, splashdown: 4 };
-  const stageProgress = compared.some(key => {
+  const stageOrder: Record<string, number> = {
+    initial: 1, launched: 2, progress: 3, orbit: 3, docked: 3, splashdown: 4, landed: 4,
+  };
+  const stageProgress = changed.length > 0 && changed.every(key => {
     const [factKey] = key.split('\0');
     if (factKey !== 'flight_phase' && factKey !== 'state') return false;
     const left = [...before.get(key)!];
     const right = [...after.get(key)!];
-    if (left.length !== 1 || right.length !== 1) return false;
     const oldStage = stageOrder[JSON.parse(left[0]) as string];
     const newStage = stageOrder[JSON.parse(right[0]) as string];
     return !!oldStage && !!newStage && newStage > oldStage;
   });
+  const completeEqual = compared.length > 0 && changed.length === 0 &&
+    added.length === 0 && omitted.length === 0 && unknown.length === 0 && !internalConflict;
   let factChange: FactChange = 'unknown';
   if (eventRelation === 'different_event') {
     if (internalConflict) factChange = 'unknown';
-    else if (comparableChanged) factChange = 'material_change';
-    else if (comparableUnchanged) factChange = 'no_material_change';
+    else if (changed.length) factChange = 'material_change';
+    else if (compared.length && unknown.length === 0)
+      factChange = 'no_material_change';
+    else if (unknown.length) factChange = 'unknown';
     else factChange = 'not_comparable';
     if (factChange === 'no_material_change') reasons.push('仅相同指标、范围与单位的值未变；会议仍各自成事件');
   } else if (eventRelation === 'same_event') {
-    if (conflict && sameDocument) {
-      reasons.push('同一发布物的事实互相冲突，需人工复核');
-    } else if (sameDocument && !conflict && !unmatched.length && compared.length) {
+    if (internalConflict || (sameDocument && changed.length)) {
+      reasons.push('来源事实互相冲突，需人工复核');
+    } else if (sameDocument && completeEqual) {
       factChange = 'no_material_change';
       reasons.push('发布物身份与有界事实一致，译文不构成新进展');
-    } else if (earlier.event.eventType === 'mission' && !sameDocument && !internalConflict &&
-      later.publishedAt && earlier.publishedAt && later.publishedAt !== earlier.publishedAt &&
-      later.facts.length && (stageProgress || (!comparableChanged && !!unmatched.length))) {
+    } else if (earlier.event.eventType === 'mission' && !sameDocument &&
+      definitelyLater(earlier, later) && (stageProgress || (!changed.length && added.length > 0))) {
       factChange = 'material_change';
       reasons.push('同一长程任务在较后来源中出现新的阶段事实');
-    } else if (!conflict && !unmatched.length && compared.length) {
+    } else if (completeEqual && earlier.sourceFact === later.sourceFact) {
       factChange = 'no_material_change';
-      reasons.push('同一事件可比事实没有变化');
+      reasons.push('同一事件的有界来源事实完全相同');
     } else {
       reasons.push('文档覆盖范围或事实矛盾不足以判定实质变化');
     }
   }
-  if (unmatched.length) reasons.push(`尚不可比的事实：${unmatched.map(factName).join('、')}`);
+  if (added.length) reasons.push(`较后来源新增的事实：${added.map(factName).join('、')}`);
+  if (omitted.length) reasons.push(`较后来源省略的旧事实：${omitted.map(factName).join('、')}`);
+  if (unknown.length) reasons.push(`值未知、不能用于无变化结论：${unknown.map(factName).join('、')}`);
+  if (!sameDocument && eventRelation === 'same_event' && !definitelyLater(earlier, later) &&
+    (added.length || changed.length)) reasons.push('来源时间精度不足以证明先后进展');
   const decision: MatchDecision = eventRelation === 'same_event'
     ? factChange === 'material_change' ? 'progress'
       : factChange === 'no_material_change' ? (sameDocument ? 'duplicate' : 'no_material_change')
@@ -168,7 +199,9 @@ export function suggestOfflineV3Match(first: OfflineV3Source, second: OfflineV3S
   return {
     eventRelation, factChange, decision,
     candidateEventId: eventRelation === 'same_event' ? eventId(earlier) : null,
-    evidenceIds, comparedFactKeys: compared.map(factName), unmatchedFactKeys: unmatched.map(factName),
+    evidenceIds, comparedFactKeys: compared.map(factName),
+    addedFactKeys: added.map(factName), omittedFactKeys: omitted.map(factName),
+    unknownFactKeys: unknown.map(factName),
     reasons, mayReferenceSameEvent: eventRelation === 'same_event' && decision !== 'ambiguous',
   };
 }

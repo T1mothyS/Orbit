@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "d08-r2-oracle.v1",
+  "note": "Scorer-only pair labels. IDs are neutral and never passed to matching or extraction functions.",
+  "pairs": [
+    { "id": "p01", "sources": ["s01", "s02"], "eventRelation": "different_event", "factChange": "no_material_change" },
+    { "id": "p02", "sources": ["s02", "s03"], "eventRelation": "different_event", "factChange": "no_material_change" },
+    { "id": "p03", "sources": ["s03", "s04"], "eventRelation": "different_event", "factChange": "no_material_change" },
+    { "id": "p04", "sources": ["s02", "s05"], "eventRelation": "same_event", "factChange": "unknown" },
+    { "id": "p05", "sources": ["s01", "s12"], "eventRelation": "same_event", "factChange": "unknown" },
+    { "id": "p06", "sources": ["s05", "s12"], "eventRelation": "different_event", "factChange": "not_comparable" },
+    { "id": "p07", "sources": ["s06", "s07"], "eventRelation": "same_event", "factChange": "material_change" },
+    { "id": "p08", "sources": ["s07", "s08"], "eventRelation": "same_event", "factChange": "material_change" },
+    { "id": "p09", "sources": ["s06", "s08"], "eventRelation": "same_event", "factChange": "material_change" },
+    { "id": "p10", "sources": ["s06", "s09"], "eventRelation": "different_event", "factChange": "not_comparable" },
+    { "id": "p11", "sources": ["s09", "s10"], "eventRelation": "same_event", "factChange": "material_change" },
+    { "id": "p12", "sources": ["s09", "s11"], "eventRelation": "same_event", "factChange": "unknown" },
+    { "id": "p13", "sources": ["s07", "s10"], "eventRelation": "different_event", "factChange": "not_comparable" }
+  ]
+}

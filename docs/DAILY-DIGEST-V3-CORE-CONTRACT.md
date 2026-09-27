@@ -1,12 +1,12 @@
 # Daily Digest V3 Core：事件记忆字段与状态合同
 
-- Status: CONTRACT / S2-02；S2-03/04 LOCAL VERIFIED；D07 登录态本地接口闭环；D08 第一轮离线建议
+- Status: CONTRACT / S2-02；S2-03/04 LOCAL VERIFIED；D07 登录态本地接口闭环；D08 第二轮只读离线建议，继续完善
 - Scope: Event、Revision、Evidence、Analysis 的字段与状态、原活动库增量存储、账号级备份恢复、D07 受控提交和 D08 只读离线匹配建议；不定义 Work 写入。
-- Last verified version: `0.34.0-260927.1641`（2026-09-27，D08 第一轮离线评测；无 Work 接入或部署）。S2-04 历史基线为 `b040b01` / `0.31.8-260924.1255`。
+- Last verified version: `0.35.0-260927.1717`（2026-09-27，D08 第二轮离线评测；无 Work 接入或部署）。S2-04 历史基线为 `b040b01` / `0.31.8-260924.1255`。
 - Authority: 当前源码及 [S2-01 固定案例](daily-digest-v3-s2-01-cases.json) 优先；实现时如需改动本合同，应先解释案例与兼容性差异。
 - Update trigger: V3 数据结构或备份合同、S2-06 写入校验、S2-09 修订语义或 S2-10a 纠正流程落地时。
 - Supersedes: 无；[V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)及已有产物保持原语义。
-- Do not use for: 宣称 V3 已接入 Work/MCP、从原网页自动抽取事件身份、正式日报冻结引用或真实 Shadow 验收。
+- Do not use for: 宣称 V3 已接入 Work/MCP、已通用抓取原网页、正式日报冻结引用或真实 Shadow 验收。
 
 ## 共同约束
 
@@ -49,17 +49,23 @@
 | U01–U03（跟踪项无变化） | 两次 FOMC 会议各有自己的 Event/初始 Revision；`Analysis.change_assessment` 固定两版 ID，对共同的 `factKey=federal_funds_target_range` 和相同单位/范围比较，且 `check=complete` 后，才可记录该跟踪项的 `no_material_change`。U03 的缩表上限变化是另一 `factKey`，不得被利率“无变化”覆盖。 |
 | A01–A03（易混淆） | A01 英西语保留翻译关系，但冲突内容标 `needs_review`，不算双重确认或覆盖旧事实；A02 同一次会议的声明与后来纪要保留不同 `documentType` 和 `publishedAt`，新增事实才追加 Revision；A03 同时发布的决定与预测材料各自保留 Evidence，不因时间相同当转载或把预测当决定。 |
 
-本表记录 S2-01 的历史人工预期；D08 第一轮离线回放见下节。来源身份与有界事实在本轮仍由人工抽取，S2-12 的真实 Shadow 对照尚未完成。
+本表记录 S2-01 的历史人工预期；D08 第一轮离线回放见下节。首轮的来源身份与有界事实由人工抽取；第二轮的限定抽取见后续小节。S2-12 的真实 Shadow 对照尚未完成。
 
 ## D08 第一轮离线匹配与双轴变化合同（2026-09-27）
 
-[离线匹配器](../server/digest-v3-offline-match.ts)只接收基于现有 Evidence/Event/Revision 字段形成的匿名来源投影：来源 ID、URL、发表时间及精度、出版方/文档类型/语言/发布物身份与独立性键、人工核对的有界 `sourceFact`、事件 `eventType/subjectKey/occurrenceKey` 和结构化 `factKey/value/unit/scope`。它不接收 S2-01 的案例编号、`expectedCategory`、`expectedDecision`、`reprintRelation`，也不接收七期模拟的 `selected`、`relation`、`eventKey` 或解释。字段提取不是当前算法的能力；身份键错误会影响建议，须在后续真实样例中验证。匹配器纯计算，不读取/写入 `activity.db`，不改变 Event 指针、Revision 或 Evidence。
+[离线匹配器](../server/digest-v3-offline-match.ts)只接收基于现有 Evidence/Event/Revision 字段形成的匿名来源投影：来源 ID、URL、发表时间及精度、出版方/文档类型/语言/发布物身份与独立性键、人工核对的有界 `sourceFact`、事件 `eventType/subjectKey/occurrenceKey` 和结构化 `factKey/value/unit/scope`。它不接收 S2-01 的案例编号、`expectedCategory`、`expectedDecision`、`reprintRelation`，也不接收七期模拟的 `selected`、`relation`、`eventKey` 或解释。首轮没有字段提取能力；身份键错误会影响建议，须在后续真实样例中验证。匹配器纯计算，不读取/写入 `activity.db`，不改变 Event 指针、Revision 或 Evidence。
 
 每条建议同时保留 `eventRelation`、`factChange`、五类汇总 `decision`、候选 Event ID、两条匿名 Evidence ID、可比与未可比的事实键及简短理由。候选 Event ID 仅是离线稳定标识，不是现有库的 Event ID；`mayReferenceSameEvent` 只表示可供人工复核的关联建议，绝不触发合并或提交。交换两来源或改变同日候选输入顺序须得到相同结果。
 
 不同会议由不同 `occurrenceKey` 标识；即使联邦基金利率目标区间在相同 `factKey/scope/unit` 下数值不变，事件关系仍为 `different_event`，仅该指标的 `factChange=no_material_change`。U03 的缩表上限属于另一事实键，不能被这个结论覆盖。同一发布物的翻译/转载共用独立性键；A01 的英西语 FAQ 同属一个发布物，但英文决定、旧西语正文和西语编辑注释存在冲突，事实变化为 `unknown`、五类汇总为 `ambiguous`，不作为两份确认或自动覆盖。[A01 复核](DAILY-DIGEST-V3-S2-01-CASES-20260924.md#a01-来源冲突复核2026-09-27)保留不确定原因。
 
 同一长程任务的后续阶段在有较晚发表来源和新的可核事实时可建议 `progress`；同一 `factKey` 的任意矛盾值不能仅凭较晚发表就当进展。不同文档类型可能描述同一会议，但在事实范围不重合时只给 `same_event + unknown`，不把纪要/预测冒充政策变更。事件关系与事实变化的人工标准答案分别评分；原五类混淆矩阵仅用于与 S2-01 历史分类对照。首轮结果、保留样例、七期原始候选和不能推断的边界见 [D08 评测快照](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md)。
+
+## D08 第二轮遗漏、未知值与有界抽取合同（2026-09-27）
+
+同一事件的两个有界来源各自只是观察到的事实集合。后来源缺少先前某 `factKey/scope/unit` 是**省略**，不能充当新事实；后来源独有且值已知才是**新增**。值为 `null` 的事实不能参加相等比较；双未知、已知转未知及仅新增未知值均不足以判 `no_material_change` 或 `progress`。同一键有多个已知值或同一发布物互相矛盾时保持 `unknown`。对不同事件的共有可比指标可给范围限定的无变化判断，其他被省略的指标不受该判断覆盖；若共有指标本身未知，则保留未知。`addedFactKeys`、`omittedFactKeys`、`unknownFactKeys` 与 `comparedFactKeys` 分别在建议中说明依据。
+
+阶段事实仅在同任务且发表时间可严格证明先后时建议进展；对 `date/minute/second/unknown` 先验证格式再比较，混合日期与具体时刻、同一精度区间内的重叠时刻都先待核。第二轮保留样本显示该保守口径会漏掉相隔多日的真实进展，属于已知召回缺陷，不得以零错并掩盖。无法证明先后时，“新增/省略”字段的方向只来自稳定 URL 排序，不能当作时间事实。独立抽取器只从长度受限的公开标题/短摘录及来源元数据生成 V3 投影，不接收人工标准答案；提取不出可靠身份时整体弃权，不以发表日偷换会议日或按 URL 路径猜任务。它是限定语法的离线基线，不是通用网页抓取能力。双轨分母、来源引用、错误逐例及冻结哈希见[第二轮快照](DAILY-DIGEST-D08-OFFLINE-EVALUATION-R2-20260927.md)。本轮没有任何自动 Event/Revision/Evidence/Analysis 写入或合并。
 
 ## S2-03 本地存储与迁移（2026-09-24）
 

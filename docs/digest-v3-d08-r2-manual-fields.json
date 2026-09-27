@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "d08-r2-manual.v1",
+  "note": "Human V3 projection from the bounded official-source records. FOMC occurrence dates were cross-checked against the official meeting index; they are not copied from the release timestamp by default. This file is never passed to the independent extractor.",
+  "sources": [
+    { "id": "s01", "event": { "eventType": "meeting", "subjectKey": "fomc", "occurrenceKey": "2025-01-29" }, "facts": [{ "factKey": "target_range", "value": "4.25-4.50", "unit": "%", "scope": "federal_funds" }] },
+    { "id": "s02", "event": { "eventType": "meeting", "subjectKey": "fomc", "occurrenceKey": "2025-03-19" }, "facts": [{ "factKey": "target_range", "value": "4.25-4.50", "unit": "%", "scope": "federal_funds" }] },
+    { "id": "s03", "event": { "eventType": "meeting", "subjectKey": "fomc", "occurrenceKey": "2025-05-07" }, "facts": [{ "factKey": "target_range", "value": "4.25-4.50", "unit": "%", "scope": "federal_funds" }] },
+    { "id": "s04", "event": { "eventType": "meeting", "subjectKey": "fomc", "occurrenceKey": "2025-06-18" }, "facts": [{ "factKey": "target_range", "value": "4.25-4.50", "unit": "%", "scope": "federal_funds" }] },
+    { "id": "s05", "event": { "eventType": "meeting", "subjectKey": "fomc", "occurrenceKey": "2025-03-19" }, "facts": [] },
+    { "id": "s06", "event": { "eventType": "mission", "subjectKey": "crew-10", "occurrenceKey": "crew-10" }, "facts": [{ "factKey": "flight_phase", "value": "launched", "unit": null, "scope": "crew-10" }, { "factKey": "crew_count", "value": 4, "unit": "people", "scope": "crew-10" }] },
+    { "id": "s07", "event": { "eventType": "mission", "subjectKey": "crew-10", "occurrenceKey": "crew-10" }, "facts": [{ "factKey": "flight_phase", "value": "docked", "unit": null, "scope": "crew-10" }, { "factKey": "crew_count", "value": 4, "unit": "people", "scope": "crew-10" }] },
+    { "id": "s08", "event": { "eventType": "mission", "subjectKey": "crew-10", "occurrenceKey": "crew-10" }, "facts": [{ "factKey": "flight_phase", "value": "splashdown", "unit": null, "scope": "crew-10" }] },
+    { "id": "s09", "event": { "eventType": "mission", "subjectKey": "crew-11", "occurrenceKey": "crew-11" }, "facts": [{ "factKey": "flight_phase", "value": "launched", "unit": null, "scope": "crew-11" }, { "factKey": "crew_count", "value": 4, "unit": "people", "scope": "crew-11" }] },
+    { "id": "s10", "event": { "eventType": "mission", "subjectKey": "crew-11", "occurrenceKey": "crew-11" }, "facts": [{ "factKey": "flight_phase", "value": "docked", "unit": null, "scope": "crew-11" }] },
+    { "id": "s11", "event": { "eventType": "mission", "subjectKey": "crew-11", "occurrenceKey": "crew-11" }, "facts": [{ "factKey": "flight_phase", "value": "launched", "unit": null, "scope": "crew-11" }] },
+    { "id": "s12", "event": { "eventType": "meeting", "subjectKey": "fomc", "occurrenceKey": "2025-01-29" }, "facts": [] }
+  ]
+}
