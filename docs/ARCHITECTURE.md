@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.36.0-260928.0729`（2026-09-28，D09 第一步本地引用冻结；其他领域保留各节时点，不代表生产或真实 Work）。
+- Last verified commit/version: `0.36.1-260928.0746`（2026-09-28，D09 旧备份跨账号替换保护修复；其他领域保留各节时点，不代表生产或真实 Work）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。

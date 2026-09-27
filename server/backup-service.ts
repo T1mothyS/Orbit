@@ -115,13 +115,16 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
     activity.digestV3AnalysisComparisons = v3.digestV3AnalysisComparisons.map(row => ({ ...row,
       analysis_id: mapped(analysisIds, row.analysis_id), revision_id: mapped(revisionIds, row.revision_id),
     }));
-    activity.digestV3FrozenCitations = v3.digestV3FrozenCitations.map(row => ({ ...row,
-      id: mapped(frozenIds, row.id), report_version_key: `restored:${mapped(frozenReportKeys, row.report_version_key)}`,
-      event_id: mapped(eventIds, row.event_id),
-      revision_id: mapped(revisionIds, row.revision_id), analysis_id: mapped(analysisIds, row.analysis_id),
-      previous_revision_id: mapped(revisionIds, row.previous_revision_id),
-      evidence_ids_json: JSON.stringify(JSON.parse(row.evidence_ids_json).map((id: string) => mapped(evidenceIds, id)).sort()),
-    }));
+    // Keep legacy seven-table backups missing this field for replace protection.
+    if (Object.hasOwn(activity, 'digestV3FrozenCitations')) {
+      activity.digestV3FrozenCitations = v3.digestV3FrozenCitations.map(row => ({ ...row,
+        id: mapped(frozenIds, row.id), report_version_key: `restored:${mapped(frozenReportKeys, row.report_version_key)}`,
+        event_id: mapped(eventIds, row.event_id),
+        revision_id: mapped(revisionIds, row.revision_id), analysis_id: mapped(analysisIds, row.analysis_id),
+        previous_revision_id: mapped(revisionIds, row.previous_revision_id),
+        evidence_ids_json: JSON.stringify(JSON.parse(row.evidence_ids_json).map((id: string) => mapped(evidenceIds, id)).sort()),
+      }));
+    }
   }
   if (research) {
     const runIds = createIdMap(research.researchRuns.map(row => row.id));

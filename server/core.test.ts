@@ -675,6 +675,25 @@ test('D09 frozen citations survive encrypted same-account and cross-account rest
   unsafeRow.snapshot_json = JSON.stringify(unsafeSnapshot);
   unsafeRow.snapshot_sha256 = crypto.createHash('sha256').update(unsafeRow.snapshot_json).digest('hex');
   assert.throws(() => backups.inspectUserBackup(backups.encryptBackup(unsafe, password), password), /冻结引用备份无效/);
+  const beforeTarget = activity.exportUserActivity(target);
+  const beforeTargetBackup = backups.decryptBackup<any>(backups.createUserBackup(target, password), password);
+  assert.throws(() => backups.restoreUserBackup(target, oldSevenEncrypted, password, 'replace'), /不含 V3 冻结引用/);
+  assert.deepEqual(activity.exportUserActivity(target), beforeTarget);
+  const afterTargetBackup = backups.decryptBackup<any>(backups.createUserBackup(target, password), password);
+  assert.deepEqual({ ...afterTargetBackup, exportedAt: beforeTargetBackup.exportedAt }, beforeTargetBackup);
+  const oldMerge = backups.restoreUserBackup(target, oldSevenEncrypted, password, 'merge') as any;
+  assert.equal(oldMerge.idsRemapped, true);
+  const afterOldMerge = activity.exportUserActivity(target) as Record<string, any[]>;
+  assert.deepEqual(afterOldMerge.digestV3FrozenCitations, (beforeTarget as Record<string, any[]>).digestV3FrozenCitations);
+  assert.equal(afterOldMerge.digestV3Events.length, (beforeTarget as Record<string, any[]>).digestV3Events.length + 1);
+  const newReplace = backups.restoreUserBackup(target, encrypted, password, 'replace') as any;
+  assert.equal(newReplace.idsRemapped, true);
+  const afterNewReplace = activity.exportUserActivity(target) as Record<string, any[]>;
+  assert.equal(afterNewReplace.digestV3Events.length, 1);
+  assert.equal(afterNewReplace.digestV3FrozenCitations.length, 1);
+  const replaced = v3.getFrozenCitation(target, afterNewReplace.digestV3FrozenCitations[0].id)!;
+  assert.deepEqual(replaced.snapshot, original.snapshot);
+  assert.equal(v3.getRevision(target, replaced.revisionId)?.eventId, replaced.eventId);
 });
 
 test('全站恢复统一替换四个数据库和附件且不遗留暂存文件', () => {

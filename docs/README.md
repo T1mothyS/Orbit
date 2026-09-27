@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified version: `0.36.0-260928.0729`（2026-09-28，D09 第一步本地引用冻结；真实 Agent、Work、生产与发信未验）。
+- Last verified version: `0.36.1-260928.0746`（2026-09-28，D09 旧备份跨账号替换保护修复；真实 Agent、Work、生产与发信未验）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。
