@@ -246,13 +246,13 @@ export function DailyReportsPage() {
                 {item.heroImageLicenseUrl && item.heroImageLicenseUrl !== item.heroImageSourceUrl && <a href={item.heroImageLicenseUrl} target="_blank" rel="noopener noreferrer">许可说明</a>}
               </div>
             ) : null;
-            const isGeneratedIllustration = (item: DailyReportSummary) => item.heroImageCredit === '原创编辑插画，非新闻现场图片' || item.heroImageCredit === '原创分类示意图，非新闻现场图片';
+            const isWidePlaceholder = (item: DailyReportSummary) => ['原创编辑插画，非新闻现场图片', '原创分类示意图，非新闻现场图片', '原创栏目占位图，非新闻现场图片'].includes(item.heroImageCredit || '');
             return (
               <>
                 <article className="daily-report-featured" key={latest.id}>
                   <button
                     type="button"
-                    className={`daily-report-featured-open${latest.heroImageUrl ? ' with-image' : ''}${isGeneratedIllustration(latest) ? ' illustrated' : ''}`}
+                    className={`daily-report-featured-open${latest.heroImageUrl ? ' with-image' : ''}${isWidePlaceholder(latest) ? ' illustrated' : ''}`}
                     onClick={() => openReport(latest)}
                     aria-label={`打开最新的 ${formatReportDate(latest.date)} 日报`}
                   >
@@ -292,7 +292,7 @@ export function DailyReportsPage() {
                         <article className="daily-report-card" key={item.id}>
                           <button
                             type="button"
-                            className={`daily-report-card-open${item.heroImageUrl ? ' with-image' : ''}${isGeneratedIllustration(item) ? ' illustrated' : ''}`}
+                            className={`daily-report-card-open${item.heroImageUrl ? ' with-image' : ''}${isWidePlaceholder(item) ? ' illustrated' : ''}`}
                             onClick={() => openReport(item)}
                             aria-label={`打开 ${formatReportDate(item.date)} 日报`}
                           >

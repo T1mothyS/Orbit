@@ -20,7 +20,24 @@ export function createDigestSnapshotRun(userId: string, snapshot: DigestSnapshot
   const id = crypto.randomUUID(); const now = new Date();
   const manifest = { date: snapshot.date, timezone: snapshot.timezone, cutoff: snapshot.cutoff, contextVersion: snapshot.contextVersion, contractVersion: DIGEST_V2_VERSION, generationVersion: DIGEST_V2_GENERATION, modelVersion: 'unknown', status: 'INPUTS_SNAPSHOTTED', inputCounts: { calendar: snapshot.calendar.items.length, mail: snapshot.mail.items.length, watchlist: snapshot.watchlist.items.length }, warnings: digestSnapshotWarnings(snapshot) };
   store.createDigestRun({ id, user_id: userId, report_date: snapshot.date, snapshot_json: JSON.stringify(snapshot), manifest_json: JSON.stringify(manifest), created_at: now.toISOString(), expires_at: new Date(now.getTime() + 7 * 86400000).toISOString() });
-  return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA, editorialGuidance: '仅在正文中用 **原文短词组** 标重点；每句一到两处，优先关键对象、数字、结论或行动。标题不加标记，不能整句加粗。图片是否为现场只在图注说明，正文不重复。来源和发布时间由服务端生成角标与文末引用，不要写入摘要。' };
+  return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA, editorialGuidance: '仅在正文中用 **原文短词组** 标重点；每句一到两处，优先关键对象、数字、结论或行动。标题不加标记，不能整句加粗。邮件逐封保留服务或事项名称、具体动作和已知期限；同一事项突出各封新增事实，未知期限不猜。对每个关注标的记录检索时间窗、来源、重要变化或无变化依据及失败情况；未配置、读取失败、未研究不可写成无变化。新闻说明具体事实、关注关系与下一步；候选、排除及失败另留有界记录。图片须贴合具体新闻，不能把类别图形当贴题插画。图片是否为现场只在图注说明，正文不重复。来源和发布时间由服务端生成角标与文末引用，不要写入摘要。' };
+}
+export function digestWatchlistInput(context: ReturnType<typeof getDailyReportCloudContext>): InputSection {
+  if (context.readFailed) return { status: 'failed', items: [] };
+  const raw = context.context.watchlist;
+  if (raw === undefined || raw === null) return { status: 'not_configured', items: [] };
+  const stocks = Array.isArray(raw) ? raw : typeof raw === 'object' && !Array.isArray(raw) ? (raw as { stocks?: unknown }).stocks : undefined;
+  if (!Array.isArray(stocks)) return { status: 'failed', items: [] };
+  if (!stocks.length) return { status: 'not_configured', items: [] };
+  const items = stocks.flatMap((value, index) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+    const stock = value as { name?: unknown; symbol?: unknown };
+    const name = typeof stock.name === 'string' ? stock.name.trim() : '';
+    const symbol = typeof stock.symbol === 'string' ? stock.symbol.trim() : '';
+    if (!name && !symbol) return [];
+    return [{ id: `watch-${index}-${digestHash(value).slice(0, 12)}`, title: [name, symbol].filter(Boolean).join(' '), detail: '' }];
+  });
+  return { status: !items.length ? 'failed' : items.length !== stocks.length || stocks.length > 100 ? 'partial' : 'complete', items: items.slice(0, 100) };
 }
 export async function readDigestV2Inputs(userId: string, date: string) {
   assertDigestV2Enabled();
@@ -37,8 +54,7 @@ export async function readDigestV2Inputs(userId: string, date: string) {
     mail = { status: !result.configured || !result.enabled ? 'not_configured' : result.status === 'OK' ? (result.unreadCount > result.messages.length ? 'partial' : 'complete') : result.status === 'PARTIAL' ? 'partial' : 'failed', items: result.messages.map(m => ({ id: m.id, title: m.subject, detail: JSON.stringify(m).slice(0, 4000) })) };
   } catch { /* Never copy provider error strings or credentials into snapshots. */ }
   const context = getDailyReportCloudContext(userId);
-  const watch = (context.context.watchlist as { stocks?: Array<{ name?: string; symbol?: string }> })?.stocks || [];
-  const snapshot: DigestSnapshot = { date, timezone, cutoff: new Date().toISOString(), contextVersion: context.version, calendar, mail, watchlist: { status: watch.length > 100 ? 'partial' : 'complete', items: watch.slice(0, 100).map((w, i) => ({ id: `watch-${i}-${digestHash(w).slice(0, 12)}`, title: [w.name, w.symbol].filter(Boolean).join(' '), detail: '' })) } };
+  const snapshot: DigestSnapshot = { date, timezone, cutoff: new Date().toISOString(), contextVersion: context.version, calendar, mail, watchlist: digestWatchlistInput(context) };
   return { ...createDigestSnapshotRun(userId, snapshot), context: context.context };
 }
 function snapshotFor(userId: string, runId: string): { snapshot: DigestSnapshot; generationVersion: string } {
@@ -113,11 +129,12 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       recordPhase(payload.status, { emailStatus: payload.emailStatus || 'NOT_QUEUED', renderHash: payload.renderHash });
       const mediaById = new Map(payload.publication.media.map(m => [m.id, m]));
       const newsItems = [...digest.market, ...digest.macro, ...digest.stories];
-      const coverage = { total: newsItems.length, real: 0, illustration: 0, missing: 0 };
+      const coverage = { total: newsItems.length, real: 0, illustration: 0, placeholder: 0, missing: 0 };
       for (const story of newsItems) {
         const images = [...story.media_ids.map(id => mediaById.get(id)), ...payload.publication.media.filter(m => m.storyId === story.id)].filter(m => m && m.kind !== 'source_icon' && m.publicUrl);
         if (images.some(m => !m!.fallback)) coverage.real++;
-        else if (images.length) coverage.illustration++;
+        else if (images.some(m => m!.visualKind === 'illustration')) coverage.illustration++;
+        else if (images.length) coverage.placeholder++;
         else coverage.missing++;
       }
       addLog('info', 'daily-report', '新版日报运行完成', { event: 'digest_v2_completed', runId, mode, status: payload.status, imageCount: coverage.real, missingImageCount: coverage.missing });

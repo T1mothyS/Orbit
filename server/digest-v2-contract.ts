@@ -3,8 +3,8 @@ import net from 'node:net';
 import { isValidDateKey } from './date-key.js';
 
 export const DIGEST_V2_VERSION = 'daily-digest.v2';
-export const DIGEST_V2_GENERATION = '2026-09-27.2';
-export const DIGEST_V2_EDITORIAL_GENERATIONS = ['2026-09-27.1', DIGEST_V2_GENERATION];
+export const DIGEST_V2_GENERATION = '2026-09-28.1';
+export const DIGEST_V2_EDITORIAL_GENERATIONS = ['2026-09-27.1', '2026-09-27.2', DIGEST_V2_GENERATION];
 export const DIGEST_V2_ILLUSTRATED_GENERATIONS = ['2026-09-26.1', ...DIGEST_V2_EDITORIAL_GENERATIONS];
 export type CheckStatus = 'complete' | 'partial' | 'failed' | 'not_configured';
 export interface InputItem { id: string; title: string; detail: string }
@@ -21,6 +21,8 @@ export function digestSnapshotWarnings(snapshot: DigestSnapshot, generationVersi
     const status = snapshot[section].status;
     if (section === 'mail' && status === 'not_configured') return ['MAIL_NOT_CONFIGURED'];
     if (section === 'mail' && status === 'failed') return ['MAIL_READ_FAILED'];
+    if (section === 'watchlist' && status === 'not_configured') return ['WATCHLIST_NOT_CONFIGURED'];
+    if (section === 'watchlist' && status === 'failed') return ['WATCHLIST_READ_FAILED'];
     return status === 'failed' || status === 'partial' ? [`${section.toUpperCase()}_INCOMPLETE`] : [];
   });
 }
@@ -50,9 +52,9 @@ const story = obj({ id, title: { ...str(250), minLength: 1 }, summary: { ...pros
 export const DIGEST_V2_SCHEMA = obj({
   schema_version: { ...str(), enum: [DIGEST_V2_VERSION] }, date: { ...str(), format: 'date' }, title: { ...str(200), minLength: 1 },
   executive_signals: array({ ...prose(500), minLength: 1 }, 5), calendar: array(obj({ input_id: id, text: { ...prose(), minLength: 1 } }), 300),
-  mail: array(obj({ input_id: id, summary: { ...prose(3000), minLength: 1 }, action: prose() })),
+  mail: array(obj({ input_id: id, summary: { ...prose(3000), minLength: 1, description: `${prose(3000).description} 登录态私人日报应保留邮件中明确的服务或事项名称、具体动作和已知期限。未知期限不得猜测；同一事项多封邮件可写各自新增事实，不重复泛化文案。` }, action: prose() })),
   market: array(story, 30), macro: array(story, 30), stories: array(story, 30),
-  watchlist: array(obj({ input_id: id, summary: prose(), check: { ...str(), enum: ['complete', 'incomplete'] }, change: { ...str(), enum: ['material', 'nothing_material', 'unknown'] }, evidence_ids: refs })),
+  watchlist: array(obj({ input_id: id, summary: { ...prose(), description: `${prose().description} 逐项写明有界检索时间窗、来源、重要变化或无变化依据、失败情况。未完成研究时明确说明，不能写本期无新增内容。` }, check: { ...str(), enum: ['complete', 'incomplete'] }, change: { ...str(), enum: ['material', 'nothing_material', 'unknown'] }, evidence_ids: refs })),
   what_matters_next: array(prose(1000), 20),
   evidence: array(obj({ id, url: { ...str(2048), format: 'url' }, source: { ...str(200), minLength: 1, description: '只填写媒体或机构名称，不加入核验状态、图片处理过程、时间说明或网址。' }, published_at: { ...str(40), format: 'timestamp' } }), 200),
   media: array(obj({ id, evidence_id: id, url: { ...str(2048), format: 'url' }, category: { ...str(), enum: ['AI', 'Semiconductor', 'Banking', 'Macro', 'Gaming', 'China', 'International', 'Company', 'Market'] } }), 20),
@@ -115,7 +117,7 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
   const unique = (ids: string[], path: string) => { if (new Set(ids).size !== ids.length) issue(path, 'DUPLICATE_ID'); };
   const stories = [...d.market, ...d.macro, ...d.stories];
   unique(stories.map(x => x.id), '$.stories'); unique(d.evidence.map(x => x.id), '$.evidence'); unique(d.media.map(x => x.id), '$.media');
-  if (generationVersion === DIGEST_V2_GENERATION) {
+  if (generationVersion === '2026-09-27.2' || generationVersion === DIGEST_V2_GENERATION) {
     const normalized = (value: string) => value.normalize('NFKC').replace(/\*\*/g, '').replace(/\s+/gu, ' ').trim().toLowerCase();
     const seen = new Set<string>();
     for (const section of ['market', 'macro', 'stories'] as const) {
@@ -150,7 +152,7 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
     if (!stories.some(s => s.media_ids.includes(m.id))) issue(`$.media[${i}]`, 'UNREFERENCED_MEDIA');
   }
   for (const [i, w] of d.watchlist.entries()) {
-    if (w.change !== 'unknown' && (w.check !== 'complete' || !w.evidence_ids.length)) issue(`$.watchlist[${i}]`, 'CHECK_EVIDENCE_REQUIRED');
+    if ((w.change !== 'unknown' && w.check !== 'complete') || (w.check === 'complete' && !w.evidence_ids.length && (w.change !== 'unknown' || generationVersion === DIGEST_V2_GENERATION))) issue(`$.watchlist[${i}]`, 'CHECK_EVIDENCE_REQUIRED');
   }
   if (snapshot) {
     if (d.date !== snapshot.date) issue('$.date', 'SNAPSHOT_DATE_MISMATCH');

@@ -20,6 +20,7 @@ export interface PreparedImage {
   sourceHost?: string;
   sourceSha256?: string;
   storyId?: string;
+  visualKind?: 'placeholder' | 'illustration';
 }
 export interface ObjectStorage {
   origin: string;
@@ -129,7 +130,7 @@ export async function transformDigestIcon(bytes: Buffer) {
 const categories = ['AI', 'Semiconductor', 'Banking', 'Macro', 'Gaming', 'China', 'International', 'Company', 'Market'];
 async function fallbackImage(category: string, seed = '') {
   const index = Math.max(0, categories.indexOf(category));
-  // Original abstract editorial art. Shapes are decorative, never a chart of observed values.
+  // Category placeholder. Shapes are decorative, never a chart of observed values.
   const digest = crypto.createHash('sha256').update(`${category}:${seed}`).digest();
   const palettes = [
     ['#e5edf5', '#1b4d6b', '#5a96b5'], ['#e9edf5', '#284b7c', '#8faed2'],
@@ -212,7 +213,7 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
       }
     } catch { failure = storage ? 'R2_UPLOAD_FAILED' : 'R2_NOT_CONFIGURED'; }
     failure = configurationFailure || failure;
-    images.push({ ...(m.kind ? { kind: m.kind, sourceHost: new URL(evidence.url).hostname } : {}), id: m.id, evidenceId: m.evidence_id, sourceUrl: m.url, category: m.category, licenseRef: fallback ? 'code-owned-category-art' : rule!.licenseRef, policy: fallback ? 'OWNED_OPEN' : rule!.policy, publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback, failure, ...(!fallback ? { sourceTransport: rule?.sourceFile ? 'audited_copy' as const : transport || 'network' as const, sourceSha256, ...(rule?.credit ? { credit: { ...rule.credit } } : {}) } : {}) });
+    images.push({ ...(m.kind ? { kind: m.kind, sourceHost: new URL(evidence.url).hostname } : {}), id: m.id, evidenceId: m.evidence_id, sourceUrl: m.url, category: m.category, licenseRef: fallback ? 'code-owned-category-art' : rule!.licenseRef, policy: fallback ? 'OWNED_OPEN' : rule!.policy, publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback, failure, ...(fallback ? { visualKind: 'placeholder' as const } : { sourceTransport: rule?.sourceFile ? 'audited_copy' as const : transport || 'network' as const, sourceSha256, ...(rule?.credit ? { credit: { ...rule.credit } } : {}) }) });
   }
   if (options.storyIllustrations) {
     const stories = [...d.market, ...d.macro, ...d.stories];
@@ -233,7 +234,7 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
         await storage.put(key, result.data, mime, sha256);
         publicUrl = storage.origin + '/' + key;
       } catch { failure = storage ? 'R2_UPLOAD_FAILED' : 'R2_NOT_CONFIGURED'; }
-      images.push({ id: `story-illustration:${sha256}`, storyId: story.id, evidenceId: story.evidence_ids[0] || '', sourceUrl: '', category, licenseRef: 'code-owned-editorial-illustration', policy: 'OWNED_OPEN', publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback: true, failure });
+      images.push({ id: `story-placeholder:${sha256}`, storyId: story.id, evidenceId: story.evidence_ids[0] || '', sourceUrl: '', category, licenseRef: 'code-owned-category-placeholder', policy: 'OWNED_OPEN', publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback: true, failure, visualKind: 'placeholder' });
     }
   }
   return images;

@@ -11,6 +11,7 @@ export interface DailyReportCloudContextEnvelope {
   context: Record<string, unknown>;
   createdAt: string | null;
   updatedAt: string | null;
+  readFailed: boolean;
 }
 
 export interface DailyReportCloudActivity {
@@ -107,7 +108,7 @@ function validDateKey(value: string): boolean {
 }
 
 function parseContext(row: db.DbDailyReportCloudContext | undefined): DailyReportCloudContextEnvelope {
-  if (!row) return { version: 0, context: {}, createdAt: null, updatedAt: null };
+  if (!row) return { version: 0, context: {}, createdAt: null, updatedAt: null, readFailed: false };
   try {
     const value = JSON.parse(row.context_json);
     return {
@@ -115,14 +116,16 @@ function parseContext(row: db.DbDailyReportCloudContext | undefined): DailyRepor
       context: normalizeDailyReportCloudContext(value),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      readFailed: false,
     };
   } catch {
-    // 历史数据不应阻断日报任务；返回空 Context 并保留版本信息，后续 PUT 可修复。
+    // Keep the error visible to input readers instead of treating damaged data as an empty list.
     return {
       version: row.version,
       context: {},
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      readFailed: true,
     };
   }
 }
