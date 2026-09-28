@@ -174,6 +174,9 @@ test('editorial digest renders selective emphasis, one opening cover, numbered s
     assert.ok(html.includes('Example source · 发布时间：时间未知'));
     assert.ok(html.includes('>原文链接</a>'));
     assert.ok(html.includes('Photographer'));
+    assert.match(html, email
+      ? /lead\.jpg[^>]*height:auto;max-height:440px;aspect-ratio:16\/9;object-fit:cover/
+      : /lead\.jpg[^>]*height:70svh;min-height:360px;max-height:720px;object-fit:cover/);
     assert.ok(html.includes('已编辑'));
     assert.ok(!html.includes('证据已核对'));
     assert.ok(!html.includes('发布时间未提供'));
@@ -192,6 +195,12 @@ test('editorial digest renders selective emphasis, one opening cover, numbered s
   const escaped = structuredClone(p); escaped.digest.stories[0].summary = '**<img src=x onerror=alert(1)>** 后续内容。';
   assert.ok(renderDigestV2(escaped).includes('<strong>&lt;img src=x onerror=alert(1)&gt;</strong>'));
   assert.ok(!renderDigestV2(escaped).includes('<img src=x'));
+  const illustratedCover = { ...p, media: [{ id: 'story-art', storyId: d.stories[0].id, publicUrl: 'https://images.example.com/editorial.png', fallback: true } as any] };
+  for (const email of [false, true]) {
+    const html = renderDigestV2(illustratedCover, email);
+    assert.match(html, /editorial\.png[^>]*height:auto;max-height:320px;object-fit:contain/);
+    assert.doesNotMatch(html, /editorial\.png[^>]*height:70svh/);
+  }
   const oldDigest = structuredClone(d);
   oldDigest.stories[0].summary = '这是旧版已经保存的较长正文，其中没有任何新的加粗标记。';
   const oldPublication = { ...p, digest: oldDigest, renderer: '2026-09-26.1' };
