@@ -40,7 +40,8 @@ app.use((req, res, next) => {
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   const mailAccountSetting = req.path === '/api/user-mail-account' && ['PUT', 'DELETE'].includes(req.method);
   const mailAccountTest = req.path === '/api/user-mail-account/test' && req.method === 'POST';
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !(req.method === 'POST' && allowedPosts.has(req.path)) && !mailAccountSetting && !mailAccountTest) return res.status(403).json({ error: 'SHADOW_ONLY' });
+  const watchlistMigration = req.path === '/api/daily-report/cloud-context/shadow-watchlist' && ['PATCH', 'DELETE'].includes(req.method);
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !(req.method === 'POST' && allowedPosts.has(req.path)) && !mailAccountSetting && !mailAccountTest && !watchlistMigration) return res.status(403).json({ error: 'SHADOW_ONLY' });
   next();
 });
 app.use(api.app);

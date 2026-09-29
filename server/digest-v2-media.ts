@@ -4,11 +4,12 @@ import crypto from 'node:crypto';
 import sharp from 'sharp';
 import { digestMediaFetcher } from './digest-v2-relay.js';
 import { S3Client, HeadObjectCommand, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { controlledMediaFetch, dailyReportMediaRoot, storeProvidedDailyReportMedia, type ControlledDailyReportMediaOptions } from './daily-report-media-service.js';
+import { controlledMediaFetch, dailyReportMediaRoot, getDailyReportMediaPublicOrigin, storeProvidedDailyReportMedia, type ControlledDailyReportMediaOptions } from './daily-report-media-service.js';
 import { publicDigestUrl, type DigestV2 } from './digest-v2-contract.js';
+import { isValidDateKey } from './date-key.js';
 
 export interface MediaCredit { caption: string; author: string; sourcePage: string; licenseName: string; licenseUrl: string }
-export interface MediaRule { pageHost: string; imageHosts: string[]; policy: 'OWNED_OPEN' | 'LICENSED' | 'EXTERNAL_ALLOWED'; licenseRef: string; pageUrl?: string; imageUrls?: string[]; credit?: MediaCredit; sourceFile?: string; sourceSha256?: string; kind?: 'source_icon' }
+export interface MediaRule { pageHost: string; imageHosts: string[]; policy: 'OWNED_OPEN' | 'LICENSED' | 'EXTERNAL_ALLOWED'; licenseRef: string; pageUrl?: string; imageUrls?: string[]; credit?: MediaCredit; sourceFile?: string; sourceSha256?: string; kind?: 'source_icon'; visualKind?: 'photo' | 'archive_photo' | 'illustration' }
 export interface PreparedImage {
   id: string; evidenceId: string; category: string; sourceUrl: string; licenseRef: string;
   policy: string; publicUrl: string; key: string; filename: string; sha256: string;
@@ -18,6 +19,8 @@ export interface PreparedImage {
   kind?: 'source_icon';
   sourceHost?: string;
   sourceSha256?: string;
+  storyId?: string;
+  visualKind?: 'photo' | 'archive_photo' | 'illustration' | 'placeholder';
 }
 export interface ObjectStorage {
   origin: string;
@@ -46,7 +49,7 @@ export function configuredR2(): ObjectStorage | null {
         if (existing.Metadata?.sha256 !== sha256 || existing.ContentLength !== bytes.length) throw new Error('R2_HASH_CONFLICT');
         return;
       } catch (e: any) { if (e?.$metadata?.httpStatusCode !== 404) throw e; }
-      await send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: mime, Metadata: { sha256 }, CacheControl: 'public, max-age=31536000, immutable' }));
+      await send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: mime, Metadata: { sha256 }, CacheControl: key.startsWith('tmp/') ? 'no-store' : 'public, max-age=31536000, immutable' }));
     },
     async get(key) {
       const result: any = await send(new GetObjectCommand({ Bucket: bucket, Key: key }));
@@ -72,9 +75,11 @@ export function configuredMediaRules(): MediaRule[] {
       || r.imageHosts.some((h: string) => !publicDigestUrl(`https://${h}`)) || !['OWNED_OPEN', 'LICENSED', 'EXTERNAL_ALLOWED'].includes(r.policy)
       || typeof r.licenseRef !== 'string' || !r.licenseRef.trim()) throw new Error('MEDIA_RULES_INVALID');
     if (r.kind !== undefined && (r.kind !== 'source_icon' || r.imageUrls?.length !== 1 || r.sourceFile)) throw new Error('MEDIA_RULES_INVALID');
+    if (r.visualKind !== undefined && !['photo', 'archive_photo', 'illustration'].includes(r.visualKind)) throw new Error('MEDIA_RULES_INVALID');
+    if (r.visualKind === 'illustration' && (r.kind || r.policy !== 'OWNED_OPEN' || !r.sourceFile || !r.credit || r.credit.licenseUrl !== '')) throw new Error('MEDIA_RULES_INVALID');
     if (r.pageUrl !== undefined && (!publicDigestUrl(r.pageUrl) || new URL(r.pageUrl).hostname !== r.pageHost)) throw new Error('MEDIA_RULES_INVALID');
     if (r.imageUrls !== undefined && (!Array.isArray(r.imageUrls) || !r.imageUrls.length || r.imageUrls.some((u: string) => !publicDigestUrl(u) || !r.imageHosts.includes(new URL(u).hostname)))) throw new Error('MEDIA_RULES_INVALID');
-    if (r.credit !== undefined && (!r.pageUrl || !r.imageUrls || !r.credit || !['caption', 'author', 'licenseName'].every(k => typeof r.credit[k] === 'string' && r.credit[k].trim() && r.credit[k].length <= 500) || !publicDigestUrl(r.credit.sourcePage) || !publicDigestUrl(r.credit.licenseUrl))) throw new Error('MEDIA_RULES_INVALID');
+    if (r.credit !== undefined && (!r.pageUrl || !r.imageUrls || !r.credit || !['caption', 'author', 'licenseName'].every(k => typeof r.credit[k] === 'string' && r.credit[k].trim() && r.credit[k].length <= 500) || !publicDigestUrl(r.credit.sourcePage) || (r.visualKind !== 'illustration' && !publicDigestUrl(r.credit.licenseUrl)))) throw new Error('MEDIA_RULES_INVALID');
     if ((r.sourceFile !== undefined || r.sourceSha256 !== undefined) && (typeof r.sourceFile !== 'string' || !path.isAbsolute(r.sourceFile) || !/^[a-f0-9]{64}$/.test(r.sourceSha256 || '') || !r.pageUrl || r.imageUrls?.length !== 1 || !r.credit)) throw new Error('MEDIA_RULES_INVALID');
   }
   return value;
@@ -125,17 +130,35 @@ export async function transformDigestIcon(bytes: Buffer) {
   return image.resize({ width: 64, height: 64, fit: 'inside', withoutEnlargement: true }).png().toBuffer({ resolveWithObject: true });
 }
 const categories = ['AI', 'Semiconductor', 'Banking', 'Macro', 'Gaming', 'China', 'International', 'Company', 'Market'];
-async function fallbackImage(category: string) {
+async function fallbackImage(category: string, seed = '') {
   const index = Math.max(0, categories.indexOf(category));
-  // Code-owned neutral category artwork; no external image or claims about a news scene.
-  const svg = `<svg width="960" height="320" xmlns="http://www.w3.org/2000/svg"><rect width="960" height="320" fill="#e9edf2"/><path d="M0 270 L${160 + index * 25} 150 L470 225 L720 70 L960 160" fill="none" stroke="#617c96" stroke-width="18"/><text x="48" y="80" font-size="36" fill="#34475b" font-family="sans-serif">${categories[index]}</text></svg>`;
+  // Category placeholder. Shapes are decorative, never a chart of observed values.
+  const digest = crypto.createHash('sha256').update(`${category}:${seed}`).digest();
+  const palettes = [
+    ['#e5edf5', '#1b4d6b', '#5a96b5'], ['#e9edf5', '#284b7c', '#8faed2'],
+    ['#edf1e8', '#365c43', '#8aa779'], ['#f4ece6', '#805444', '#c49a7f'],
+    ['#f0eaf3', '#614c78', '#a889b8'], ['#f4eee3', '#725529', '#c19d5b'],
+    ['#e5f1f0', '#245f60', '#80aead'], ['#edf0f3', '#425669', '#91a5b5'],
+    ['#edf1e8', '#52673b', '#a1b47b'],
+  ];
+  const [background, foreground, accent] = palettes[index];
+  const blocks = Array.from({ length: 5 }, (_, i) => {
+    const x = 500 + i * 78;
+    const y = 54 + digest[i] % 140;
+    const height = 230 - y + digest[i + 5] % 50;
+    return `<rect x="${x}" y="${y}" width="42" height="${height}" rx="21" fill="${i % 2 ? foreground : accent}" opacity="${(0.35 + digest[i + 10] / 510).toFixed(2)}"/>`;
+  }).join('');
+  const svg = `<svg width="960" height="320" xmlns="http://www.w3.org/2000/svg"><rect width="960" height="320" fill="${background}"/><circle cx="775" cy="155" r="138" fill="${accent}" opacity=".13"/>${blocks}<path d="M0 270 C210 ${205 + digest[15] % 55}, 300 ${205 + digest[16] % 55}, 520 290 L0 320Z" fill="${accent}" opacity=".22"/><text x="48" y="72" font-size="18" letter-spacing="3" fill="${foreground}" font-family="sans-serif">EDITORIAL ILLUSTRATION</text><text x="48" y="180" font-size="60" font-weight="700" fill="${foreground}" font-family="sans-serif">${categories[index]}</text><path d="M48 207 H330" stroke="${accent}" stroke-width="8" stroke-linecap="round"/></svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer({ resolveWithObject: true });
 }
-export async function prepareDigestMedia(d: DigestV2, options: { storage?: ObjectStorage | null; rules?: MediaRule[]; fetchOptions?: ControlledDailyReportMediaOptions; mode: 'shadow' | 'production'; mediaRoot?: string }) {
+export async function prepareDigestMedia(d: DigestV2, options: { storage?: ObjectStorage | null; rules?: MediaRule[]; fetchOptions?: ControlledDailyReportMediaOptions; mode: 'shadow' | 'production'; mediaRoot?: string; storyIllustrations?: boolean }) {
+  if (!isValidDateKey(d.date)) throw new Error('INVALID_DATE');
+  const localOrigin = options.mode === 'production' && process.env.DIGEST_V2_MEDIA_STORE === 'local' ? getDailyReportMediaPublicOrigin() : null;
+  if (localOrigin && (!publicDigestUrl(localOrigin) || new URL(localOrigin).origin !== localOrigin)) throw new Error('LOCAL_MEDIA_ORIGIN_INVALID');
   let storage: ObjectStorage | null = null;
   let configurationFailure: string | null = null;
   let rules: MediaRule[] = [];
-  try { storage = options.storage === undefined ? configuredR2() : options.storage; }
+  try { storage = localOrigin ? null : options.storage === undefined ? configuredR2() : options.storage; }
   catch { configurationFailure = 'R2_CONFIGURATION_INVALID'; }
   try { rules = options.rules || configuredMediaRules(); }
   catch { configurationFailure = 'MEDIA_RULES_INVALID'; }
@@ -175,32 +198,68 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
     } catch (e) {
       fallback = true;
       failure = rule ? 'SOURCE_OR_IMAGE_FAILED' : 'LICENSE_NOT_APPROVED';
-      result = await fallbackImage(m.category);
+      const story = [...d.market, ...d.macro, ...d.stories].find(s => s.media_ids.includes(m.id));
+      result = await fallbackImage(m.category, story ? `${story.id}:${story.title}` : '');
     }
     const mime = fallback || m.kind === 'source_icon' ? 'image/png' : 'image/jpeg';
     const sha256 = crypto.createHash('sha256').update(result.data).digest('hex');
     const filename = `${sha256}.${mime === 'image/png' ? 'png' : 'jpg'}`;
     // Durable local mirror participates in existing system backup, independently of R2.
     storeProvidedDailyReportMedia(filename, result.data, mime, root);
-    const key = `${fallback ? 'fallback' : options.mode === 'production' ? 'published' : 'tmp'}/${filename}`;
+    // A later Shadow date must not inherit an earlier date's tmp/ expiration.
+    const key = localOrigin ? `local/${filename}` : fallback ? `fallback/${filename}` : options.mode === 'production' ? `published/${filename}` : `tmp/${d.date}/${filename}`;
     let publicUrl = '';
     try {
-      if (!storage) throw new Error('R2_NOT_CONFIGURED');
       if (!(m.kind === 'source_icon' && fallback)) {
-        await storage.put(key, result.data, mime, sha256);
-        publicUrl = storage.origin + '/' + key;
+        if (localOrigin) publicUrl = `${localOrigin}/daily-report-media/${filename}`;
+        else {
+          if (!storage) throw new Error('R2_NOT_CONFIGURED');
+          await storage.put(key, result.data, mime, sha256);
+          publicUrl = storage.origin + '/' + key;
+        }
       }
     } catch { failure = storage ? 'R2_UPLOAD_FAILED' : 'R2_NOT_CONFIGURED'; }
     failure = configurationFailure || failure;
-    images.push({ ...(m.kind ? { kind: m.kind, sourceHost: new URL(evidence.url).hostname } : {}), id: m.id, evidenceId: m.evidence_id, sourceUrl: m.url, category: m.category, licenseRef: fallback ? 'code-owned-category-art' : rule!.licenseRef, policy: fallback ? 'OWNED_OPEN' : rule!.policy, publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback, failure, ...(!fallback ? { sourceTransport: rule?.sourceFile ? 'audited_copy' as const : transport || 'network' as const, sourceSha256, ...(rule?.credit ? { credit: { ...rule.credit } } : {}) } : {}) });
+    images.push({ ...(m.kind ? { kind: m.kind, sourceHost: new URL(evidence.url).hostname } : {}), id: m.id, evidenceId: m.evidence_id, sourceUrl: m.url, category: m.category, licenseRef: fallback ? 'code-owned-category-art' : rule!.licenseRef, policy: fallback ? 'OWNED_OPEN' : rule!.policy, publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback, failure, ...(fallback ? { visualKind: 'placeholder' as const } : { visualKind: rule!.visualKind || 'archive_photo' as const, sourceTransport: rule?.sourceFile ? 'audited_copy' as const : transport || 'network' as const, sourceSha256, ...(rule?.credit ? { credit: { ...rule.credit } } : {}) }) });
+  }
+  if (options.storyIllustrations) {
+    const stories = [...d.market, ...d.macro, ...d.stories];
+    for (const story of stories) {
+      if (images.length >= 40) break;
+      if (story.media_ids.some(id => images.some(m => m.id === id && m.publicUrl))) continue;
+      const category = d.market.includes(story) ? 'Market' : d.macro.includes(story) ? 'Macro' : 'International';
+      const result = await fallbackImage(category, `${story.id}:${story.title}`);
+      const mime = 'image/png';
+      const sha256 = crypto.createHash('sha256').update(result.data).digest('hex');
+      const filename = `${sha256}.png`;
+      const key = localOrigin ? `local/${filename}` : `fallback/${filename}`;
+      storeProvidedDailyReportMedia(filename, result.data, mime, root);
+      let publicUrl = '';
+      let failure: string | null = null;
+      try {
+        if (localOrigin) publicUrl = `${localOrigin}/daily-report-media/${filename}`;
+        else {
+          if (!storage) throw new Error('R2_NOT_CONFIGURED');
+          await storage.put(key, result.data, mime, sha256);
+          publicUrl = storage.origin + '/' + key;
+        }
+      } catch { failure = storage ? 'R2_UPLOAD_FAILED' : 'R2_NOT_CONFIGURED'; }
+      images.push({ id: `story-placeholder:${sha256}`, storyId: story.id, evidenceId: story.evidence_ids[0] || '', sourceUrl: '', category, licenseRef: 'code-owned-category-placeholder', policy: 'OWNED_OPEN', publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback: true, failure, visualKind: 'placeholder' });
+    }
   }
   return images;
 }
 export async function restoreDigestObjects(images: PreparedImage[], storage: ObjectStorage, root = dailyReportMediaRoot()) {
+  const unique = new Map<string, { item: PreparedImage; bytes: Buffer }>();
   for (const item of images) {
-    if (!/^[a-f0-9]{64}\.(jpg|png)$/.test(item.filename) || !/^(published|fallback|tmp)\/[a-f0-9]{64}\.(jpg|png)$/.test(item.key)) throw new Error('MEDIA_BACKUP_PATH');
+    const expected = item.key.match(/^(?:published|fallback|tmp(?:\/\d{4}-\d{2}-\d{2})?)\/([a-f0-9]{64}\.(?:jpg|png))$/)?.[1];
+    if (!expected || expected !== item.filename || !item.filename.startsWith(`${item.sha256}.`)
+      || (item.filename.endsWith('.png') ? item.mime !== 'image/png' : item.mime !== 'image/jpeg')) throw new Error('MEDIA_BACKUP_PATH');
     const bytes = fs.readFileSync(path.join(root, item.filename));
-    if (crypto.createHash('sha256').update(bytes).digest('hex') !== item.sha256) throw new Error('MEDIA_BACKUP_HASH');
+    if (bytes.length !== item.bytes || crypto.createHash('sha256').update(bytes).digest('hex') !== item.sha256) throw new Error('MEDIA_BACKUP_HASH');
+    unique.set(item.key, { item, bytes });
+  }
+  for (const { item, bytes } of unique.values()) {
     await storage.put(item.key, bytes, item.mime, item.sha256);
     if (crypto.createHash('sha256').update(await storage.get(item.key)).digest('hex') !== item.sha256) throw new Error('MEDIA_RESTORE_HASH');
   }

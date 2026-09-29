@@ -95,7 +95,7 @@
   width: 100%;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(300px, .88fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   padding: 0;
   border: 0;
@@ -105,8 +105,10 @@
   cursor: pointer;
   font: inherit;
 }
+.daily-report-featured-open.with-image { grid-template-columns: minmax(0, 1.12fr) minmax(300px, .88fr); }
 .daily-report-featured-open:focus-visible { outline: 2px solid var(--td-brand-color); outline-offset: -3px; }
 .daily-report-featured-hero { width: 100%; height: 100%; min-height: 270px; aspect-ratio: 16 / 9; object-fit: cover; background: var(--td-bg-color-component); }
+.daily-report-featured-open.illustrated .daily-report-featured-hero { height: auto; min-height: 0; aspect-ratio: 3 / 1; object-fit: contain; align-self: center; }
 .daily-report-featured-body { min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: clamp(22px, 4vw, 44px); }
 .daily-report-featured-kicker { margin-bottom: 15px; color: var(--td-brand-color); font-size: 10px; font-weight: 850; letter-spacing: .16em; }
 .daily-report-featured-headline { margin: 15px 0 0; color: var(--td-text-color-primary); font-family: Georgia, 'Songti SC', 'SimSun', serif; font-size: clamp(28px, 4vw, 46px); line-height: 1.18; letter-spacing: -.035em; overflow-wrap: anywhere; }
@@ -144,7 +146,7 @@
   min-width: 0;
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   padding: 0;
   overflow: hidden;
@@ -156,8 +158,10 @@
   cursor: pointer;
   font: inherit;
 }
+.daily-report-card-open.with-image { grid-template-columns: 240px minmax(0, 1fr); }
 .daily-report-card-open:focus-visible { outline: 2px solid var(--td-brand-color); outline-offset: -3px; }
 .daily-report-card-hero { width: 240px; height: 148px; object-fit: cover; background: var(--td-bg-color-component); }
+.daily-report-card-open.illustrated .daily-report-card-hero { height: auto; aspect-ratio: 3 / 1; object-fit: contain; align-self: center; }
 .daily-report-card-body { min-width: 0; display: flex; flex: 1 1 auto; flex-direction: column; padding: 17px 20px 16px; }
 .daily-report-card-topline,
 .daily-report-detail-header,
@@ -178,6 +182,9 @@
 .daily-report-delivery-status.received { color: #166534; background: rgba(34, 197, 94, .10); }
 .daily-report-delivery-status.candidate { color: #7c3aed; background: rgba(139, 92, 246, .12); }
 .daily-report-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 10px 20px 14px; border-top: 1px solid var(--td-component-stroke); color: var(--td-text-color-placeholder); font-size: 11px; }
+.daily-report-image-credit { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; padding: 8px 20px 10px; border-top: 1px solid var(--td-component-stroke); color: var(--td-text-color-placeholder); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.daily-report-image-credit a { color: var(--td-brand-color); text-underline-offset: 2px; }
+.daily-report-featured .daily-report-image-credit { padding-inline: clamp(22px, 4vw, 44px); }
 .daily-report-card-footer > span { min-width: 0; overflow-wrap: anywhere; }
 .daily-report-email-status { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; color: var(--td-text-color-placeholder); font-size: 11px; white-space: nowrap; }
 .daily-report-email-status.queued { color: #b45309; }
@@ -239,6 +246,8 @@
 .daily-report-markdown table { min-width: 520px; width: 100%; border-collapse: collapse; font-size: 12px; }
 .daily-report-markdown th, .daily-report-markdown td { padding: 8px 10px; border: 1px solid var(--td-component-stroke); text-align: left; vertical-align: top; }
 .daily-report-markdown th { background: var(--td-bg-color-component); font-weight: 700; }
+.daily-report-markdown .digest-v2-story table { min-width: 0; font-size: inherit; }
+.daily-report-markdown .digest-v2-story td { padding: 0; border: 0; }
 .daily-report-markdown .daily-report-unsafe-link { color: var(--td-text-color-secondary); text-decoration: line-through; }
 .daily-report-markdown .daily-report-card-grid { width: 100%; }
 .daily-report-markdown .daily-report-card-grid > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
@@ -261,6 +270,7 @@
   .daily-report-featured-headline { font-size: 30px; }
   .daily-report-card-open { display: flex; flex-direction: column; }
   .daily-report-card-hero { width: 100%; height: 180px; }
+  .daily-report-card-open.illustrated .daily-report-card-hero { width: 100%; height: auto; }
   .daily-report-history-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
   .daily-report-card-footer { align-items: flex-start; flex-direction: column; }
   .daily-report-card-footer .daily-report-retry-button { align-self: flex-start; }

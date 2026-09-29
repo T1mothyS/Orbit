@@ -6,9 +6,9 @@ import { scheduleDateInTimezone } from './schedule-time.js';
 import { readUserMail } from './user-mail-service.js';
 import { getDailyReportCloudContext } from './daily-report-cloud-store.js';
 import { isValidDateKey } from './date-key.js';
-import { DIGEST_V2_VERSION, DIGEST_V2_GENERATION, DIGEST_V2_SCHEMA, digestHash, digestSnapshotWarnings, validateDigestV2, type DigestSnapshot, type DigestV2, type InputSection } from './digest-v2-contract.js';
+import { DIGEST_V2_VERSION, DIGEST_V2_GENERATION, DIGEST_V2_ILLUSTRATED_GENERATIONS, DIGEST_V2_SCHEMA, digestHash, digestSnapshotWarnings, validateDigestV2, type DigestSnapshot, type DigestV2, type InputSection } from './digest-v2-contract.js';
 import { prepareDigestMedia } from './digest-v2-media.js';
-import { encodeDigestPublication, renderDigestV2, type DigestPublication } from './digest-v2-render.js';
+import { digestV2Cover, encodeDigestPublication, renderDigestV2, type DigestPublication } from './digest-v2-render.js';
 import { enqueueUserEmailNotificationDetailed } from './notification-service.js';
 import { getDailyReportDeliveryPolicy } from './daily-report-delivery-policy.js';
 import { addLog } from './log-service.js';
@@ -20,7 +20,44 @@ export function createDigestSnapshotRun(userId: string, snapshot: DigestSnapshot
   const id = crypto.randomUUID(); const now = new Date();
   const manifest = { date: snapshot.date, timezone: snapshot.timezone, cutoff: snapshot.cutoff, contextVersion: snapshot.contextVersion, contractVersion: DIGEST_V2_VERSION, generationVersion: DIGEST_V2_GENERATION, modelVersion: 'unknown', status: 'INPUTS_SNAPSHOTTED', inputCounts: { calendar: snapshot.calendar.items.length, mail: snapshot.mail.items.length, watchlist: snapshot.watchlist.items.length }, warnings: digestSnapshotWarnings(snapshot) };
   store.createDigestRun({ id, user_id: userId, report_date: snapshot.date, snapshot_json: JSON.stringify(snapshot), manifest_json: JSON.stringify(manifest), created_at: now.toISOString(), expires_at: new Date(now.getTime() + 7 * 86400000).toISOString() });
-  return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA };
+  return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA, editorialGuidance: '仅在正文中用 **原文短词组** 标重点；每句一到两处，优先关键对象、数字、结论或行动。标题不加标记，不能整句加粗。邮件逐封保留服务或事项名称、具体动作和已知期限；同一事项突出各封新增事实，未知期限不猜。对每个关注标的记录检索时间窗、来源、重要变化或无变化依据及失败情况；未配置、读取失败、未研究不可写成无变化。新闻说明具体事实、关注关系与下一步；候选、排除及失败另留有界记录。图片须贴合具体新闻，不能把类别图形当贴题插画。图片是否为现场只在图注说明，正文不重复。来源和发布时间由服务端生成角标与文末引用，不要写入摘要。' };
+}
+export function digestWatchlistInput(context: ReturnType<typeof getDailyReportCloudContext>): InputSection {
+  if (context.readFailed) return { status: 'failed', items: [] };
+  const raw = context.context.watchlist;
+  if (raw === undefined || raw === null) return { status: 'not_configured', items: [] };
+  const stocks = Array.isArray(raw) ? raw : typeof raw === 'object' && !Array.isArray(raw) ? (raw as { stocks?: unknown }).stocks : undefined;
+  if (!Array.isArray(stocks)) return { status: 'failed', items: [] };
+  if (!stocks.length) return { status: 'not_configured', items: [] };
+  let incomplete = false;
+  const items = stocks.flatMap((value, index) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+    const stock = value as Record<string, unknown>;
+    const name = typeof stock.name === 'string' ? stock.name.trim() : '';
+    const symbol = typeof stock.symbol === 'string' ? stock.symbol.trim() : '';
+    if (!name && !symbol) return [];
+    const thesisFile = typeof stock.thesis_file === 'string' ? /^theses\/([A-Za-z0-9_-]+)\.ya?ml$/.exec(stock.thesis_file) : null;
+    const theses = context.context.theses;
+    const referencedThesis = thesisFile && theses && typeof theses === 'object' && !Array.isArray(theses)
+      ? (theses as Record<string, unknown>)[thesisFile[1]] : null;
+    const matchedThesis = referencedThesis && typeof referencedThesis === 'object' && !Array.isArray(referencedThesis)
+      && typeof (referencedThesis as Record<string, unknown>).symbol === 'string'
+      && ((referencedThesis as Record<string, unknown>).symbol as string).toLowerCase() === symbol.toLowerCase()
+      ? referencedThesis as Record<string, unknown> : null;
+    const thesis = stock.thesis && typeof stock.thesis === 'object' && !Array.isArray(stock.thesis)
+      ? stock.thesis as Record<string, unknown> : matchedThesis;
+    const complete = !!name && !!symbol && typeof stock.priority === 'string' && !!stock.priority.trim()
+      && Array.isArray(stock.sectors) && stock.sectors.every(sector => typeof sector === 'string' && !!sector.trim())
+      && thesis && typeof thesis.status === 'string' && !!thesis.status.trim()
+      && typeof thesis.priority === 'string' && !!thesis.priority.trim()
+      && thesis.thesis && typeof thesis.thesis === 'object' && !Array.isArray(thesis.thesis)
+      && thesis.monitor && typeof thesis.monitor === 'object' && !Array.isArray(thesis.monitor);
+    const detail = complete ? JSON.stringify({ priority: stock.priority, sectors: stock.sectors,
+      thesis: { status: thesis!.status, priority: thesis!.priority, thesis: thesis!.thesis, monitor: thesis!.monitor } }) : '';
+    if (!detail || detail.length > 4000) incomplete = true;
+    return [{ id: `watch-${index}-${digestHash(value).slice(0, 12)}`, title: [name, symbol].filter(Boolean).join(' '), detail: detail.length <= 4000 ? detail : '' }];
+  });
+  return { status: !items.length ? 'failed' : incomplete || items.length !== stocks.length || stocks.length > 100 ? 'partial' : 'complete', items: items.slice(0, 100) };
 }
 export async function readDigestV2Inputs(userId: string, date: string) {
   assertDigestV2Enabled();
@@ -37,8 +74,7 @@ export async function readDigestV2Inputs(userId: string, date: string) {
     mail = { status: !result.configured || !result.enabled ? 'not_configured' : result.status === 'OK' ? (result.unreadCount > result.messages.length ? 'partial' : 'complete') : result.status === 'PARTIAL' ? 'partial' : 'failed', items: result.messages.map(m => ({ id: m.id, title: m.subject, detail: JSON.stringify(m).slice(0, 4000) })) };
   } catch { /* Never copy provider error strings or credentials into snapshots. */ }
   const context = getDailyReportCloudContext(userId);
-  const watch = (context.context.watchlist as { stocks?: Array<{ name?: string; symbol?: string }> })?.stocks || [];
-  const snapshot: DigestSnapshot = { date, timezone, cutoff: new Date().toISOString(), contextVersion: context.version, calendar, mail, watchlist: { status: watch.length > 100 ? 'partial' : 'complete', items: watch.slice(0, 100).map((w, i) => ({ id: `watch-${i}-${digestHash(w).slice(0, 12)}`, title: [w.name, w.symbol].filter(Boolean).join(' '), detail: '' })) } };
+  const snapshot: DigestSnapshot = { date, timezone, cutoff: new Date().toISOString(), contextVersion: context.version, calendar, mail, watchlist: digestWatchlistInput(context) };
   return { ...createDigestSnapshotRun(userId, snapshot), context: context.context };
 }
 function snapshotFor(userId: string, runId: string): { snapshot: DigestSnapshot; generationVersion: string } {
@@ -83,11 +119,13 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       let payload: { publication: DigestPublication; reportId?: string; status: string; renderHash: string; emailStatus?: string };
       if (existing) payload = JSON.parse(existing.payload_json);
       else {
-        const media = await prepareDigestMedia(digest, { ...mediaOptions, mode: mode as 'shadow' | 'production' });
+        const media = await prepareDigestMedia(digest, { ...mediaOptions, mode: mode as 'shadow' | 'production', storyIllustrations: DIGEST_V2_ILLUSTRATED_GENERATIONS.includes(generationVersion) });
         const publication = { digest, warnings: validation.warnings, media, renderer: generationVersion };
+        if (mode === 'production') assertStoryImagesReady(publication);
         payload = { publication, status: 'PREPARED', renderHash: digestHash(publication) };
         existing = store.saveDigestArtifact({ id: crypto.randomUUID(), user_id: userId, run_id: runId, report_date: digest.date, mode: mode as 'shadow' | 'production', content_hash: validation.contentHash!, payload_json: JSON.stringify(payload), created_at: new Date().toISOString() });
       }
+      if (mode === 'production') assertStoryImagesReady(payload.publication);
       recordPhase('MEDIA_PREPARED', { artifactId: existing.id, mediaFailures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })) });
       // Re-check the switch after network work, before committing any formal side effect.
       assertDigestV2Enabled();
@@ -111,8 +149,34 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       } else payload.status = 'SHADOW_SAVED';
       store.saveDigestArtifact({ ...existing, payload_json: JSON.stringify(payload) });
       recordPhase(payload.status, { emailStatus: payload.emailStatus || 'NOT_QUEUED', renderHash: payload.renderHash });
-      addLog('info', 'daily-report', '新版日报运行完成', { event: 'digest_v2_completed', runId, mode, status: payload.status, imageCount: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && !m.fallback).length });
-      return { status: payload.status, artifactId: existing.id, contentHash: validation.contentHash, renderHash: payload.renderHash, warnings: validation.warnings, emailStatus: payload.emailStatus || 'NOT_QUEUED', previewUrl: mode === 'shadow' ? `/reports/${digest.date}?shadow=${existing.id}` : `/reports/${digest.date}?source=cloud`, media: { icons: payload.publication.media.filter(m => m.kind === 'source_icon' && m.publicUrl && !m.fallback).length, real: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length, fallback: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length, failures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })) } };
+      const mediaById = new Map(payload.publication.media.map(m => [m.id, m]));
+      const newsItems = [...digest.market, ...digest.macro, ...digest.stories];
+      const coverage = { total: newsItems.length, real: 0, archival: 0, illustration: 0, placeholder: 0, missing: 0 };
+      for (const story of newsItems) {
+        const images = [...story.media_ids.map(id => mediaById.get(id)), ...payload.publication.media.filter(m => m.storyId === story.id)].filter(m => m && m.kind !== 'source_icon' && m.publicUrl);
+        if (images.some(m => m!.visualKind === 'photo')) coverage.real++;
+        else if (images.some(m => m!.visualKind === 'archive_photo' || (!m!.fallback && !m!.visualKind))) coverage.archival++;
+        else if (images.some(m => m!.visualKind === 'illustration')) coverage.illustration++;
+        else if (images.length) coverage.placeholder++;
+        else coverage.missing++;
+      }
+      addLog('info', 'daily-report', '新版日报运行完成', { event: 'digest_v2_completed', runId, mode, status: payload.status, imageCount: coverage.real + coverage.archival + coverage.illustration, missingImageCount: coverage.missing });
+      return {
+        status: payload.status, artifactId: existing.id, contentHash: validation.contentHash, renderHash: payload.renderHash,
+        warnings: validation.warnings, reviewIssues: validation.reviewIssues,
+        emailStatus: payload.emailStatus || 'NOT_QUEUED',
+        previewUrl: mode === 'shadow' ? `/reports/${digest.date}?shadow=${existing.id}` : `/reports/${digest.date}?source=cloud`,
+        imageCoverage: coverage,
+        media: {
+          icons: payload.publication.media.filter(m => m.kind === 'source_icon' && m.publicUrl && !m.fallback).length,
+          real: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.visualKind === 'photo').length,
+          archival: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && (m.visualKind === 'archive_photo' || (!m.fallback && !m.visualKind))).length,
+          illustration: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.visualKind === 'illustration').length,
+          placeholder: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.visualKind === 'placeholder').length,
+          fallback: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length,
+          failures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })),
+        },
+      };
     } catch (error) {
       // Keep only bounded, non-sensitive stage diagnostics, never provider error messages.
       try { recordPhase('FAILED', { failedPhase: phase, retryable: true }); } catch { /* Original durable-write failure remains primary. */ }
@@ -122,7 +186,15 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
   locks.set(key, task);
   try { return await task; } finally { if (locks.get(key) === task) locks.delete(key); }
 }
+function assertStoryImagesReady(publication: DigestPublication): void {
+  const media = publication.media;
+  for (const story of [...publication.digest.market, ...publication.digest.macro, ...publication.digest.stories]) {
+    if (![...story.media_ids.map(id => media.find(item => item.id === id)), ...media.filter(item => item.storyId === story.id)]
+      .some(item => item && item.kind !== 'source_icon' && item.publicUrl && !item.failure && !item.fallback
+        && ['photo', 'archive_photo', 'illustration'].includes(item.visualKind || 'archive_photo'))) throw new Error('STORY_IMAGE_NOT_READY');
+  }
+}
 export function digestArtifactView(row: store.DigestArtifactRow) {
   const payload = JSON.parse(row.payload_json); const p = payload.publication as DigestPublication;
-  return { id: row.id, date: row.report_date, headline: p.digest.title, heroImageUrl: null, excerpt: p.digest.executive_signals.join('；'), contentHash: row.content_hash, publishedAt: row.created_at, updatedAt: row.created_at, source: 'cloud', deliveryStatus: 'CANDIDATE', emailStatus: 'DISABLED', emailNotificationId: null, markdown: encodeDigestPublication(p), html: renderDigestV2(p), shadow: true };
+  return { id: row.id, date: row.report_date, ...digestV2Cover(p), contentHash: row.content_hash, publishedAt: row.created_at, updatedAt: row.created_at, source: 'cloud', deliveryStatus: 'CANDIDATE', emailStatus: 'DISABLED', emailNotificationId: null, markdown: encodeDigestPublication(p), html: renderDigestV2(p), shadow: true };
 }

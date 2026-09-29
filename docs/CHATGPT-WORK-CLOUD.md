@@ -134,6 +134,7 @@ dry-run 返回 `VALIDATED_NOT_PUBLISHED` 才能进行同正文正式发布。兼
 ### 输入、校验和权限
 
 - `daily_report.read_inputs_v2({date})` 返回账号隔离的 `runId`、输入快照、Context 及 JSON schema。生成日期、时区、截止时间、Context 版本由服务端绑定；合同/生成规则版本由程序记录，模型版本为 `unknown`。Calendar 最多 300、Mail 最多 100、Watchlist 最多 100；达到截断条件显式 `partial`。
+- Watchlist 沿用当前 OAuth 账号已有的 `watchlist.stocks`。标的可内嵌 `thesis`，也可用 `thesis_file` 引用同一 Context 的 `theses/<key>.yaml`；后一种只在引用格式合法、键存在且标的代码一致时拼接必要研究字段。缺失或不一致标为 `partial`，不写成“无变化”；不复制隔离账号配置或覆盖正式 Context。
 - QQ 邮箱状态分别映射为 `MAIL_NOT_CONFIGURED`（未配置或停用）、`MAIL_READ_FAILED`（读取失败）、`MAIL_INCOMPLETE`（部分读取）；读取成功且无未读时不产生邮箱警告。快照清单、校验/发布回执、内容哈希和新产物沿用同一映射；网页、邮件 HTML 与纯文本显示对应空态。未过期的旧 run 按原 `generationVersion` 维持原警告与内容哈希，重试复用既有产物；既有 Shadow 产物不改写，旧警告码仍可读取。
 - 快照只含日程必要字段、邮件摘要和引用、关注名单。7 天后不可继续验证/发布，并由后台维护清除敏感快照；运行版本、覆盖数量及阶段诊断长期保留。已生成的私有日报仍属于历史产物，不随输入快照过期而删除。旧加密备份中的快照遵守备份保留规则；恢复时再次丢弃已过期快照。
 - `daily_report.validate_v2({runId,digest})` 和 `publish_v2` 的 `dry_run` 只读取快照并纯校验；不访问外站、不处理媒体、不修改业务数据、不入队。过期或跨账号 run 拒绝。所有成功读取的输入 ID 必须逐项覆盖，即使该部分标记 `partial`；错误返回 `path/code`，成功返回稳定 `contentHash`。
@@ -146,17 +147,19 @@ dry-run 返回 `VALIDATED_NOT_PUBLISHED` 才能进行同正文正式发布。兼
 |---|---|
 | `dry_run`（默认） | 纯校验，返回 `VALIDATED_NOT_PUBLISHED` |
 | `shadow` | 处理媒体，保存 `digest_v2_artifacts`；返回 `SHADOW_SAVED`，不写 `daily_reports` 或通知队列 |
-| `production` | 仅 `DIGEST_PRODUCTION_CONTRACT=daily-digest.v2` 放行；拒绝 `DIGEST_R2_ENV=test`；保存正式快照，按既有来源设置与通知设置入队 |
+| `production` | 仅 `DIGEST_PRODUCTION_CONTRACT=daily-digest.v2` 放行；拒绝 `DIGEST_R2_ENV=test`；每条新闻须有实际可访问、审核通过的照片、资料照或贴题原创插画，占位/缺图先拒绝正式发布；保存正式快照，按既有来源设置与通知设置入队 |
 
 Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，复用登录保护与阅读页面，但不进入正式列表、旧 History 或候选来源切换。对应 GET 接口仍检查账号和日期。未登录的日报链接登录后保留查询参数。
 
-网页、邮件 HTML 和纯文本由 JSON 确定性生成；模型不提交 Markdown。媒体全部失败仍保留完整文字；输入失败在顶部显示明确提示。V1 的历史解析和展示继续保留。新版内部发布快照使用带 V2 标记的 JSON envelope，旧发布接口拒绝该标记。
+网页、邮件 HTML 和纯文本由 JSON 确定性生成；模型不提交 Markdown。Shadow 可在媒体失败时保留完整文字并明确分类；正式 V2.5 在图片缺失时停在发布前，避免把占位图当作获认可的图文版。输入失败在顶部显示明确提示。V1 的历史解析和展示继续保留。新版内部发布快照使用带 V2 标记的 JSON envelope，旧发布接口拒绝该标记。
 
 按账号/日期串行提交，账号/日期/模式/内容哈希唯一。内容哈希覆盖结构化内容和输入缺失警告，不包含运行时间、渲染媒体的临时地址或日志；渲染另有哈希，通知有独立 ID。`MEDIA_PREPARING`、`MEDIA_PREPARED`、`REPORT_SAVED`、完成/失败分别记入运行清单，保留最多 50 条最近阶段事件。中断后以相同 run、内容和模式重试；已保存的产物复用冻结媒体，不因重试悄悄改变已发布内容。
 
 同日自动投递只保留一个稳定去重键；新内容修订默认不补发，仍可通过原有网页手动发信入口明确重发。队列失败、SMTP accepted、最终收件箱到达分别验收。此实现依赖项目现有单进程 sql.js 所有权，不支持多个独立进程共享同一数据目录。
 
 ### 图片、许可与 R2
+
+正式服务可显式设置 `DIGEST_V2_MEDIA_STORE=local`：媒体经过相同审核、解码和内容哈希校验后保存在现有 `data/daily-report-media/`，邮件与网页使用 HTTPS `APP_URL` 下的 `/daily-report-media/<哈希文件名>`；产物键标为 `local/`，不引用隔离 R2 的 `tmp/` 对象。此目录由现有账号加密备份和全站备份覆盖，恢复后须核对文件哈希与公开 GET。未显式选择时仍使用下面的 R2 `published/`、`fallback/` 策略；Shadow 始终使用独立测试 R2。生产本地模式若 `APP_URL` 非有效公开 HTTPS，媒体准备立即拒绝。
 
 - 开启V2且配置合法R2公开域名时，网页CSP的 `img-src` 只追加这个精确HTTPS origin；不允许通配域名、带路径/凭据的地址或生产 `r2.dev`，脚本和连接策略不扩大。验收必须检查浏览器图片实际加载，不能用R2 HTTP 200代替网页显示。
 

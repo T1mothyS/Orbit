@@ -15,6 +15,10 @@ interface DailyReportSummary {
   date: string;
   headline: string | null;
   heroImageUrl: string | null;
+  heroImageVisualKind?: 'photo' | 'archive_photo' | 'illustration' | 'placeholder' | null;
+  heroImageCredit?: string | null;
+  heroImageSourceUrl?: string | null;
+  heroImageLicenseUrl?: string | null;
   excerpt: string;
   contentHash: string;
   publishedAt: string;
@@ -235,18 +239,26 @@ export function DailyReportsPage() {
                 </button>
               </div>
             ) : null;
+            const renderImageCredit = (item: DailyReportSummary) => item.heroImageUrl && item.heroImageCredit ? (
+              <div className="daily-report-image-credit">
+                <span>{item.heroImageCredit}</span>
+                {item.heroImageSourceUrl && <a href={item.heroImageSourceUrl} target="_blank" rel="noopener noreferrer">图片来源</a>}
+                {item.heroImageLicenseUrl && item.heroImageLicenseUrl !== item.heroImageSourceUrl && <a href={item.heroImageLicenseUrl} target="_blank" rel="noopener noreferrer">许可说明</a>}
+              </div>
+            ) : null;
+            const isWidePlaceholder = (item: DailyReportSummary) => item.heroImageVisualKind === 'illustration' || item.heroImageVisualKind === 'placeholder' || ['原创编辑插画，非新闻现场图片', '原创分类示意图，非新闻现场图片', '原创栏目占位图，非新闻现场图片'].includes(item.heroImageCredit || '');
             return (
               <>
                 <article className="daily-report-featured" key={latest.id}>
                   <button
                     type="button"
-                    className="daily-report-featured-open"
+                    className={`daily-report-featured-open${latest.heroImageUrl ? ' with-image' : ''}${isWidePlaceholder(latest) ? ' illustrated' : ''}`}
                     onClick={() => openReport(latest)}
                     aria-label={`打开最新的 ${formatReportDate(latest.date)} 日报`}
                   >
                     {latest.heroImageUrl && <img className="daily-report-featured-hero" src={latest.heroImageUrl} alt="" aria-hidden="true" />}
                     <div className="daily-report-featured-body">
-                      <div className="daily-report-featured-kicker">{viewMode === 'shadow' ? '新版隔离预览' : viewMode === 'received' ? 'FRONT PAGE · 最新日报' : 'CANDIDATE DESK · 最新候选'}</div>
+                      <div className="daily-report-featured-kicker">{viewMode === 'shadow' ? '最新日报 · 新版隔离预览' : viewMode === 'received' ? 'FRONT PAGE · 最新日报' : 'CANDIDATE DESK · 最新候选'}</div>
                       <div className="daily-report-card-topline">
                         <span className="daily-report-card-date">{formatReportDate(latest.date)}</span>
                         <span className="daily-report-source-meta">
@@ -262,6 +274,7 @@ export function DailyReportsPage() {
                       <span className="daily-report-card-meta">更新于 {formatUpdatedAt(latest.updatedAt)} <span aria-hidden="true">→</span></span>
                     </div>
                   </button>
+                  {renderImageCredit(latest)}
                   {renderEmailRetry(latest)}
                 </article>
 
@@ -279,7 +292,7 @@ export function DailyReportsPage() {
                         <article className="daily-report-card" key={item.id}>
                           <button
                             type="button"
-                            className="daily-report-card-open"
+                            className={`daily-report-card-open${item.heroImageUrl ? ' with-image' : ''}${isWidePlaceholder(item) ? ' illustrated' : ''}`}
                             onClick={() => openReport(item)}
                             aria-label={`打开 ${formatReportDate(item.date)} 日报`}
                           >
@@ -300,6 +313,7 @@ export function DailyReportsPage() {
                               <span className="daily-report-card-meta">更新于 {formatUpdatedAt(item.updatedAt)} <span aria-hidden="true">→</span></span>
                             </div>
                           </button>
+                          {renderImageCredit(item)}
                           {renderEmailRetry(item)}
                         </article>
                       ))}

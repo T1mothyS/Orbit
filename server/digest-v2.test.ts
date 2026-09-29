@@ -6,9 +6,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import http from 'node:http';
 import sharp from 'sharp';
-import { validateDigestV2, digestHash, type DigestV2, type DigestSnapshot } from './digest-v2-contract.js';
+import { validateDigestV2, digestHash, DIGEST_V2_GENERATION, type DigestV2, type DigestSnapshot } from './digest-v2-contract.js';
 import type { ObjectStorage } from './digest-v2-media.js';
-import { renderDigestV2, digestV2Text, encodeDigestPublication, decodeDigestPublication } from './digest-v2-render.js';
+import { renderDigestV2, digestV2Text, digestV2Cover, encodeDigestPublication, decodeDigestPublication } from './digest-v2-render.js';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'digest-v2-'));
 process.env.DATA_DIR = root;
@@ -17,7 +17,7 @@ process.env.NODE_ENV = 'test';
 process.env.BACKGROUND_JOBS_ENABLED = 'false';
 process.env.APP_URL = 'http://127.0.0.1:0';
 process.env.DIGEST_V2_ENABLED = 'true';
-const { prepareDigestMedia, transformDigestImage, restoreDigestObjects } = await import('./digest-v2-media.js');
+const { prepareDigestMedia, transformDigestImage, restoreDigestObjects, configuredMediaRules } = await import('./digest-v2-media.js');
 const api = await import('./index.js');
 const db = await import('./db.js');
 const activity = await import('./activity-store.js');
@@ -57,6 +57,215 @@ test('v2 contract: zero news, partial personal inputs, stable hash, IDs and vali
   ]) { const d = illustrated(); mutate(d); assert.equal(validateDigestV2(d).valid, false); }
 });
 
+test('input reader covers synthetic account calendar and watchlist, and rejects omitted IDs', async () => {
+  const schedules = await import('./schedule-store.js');
+  const cloudContext = await import('./daily-report-cloud-store.js');
+  const inputUserId = 'digest-input-reader-user';
+  const otherUserId = 'digest-input-reader-other';
+  const date = '2026-10-14';
+  for (const id of [inputUserId, otherUserId]) {
+    db.createUser({ id, email: `${id}@example.com`, password_hash: 'test', role: 'user', disabled: 0, created_at: now, updated_at: now });
+  }
+  const makeSchedule = (id: string, owner: string, unscheduled = false) => schedules.createSchedule({
+    id, user_id: owner, calendar_id: 'personal', type: 'todo', title: id,
+    start_time: `${date}T09:00:00`, all_day: false, category: 'other', priority: 'medium',
+    is_completed: false, is_repeated: false, reminders: [], is_high_risk: false, is_unscheduled: unscheduled,
+  });
+  makeSchedule('owned-calendar-input', inputUserId);
+  makeSchedule('other-account-calendar-input', otherUserId);
+  makeSchedule('unscheduled-calendar-input', inputUserId, true);
+  cloudContext.replaceDailyReportCloudContext(inputUserId, { watchlist: { stocks: [{ name: '合成关注项', symbol: 'TEST', priority: 'high', sectors: ['AI'], thesis: { status: 'active', priority: 'high', thesis: { rationale: '合成研究范围' }, monitor: { signal: '合成核查项' } }, unrelated: '不得进入快照' }] } });
+
+  const run = await service.readDigestV2Inputs(inputUserId, date);
+  assert.equal(run.snapshot.calendar.status, 'complete');
+  assert.deepEqual(run.snapshot.calendar.items.map(item => item.id), ['owned-calendar-input']);
+  assert.equal(run.snapshot.watchlist.status, 'complete');
+  assert.equal(run.snapshot.watchlist.items.length, 1);
+  assert.equal(run.snapshot.watchlist.items[0].title, '合成关注项 TEST');
+  assert.deepEqual(JSON.parse(run.snapshot.watchlist.items[0].detail), { priority: 'high', sectors: ['AI'], thesis: { status: 'active', priority: 'high', thesis: { rationale: '合成研究范围' }, monitor: { signal: '合成核查项' } } });
+  assert.ok(!run.snapshot.watchlist.items[0].detail.includes('unrelated'));
+  const isolatedRun = await service.readDigestV2Inputs(otherUserId, date);
+  assert.equal(isolatedRun.snapshot.watchlist.status, 'not_configured');
+  assert.equal(isolatedRun.snapshot.watchlist.items.length, 0);
+  assert.ok(isolatedRun.manifest.warnings.includes('WATCHLIST_NOT_CONFIGURED'));
+  assert.equal(run.snapshot.mail.status, 'not_configured');
+  assert.deepEqual(run.manifest.warnings, ['MAIL_NOT_CONFIGURED']);
+
+  const d = digest();
+  d.date = date;
+  d.calendar = [{ input_id: run.snapshot.calendar.items[0].id, text: '合成日程已覆盖' }];
+  d.watchlist = [{ input_id: run.snapshot.watchlist.items[0].id, summary: '合成关注项待核验', check: 'incomplete', change: 'unknown', evidence_ids: [] }];
+  assert.equal(service.validateDigestRun(inputUserId, run.runId, d).valid, true);
+  const missingCalendar = structuredClone(d); missingCalendar.calendar = [];
+  assert.ok(service.validateDigestRun(inputUserId, run.runId, missingCalendar).errors.some(issue => issue.code === 'INPUT_OMITTED'));
+  const missingWatchlist = structuredClone(d); missingWatchlist.watchlist = [];
+  assert.ok(service.validateDigestRun(inputUserId, run.runId, missingWatchlist).errors.some(issue => issue.code === 'INPUT_OMITTED'));
+  const foreign = structuredClone(d); foreign.calendar[0].input_id = 'other-account-calendar-input';
+  assert.ok(service.validateDigestRun(inputUserId, run.runId, foreign).errors.some(issue => issue.code === 'UNKNOWN_INPUT'));
+  const result = await service.publishDigestV2(inputUserId, run.runId, d, 'shadow');
+  assert.equal(result.status, 'SHADOW_SAVED');
+  assert.equal(result.emailStatus, 'NOT_QUEUED');
+
+  db.upsertDailyReportCloudContext(otherUserId, '{invalid-json');
+  const malformedRun = await service.readDigestV2Inputs(otherUserId, date);
+  assert.equal(malformedRun.snapshot.watchlist.status, 'failed');
+  assert.ok(malformedRun.manifest.warnings.includes('WATCHLIST_READ_FAILED'));
+});
+
+test('watchlist distinguishes missing, malformed, partial, and researched states', async () => {
+  const base = { version: 1, createdAt: now, updatedAt: now, readFailed: false };
+  const input = service.digestWatchlistInput;
+  assert.deepEqual(input({ ...base, version: 0, context: {} }), { status: 'not_configured', items: [] });
+  assert.deepEqual(input({ ...base, context: { watchlist: { stocks: [] } } }), { status: 'not_configured', items: [] });
+  assert.deepEqual(input({ ...base, context: { watchlist: { companies: ['missing stocks'] } } }), { status: 'failed', items: [] });
+  assert.deepEqual(input({ ...base, readFailed: true, context: { watchlist: { stocks: [{ symbol: 'TEST' }] } } }), { status: 'failed', items: [] });
+  assert.equal(input({ ...base, context: { watchlist: [{ name: '合成标的', symbol: 'TEST' }] } }).status, 'partial');
+  assert.equal(input({ ...base, context: { watchlist: { stocks: [{ symbol: 'TEST' }, {}] } } }).status, 'partial');
+  assert.equal(input({ ...base, context: { watchlist: { stocks: [{}] } } }).status, 'failed');
+  const linked = { ...base, context: {
+    watchlist: { stocks: [{ name: '合成标的', symbol: 'TEST', priority: 'high', sectors: ['AI'], thesis_file: 'theses/test.yaml' }] },
+    theses: { test: { symbol: 'TEST', status: 'active', priority: 'high', thesis: { rationale: '合成研究' }, monitor: { signal: '合成监控' }, unrelated: '不得进入快照' } },
+  } };
+  const linkedInput = input(linked);
+  assert.equal(linkedInput.status, 'complete');
+  assert.deepEqual(JSON.parse(linkedInput.items[0].detail), { priority: 'high', sectors: ['AI'], thesis: { status: 'active', priority: 'high', thesis: { rationale: '合成研究' }, monitor: { signal: '合成监控' } } });
+  assert.ok(!linkedInput.items[0].detail.includes('unrelated'));
+  assert.equal(input({ ...linked, context: { ...linked.context, theses: { test: { ...linked.context.theses.test, symbol: 'OTHER' } } } }).status, 'partial');
+  assert.equal(input({ ...linked, context: { ...linked.context, theses: {} } }).status, 'partial');
+
+  for (const [status, warning, message] of [
+    ['not_configured', 'WATCHLIST_NOT_CONFIGURED', '个人关注列表尚未配置，本期未检查关注对象。'],
+    ['failed', 'WATCHLIST_READ_FAILED', '个人关注列表读取失败，本期无法判断关注对象变化。'],
+    ['partial', 'WATCHLIST_INCOMPLETE', '个人关注列表读取不完整，本期无法确认全部关注对象的变化。'],
+    ['complete', null, '本期输入快照未记录关注标的，无法判断个人关注是否有变化。'],
+  ] as const) {
+    const snap = snapshot(); snap.watchlist = { status, items: [] };
+    const validation = validateDigestV2(digest(), snap);
+    assert.deepEqual(validation.warnings, ['MAIL_READ_FAILED', ...(warning ? [warning] : [])]);
+    const publication = { digest: digest(), media: [], warnings: validation.warnings, renderer: DIGEST_V2_GENERATION };
+    for (const email of [false, true]) assert.ok(renderDigestV2(publication, email).includes(message));
+    assert.ok(digestV2Text(publication).includes(message));
+  }
+
+  const d = digest();
+  d.watchlist = [{ input_id: 'w', summary: '尚未完成检索', check: 'incomplete', change: 'unknown', evidence_ids: [] }];
+  assert.ok(renderDigestV2({ digest: d, media: [], warnings: [], renderer: DIGEST_V2_GENERATION }).includes('已读取，尚未完成研究或核验'));
+  d.watchlist[0].check = 'complete';
+  assert.ok(validateDigestV2(d).errors.some(issue => issue.code === 'CHECK_EVIDENCE_REQUIRED'));
+  const generic = digest();
+  generic.mail = [{ input_id: 'mail-1', summary: '这是一封没有具体服务名称和行动信息的泛化通知摘要。', action: '' }];
+  generic.watchlist = [{ input_id: 'watch-1', summary: '这项关注尚未核对任何具体来源和时间窗口，仍不知道变化。', check: 'incomplete', change: 'unknown', evidence_ids: [] }];
+  assert.ok(validateDigestV2(generic).errors.some(issue => issue.path === '$.mail[0].summary' && issue.code === 'EMPHASIS_REQUIRED'));
+  assert.ok(validateDigestV2(generic).errors.some(issue => issue.path === '$.watchlist[0].summary' && issue.code === 'EMPHASIS_REQUIRED'));
+});
+
+test('new digest layout gives the lead a large image, other stories side images, and shows missing images', () => {
+  const d = illustrated();
+  d.evidence.push({ id: 'e2', url: 'https://example.com/second', source: 'Second source', published_at: now });
+  d.media.push({ id: 'm2', evidence_id: 'e2', url: 'https://images.example.com/second.jpg', category: 'Market' });
+  d.stories.push({ id: 's2', title: '次要新闻', summary: '另一条消息', evidence_ids: ['e2'], media_ids: ['m2'], verification: 'verified' });
+  d.stories.push({ id: 's3', title: '缺图新闻', summary: '图片仍待补齐', evidence_ids: ['e2'], media_ids: [], verification: 'partial' });
+  const media = d.media.map(m => ({ id: m.id, publicUrl: m.url, fallback: false, kind: undefined, credit: { caption: m.id, author: 'Test', sourcePage: 'https://example.com/story', licenseName: 'Test', licenseUrl: 'https://example.com/license' } })) as any;
+  const publication = { digest: d, media, warnings: [], renderer: DIGEST_V2_GENERATION };
+  for (const email of [false, true]) {
+    const html = renderDigestV2(publication, email);
+    assert.equal((html.match(/digest-v2-story--lead/g) || []).length, 1);
+    assert.equal((html.match(/digest-v2-story--compact/g) || []).length, 1);
+    assert.equal((html.match(/digest-v2-story--no-image/g) || []).length, 1);
+    assert.ok(html.includes('class="digest-v2-cover"'));
+    assert.ok(html.includes('width="680"'));
+    assert.ok(html.includes('width="116"'));
+    assert.ok(html.includes('此条暂无可用配图'));
+  }
+  const legacy = renderDigestV2({ ...publication, renderer: '2026-09-24.1' });
+  assert.ok(!legacy.includes('digest-v2-story--lead'));
+  assert.ok(!legacy.includes('此条暂无可用配图'));
+  assert.ok(digestV2Text({ ...publication, renderer: '2026-09-24.1' }).includes('本期无新增内容。'));
+});
+
+test('report list uses the lead news title and image instead of the draft title or a source icon', () => {
+  const d = illustrated(); d.title = 'Daily Digest V2.5｜2026-09-21 · 逐条配图验收';
+  d.executive_signals = ['与头条无关的市场信号'];
+  const photo = { id: 'm1', publicUrl: 'https://images.example.com/lead.jpg', fallback: false, credit: { caption: '公司资料照片，非新闻现场', author: 'Photographer', sourcePage: 'https://example.com/photo', licenseName: 'CC BY', licenseUrl: 'https://example.com/license' } } as any;
+  const cover = digestV2Cover({ digest: d, media: [{ ...photo, id: 'icon', kind: 'source_icon' }, photo], warnings: [], renderer: DIGEST_V2_GENERATION });
+  assert.equal(cover.headline, '有来源的新闻');
+  assert.equal(cover.excerpt, '一项可核验的新变化');
+  assert.equal(cover.heroImageUrl, photo.publicUrl);
+  assert.equal(cover.heroImageCredit, '公司资料照片，非新闻现场 · Photographer · CC BY');
+  assert.equal(cover.heroImageSourceUrl, 'https://example.com/photo');
+  assert.equal(cover.heroImageLicenseUrl, 'https://example.com/license');
+  const publication = { digest: d, media: [photo], warnings: [], renderer: DIGEST_V2_GENERATION };
+  assert.ok(renderDigestV2(publication).includes('>今日重点新闻</h1>'));
+  assert.ok(!renderDigestV2(publication).includes(d.title));
+  assert.ok(digestV2Text(publication).includes('今日重点新闻'));
+  assert.ok(!digestV2Text(publication).includes(d.title));
+  assert.ok(renderDigestV2({ ...publication, renderer: '2026-09-24.1' }).includes(d.title));
+  const fallback = digestV2Cover({ digest: d, media: [{ id: 'story-art', storyId: 's1', publicUrl: 'https://images.example.com/art.png', fallback: true } as any], warnings: [], renderer: DIGEST_V2_GENERATION });
+  assert.equal(fallback.heroImageCredit, '原创栏目占位图，非新闻现场图片');
+  const empty = digestV2Cover({ digest: digest(), media: [], warnings: [], renderer: DIGEST_V2_GENERATION });
+  assert.equal(empty.heroImageUrl, null);
+  assert.ok(renderDigestV2({ digest: digest(), media: [], warnings: [], renderer: DIGEST_V2_GENERATION }).includes('今日情报简报'));
+});
+
+test('editorial digest renders selective emphasis, one opening cover, numbered sources and concise credits', () => {
+  const d = illustrated();
+  d.executive_signals = ['美国**长端国债收益率**仍高，**高无风险利率**约束估值。'];
+  d.stories[0].summary = '**Akamai与Anthropic**宣布合作，图片仅作背景，不代表公告现场。';
+  d.evidence[0] = { id: 'e1', url: 'https://example.com/story', source: 'Example source', published_at: '' };
+  d.evidence.push({ id: 'e2', url: 'https://photos.example.com/image', source: 'Photo archive', published_at: now });
+  d.media[0].evidence_id = 'e2';
+  d.stories[0].evidence_ids = ['e1', 'e2'];
+  d.market = [{ id: 'market', title: '市场跟踪', summary: '同一来源显示**利率继续走高**，需要关注估值变化。', evidence_ids: ['e1'], media_ids: [], verification: 'verified' }];
+  const photo = { id: 'm1', publicUrl: 'https://images.example.com/lead.jpg', fallback: false, credit: { caption: '资料照片，非公告现场', author: 'Photographer', sourcePage: 'https://photos.example.com/image', licenseName: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/' } } as any;
+  const icon = { id: 'source-icon:example.com', kind: 'source_icon', sourceHost: 'example.com', publicUrl: 'https://images.example.com/icon.png', fallback: false } as any;
+  const p = { digest: d, media: [photo, icon], warnings: [], renderer: DIGEST_V2_GENERATION };
+  assert.equal(validateDigestV2(d).valid, true);
+  for (const email of [false, true]) {
+    const html = renderDigestV2(p, email);
+    assert.ok(html.indexOf('class="digest-v2-cover"') < html.indexOf('>今日重点新闻</h1>'));
+    assert.equal((html.match(/lead\.jpg/g) || []).length, 1);
+    assert.ok(html.includes('<strong>长端国债收益率</strong>'));
+    assert.ok(html.includes('href="#digest-source-1"'));
+    assert.ok(html.includes('id="digest-source-1"'));
+    assert.equal((html.match(/id="digest-source-1"/g) || []).length, 1);
+    assert.ok(html.includes('icon.png'));
+    assert.ok(html.includes('Example source · 发布时间：时间未知'));
+    assert.ok(html.includes('>原文链接</a>'));
+    assert.ok(html.includes('Photographer'));
+    assert.match(html, email
+      ? /lead\.jpg[^>]*height:auto;max-height:440px;aspect-ratio:16\/9;object-fit:cover/
+      : /lead\.jpg[^>]*height:70svh;min-height:360px;max-height:720px;object-fit:cover/);
+    assert.ok(html.includes('已编辑'));
+    assert.ok(!html.includes('证据已核对'));
+    assert.ok(!html.includes('发布时间未提供'));
+    assert.ok(!html.includes('已缩放'));
+    assert.ok(!html.includes('Photo archive · 发布时间'));
+  }
+  assert.ok(!digestV2Text(p).includes('**'));
+  assert.ok(digestV2Cover(p).excerpt.includes('Akamai与Anthropic'));
+  assert.ok(!digestV2Cover(p).excerpt.includes('**'));
+  const missing = structuredClone(d); missing.stories[0].summary = '这是一段足够长但完全没有标出重点的正文内容。';
+  assert.ok(validateDigestV2(missing).errors.some(issue => issue.code === 'EMPHASIS_REQUIRED'));
+  const halfMarked = structuredClone(d); halfMarked.stories[0].summary = '第一句说明了**关键事实**。第二句足够长却完全没有标出任何重点内容，读者无法快速抓住核心变化。';
+  assert.ok(validateDigestV2(halfMarked).errors.some(issue => issue.code === 'EMPHASIS_REQUIRED'));
+  const broken = structuredClone(d); broken.stories[0].summary = '这一段有**没有结束的标记';
+  assert.ok(validateDigestV2(broken).errors.some(issue => issue.code === 'EMPHASIS_INVALID'));
+  const escaped = structuredClone(p); escaped.digest.stories[0].summary = '**<img src=x onerror=alert(1)>** 后续内容。';
+  assert.ok(renderDigestV2(escaped).includes('<strong>&lt;img src=x onerror=alert(1)&gt;</strong>'));
+  assert.ok(!renderDigestV2(escaped).includes('<img src=x'));
+  const illustratedCover = { ...p, media: [{ id: 'story-art', storyId: d.stories[0].id, publicUrl: 'https://images.example.com/editorial.png', fallback: true } as any] };
+  for (const email of [false, true]) {
+    const html = renderDigestV2(illustratedCover, email);
+    assert.match(html, /editorial\.png[^>]*height:auto;max-height:320px;object-fit:contain/);
+    assert.doesNotMatch(html, /editorial\.png[^>]*height:70svh/);
+  }
+  const oldDigest = structuredClone(d);
+  oldDigest.stories[0].summary = '这是旧版已经保存的较长正文，其中没有任何新的加粗标记。';
+  const oldPublication = { ...p, digest: oldDigest, renderer: '2026-09-26.1' };
+  assert.ok(decodeDigestPublication(encodeDigestPublication(oldPublication)));
+  assert.ok(renderDigestV2(oldPublication).includes('发布时间未提供'));
+});
+
 test('mail snapshot state distinguishes unconfigured, failed, partial, and empty success in every receipt', async () => {
   const date = '2026-10-09';
   const cases = [
@@ -73,8 +282,10 @@ test('mail snapshot state distinguishes unconfigured, failed, partial, and empty
     assert.deepEqual(manifest.warnings, entry.warning ? [entry.warning] : []);
     const validated = service.validateDigestRun(userId, run.runId, d);
     assert.deepEqual(validated.warnings, manifest.warnings);
+    assert.deepEqual(validated.reviewIssues, [{ path: '$.stories', code: 'NEWS_SELECTION_REVIEW_REQUIRED' }]);
     const result = await service.publishDigestV2(userId, run.runId, d, 'shadow');
     assert.deepEqual(result.warnings, manifest.warnings);
+    assert.deepEqual(result.reviewIssues, validated.reviewIssues);
     const artifact = activity.getDigestArtifact(userId, String(result.artifactId))!;
     const publication = JSON.parse(artifact.payload_json).publication;
     assert.deepEqual(publication.warnings, manifest.warnings);
@@ -115,7 +326,9 @@ test('validate and dry_run are pure; foreign account and expired run are rejecte
   const run = service.createDigestSnapshotRun(userId, snapshot());
   const before = activity.exportActivityDb(); const files = fs.readdirSync(root);
   assert.equal(service.validateDigestRun(userId, run.runId, digest()).valid, true);
-  assert.equal((await service.publishDigestV2(userId, run.runId, digest(), 'dry_run')).status, 'VALIDATED_NOT_PUBLISHED');
+  const dryRun = await service.publishDigestV2(userId, run.runId, digest(), 'dry_run');
+  assert.equal(dryRun.status, 'VALIDATED_NOT_PUBLISHED');
+  assert.deepEqual(dryRun.reviewIssues, [{ path: '$.stories', code: 'NEWS_SELECTION_REVIEW_REQUIRED' }]);
   assert.deepEqual(activity.exportActivityDb(), before); assert.deepEqual(fs.readdirSync(root), files);
   assert.throws(() => service.validateDigestRun('other', run.runId, digest()), /RUN_NOT_FOUND/);
   activity.createDigestRun({ id: 'expired', user_id: userId, report_date: snapshot().date, snapshot_json: JSON.stringify(snapshot()), manifest_json: '{}', created_at: '2020-01-01', expires_at: '2020-01-02' });
@@ -139,6 +352,18 @@ test('media: decode, resize, strip metadata, reject bad or small images, fallbac
   const options = { storage, mode: 'shadow' as const, mediaRoot: path.join(root, 'daily-report-media'), rules: [{ pageHost: 'example.com', imageHosts: ['images.example.com'], policy: 'OWNED_OPEN' as const, licenseRef: 'test open source' }], fetchOptions: { fetcher, lookup: async () => [{ address: '93.184.216.34', family: 4 as const }] } };
   const real = await prepareDigestMedia(illustrated(), options);
   assert.equal(real[0].fallback, false); assert.ok(real[0].publicUrl);
+  const withImage = illustrated(); withImage.date = '2026-10-11';
+  const imageRun = service.createDigestSnapshotRun(userId, { ...snapshot(), date: withImage.date });
+  const published = await service.publishDigestV2(userId, imageRun.runId, withImage, 'shadow', options);
+  assert.deepEqual(published.imageCoverage, { total: 1, real: 0, archival: 1, illustration: 0, placeholder: 0, missing: 0 });
+  assert.equal((published.media as any).archival, 1);
+  const listItem = service.digestArtifactView(activity.getDigestArtifact(userId, String(published.artifactId))!);
+  assert.equal(listItem.headline, '有来源的新闻');
+  const publishedMedia = JSON.parse(activity.getDigestArtifact(userId, String(published.artifactId))!.payload_json).publication.media[0];
+  assert.equal(publishedMedia.filename, real[0].filename);
+  assert.notEqual(publishedMedia.key, real[0].key);
+  assert.equal(listItem.heroImageUrl, publishedMedia.publicUrl);
+  assert.equal(listItem.excerpt, '一项可核验的新变化');
   const count = uploads; await prepareDigestMedia(illustrated(), options); assert.equal(uploads, count);
   objects.delete(real[0].key); await restoreDigestObjects(real, storage, options.mediaRoot); assert.ok(objects.has(real[0].key));
   for (const status of [403, 404, 500]) {
@@ -155,6 +380,37 @@ test('media: decode, resize, strip metadata, reject bad or small images, fallbac
   const shared = illustrated(); shared.media.push({ ...shared.media[0], id: 'm2' }); shared.stories[0].media_ids.push('m2');
   const refs = await prepareDigestMedia(shared, options);
   assert.equal(refs.length, 2); assert.equal(refs[0].sha256, refs[1].sha256); assert.notEqual(refs[0].id, refs[1].id);
+  assert.equal(refs[0].key, refs[1].key, 'same-date references share one object');
+  const later = illustrated(); later.date = '2026-10-12';
+  const laterRefs = await prepareDigestMedia(later, options);
+  assert.equal(laterRefs[0].filename, refs[0].filename, 'local content-addressed mirror stays shared');
+  assert.notEqual(laterRefs[0].key, refs[0].key, 'later date gets its own tmp expiration');
+  assert.match(laterRefs[0].key, /^tmp\/2026-10-12\//);
+  objects.delete(refs[0].key); objects.delete(laterRefs[0].key);
+  await restoreDigestObjects([...refs, ...laterRefs], storage, options.mediaRoot);
+  assert.ok(objects.has(refs[0].key)); assert.ok(objects.has(laterRefs[0].key));
+  const beforeBadRestore = uploads;
+  await assert.rejects(restoreDigestObjects([refs[0], { ...laterRefs[0], key: `tmp/2026-10-12/${'0'.repeat(64)}.jpg` }], storage, options.mediaRoot), /MEDIA_BACKUP_PATH/);
+  assert.equal(uploads, beforeBadRestore, 'a bad later reference cannot cause an earlier upload');
+});
+
+test('new Shadow labels and counts category fallback as a placeholder', async () => {
+  const d = illustrated(); d.date = '2026-10-12'; d.media = []; d.stories[0].media_ids = [];
+  d.stories.push({ id: 's2', title: '另一条新闻', summary: '第二条可核验消息', evidence_ids: ['e1'], media_ids: [], verification: 'partial' });
+  const run = service.createDigestSnapshotRun(userId, { ...snapshot(), date: d.date });
+  const receipt = await service.publishDigestV2(userId, run.runId, d, 'shadow', { storage, rules: [], mediaRoot: path.join(root, 'daily-report-media') });
+  assert.deepEqual(receipt.imageCoverage, { total: 2, real: 0, archival: 0, illustration: 0, placeholder: 2, missing: 0 });
+  assert.equal((receipt.media as any).fallback, 2);
+  const artifact = activity.getDigestArtifact(userId, String(receipt.artifactId))!;
+  const publication = JSON.parse(artifact.payload_json).publication;
+  assert.equal(publication.media.length, 2);
+  assert.equal(new Set(publication.media.map((m: any) => m.sha256)).size, 2);
+  assert.ok(publication.media.every((m: any) => m.storyId && m.fallback && m.publicUrl && m.visualKind === 'placeholder' && m.licenseRef === 'code-owned-category-placeholder'));
+  const html = renderDigestV2(publication);
+  assert.ok(html.includes('digest-v2-story--lead'));
+  assert.ok(html.includes('digest-v2-story--compact'));
+  assert.equal((html.match(/原创栏目占位图，非新闻现场图片/g) || []).length, 4);
+  assert.ok(!html.includes('此条暂无可用配图'));
 });
 
 test('interrupted media-save, report-save and queue steps recover without duplicate deliveries', async t => {
@@ -191,6 +447,7 @@ test('shadow is isolated, retry is idempotent, renderer escapes injection and ba
   const d = illustrated(); d.stories[0].title = '<img src=x onerror=alert(1)>';
   const results = await Promise.all(Array.from({ length: 3 }, () => service.publishDigestV2(userId, run.runId, d, 'shadow', { storage, rules: [] })));
   assert.equal(new Set(results.map(r => r.artifactId)).size, 1);
+  assert.deepEqual(results[0].imageCoverage, { total: 1, real: 0, archival: 0, illustration: 0, placeholder: 1, missing: 0 });
   assert.equal(activity.listDailyReports(userId).length, reportCount);
   assert.equal(activity.exportUserActivity(userId).notifications.length, notificationCount);
   const artifact = activity.getDigestArtifact(userId, String(results[0].artifactId))!;
@@ -223,11 +480,20 @@ test('production is gated and repeated/concurrent publication does not duplicate
   await assert.rejects(service.publishDigestV2(userId, run.runId, digest(), 'production'), /V2_PRODUCTION_DISABLED/);
 });
 
-test('user backup restores V2 runs, immutable publications and independently stored image bytes', () => {
+test('user backup restores V2 runs, immutable publications and independently stored image bytes', async () => {
+  for (const date of ['2026-10-20', '2026-10-21']) {
+    const d = illustrated(); d.date = date;
+    const run = service.createDigestSnapshotRun(userId, { ...snapshot(), date });
+    await service.publishDigestV2(userId, run.runId, d, 'shadow', { storage, rules: [] });
+  }
   const before = activity.exportUserActivity(userId);
   const saved = backup.createUserBackup(userId, 'restore-test-password');
   const decoded: any = backup.decryptBackup(saved, 'restore-test-password');
-  const first = decoded.digestMedia[0];
+  const references = before.digestV2Artifacts.flatMap((row: any) => JSON.parse(row.payload_json).publication.media.map((media: any) => media.filename));
+  const sharedFilename = references.find((filename: string, index: number) => references.indexOf(filename) !== index);
+  assert.ok(sharedFilename, 'separate artifacts share a content-addressed local media file');
+  assert.equal(decoded.digestMedia.filter((item: any) => item.filename === sharedFilename).length, 1);
+  const first = decoded.digestMedia.find((item: any) => item.filename === sharedFilename);
   const imagePath = path.join(root, 'daily-report-media', first.filename);
   assert.ok(fs.existsSync(imagePath), 'fixture must use isolated media root');
   fs.renameSync(imagePath, imagePath + '.held');
@@ -306,7 +572,7 @@ test('seven fixed synthetic scenarios save only isolated Shadow artifacts', asyn
       d.mail = [{ input_id: 'mail-1', summary: '合成邮件摘要', action: '整理资料' }];
     }
     if (name === 'major-news') d.executive_signals = ['合成重大事件，不代表真实新闻'];
-    if (name === 'data-revision') d.stories[0].summary = '合成数据：前值 1.0，修订值 1.1；不构成真实数据发布。';
+    if (name === 'data-revision') d.stories[0].summary = '合成数据：前值 1.0，**修订值 1.1**；不构成真实数据发布。';
     if (name === 'source-failure') d.stories[0].verification = 'unverified';
     const run = service.createDigestSnapshotRun(userId, snap);
     const result = await service.publishDigestV2(userId, run.runId, d, 'shadow', { storage: name === 'all-images-failure' ? null : storage, rules: [] });
@@ -357,6 +623,68 @@ test('audited single-image rules retain attribution and reject siblings, redirec
   const { sourceFile: _file, sourceSha256: _hash, ...networkRule } = rule;
   const redirected = await prepareDigestMedia(illustrated(), { ...options, rules: [networkRule], fetchOptions: { lookup: async () => [{ address: '93.184.216.34', family: 4 as const }], fetcher: async () => new Response(null, { status: 302, headers: { location: 'https://images.example.com/unapproved.jpg' } }) } });
   assert.equal(redirected[0].fallback, true);
+});
+
+test('audited original illustration stays distinct from photos and placeholders through Shadow', async () => {
+  const png = await sharp({ create: { width: 960, height: 320, channels: 3, background: '#365a73' } }).png().toBuffer();
+  const sourceFile = path.join(root, 'owned-story-art.png'); fs.writeFileSync(sourceFile, png);
+  const sourceSha256 = crypto.createHash('sha256').update(png).digest('hex');
+  const sourceUrl = 'https://images.example.com/owned-story-art.png';
+  const rule = { pageHost: 'example.com', pageUrl: 'https://example.com/story', imageHosts: ['images.example.com'], imageUrls: [sourceUrl], policy: 'OWNED_OPEN' as const,
+    licenseRef: 'project-owned-image', visualKind: 'illustration' as const, sourceFile, sourceSha256,
+    credit: { caption: '贴题原创插画，非新闻现场', author: 'AI Calendar', sourcePage: sourceUrl, licenseName: '项目原创', licenseUrl: '' } };
+  const rulesFile = path.join(root, 'owned-media-rules.json'); fs.writeFileSync(rulesFile, JSON.stringify([rule]));
+  process.env.DIGEST_V2_MEDIA_RULES_FILE = rulesFile;
+  try { assert.equal(configuredMediaRules()[0].visualKind, 'illustration'); }
+  finally { delete process.env.DIGEST_V2_MEDIA_RULES_FILE; }
+  const d = illustrated(); d.date = '2026-10-29'; d.media[0].url = sourceUrl;
+  const run = service.createDigestSnapshotRun(userId, { ...snapshot(), date: d.date });
+  const receipt = await service.publishDigestV2(userId, run.runId, d, 'shadow', { storage, rules: [rule], mediaRoot: path.join(root, 'daily-report-media') });
+  assert.deepEqual(receipt.imageCoverage, { total: 1, real: 0, archival: 0, illustration: 1, placeholder: 0, missing: 0 });
+  assert.equal((receipt.media as any).real, 0);
+  assert.equal((receipt.media as any).illustration, 1);
+  const artifact = activity.getDigestArtifact(userId, String(receipt.artifactId))!;
+  const publication = JSON.parse(artifact.payload_json).publication;
+  assert.equal(publication.media[0].visualKind, 'illustration');
+  assert.equal(publication.media[0].sourceTransport, 'audited_copy');
+  assert.equal(publication.media[0].failure, null);
+  assert.equal(service.digestArtifactView(artifact).heroImageVisualKind, 'illustration');
+  const html = renderDigestV2(publication, true);
+  assert.match(html, /height:auto;max-height:320px;object-fit:contain/);
+  assert.ok(html.includes('贴题原创插画，非新闻现场'));
+  assert.ok(!html.includes('href=""'));
+});
+
+test('production local media uses durable hosted files and rejects unpictured news before publishing', async () => {
+  const previousOrigin = process.env.APP_URL;
+  process.env.APP_URL = 'https://calendar.example.com';
+  process.env.DIGEST_V2_MEDIA_STORE = 'local';
+  process.env.DIGEST_PRODUCTION_CONTRACT = 'daily-digest.v2';
+  try {
+    const bytes = await sharp({ create: { width: 960, height: 320, channels: 3, background: '#365a73' } }).png().toBuffer();
+    const sourceFile = path.join(root, 'production-art.png'); fs.writeFileSync(sourceFile, bytes);
+    const rule = { pageHost: 'example.com', pageUrl: 'https://example.com/story', imageHosts: ['images.example.com'], imageUrls: ['https://images.example.com/image.jpg'], policy: 'OWNED_OPEN' as const,
+      licenseRef: 'project-owned-image', visualKind: 'illustration' as const, sourceFile, sourceSha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+      credit: { caption: '合成贴题插画', author: 'AI Calendar', sourcePage: 'https://images.example.com/image.jpg', licenseName: '项目原创', licenseUrl: '' } };
+    const d = illustrated(); d.date = '2026-10-30';
+    const run = service.createDigestSnapshotRun(userId, { ...snapshot(), date: d.date });
+    const receipt = await service.publishDigestV2(userId, run.runId, d, 'production', { rules: [rule], mediaRoot: path.join(root, 'daily-report-media') });
+    assert.equal(receipt.status, 'PUBLISHED');
+    const publication = JSON.parse(activity.getDigestArtifact(userId, String(receipt.artifactId))!.payload_json).publication;
+    const image = publication.media[0];
+    assert.equal(image.key, `local/${image.filename}`);
+    assert.equal(image.publicUrl, `https://calendar.example.com/daily-report-media/${image.filename}`);
+    assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'daily-report-media', image.filename))).digest('hex'), image.sha256);
+
+    const missing = illustrated(); missing.date = '2026-10-31'; missing.media = []; missing.stories[0].media_ids = [];
+    const missingRun = service.createDigestSnapshotRun(userId, { ...snapshot(), date: missing.date });
+    await assert.rejects(service.publishDigestV2(userId, missingRun.runId, missing, 'production', { rules: [], mediaRoot: path.join(root, 'daily-report-media') }), /STORY_IMAGE_NOT_READY/);
+    assert.equal(activity.getDailyReport(userId, missing.date, 'cloud'), null);
+  } finally {
+    if (previousOrigin === undefined) delete process.env.APP_URL; else process.env.APP_URL = previousOrigin;
+    delete process.env.DIGEST_V2_MEDIA_STORE;
+    delete process.env.DIGEST_PRODUCTION_CONTRACT;
+  }
 });
 
 test('source icons use reviewed exact URLs, stay optional, and never count as story images', async () => {
