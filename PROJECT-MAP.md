@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified version: `0.31.14-260927.1103`（2026-09-27，V2.5 早版空新闻 Shadow 与列表文案已在独立站验收；D03 媒体恢复仍仅有测试对象证据，V3 Core 保留其 2026-09-24 本地合成基线，不代表正式生产或跨日期有新闻配图验收）。
+- Last verified version: `0.31.22-260929.0809`（2026-09-29，V2.5 隔离关注输入与媒体类别合同已本地验证；隔离 Shadow、浏览器和自然定时结果按实际运行分别记录，V3 Core 仍保留其 2026-09-24 本地合成基线）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -49,6 +49,8 @@ CalDAV 入口为 `server/routes/caldav.ts`；`caldav-service` 共享手动/后�
 ### 1.2 日报 V2 Local 流程
 
 新版 V2.5 的独立 Cloud 分支由 `server/digest-v2-{contract,service,media,fetch,render}.ts` 实现，MCP 入口仍在 `daily-report-cloud-mcp.ts`。输入运行与隔离产物在原 `activity.db` 的 `digest_v2_runs`、`digest_v2_artifacts`；production 才写原日报/通知表。阅读复用 `reports-read.ts` 与 `DailyReportsPage.tsx`，R2 字节镜像进入原媒体/备份边界。V1 Local 图示仍适用于原链路，不能作为新版合同。详细字段、开关和 Shadow 边界见 [V2.5 合同](docs/CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
+
+隔离服务额外允许登录账号以版本前提写入或撤回该账号的两项关注配置，入口为 `/api/daily-report/cloud-context/shadow-watchlist`。该入口仅在 Shadow 进程启用，字段和媒体分类以 [V2.5 合同](docs/CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同) 为准；主站不启用。
 
 V3 Core 的 S2-03 存储位于同一个 `activity.db`：`server/digest-v3-store.ts` 管理 Event/Revision/Evidence/Analysis 与引用表，`activity-store.ts` 负责初始化和可靠写回。S2-04 通过原 `backup-service.ts` 账号备份和恢复七张表，同账号替换、旧备份与跨账号 ID 重映射均有保护。当前仅供内部使用；没有 V3 MCP/HTTP 或自动匹配，详见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#s2-04-账号级备份与恢复2026-09-24)。
 

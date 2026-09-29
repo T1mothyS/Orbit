@@ -25,6 +25,7 @@ export interface DailyReportView {
   date: string;
   headline: string | null;
   heroImageUrl: string | null;
+  heroImageVisualKind?: 'photo' | 'archive_photo' | 'illustration' | 'placeholder' | null;
   heroImageCredit: string | null;
   heroImageSourceUrl: string | null;
   heroImageLicenseUrl: string | null;
@@ -149,7 +150,7 @@ function legacyExcerpt(markdown: string): string {
   return (candidate?.cleaned || PREVIEW_FALLBACK).slice(0, 240);
 }
 
-function reportPresentation(markdown: string): Pick<DailyReportView, 'headline' | 'heroImageUrl' | 'heroImageCredit' | 'heroImageSourceUrl' | 'heroImageLicenseUrl' | 'excerpt'> {
+function reportPresentation(markdown: string): Pick<DailyReportView, 'headline' | 'heroImageUrl' | 'heroImageCredit' | 'heroImageSourceUrl' | 'heroImageLicenseUrl' | 'excerpt' | 'heroImageVisualKind'> {
   const v2 = decodeDigestPublication(markdown);
   if (v2) return digestV2Cover(v2);
   const noCredit = { heroImageCredit: null, heroImageSourceUrl: null, heroImageLicenseUrl: null };
@@ -175,6 +176,7 @@ export function toDailyReportView(record: activityStore.DailyReportRecord, inclu
     date: record.reportDate,
     headline: presentation.headline,
     heroImageUrl: presentation.heroImageUrl,
+    heroImageVisualKind: presentation.heroImageVisualKind || null,
     heroImageCredit: presentation.heroImageCredit,
     heroImageSourceUrl: presentation.heroImageSourceUrl,
     heroImageLicenseUrl: presentation.heroImageLicenseUrl,

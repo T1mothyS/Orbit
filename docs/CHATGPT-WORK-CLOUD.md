@@ -134,7 +134,7 @@ dry-run 返回 `VALIDATED_NOT_PUBLISHED` 才能进行同正文正式发布。兼
 ### 输入、校验和权限
 
 - `daily_report.read_inputs_v2({date})` 返回账号隔离的 `runId`、输入快照、Context 及 JSON schema。生成日期、时区、截止时间、Context 版本由服务端绑定；合同/生成规则版本由程序记录，模型版本为 `unknown`。Calendar 最多 300、Mail 最多 100、Watchlist 最多 100；达到截断条件显式 `partial`。
-- QQ 邮箱状态分别映射为 `MAIL_NOT_CONFIGURED`（未配置或停用）、`MAIL_READ_FAILED`（读取失败）、`MAIL_INCOMPLETE`（部分读取）；读取成功且无未读时不产生邮箱警告。快照清单、校验/发布回执、内容哈希和新产物沿用同一映射；网页、邮件 HTML 与纯文本显示对应空态。未过期的旧 run 按原 `generationVersion` 维持原警告与内容哈希，重试复用既有产物；既有 Shadow 产物不改写，旧警告码仍可读取。
+- QQ 邮箱状态分别映射为 `MAIL_NOT_CONFIGURED`（未配置或停用）、`MAIL_READ_FAILED`（读取失败）、`MAIL_INCOMPLETE`（部分读取）；读取成功且无未读时不产生邮箱警告。Watchlist 缺配置、读取失败、部分有效分别为 `WATCHLIST_NOT_CONFIGURED`、`WATCHLIST_READ_FAILED`、`WATCHLIST_INCOMPLETE`，未完成逐项研究不得写成无变化。快照清单、校验/发布回执、内容哈希和新产物沿用同一映射；网页、邮件 HTML 与纯文本显示对应空态。未过期的旧 run 按原 `generationVersion` 维持原警告与内容哈希，重试复用既有产物；既有 Shadow 产物不改写，旧警告码仍可读取。
 - 快照只含日程必要字段、邮件摘要和引用、关注名单。7 天后不可继续验证/发布，并由后台维护清除敏感快照；运行版本、覆盖数量及阶段诊断长期保留。已生成的私有日报仍属于历史产物，不随输入快照过期而删除。旧加密备份中的快照遵守备份保留规则；恢复时再次丢弃已过期快照。
 - `daily_report.validate_v2({runId,digest})` 和 `publish_v2` 的 `dry_run` 只读取快照并纯校验；不访问外站、不处理媒体、不修改业务数据、不入队。过期或跨账号 run 拒绝。所有成功读取的输入 ID 必须逐项覆盖，即使该部分标记 `partial`；错误返回 `path/code`，成功返回稳定 `contentHash`。
 - JSON 权威定义为 [digest-v2-contract.ts](../server/digest-v2-contract.ts) 的 `DIGEST_V2_SCHEMA`。所有顶层字段必填，允许空数组；摘要信号最多 5 条。`check`、`verification`、`change` 分别表示检查完成、证据核对、事件变化，不能互相替代。缺少证据或检查未完成时不得判断“无重大变化”。新闻数量没有最低要求。
@@ -150,6 +150,10 @@ dry-run 返回 `VALIDATED_NOT_PUBLISHED` 才能进行同正文正式发布。兼
 
 Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，复用登录保护与阅读页面，但不进入正式列表、旧 History 或候选来源切换。对应 GET 接口仍检查账号和日期。未登录的日报链接登录后保留查询参数。
 
+隔离测试账号的两项关注迁移仅开放 `PATCH /api/daily-report/cloud-context/shadow-watchlist`：要求登录、`expectedVersion` 与恰好两项唯一标的，标的只接受 `name/symbol/priority/sectors/thesis`，其中 `thesis` 只接受 `status/priority/thesis/monitor`。写入仅合并当前账号的 `watchlist.stocks`，保留 Context 其他字段；版本不符或现有 Context 损坏即拒绝。相同路径的 `DELETE` 要求当前版本，供撤回迁入的 stocks，其他 Context 字段仍保留。此路由仅在独立 Shadow 进程注册；完整 Context PUT 仍被其写入屏障阻止。为容纳现有 Thesis 的一层嵌套，Context 安全校验深度上限为 9，字节与敏感字段/值限制不变。迁移前后应分别备份并回读，不复制其他个人数据。
+
+`read_inputs_v2` 的 Watchlist 快照逐项投影 `priority/sectors` 与 `thesis.status/priority/thesis/monitor` 到 `detail`，只把已授权的研究范围交给 Work，不透传 Context 的其他字段。缺名称、标的代码、任一研究字段，或单项投影超过 4000 字符时，保留对象标题但把 Watchlist 标为 `partial`；Work 不得将此状态写成“无新增”。
+
 网页、邮件 HTML 和纯文本由 JSON 确定性生成；模型不提交完整 Markdown。自 `2026-09-27.1` 生成规则起，正文字符串用成对 `**` 标出每句一到两处短重点（对象、关键数字、结论或行动），服务端校验标记并安全转成加粗；标题不加标记，长正文缺重点或标记不成对会拒绝。纯文本与列表摘要去掉标记。旧 run/产物仍按冻结的 `renderer` 校验与展示，不补写旧正文。媒体全部失败仍保留完整文字；输入失败在顶部显示明确提示。V1 的历史解析和展示继续保留。新版内部发布快照使用带 V2 标记的 JSON envelope，旧发布接口拒绝该标记。
 
 按账号/日期串行提交，账号/日期/模式/内容哈希唯一。内容哈希覆盖结构化内容和输入缺失警告，不包含运行时间、渲染媒体的临时地址或日志；渲染另有哈希，通知有独立 ID。`MEDIA_PREPARING`、`MEDIA_PREPARED`、`REPORT_SAVED`、完成/失败分别记入运行清单，保留最多 50 条最近阶段事件。中断后以相同 run、内容和模式重试；已保存的产物复用冻结媒体，不因重试悄悄改变已发布内容。
@@ -160,13 +164,13 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 
 - 开启V2且配置合法R2公开域名时，网页CSP的 `img-src` 只追加这个精确HTTPS origin；不允许通配域名、带路径/凭据的地址或生产 `r2.dev`，脚本和连接策略不扩大。验收必须检查浏览器图片实际加载，不能用R2 HTTP 200代替网页显示。
 
-- 单图审核可增加 `pageUrl`、`imageUrls` 精确地址限制；重定向也必须命中审核地址，不能用同域其他文件替换。`credit` 包含 `caption`、`author`、`sourcePage`、`licenseName`、`licenseUrl`，只能由服务器审核配置提供。旧产物继续保留原署名行；`2026-09-27.1` 起网页、邮件HTML与纯文本以简短图注保留作者、来源、许可链接和“已编辑”，不再向读者展示 JPEG/元数据处理细节。历史资料图必须注明拍摄日期及非当日现场，不算分类默认图，也不能声称是当日现场图。
+- 单图审核可增加 `pageUrl`、`imageUrls` 精确地址限制；重定向也必须命中审核地址，不能用同域其他文件替换。`credit` 包含 `caption`、`author`、`sourcePage`、`licenseName`、`licenseUrl`，只能由服务器审核配置提供；项目自有插画以空 `licenseUrl` 和“项目原创”标识，图注标明非新闻现场。旧产物继续保留原署名行；`2026-09-27.1` 起网页、邮件HTML与纯文本以简短图注保留作者、来源、许可和“已编辑”，不再向读者展示 JPEG/元数据处理细节。历史资料图必须注明拍摄日期及非当日现场，不算分类默认图，也不能声称是当日现场图。
 - 源站在服务器侧不可达时，操作者可提供私有 `sourceFile` 与原始 `sourceSha256`，仅允许绑定一个精确图片URL且具有完整署名的规则。读取前验证普通文件、大小和SHA-256，再执行相同解码/缩放/R2流程；Work不能提交本机路径。回执 `sourceTransport=audited_copy` 与 `network` 分开，审核副本成功不算服务器直连源站成功。原始URL及哈希随产物保留，私有路径不进入产物。回退旧代码前先禁用新增规则，避免旧实现忽略精确限制。
 
 - 服务端许可文件为 JSON 数组：`[{"pageHost":"publisher.example.com","imageHosts":["images.example.com"],"policy":"OWNED_OPEN","licenseRef":"审核证据或授权说明"}]`。支持 `OWNED_OPEN`、`LICENSED`、`EXTERNAL_ALLOWED`，只由操作者配置；Work 的许可声明不能授权。未知或受限来源不抓取，转分类图。需要公开的新闻图片才能进入此流程，私人邮件图片、附件和敏感预览不得加入许可名单。
 - 逐图许可的日期证据另存审核快照；[2026-09-23 NASA Earth Observatory 单图审核](DAILY-DIGEST-MEDIA-SOURCE-AUDIT-20260923.md)仅限精确文章和图片，不扩大为整域许可或正式发布；其隔离下载、处理与引用结果见 [S1-R3b 技术验收](DAILY-DIGEST-MEDIA-R3B-VERIFICATION-20260923.md)。
 - 复用现有下载大小/超时、SSRF、签名验证和内容哈希；新增 HTTPS DNS 地址固定与每次重定向许可校验。JPEG/PNG/WebP 解码，20MP 像素上限、最小 80×80、缩放至最多 1200×900，去元数据并转 JPEG；分类图由程序生成 PNG。未知图片/403/404/超时等进入分类图；R2 不可用则纯文字。
-- 图片内容按哈希去重；每篇文章的媒体 ID、来源、许可、账号产物引用独立保留。2026-09-26.1 起，每条没有可展示真实图的 `market`、`macro`、`stories` 条目由服务端生成不同的原创抽象编辑插画，并标明“非新闻现场图片”；图片仍经本地镜像和 R2 保存，R2 失败则保留文字并计为缺图。插画是视觉补位，不计入真实新闻配图数量；无允许来源时真实配图成功率必须报告为 0，不能拿插画代替。回执 `imageCoverage` 分别记录条目总数、真实图、插画和缺图。日报列表的封面、标题和短摘要取同一条有图的重点新闻，封面保留资料图/插画标注及许可入口；若没有可展示新闻图，列表不预留空白图片栏。`2026-09-27.1` 起详情页把同一张头条图作为文章开头的首屏大图，标题放在图下，正文不重复展示该图；正常媒体不可用时如实展示无图状态。
+- 图片内容按哈希去重；每篇文章的媒体 ID、来源、许可、账号产物引用独立保留。服务端原有按类别生成的文字与几何图自 `2026-09-28.1` 起明确算 `placeholder`，不算贴题插画。审核过的精确来源规则可标 `visualKind=photo/archive_photo/illustration`；项目自有插画必须同时绑定一份审核副本、原始 SHA-256、精确来源 URL 和署名，处理后仍按原镜像与 R2 链路托管。回执 `imageCoverage` 将当期照片、资料照片、贴题插画、类别占位图和缺图分开统计；图片上传失败时不得以许可页或本地样张冒充成功。日报列表的封面、标题和短摘要取同一条有图的重点新闻，封面保留资料图/插画标注；宽幅插画与占位图完整展示。`2026-09-27.1` 起详情页把同一张头条图作为文章开头的首屏大图，标题放在图下，正文不重复展示该图；正常媒体不可用时如实展示无图状态。
 - 新版详情和邮件的展示栏目名由新闻有无确定为“今日重点新闻”或“今日情报简报”，日期单列；Shadow 列表最新卡片统一标为“最新日报 · 新版隔离预览”，避免空新闻早版被标成重点新闻。历史隔离稿的原始 `digest.title` 仍留在不可变产物中供核对，展示不再重复版本、日期和验收字样。`2026-09-27.1` 起新闻段落和 Watchlist 用编号角标跳转到文末“来源”；同一证据复用编号，图片专用证据从新闻来源列表排除并在图片署名中保留。文末逐项显示来源名称、原始发布时间或“时间未知”、原文链接；正文不显示“证据已核对”“发布时间未提供”。旧 renderer 保留原有标题和来源语义。
 - 测试使用专用 Bucket 和受限对象令牌；生产使用自定义域名，拒绝 `r2.dev`。Shadow 真实图和来源图标写 `tmp/<日报日期>/<哈希文件名>`，旧产物仍可引用原 `tmp/<哈希文件名>`；生产真实图写 `published/`，原创插画写 `fallback/`。同一日期的相同字节共用临时对象，不同日期使用不同键，避免后一期引用继承前一期的到期时间。Bucket 生命周期只对 `tmp/` 保留 7 天，不对 `published/` 或 `fallback/` 设置到期删除；新临时对象使用 `Cache-Control: no-store`，长期图片仍使用不可变缓存。超过 7 天的 Shadow 可能失去在线图片，其私有本地备份仍保留。R2 自定义域的 CDN 清除须按单个精确 URL 进行，删除源对象或收到清除回执后还应核对实际公共读回；`r2.dev` 不支持 CDN 缓存验收。
 - 每个上传对象先保存独立本地镜像，正式/Shadow 产物存对象键与 SHA-256；账号加密备份按哈希文件名去重附带媒体字节，全站备份沿现有媒体目录收集。仅有 URL 不能算完整备份。恢复账号备份先校验文件名、大小与哈希；R2 对象恢复使用 `restoreDigestObjects`，先校验整批键、文件名、字节数、MIME 与哈希，再按唯一键上传并下载核验；旧 `tmp/<哈希文件名>` 继续可恢复。不自动重发邮件，也不自动清除 CDN 缓存。

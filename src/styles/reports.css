@@ -108,6 +108,7 @@
 .daily-report-featured-open.with-image { grid-template-columns: minmax(0, 1.12fr) minmax(300px, .88fr); }
 .daily-report-featured-open:focus-visible { outline: 2px solid var(--td-brand-color); outline-offset: -3px; }
 .daily-report-featured-hero { width: 100%; height: 100%; min-height: 270px; aspect-ratio: 16 / 9; object-fit: cover; background: var(--td-bg-color-component); }
+.daily-report-featured-open.illustrated .daily-report-featured-hero { height: auto; min-height: 0; aspect-ratio: 3 / 1; object-fit: contain; align-self: center; }
 .daily-report-featured-body { min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: clamp(22px, 4vw, 44px); }
 .daily-report-featured-kicker { margin-bottom: 15px; color: var(--td-brand-color); font-size: 10px; font-weight: 850; letter-spacing: .16em; }
 .daily-report-featured-headline { margin: 15px 0 0; color: var(--td-text-color-primary); font-family: Georgia, 'Songti SC', 'SimSun', serif; font-size: clamp(28px, 4vw, 46px); line-height: 1.18; letter-spacing: -.035em; overflow-wrap: anywhere; }
@@ -160,6 +161,7 @@
 .daily-report-card-open.with-image { grid-template-columns: 240px minmax(0, 1fr); }
 .daily-report-card-open:focus-visible { outline: 2px solid var(--td-brand-color); outline-offset: -3px; }
 .daily-report-card-hero { width: 240px; height: 148px; object-fit: cover; background: var(--td-bg-color-component); }
+.daily-report-card-open.illustrated .daily-report-card-hero { height: auto; aspect-ratio: 3 / 1; object-fit: contain; align-self: center; }
 .daily-report-card-body { min-width: 0; display: flex; flex: 1 1 auto; flex-direction: column; padding: 17px 20px 16px; }
 .daily-report-card-topline,
 .daily-report-detail-header,
@@ -268,6 +270,7 @@
   .daily-report-featured-headline { font-size: 30px; }
   .daily-report-card-open { display: flex; flex-direction: column; }
   .daily-report-card-hero { width: 100%; height: 180px; }
+  .daily-report-card-open.illustrated .daily-report-card-hero { width: 100%; height: auto; }
   .daily-report-history-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
   .daily-report-card-footer { align-items: flex-start; flex-direction: column; }
   .daily-report-card-footer .daily-report-retry-button { align-self: flex-start; }

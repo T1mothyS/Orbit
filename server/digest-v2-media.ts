@@ -9,7 +9,7 @@ import { publicDigestUrl, type DigestV2 } from './digest-v2-contract.js';
 import { isValidDateKey } from './date-key.js';
 
 export interface MediaCredit { caption: string; author: string; sourcePage: string; licenseName: string; licenseUrl: string }
-export interface MediaRule { pageHost: string; imageHosts: string[]; policy: 'OWNED_OPEN' | 'LICENSED' | 'EXTERNAL_ALLOWED'; licenseRef: string; pageUrl?: string; imageUrls?: string[]; credit?: MediaCredit; sourceFile?: string; sourceSha256?: string; kind?: 'source_icon' }
+export interface MediaRule { pageHost: string; imageHosts: string[]; policy: 'OWNED_OPEN' | 'LICENSED' | 'EXTERNAL_ALLOWED'; licenseRef: string; pageUrl?: string; imageUrls?: string[]; credit?: MediaCredit; sourceFile?: string; sourceSha256?: string; kind?: 'source_icon'; visualKind?: 'photo' | 'archive_photo' | 'illustration' }
 export interface PreparedImage {
   id: string; evidenceId: string; category: string; sourceUrl: string; licenseRef: string;
   policy: string; publicUrl: string; key: string; filename: string; sha256: string;
@@ -20,6 +20,7 @@ export interface PreparedImage {
   sourceHost?: string;
   sourceSha256?: string;
   storyId?: string;
+  visualKind?: 'photo' | 'archive_photo' | 'illustration' | 'placeholder';
 }
 export interface ObjectStorage {
   origin: string;
@@ -74,9 +75,11 @@ export function configuredMediaRules(): MediaRule[] {
       || r.imageHosts.some((h: string) => !publicDigestUrl(`https://${h}`)) || !['OWNED_OPEN', 'LICENSED', 'EXTERNAL_ALLOWED'].includes(r.policy)
       || typeof r.licenseRef !== 'string' || !r.licenseRef.trim()) throw new Error('MEDIA_RULES_INVALID');
     if (r.kind !== undefined && (r.kind !== 'source_icon' || r.imageUrls?.length !== 1 || r.sourceFile)) throw new Error('MEDIA_RULES_INVALID');
+    if (r.visualKind !== undefined && !['photo', 'archive_photo', 'illustration'].includes(r.visualKind)) throw new Error('MEDIA_RULES_INVALID');
+    if (r.visualKind === 'illustration' && (r.kind || r.policy !== 'OWNED_OPEN' || !r.sourceFile || !r.credit || r.credit.licenseUrl !== '')) throw new Error('MEDIA_RULES_INVALID');
     if (r.pageUrl !== undefined && (!publicDigestUrl(r.pageUrl) || new URL(r.pageUrl).hostname !== r.pageHost)) throw new Error('MEDIA_RULES_INVALID');
     if (r.imageUrls !== undefined && (!Array.isArray(r.imageUrls) || !r.imageUrls.length || r.imageUrls.some((u: string) => !publicDigestUrl(u) || !r.imageHosts.includes(new URL(u).hostname)))) throw new Error('MEDIA_RULES_INVALID');
-    if (r.credit !== undefined && (!r.pageUrl || !r.imageUrls || !r.credit || !['caption', 'author', 'licenseName'].every(k => typeof r.credit[k] === 'string' && r.credit[k].trim() && r.credit[k].length <= 500) || !publicDigestUrl(r.credit.sourcePage) || !publicDigestUrl(r.credit.licenseUrl))) throw new Error('MEDIA_RULES_INVALID');
+    if (r.credit !== undefined && (!r.pageUrl || !r.imageUrls || !r.credit || !['caption', 'author', 'licenseName'].every(k => typeof r.credit[k] === 'string' && r.credit[k].trim() && r.credit[k].length <= 500) || !publicDigestUrl(r.credit.sourcePage) || (r.visualKind !== 'illustration' && !publicDigestUrl(r.credit.licenseUrl)))) throw new Error('MEDIA_RULES_INVALID');
     if ((r.sourceFile !== undefined || r.sourceSha256 !== undefined) && (typeof r.sourceFile !== 'string' || !path.isAbsolute(r.sourceFile) || !/^[a-f0-9]{64}$/.test(r.sourceSha256 || '') || !r.pageUrl || r.imageUrls?.length !== 1 || !r.credit)) throw new Error('MEDIA_RULES_INVALID');
   }
   return value;
@@ -129,7 +132,7 @@ export async function transformDigestIcon(bytes: Buffer) {
 const categories = ['AI', 'Semiconductor', 'Banking', 'Macro', 'Gaming', 'China', 'International', 'Company', 'Market'];
 async function fallbackImage(category: string, seed = '') {
   const index = Math.max(0, categories.indexOf(category));
-  // Original abstract editorial art. Shapes are decorative, never a chart of observed values.
+  // Category placeholder. Shapes are decorative, never a chart of observed values.
   const digest = crypto.createHash('sha256').update(`${category}:${seed}`).digest();
   const palettes = [
     ['#e5edf5', '#1b4d6b', '#5a96b5'], ['#e9edf5', '#284b7c', '#8faed2'],
@@ -212,7 +215,7 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
       }
     } catch { failure = storage ? 'R2_UPLOAD_FAILED' : 'R2_NOT_CONFIGURED'; }
     failure = configurationFailure || failure;
-    images.push({ ...(m.kind ? { kind: m.kind, sourceHost: new URL(evidence.url).hostname } : {}), id: m.id, evidenceId: m.evidence_id, sourceUrl: m.url, category: m.category, licenseRef: fallback ? 'code-owned-category-art' : rule!.licenseRef, policy: fallback ? 'OWNED_OPEN' : rule!.policy, publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback, failure, ...(!fallback ? { sourceTransport: rule?.sourceFile ? 'audited_copy' as const : transport || 'network' as const, sourceSha256, ...(rule?.credit ? { credit: { ...rule.credit } } : {}) } : {}) });
+    images.push({ ...(m.kind ? { kind: m.kind, sourceHost: new URL(evidence.url).hostname } : {}), id: m.id, evidenceId: m.evidence_id, sourceUrl: m.url, category: m.category, licenseRef: fallback ? 'code-owned-category-art' : rule!.licenseRef, policy: fallback ? 'OWNED_OPEN' : rule!.policy, publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback, failure, ...(fallback ? { visualKind: 'placeholder' as const } : { visualKind: rule!.visualKind || 'archive_photo' as const, sourceTransport: rule?.sourceFile ? 'audited_copy' as const : transport || 'network' as const, sourceSha256, ...(rule?.credit ? { credit: { ...rule.credit } } : {}) }) });
   }
   if (options.storyIllustrations) {
     const stories = [...d.market, ...d.macro, ...d.stories];
@@ -233,7 +236,7 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
         await storage.put(key, result.data, mime, sha256);
         publicUrl = storage.origin + '/' + key;
       } catch { failure = storage ? 'R2_UPLOAD_FAILED' : 'R2_NOT_CONFIGURED'; }
-      images.push({ id: `story-illustration:${sha256}`, storyId: story.id, evidenceId: story.evidence_ids[0] || '', sourceUrl: '', category, licenseRef: 'code-owned-editorial-illustration', policy: 'OWNED_OPEN', publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback: true, failure });
+      images.push({ id: `story-placeholder:${sha256}`, storyId: story.id, evidenceId: story.evidence_ids[0] || '', sourceUrl: '', category, licenseRef: 'code-owned-category-placeholder', policy: 'OWNED_OPEN', publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback: true, failure, visualKind: 'placeholder' });
     }
   }
   return images;
