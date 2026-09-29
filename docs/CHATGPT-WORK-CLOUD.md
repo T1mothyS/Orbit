@@ -159,7 +159,7 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 
 ### 图片、许可与 R2
 
-正式服务可显式设置 `DIGEST_V2_MEDIA_STORE=local`：媒体经过相同审核、解码和内容哈希校验后保存在现有 `data/daily-report-media/`，邮件与网页使用 HTTPS `APP_URL` 下的 `/daily-report-media/<哈希文件名>`；产物键标为 `local/`，不引用隔离 R2 的 `tmp/` 对象。此目录由现有账号加密备份和全站备份覆盖，恢复后须核对文件哈希与公开 GET。未显式选择时仍使用下面的 R2 `published/`、`fallback/` 策略；Shadow 始终使用独立测试 R2。生产本地模式若 `APP_URL` 非有效公开 HTTPS，媒体准备立即拒绝。
+正式服务可显式设置 `DIGEST_V2_MEDIA_STORE=local`：正式账号的 Shadow 和 production 媒体经过相同审核、解码和内容哈希校验后保存在现有 `data/daily-report-media/`，邮件与网页使用 HTTPS `APP_URL` 下的 `/daily-report-media/<哈希文件名>`；产物键标为 `local/`，不引用会过期的 `tmp/` 对象。独立隔离服务未设置此开关，继续使用其测试 R2。此目录由现有账号加密备份和全站备份覆盖，恢复后须核对文件哈希与公开 GET。未显式选择时仍使用下面的 R2 `published/`、`fallback/`、`tmp/` 策略。设置本地模式但 `APP_URL` 非有效公开 HTTPS 时，媒体准备立即拒绝。
 
 - 开启V2且配置合法R2公开域名时，网页CSP的 `img-src` 只追加这个精确HTTPS origin；不允许通配域名、带路径/凭据的地址或生产 `r2.dev`，脚本和连接策略不扩大。验收必须检查浏览器图片实际加载，不能用R2 HTTP 200代替网页显示。
 

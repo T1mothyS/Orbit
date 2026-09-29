@@ -153,7 +153,7 @@ async function fallbackImage(category: string, seed = '') {
 }
 export async function prepareDigestMedia(d: DigestV2, options: { storage?: ObjectStorage | null; rules?: MediaRule[]; fetchOptions?: ControlledDailyReportMediaOptions; mode: 'shadow' | 'production'; mediaRoot?: string; storyIllustrations?: boolean }) {
   if (!isValidDateKey(d.date)) throw new Error('INVALID_DATE');
-  const localOrigin = options.mode === 'production' && process.env.DIGEST_V2_MEDIA_STORE === 'local' ? getDailyReportMediaPublicOrigin() : null;
+  const localOrigin = process.env.DIGEST_V2_MEDIA_STORE === 'local' ? getDailyReportMediaPublicOrigin() : null;
   if (localOrigin && (!publicDigestUrl(localOrigin) || new URL(localOrigin).origin !== localOrigin)) throw new Error('LOCAL_MEDIA_ORIGIN_INVALID');
   let storage: ObjectStorage | null = null;
   let configurationFailure: string | null = null;

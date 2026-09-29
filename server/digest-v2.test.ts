@@ -655,7 +655,7 @@ test('audited original illustration stays distinct from photos and placeholders 
   assert.ok(!html.includes('href=""'));
 });
 
-test('production local media uses durable hosted files and rejects unpictured news before publishing', async () => {
+test('local media serves production and same-service Shadow, and rejects unpictured production news', async () => {
   const previousOrigin = process.env.APP_URL;
   process.env.APP_URL = 'https://calendar.example.com';
   process.env.DIGEST_V2_MEDIA_STORE = 'local';
@@ -675,6 +675,15 @@ test('production local media uses durable hosted files and rejects unpictured ne
     assert.equal(image.key, `local/${image.filename}`);
     assert.equal(image.publicUrl, `https://calendar.example.com/daily-report-media/${image.filename}`);
     assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'daily-report-media', image.filename))).digest('hex'), image.sha256);
+
+    const notificationsBeforeShadow = activity.exportUserActivity(userId).notifications.length;
+    const shadow = await service.publishDigestV2(userId, run.runId, d, 'shadow', { rules: [rule], mediaRoot: path.join(root, 'daily-report-media') });
+    assert.equal(shadow.status, 'SHADOW_SAVED');
+    const shadowImage = JSON.parse(activity.getDigestArtifact(userId, String(shadow.artifactId))!.payload_json).publication.media[0];
+    assert.equal(shadowImage.key, `local/${shadowImage.filename}`);
+    assert.equal(shadowImage.publicUrl, image.publicUrl);
+    assert.equal(shadowImage.failure, null);
+    assert.equal(activity.exportUserActivity(userId).notifications.length, notificationsBeforeShadow);
 
     const missing = illustrated(); missing.date = '2026-10-31'; missing.media = []; missing.stories[0].media_ids = [];
     const missingRun = service.createDigestSnapshotRun(userId, { ...snapshot(), date: missing.date });

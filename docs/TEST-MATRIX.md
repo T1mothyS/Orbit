@@ -21,7 +21,7 @@
 
 隔离服务增量：`server/digest-shadow-server.test.ts` 实际启动独立子进程，验证后台任务被强制关闭、合成账号登录、匿名日报拒绝、已登录测试账号的 QQ 邮箱设置/删除/只读测试接口、其他业务写入拒绝与 MCP 认证边界。`digest-v2.test.ts` 另覆盖两版正式发布与邮件入队在 Shadow 模式被拒绝。`npx tsc -p tsconfig.shadow.json` 验证独立服务构建；Linux 图片处理、真实 OAuth 与 Work 连续运行仍须独立验收。
 
-Daily Digest V2.5 增量入口：`server/digest-v2.test.ts` 覆盖结构/空内容/重复与断裂引用/非法 URL/成功输入遗漏、纯校验无写入、账号/过期隔离、同一 Context 的 `thesis_file` 关联与错误引用、图片解码与超限/超时/失败降级、生产本地持久媒体及逐条非占位图闸门、并发幂等、四处中断恢复、七类合成 Shadow、带媒体字节的备份恢复和 MCP/HTTP 权限。`scripts/digest-v2-r2-smoke.ts` 使用专用测试配置检查真实上传、重复上传、私有接口/公共地址哈希、仅合成对象删除及独立副本恢复。`scripts/digest-v2-preview.ts` 提供本机合成页面与邮件 HTML，无真实 SMTP。
+Daily Digest V2.5 增量入口：`server/digest-v2.test.ts` 覆盖结构/空内容/重复与断裂引用/非法 URL/成功输入遗漏、纯校验无写入、账号/过期隔离、同一 Context 的 `thesis_file` 关联与错误引用、图片解码与超限/超时/失败降级、正式服务 Shadow/production 本地持久媒体及逐条非占位图闸门、并发幂等、四处中断恢复、七类合成 Shadow、带媒体字节的备份恢复和 MCP/HTTP 权限。`scripts/digest-v2-r2-smoke.ts` 使用专用测试配置检查真实上传、重复上传、私有接口/公共地址哈希、仅合成对象删除及独立副本恢复。`scripts/digest-v2-preview.ts` 提供本机合成页面与邮件 HTML，无真实 SMTP。
 
 S1-R6 邮箱空态回归使用合成快照，分别检查 `not_configured`、`failed`、`partial`、`complete` 且零未读在输入清单、校验/Shadow 回执、网页、邮件 HTML 和纯文本中的区别；另查旧版 generation 的未过期 run 重试保持内容哈希与同一产物。不读取真实邮箱、不发信；真实邮箱客户端仍须单独验收。
 
