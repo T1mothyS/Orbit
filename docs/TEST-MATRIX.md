@@ -1,5 +1,7 @@
 # AI Calendar Test Matrix
 
+新闻信息图：`server/digest-v2.test.ts` 覆盖新文章无需照片白名单、原文标签/数字约束、账号与运行归属、改稿/证据变化、过期输入、图像哈希与重复准备；检查准备/Shadow 不发信、production 逐条合格图门禁和 MCP scope 拒绝。新图需实际检查中文、裁切和不同阅读尺寸；生产验收还要核对新工具在真实连接可见、素材持久可读及真实 Shadow。下一次自然定时与收件箱分别验收。字段见 [原创信息图合同](CHATGPT-WORK-CLOUD.md#每日新新闻的原创信息图准备)。
+
 项目成长：运行 `server/project-evolution.test.ts`、`npm run evolution:history` 和 `scripts/project-evolution-browser-smoke.cjs`。覆盖模型与历史真实性、认证、架构差异、顶部入口、四尺寸明暗主题及深链接；浏览器使用合成 API，真实认证由独立 HTTP 测试覆盖，均不等同生产验收。详情见 [维护说明](../project-evolution/README.md)。
 
 - Status: LIVING

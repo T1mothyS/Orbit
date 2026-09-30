@@ -108,6 +108,8 @@ server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与�
 
 ## 6. 日报 V2 跨项目流程
 
+新新闻信息图由 `digest-v2-visuals.ts` 使用现有 sharp 和随包中文字体绘制；`digest-v2-service.ts` 在账号/运行输入校验后保存原持久媒体与 run manifest 绑定。`daily_report.prepare_visuals_v2` 不发布或发信；后续发布仍检查正文/证据哈希、媒体文件哈希和逐条图门禁。外站照片审核不变，详见 [原创信息图合同](CHATGPT-WORK-CLOUD.md#每日新新闻的原创信息图准备)。
+
 外部日报 V2 负责本地链路的采集、上下文、结构化生成、Validator、确定性渲染、本地媒体下载/校验和上传；Work Cloud 通过生产 MCP 读取输入并在服务端托管媒体。AI Calendar 负责令牌/OAuth 鉴权、根据调用身份固定 `local` 或 `cloud` 来源、媒体按内容哈希保存、日报按账号/日期/来源/内容版本幂等保存，以及按账号来源设置决定 `RECEIVED` 或 `CANDIDATE` 和邮件队列。Cloud `dry_run=true` 不写日报或邮件队列，`dry_run=false` 必须返回 `PUBLISHED` 才表示生产数据库已保存。
 
 本地 NoSend、发布接口返回、QUEUED、SMTP accepted 和收件箱到达属于不同证据层级，不能相互替代。Local 发布阶段不抓取外站新闻图；Cloud 服务端可受控获取显式媒体，无批次时逐图 Best Effort，有批次时检查 READY、归属与完整性，正文完整性保持硬闸门。`dry_run=true` 不保存日报或队列，但可能托管媒体文件。不得把外部项目凭据或运行数据带入仓库。完整合同见 [Cloud 文档](CHATGPT-WORK-CLOUD.md)。
