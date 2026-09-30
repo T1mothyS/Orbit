@@ -773,6 +773,7 @@ test('owned news graphics handle new topics without photo allowlisting and stay 
     const artifact = activity.getDigestArtifact(owner, shadow.artifactId as string)!;
     const html = service.digestArtifactView(artifact).html;
     assert.ok(html.includes('原创新闻信息图')); assert.ok(html.includes('非现场照片'));
+    assert.ok(html.includes(`href="${ready.media[0].url}" rel="noopener noreferrer">原始插画</a>`));
     const published = await service.publishDigestV2(owner, run.runId, ready, 'production');
     assert.equal(published.status, 'PUBLISHED'); assert.equal(published.emailStatus, 'DISABLED');
     const expired = 'visual-expired-run';

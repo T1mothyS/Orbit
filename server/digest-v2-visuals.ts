@@ -127,7 +127,7 @@ export function visualRules(d: DigestV2, prepared: PreparedNewsVisual[]): MediaR
     } catch { throw new Error('VISUAL_FILE_INVALID'); }
     rules.push({ pageHost: new URL(evidence.url).hostname, imageHosts: [new URL(origin).hostname], policy: 'OWNED_OPEN',
       licenseRef: 'code-owned-fact-graphic-v1', pageUrl: evidence.url, imageUrls: [m.url], sourceFile, sourceSha256: v.sha256, visualKind: 'illustration',
-      credit: { caption: '原创新闻信息图，依据本条标题与摘要绘制，非现场照片', author: 'AI Calendar', sourcePage: evidence.url, licenseName: '原创信息图', licenseUrl: '' } });
+      credit: { caption: '原创新闻信息图，依据本条标题与摘要绘制，非现场照片', author: 'AI Calendar', sourcePage: v.url, licenseName: '原创信息图', licenseUrl: '' } });
   }
   return rules;
 }
