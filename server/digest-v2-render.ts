@@ -16,13 +16,14 @@ export function decodeDigestPublication(value: string): DigestPublication | null
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 function validImageCredit(m: PreparedImage): MediaCredit | null {
   const c = m.credit;
-  return c && ['caption', 'author', 'licenseName', 'sourcePage', 'licenseUrl'].every(k => typeof (c as any)[k] === 'string') && publicDigestUrl(c.sourcePage) && publicDigestUrl(c.licenseUrl) ? c : null;
+  return c && ['caption', 'author', 'licenseName', 'sourcePage', 'licenseUrl'].every(k => typeof (c as any)[k] === 'string') && publicDigestUrl(c.sourcePage) && (m.visualKind === 'illustration' ? c.licenseUrl === '' : publicDigestUrl(c.licenseUrl)) ? c : null;
 }
 function imageCredit(m: PreparedImage, html = true): string {
   if (m.fallback) return m.visualKind === 'illustration' ? '原创贴题插画，非新闻现场图片' : '原创栏目占位图，非新闻现场图片';
   const c = validImageCredit(m);
   if (!c) return '新闻配图';
   const changes = '已缩放、转为JPEG并清除元数据';
+  if (m.visualKind === 'illustration') return html ? `${esc(c.caption)} · ${esc(c.author)} · <a href="${esc(c.sourcePage)}" rel="noopener noreferrer">原始插画</a> · ${esc(c.licenseName)} · ${changes}` : `${c.caption} · ${c.author} · ${c.sourcePage} · ${c.licenseName} · ${changes}`;
   return html ? `${esc(c.caption)} · ${esc(c.author)} · <a href="${esc(c.sourcePage)}" rel="noopener noreferrer">图片来源</a> · <a href="${esc(c.licenseUrl)}" rel="noopener noreferrer">${esc(c.licenseName)}</a> · ${changes}` : `${c.caption} · ${c.author} · ${c.sourcePage} · ${c.licenseName} ${c.licenseUrl} · ${changes}`;
 }
 function imageForStory(p: DigestPublication, story: DigestStory): PreparedImage | undefined {
@@ -38,6 +39,7 @@ export function digestV2Cover(p: DigestPublication) {
     headline: story?.title || p.digest.title,
     excerpt: plainEmphasis(story?.summary || p.digest.executive_signals[0] || p.digest.title).slice(0, 240),
     heroImageUrl: image?.publicUrl || null,
+    heroImageVisualKind: image?.visualKind || (image?.fallback ? 'placeholder' : image ? 'archive_photo' : null),
     heroImageCredit: image ? image.fallback ? imageCredit(image, false) : credit ? `${credit.caption} · ${credit.author} · ${credit.licenseName}` : '新闻配图，来源见详情' : null,
     heroImageSourceUrl: credit?.sourcePage || null,
     heroImageLicenseUrl: credit?.licenseUrl || null,
@@ -72,13 +74,13 @@ function digestDisplayTitle(p: DigestPublication): string {
 const plainEmphasis = (value: string): string => value.replace(/\*\*/g, '');
 const emphasis = (value: string): string => value.split('**').map((part, i) => i % 2 ? `<strong>${esc(part)}</strong>` : esc(part)).join('');
 function conciseImageCredit(image: PreparedImage): string {
-  if (image.fallback) return imageCredit(image);
+  if (image.fallback || image.visualKind === 'illustration') return imageCredit(image);
   const c = validImageCredit(image);
   if (!c) return '新闻配图';
   return `${esc(c.caption)} · ${esc(c.author)} · <a href="${esc(c.sourcePage)}" rel="noopener noreferrer">图片来源</a> · <a href="${esc(c.licenseUrl)}" rel="noopener noreferrer">${esc(c.licenseName)}</a> · 已编辑`;
 }
 function plainImageCredit(image: PreparedImage): string {
-  if (image.fallback) return imageCredit(image, false);
+  if (image.fallback || image.visualKind === 'illustration') return imageCredit(image, false);
   const c = validImageCredit(image);
   if (!c) return '新闻配图';
   return `${c.caption} · ${c.author} · ${c.sourcePage} · ${c.licenseName} ${c.licenseUrl} · 已编辑`;
@@ -131,7 +133,7 @@ function renderEditorialDigestV2(p: DigestPublication, email: boolean): string {
   };
   const alerts = p.warnings.filter(warning => warnings[warning]).map(warning => `<p>${warnings[warning]}</p>`).join('');
   // The generated placeholder is a wide 3:1 card. A tall, cover-fitted hero crops its label and artwork.
-  const coverStyle = coverImage?.fallback && coverImage.visualKind !== 'illustration'
+  const coverStyle = coverImage?.visualKind === 'placeholder' || coverImage?.visualKind === 'illustration' || coverImage?.fallback
     ? 'height:auto;max-height:320px;object-fit:contain'
     : email ? 'height:auto;max-height:440px;aspect-ratio:16/9;object-fit:cover' : 'height:70svh;min-height:360px;max-height:720px;object-fit:cover';
   const cover = coverImage && coverStory ? `<figure class="digest-v2-cover" style="margin:0 0 8px"><img src="${esc(coverImage.publicUrl)}" alt="${esc(imageAlt(coverImage, coverStory))}" width="680" style="display:block;width:100%;${coverStyle};border-radius:6px"/></figure>` : '';

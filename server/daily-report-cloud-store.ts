@@ -54,7 +54,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function assertSafeJson(value: unknown, path = 'context', depth = 0): void {
-  if (depth > 8) throw new DailyReportCloudInputError(`${path} 嵌套层级过深`);
+  if (depth > 9) throw new DailyReportCloudInputError(`${path} 嵌套层级过深`);
   if (typeof value === 'string') {
     if (value.length > 20_000) throw new DailyReportCloudInputError(`${path} 文本过长`);
     if (SECRET_VALUE_PATTERNS.some(pattern => pattern.test(value))) {

@@ -1,5 +1,7 @@
 # AI Calendar Test Matrix
 
+新闻信息图：`server/digest-v2.test.ts` 覆盖新文章无需照片白名单、原文标签/数字约束、账号与运行归属、改稿/证据变化、过期输入、图像哈希与重复准备；检查准备/Shadow 不发信、production 逐条合格图门禁和 MCP scope 拒绝。新图需实际检查中文、裁切和不同阅读尺寸；生产验收还要核对新工具在真实连接可见、素材持久可读及真实 Shadow。下一次自然定时与收件箱分别验收。字段见 [原创信息图合同](CHATGPT-WORK-CLOUD.md#每日新新闻的原创信息图准备)。
+
 项目成长：运行 `server/project-evolution.test.ts`、`npm run evolution:history` 和 `scripts/project-evolution-browser-smoke.cjs`。覆盖模型与历史真实性、认证、架构差异、顶部入口、四尺寸明暗主题及深链接；浏览器使用合成 API，真实认证由独立 HTTP 测试覆盖，均不等同生产验收。详情见 [维护说明](../project-evolution/README.md)。
 
 - Status: LIVING
@@ -33,7 +35,7 @@
 
 隔离服务增量：`server/digest-shadow-server.test.ts` 实际启动独立子进程，验证后台任务被强制关闭、合成账号登录、匿名日报拒绝、已登录测试账号的 QQ 邮箱设置/删除/只读测试接口、其他业务写入拒绝与 MCP 认证边界。`digest-v2.test.ts` 另覆盖两版正式发布与邮件入队在 Shadow 模式被拒绝。`npx tsc -p tsconfig.shadow.json` 验证独立服务构建；Linux 图片处理、真实 OAuth 与 Work 连续运行仍须独立验收。
 
-Daily Digest V2.5 增量入口：`server/digest-v2.test.ts` 覆盖结构/空内容/重复与断裂引用/非法 URL/成功输入遗漏、纯校验无写入、账号/过期隔离、图片解码与超限/超时/失败降级、并发幂等、四处中断恢复、七类合成 Shadow、带媒体字节的备份恢复和 MCP/HTTP 权限。`scripts/digest-v2-r2-smoke.ts` 使用专用测试配置检查真实上传、重复上传、私有接口/公共地址哈希、仅合成对象删除及独立副本恢复。`scripts/digest-v2-preview.ts` 提供本机合成页面与邮件 HTML，无真实 SMTP。
+Daily Digest V2.5 增量入口：`server/digest-v2.test.ts` 覆盖结构/空内容/重复与断裂引用/非法 URL/成功输入遗漏、纯校验无写入、账号/过期隔离、同一 Context 的 `thesis_file` 关联与错误引用、图片解码与超限/超时/失败降级、正式服务 Shadow/production 本地持久媒体及逐条非占位图闸门、并发幂等、四处中断恢复、七类合成 Shadow、带媒体字节的备份恢复和 MCP/HTTP 权限。`scripts/digest-v2-r2-smoke.ts` 使用专用测试配置检查真实上传、重复上传、私有接口/公共地址哈希、仅合成对象删除及独立副本恢复。`scripts/digest-v2-preview.ts` 提供本机合成页面与邮件 HTML，无真实 SMTP。
 
 D03 媒体恢复增量：合成测试检查同日报两条引用共用一个 R2 键、跨日期相同图片使用不同 `tmp/` 键、本地备份只保存一份共享字节、整批恢复先校验再写入、旧键兼容；专用测试 Bucket 的 `digest-v2-r2-smoke.ts` 检查日期键、公共 `no-store`、源站删除和两条引用从一个本地副本恢复。对象生命周期需要在 Bucket 设置中核对 `tmp/` 七天删除且无覆盖 `published/`/`fallback/` 的到期规则；CDN 精确清除必须在绑定测试自定义域后以两个合成对象实测，不能用 `r2.dev` 或清除 API 的 200 回执代替实际缓存结果。
 

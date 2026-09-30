@@ -7,7 +7,10 @@ import { readUserMail } from './user-mail-service.js';
 import { getDailyReportCloudContext } from './daily-report-cloud-store.js';
 import { isValidDateKey } from './date-key.js';
 import { DIGEST_V2_VERSION, DIGEST_V2_GENERATION, DIGEST_V2_ILLUSTRATED_GENERATIONS, DIGEST_V2_SCHEMA, digestHash, digestSnapshotWarnings, validateDigestV2, type DigestSnapshot, type DigestV2, type InputSection } from './digest-v2-contract.js';
-import { prepareDigestMedia } from './digest-v2-media.js';
+import { prepareDigestMedia, configuredMediaRules } from './digest-v2-media.js';
+import { dailyReportMediaRoot, getDailyReportMediaPublicOrigin, storeProvidedDailyReportMedia } from './daily-report-media-service.js';
+import { publicDigestUrl } from './digest-v2-contract.js';
+import { NEWS_VISUAL_PLAN_SCHEMA, validateNewsVisualPlans, renderNewsVisual, storyVisualHash, visualRules, digestBytesHash, type PreparedNewsVisual } from './digest-v2-visuals.js';
 import { digestV2Cover, encodeDigestPublication, renderDigestV2, type DigestPublication } from './digest-v2-render.js';
 import { enqueueUserEmailNotificationDetailed } from './notification-service.js';
 import { getDailyReportDeliveryPolicy } from './daily-report-delivery-policy.js';
@@ -19,6 +22,7 @@ export function createDigestSnapshotRun(userId: string, snapshot: DigestSnapshot
   store.expireDigestSnapshots();
   const id = crypto.randomUUID(); const now = new Date();
   const manifest = { date: snapshot.date, timezone: snapshot.timezone, cutoff: snapshot.cutoff, contextVersion: snapshot.contextVersion, contractVersion: DIGEST_V2_VERSION, generationVersion: DIGEST_V2_GENERATION, modelVersion: 'unknown', status: 'INPUTS_SNAPSHOTTED', inputCounts: { calendar: snapshot.calendar.items.length, mail: snapshot.mail.items.length, watchlist: snapshot.watchlist.items.length }, warnings: digestSnapshotWarnings(snapshot) };
+  Object.assign(manifest, { visualPreparation: { tool: 'daily_report.prepare_visuals_v2', schema: NEWS_VISUAL_PLAN_SCHEMA, guidance: '照片仍需已有许可；无已审核贴题图时，可提交仅使用本条标题/摘要连续原文短语的新闻信息图方案。返回的 digest 已绑定本站持久媒体；使用它重新校验。信息图明确标为原创、非现场。更改新闻或来源后须重新准备，不复用旧图。' } });
   store.createDigestRun({ id, user_id: userId, report_date: snapshot.date, snapshot_json: JSON.stringify(snapshot), manifest_json: JSON.stringify(manifest), created_at: now.toISOString(), expires_at: new Date(now.getTime() + 7 * 86400000).toISOString() });
   return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA, editorialGuidance: '仅在正文中用 **原文短词组** 标重点；每句一到两处，优先关键对象、数字、结论或行动。标题不加标记，不能整句加粗。邮件逐封保留服务或事项名称、具体动作和已知期限；同一事项突出各封新增事实，未知期限不猜。对每个关注标的记录检索时间窗、来源、重要变化或无变化依据及失败情况；未配置、读取失败、未研究不可写成无变化。新闻说明具体事实、关注关系与下一步；候选、排除及失败另留有界记录。图片须贴合具体新闻，不能把类别图形当贴题插画。图片是否为现场只在图注说明，正文不重复。来源和发布时间由服务端生成角标与文末引用，不要写入摘要。' };
 }
@@ -29,15 +33,35 @@ export function digestWatchlistInput(context: ReturnType<typeof getDailyReportCl
   const stocks = Array.isArray(raw) ? raw : typeof raw === 'object' && !Array.isArray(raw) ? (raw as { stocks?: unknown }).stocks : undefined;
   if (!Array.isArray(stocks)) return { status: 'failed', items: [] };
   if (!stocks.length) return { status: 'not_configured', items: [] };
+  let incomplete = false;
   const items = stocks.flatMap((value, index) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
-    const stock = value as { name?: unknown; symbol?: unknown };
+    const stock = value as Record<string, unknown>;
     const name = typeof stock.name === 'string' ? stock.name.trim() : '';
     const symbol = typeof stock.symbol === 'string' ? stock.symbol.trim() : '';
     if (!name && !symbol) return [];
-    return [{ id: `watch-${index}-${digestHash(value).slice(0, 12)}`, title: [name, symbol].filter(Boolean).join(' '), detail: '' }];
+    const thesisFile = typeof stock.thesis_file === 'string' ? /^theses\/([A-Za-z0-9_-]+)\.ya?ml$/.exec(stock.thesis_file) : null;
+    const theses = context.context.theses;
+    const referencedThesis = thesisFile && theses && typeof theses === 'object' && !Array.isArray(theses)
+      ? (theses as Record<string, unknown>)[thesisFile[1]] : null;
+    const matchedThesis = referencedThesis && typeof referencedThesis === 'object' && !Array.isArray(referencedThesis)
+      && typeof (referencedThesis as Record<string, unknown>).symbol === 'string'
+      && ((referencedThesis as Record<string, unknown>).symbol as string).toLowerCase() === symbol.toLowerCase()
+      ? referencedThesis as Record<string, unknown> : null;
+    const thesis = stock.thesis && typeof stock.thesis === 'object' && !Array.isArray(stock.thesis)
+      ? stock.thesis as Record<string, unknown> : matchedThesis;
+    const complete = !!name && !!symbol && typeof stock.priority === 'string' && !!stock.priority.trim()
+      && Array.isArray(stock.sectors) && stock.sectors.every(sector => typeof sector === 'string' && !!sector.trim())
+      && thesis && typeof thesis.status === 'string' && !!thesis.status.trim()
+      && typeof thesis.priority === 'string' && !!thesis.priority.trim()
+      && thesis.thesis && typeof thesis.thesis === 'object' && !Array.isArray(thesis.thesis)
+      && thesis.monitor && typeof thesis.monitor === 'object' && !Array.isArray(thesis.monitor);
+    const detail = complete ? JSON.stringify({ priority: stock.priority, sectors: stock.sectors,
+      thesis: { status: thesis!.status, priority: thesis!.priority, thesis: thesis!.thesis, monitor: thesis!.monitor } }) : '';
+    if (!detail || detail.length > 4000) incomplete = true;
+    return [{ id: `watch-${index}-${digestHash(value).slice(0, 12)}`, title: [name, symbol].filter(Boolean).join(' '), detail: detail.length <= 4000 ? detail : '' }];
   });
-  return { status: !items.length ? 'failed' : items.length !== stocks.length || stocks.length > 100 ? 'partial' : 'complete', items: items.slice(0, 100) };
+  return { status: !items.length ? 'failed' : incomplete || items.length !== stocks.length || stocks.length > 100 ? 'partial' : 'complete', items: items.slice(0, 100) };
 }
 export async function readDigestV2Inputs(userId: string, date: string) {
   assertDigestV2Enabled();
@@ -60,14 +84,78 @@ export async function readDigestV2Inputs(userId: string, date: string) {
 function snapshotFor(userId: string, runId: string): { snapshot: DigestSnapshot; generationVersion: string } {
   const row = store.getDigestRun(userId, runId);
   if (!row) throw new Error('RUN_NOT_FOUND');
-  if (!row.snapshot_json) throw new Error('SNAPSHOT_EXPIRED');
+  if (!row.snapshot_json || Date.parse(row.expires_at) <= Date.now()) throw new Error('SNAPSHOT_EXPIRED');
   const manifest = JSON.parse(row.manifest_json);
   return { snapshot: JSON.parse(row.snapshot_json), generationVersion: manifest.generationVersion || '2026-09-21.1' };
 }
 export function validateDigestRun(userId: string, runId: string, digest: unknown) {
   assertDigestV2Enabled();
   const { snapshot, generationVersion } = snapshotFor(userId, runId);
-  return validateDigestV2(digest, snapshot, generationVersion);
+  const validation = validateDigestV2(digest, snapshot, generationVersion);
+  if (validation.valid) {
+    try { visualRules(digest as DigestV2, preparedVisuals(userId, runId)); }
+    catch (error) {
+      validation.valid = false; validation.contentHash = null;
+      validation.errors.push({ path: '$.media', code: error instanceof Error && error.message.startsWith('VISUAL_') ? error.message : 'VISUAL_FILE_INVALID' });
+    }
+  }
+  return validation;
+}
+function preparedVisuals(userId: string, runId: string): PreparedNewsVisual[] {
+  const manifest = JSON.parse(store.getDigestRun(userId, runId)!.manifest_json);
+  return Array.isArray(manifest.preparedVisuals) ? manifest.preparedVisuals : [];
+}
+const visualLocks = new Map<string, Promise<unknown>>();
+export async function prepareDigestVisuals(userId: string, runId: string, value: unknown, rawPlans: unknown): Promise<Record<string, unknown>> {
+  assertDigestV2Enabled();
+  const key = `${userId}:${runId}`;
+  const task = (visualLocks.get(key) || Promise.resolve()).catch(() => {}).then(async () => {
+    const { snapshot, generationVersion } = snapshotFor(userId, runId);
+    const validation = validateDigestV2(value, snapshot, generationVersion);
+    if (!validation.valid) return { status: 'INVALID', ...validation };
+    const digest = structuredClone(value) as DigestV2;
+    const plans = validateNewsVisualPlans(digest, rawPlans);
+    const origin = getDailyReportMediaPublicOrigin();
+    if (process.env.DIGEST_V2_MEDIA_STORE !== 'local' || !publicDigestUrl(origin)) throw new Error('VISUAL_LOCAL_STORE_REQUIRED');
+    const entries = preparedVisuals(userId, runId);
+    for (const plan of plans) {
+      const story = [...digest.market, ...digest.macro, ...digest.stories].find(s => s.id === plan.story_id)!;
+      const evidence = digest.evidence.find(e => e.id === plan.evidence_id)!;
+      const planHash = digestHash({ version: 'fact-graphic-v1', plan, storyHash: storyVisualHash(story), evidence });
+      let entry = entries.find(v => v.storyId === story.id && v.planHash === planHash);
+      if (entry) {
+        // Missing files can be recreated; an existing corrupt hashed file still fails closed.
+        const checkDigest = structuredClone(digest);
+        checkDigest.media = [{ id: entry.id, evidence_id: entry.evidenceId, url: entry.url, category: plan.category }];
+        for (const s of [...checkDigest.market, ...checkDigest.macro, ...checkDigest.stories]) s.media_ids = s.id === story.id ? [entry.id] : [];
+        try { visualRules(checkDigest, [entry]); } catch { entry = undefined; }
+      }
+      if (!entry) {
+        const bytes = await renderNewsVisual(story, plan);
+        const sha256 = digestBytesHash(bytes); const filename = `${sha256}.png`;
+        storeProvidedDailyReportMedia(filename, bytes, 'image/png', dailyReportMediaRoot());
+        entry = { id: `visual:${digestHash({ runId, storyId: story.id, sha256 })}`, storyId: story.id,
+          storyHash: storyVisualHash(story), evidenceId: evidence.id, evidenceHash: digestHash(evidence), evidenceUrl: evidence.url,
+          planHash, filename, sha256, url: `${origin}/daily-report-media/${filename}` };
+        const old = entries.findIndex(v => v.storyId === story.id);
+        if (old >= 0) entries[old] = entry; else entries.push(entry);
+      }
+      story.media_ids = [entry.id];
+      digest.media = digest.media.filter(m => [...digest.market, ...digest.macro, ...digest.stories].some(s => s.media_ids.includes(m.id)));
+      if (!digest.media.some(m => m.id === entry!.id)) digest.media.push({ id: entry.id, evidence_id: evidence.id, url: entry.url, category: plan.category });
+    }
+    if (entries.length > 20) throw new Error('VISUAL_PLAN_LIMIT');
+    const resultValidation = validateDigestV2(digest, snapshot, generationVersion);
+    if (!resultValidation.valid) return { status: 'INVALID', ...resultValidation };
+    snapshotFor(userId, runId); // Expiration can occur while rendering; do not authorize an expired run.
+    const row = store.getDigestRun(userId, runId)!;
+    store.updateDigestRunManifest(userId, runId, { ...JSON.parse(row.manifest_json), preparedVisuals: entries });
+    visualRules(digest, entries);
+    addLog('info', 'daily-report', '新版日报新闻信息图已准备', { event: 'digest_v2_visuals_prepared', runId, imageCount: plans.length });
+    return { status: 'VISUALS_PREPARED', runId, digest, visuals: entries.filter(v => plans.some(p => p.story_id === v.storyId)).map(v => ({ storyId: v.storyId, mediaId: v.id, url: v.url, sha256: v.sha256, visualKind: 'illustration' })), emailStatus: 'NOT_QUEUED' };
+  });
+  visualLocks.set(key, task);
+  try { return await task; } finally { if (visualLocks.get(key) === task) visualLocks.delete(key); }
 }
 // A single app process owns sql.js. Serialize by account/date across await boundaries.
 const locks = new Map<string, Promise<unknown>>();
@@ -99,11 +187,15 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       let payload: { publication: DigestPublication; reportId?: string; status: string; renderHash: string; emailStatus?: string };
       if (existing) payload = JSON.parse(existing.payload_json);
       else {
-        const media = await prepareDigestMedia(digest, { ...mediaOptions, mode: mode as 'shadow' | 'production', storyIllustrations: DIGEST_V2_ILLUSTRATED_GENERATIONS.includes(generationVersion) });
+        const ownedRules = visualRules(digest, preparedVisuals(userId, runId));
+        const rules = ownedRules.length ? [...(mediaOptions.rules || configuredMediaRules()), ...ownedRules] : mediaOptions.rules;
+        const media = await prepareDigestMedia(digest, { ...mediaOptions, rules, mode: mode as 'shadow' | 'production', storyIllustrations: DIGEST_V2_ILLUSTRATED_GENERATIONS.includes(generationVersion) });
         const publication = { digest, warnings: validation.warnings, media, renderer: generationVersion };
+        if (mode === 'production') assertStoryImagesReady(publication);
         payload = { publication, status: 'PREPARED', renderHash: digestHash(publication) };
         existing = store.saveDigestArtifact({ id: crypto.randomUUID(), user_id: userId, run_id: runId, report_date: digest.date, mode: mode as 'shadow' | 'production', content_hash: validation.contentHash!, payload_json: JSON.stringify(payload), created_at: new Date().toISOString() });
       }
+      if (mode === 'production') assertStoryImagesReady(payload.publication);
       recordPhase('MEDIA_PREPARED', { artifactId: existing.id, mediaFailures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })) });
       // Re-check the switch after network work, before committing any formal side effect.
       assertDigestV2Enabled();
@@ -129,15 +221,16 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       recordPhase(payload.status, { emailStatus: payload.emailStatus || 'NOT_QUEUED', renderHash: payload.renderHash });
       const mediaById = new Map(payload.publication.media.map(m => [m.id, m]));
       const newsItems = [...digest.market, ...digest.macro, ...digest.stories];
-      const coverage = { total: newsItems.length, real: 0, illustration: 0, placeholder: 0, missing: 0 };
+      const coverage = { total: newsItems.length, real: 0, archival: 0, illustration: 0, placeholder: 0, missing: 0 };
       for (const story of newsItems) {
         const images = [...story.media_ids.map(id => mediaById.get(id)), ...payload.publication.media.filter(m => m.storyId === story.id)].filter(m => m && m.kind !== 'source_icon' && m.publicUrl);
-        if (images.some(m => !m!.fallback)) coverage.real++;
+        if (images.some(m => m!.visualKind === 'photo')) coverage.real++;
+        else if (images.some(m => m!.visualKind === 'archive_photo' || (!m!.fallback && !m!.visualKind))) coverage.archival++;
         else if (images.some(m => m!.visualKind === 'illustration')) coverage.illustration++;
         else if (images.length) coverage.placeholder++;
         else coverage.missing++;
       }
-      addLog('info', 'daily-report', '新版日报运行完成', { event: 'digest_v2_completed', runId, mode, status: payload.status, imageCount: coverage.real, missingImageCount: coverage.missing });
+      addLog('info', 'daily-report', '新版日报运行完成', { event: 'digest_v2_completed', runId, mode, status: payload.status, imageCount: coverage.real + coverage.archival + coverage.illustration, missingImageCount: coverage.missing });
       return {
         status: payload.status, artifactId: existing.id, contentHash: validation.contentHash, renderHash: payload.renderHash,
         warnings: validation.warnings, reviewIssues: validation.reviewIssues,
@@ -146,7 +239,10 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
         imageCoverage: coverage,
         media: {
           icons: payload.publication.media.filter(m => m.kind === 'source_icon' && m.publicUrl && !m.fallback).length,
-          real: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && !m.fallback).length,
+          real: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.visualKind === 'photo').length,
+          archival: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && (m.visualKind === 'archive_photo' || (!m.fallback && !m.visualKind))).length,
+          illustration: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.visualKind === 'illustration').length,
+          placeholder: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.visualKind === 'placeholder').length,
           fallback: payload.publication.media.filter(m => m.kind !== 'source_icon' && m.publicUrl && m.fallback).length,
           failures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })),
         },
@@ -159,6 +255,14 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
   });
   locks.set(key, task);
   try { return await task; } finally { if (locks.get(key) === task) locks.delete(key); }
+}
+function assertStoryImagesReady(publication: DigestPublication): void {
+  const media = publication.media;
+  for (const story of [...publication.digest.market, ...publication.digest.macro, ...publication.digest.stories]) {
+    if (![...story.media_ids.map(id => media.find(item => item.id === id)), ...media.filter(item => item.storyId === story.id)]
+      .some(item => item && item.kind !== 'source_icon' && item.publicUrl && !item.failure && !item.fallback
+        && ['photo', 'archive_photo', 'illustration'].includes(item.visualKind || 'archive_photo'))) throw new Error('STORY_IMAGE_NOT_READY');
+  }
 }
 export function digestArtifactView(row: store.DigestArtifactRow) {
   const payload = JSON.parse(row.payload_json); const p = payload.publication as DigestPublication;

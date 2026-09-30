@@ -23,6 +23,62 @@ export function createReportsPolicyRouter({ authenticate }: { authenticate: Requ
     }
   });
 
+  if (process.env.DIGEST_SHADOW_ONLY === 'true') app.patch('/api/daily-report/cloud-context/shadow-watchlist', authenticate, (req, res) => {
+    const input = req.body;
+    const object = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+    const exactKeys = (value: Record<string, unknown>, keys: string[]) => Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+    const text = (value: unknown, max: number) => typeof value === 'string' && value.trim().length > 0 && value.length <= max;
+    if (!object(input) || !exactKeys(input, ['expectedVersion', 'stocks']) || !Number.isInteger(input.expectedVersion)
+      || (input.expectedVersion as number) < 0 || !Array.isArray(input.stocks) || input.stocks.length !== 2
+      || input.stocks.some((stock: unknown) => !object(stock) || !exactKeys(stock, ['name', 'symbol', 'priority', 'sectors', 'thesis'])
+        || !text(stock.name, 200) || !text(stock.symbol, 40) || !/^[A-Za-z0-9.\-]+$/.test(stock.symbol as string)
+        || !text(stock.priority, 40) || !Array.isArray(stock.sectors) || stock.sectors.length > 20
+        || stock.sectors.some((sector: unknown) => !text(sector, 100)) || !object(stock.thesis)
+        || !exactKeys(stock.thesis, ['status', 'priority', 'thesis', 'monitor'])
+        || !text(stock.thesis.status, 100) || !text(stock.thesis.priority, 40)
+        || !object(stock.thesis.thesis) || !object(stock.thesis.monitor))) {
+      return res.status(400).json({ error: 'SHADOW_WATCHLIST_FIELDS_INVALID' });
+    }
+    const symbols = input.stocks.map((stock: { symbol: string }) => stock.symbol.toUpperCase());
+    if (new Set(symbols).size !== 2) return res.status(400).json({ error: 'SHADOW_WATCHLIST_DUPLICATE' });
+    const userId = (req as any).user.userId;
+    const current = dailyReportCloudStore.getDailyReportCloudContext(userId);
+    if (current.readFailed || current.version !== input.expectedVersion) return res.status(409).json({ error: 'SHADOW_WATCHLIST_VERSION_CONFLICT' });
+    try {
+      const existingWatchlist = object(current.context.watchlist) ? current.context.watchlist : {};
+      const updated = dailyReportCloudStore.replaceDailyReportCloudContext(userId, {
+        ...current.context, watchlist: { ...existingWatchlist, stocks: input.stocks },
+      });
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ version: updated.version, watchlistStockCount: input.stocks.length });
+    } catch (error: any) {
+      res.status(400).json({ error: error?.message || '保存隔离关注配置失败' });
+    }
+  });
+
+  if (process.env.DIGEST_SHADOW_ONLY === 'true') app.delete('/api/daily-report/cloud-context/shadow-watchlist', authenticate, (req, res) => {
+    const input = req.body;
+    if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length !== 1
+      || !Number.isInteger(input.expectedVersion) || input.expectedVersion < 0) return res.status(400).json({ error: 'SHADOW_WATCHLIST_FIELDS_INVALID' });
+    const userId = (req as any).user.userId;
+    const current = dailyReportCloudStore.getDailyReportCloudContext(userId);
+    if (current.readFailed || current.version !== input.expectedVersion) return res.status(409).json({ error: 'SHADOW_WATCHLIST_VERSION_CONFLICT' });
+    const context = { ...current.context };
+    if (context.watchlist && typeof context.watchlist === 'object' && !Array.isArray(context.watchlist)) {
+      const watchlist = { ...context.watchlist as Record<string, unknown> };
+      delete watchlist.stocks;
+      if (Object.keys(watchlist).length) context.watchlist = watchlist;
+      else delete context.watchlist;
+    }
+    try {
+      const updated = dailyReportCloudStore.replaceDailyReportCloudContext(userId, context);
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ version: updated.version, watchlistStockCount: 0 });
+    } catch (error: any) {
+      res.status(400).json({ error: error?.message || '撤回隔离关注配置失败' });
+    }
+  });
+
   app.get('/api/daily-report/delivery-policy', authenticate, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.json(getDailyReportDeliveryPolicy((req as any).user.userId));

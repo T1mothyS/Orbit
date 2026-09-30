@@ -10,11 +10,15 @@
 
 ## 当前规范与合同
 
+新日期选题的 [原创新闻信息图准备](CHATGPT-WORK-CLOUD.md#每日新新闻的原创信息图准备) 复用现有 Cloud V2 输入运行与持久媒体；照片许可、逐条合格图门禁和不发信 Shadow 保持独立。
+
 Daily Digest V2.5 的字段、三种模式、R2/许可/恢复与隔离 Work 提示统一维护在 [Cloud 合同新版节](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)，阶段顺序见 [路线图](ROADMAP.md)，验收入口见 [测试矩阵](TEST-MATRIX.md)。D02 的[第一轮内容基线](DAILY-DIGEST-D02-QUALITY-BASELINE-20260927.md)、[定向校验回放](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)与[七期合成压缩回放](DAILY-DIGEST-SEVEN-DAY-SIMULATION-20260927.md)分开记录；本地开发与生产分层放行，七个真实日期不是统一前置，合成回放不能代替真实集成或上线验收。
 
 Daily Digest V3 Core 的 Event/Revision/Evidence/Analysis、存储/账号备份、D07 登录态接口、D08 只读离线建议和 D09 第一步本地引用冻结统一维护在 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md)；D08 的 [第一轮](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md)、[第二轮](DAILY-DIGEST-D08-OFFLINE-EVALUATION-R2-20260927.md)与[事实状态安全回归](DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)分别记录逐例结果。当前只对有界短摘录做限定抽取，仍无通用网页抓取、Work/MCP 写入、D09 人工纠正或正式日报接入，不改变 V2.5 当前运行合同。
 
 D13 Research/Thesis 的本地状态、登录态接口、观点确认和备份边界见[研究与观点合同](DAILY-DIGEST-RESEARCH-THESIS.md)；真实 Agent 和 Work 结果回传尚未接通。
+
+2026-09-29 的 [中期版本上线状态与下一阶段顺序](ROADMAP.md#now) 以当次受控正式发布为界；详细部署、通知及回退证据记录在被忽略的本机连续记录中。它不证明收件箱到达或下一次自然定时成功。
 
 - [项目成长](../project-evolution/README.md)：顶部入口、历史数据、统计口径、架构快照和离线维护流程。
 - [Daily Digest 15 张里程碑卡](ROADMAP.md#daily-digest-15-张里程碑卡2026-09-26-调整)：涵盖 V2.5 收口、V3 Core、Scheduled Events 与 Research/Thesis/Radar/Flash；按成果验收，一张卡可跨多次实施。除已单独授权完成的本地成果外，后续阶段仍须分别授权。

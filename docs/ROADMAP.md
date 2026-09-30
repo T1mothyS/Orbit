@@ -4,6 +4,7 @@
 
 # Now
 
+- Daily Digest V2.5 **中期版本已上线**（2026-09-29）：以用户认可的真实 Shadow 为体验基线，正式服务运行 `0.32.1-260929.1108`。发布范围为个人输入、逐项研究、图文和来源展示、校验、投递去重与媒体持久保存；V3/D13 未进入发布包。一次受控正式生成和 SMTP 接受已经核对，自然定时、收件箱到达与跨日观察仍待独立验收。合同见 [Cloud 日报](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 - Daily Digest 已形成 [D02 第一轮内容质量基线](DAILY-DIGEST-D02-QUALITY-BASELINE-20260927.md)、[定向校验/固定证据回放](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)与[七期合成压缩回放](DAILY-DIGEST-SEVEN-DAY-SIMULATION-20260927.md)：已知晚发来源和同期精确重复可被拦截；跨日期旧闻和改写转载仍可通过结构校验，合成回放的人工筛选不算自动去重。两次真实首稿遗漏和空新闻检索充分性仍须独立评审；D07 已有登录态本地读写与固定来源回归，真实 Work/Shadow 仍受限。D08 [第一轮](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md)、[第二轮](DAILY-DIGEST-D08-OFFLINE-EVALUATION-R2-20260927.md)及[事实状态安全回归](DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)仍属离线评测；抽取漏判和改写转载待定。无需集满七天才改进，本地接口不等于真实内容或生产放行。计划依据见 [2026-09-27 审计](DAILY-DIGEST-PLAN-AUDIT-20260927.md)，合同见 [Cloud 日报](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 - D09 第一步已在本地为人工核验的 D07 记录建立具体日报版本的精确引用冻结与备份恢复；人工纠正、正式日报接入和 D10 自动链仍未完成，见 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md#d09-第一步人工核验引用冻结2026-09-28)。
 
@@ -18,6 +19,7 @@
 
 # Next
 
+- 中期版上线后的顺序：先修复真实使用与下一次自然定时暴露的阻断问题，优先核对新日期的图片精确审核规则、来源和投递去重；再实现跨日事件记忆和可审计的人工纠正；最后按独立任务卡推进其余终极目标。保留七个不同日期 Shadow、OAuth 续用、收件箱和媒体下架等未完成技术验收，但不倒写为本次上线前置。
 - 在明确授权且准备好隔离/生产证据后，观察至少三次日报实际运行、至少两个日期，并单独记录 notification、queue、SMTP accepted、provider feedback 和 inbox arrival。
 - 继续按现有本地预构建、备份、原子切换、health/静态资源和回滚规则做生产发布，并分层记录邮件内容、SMTP 接受和收件箱到达证据。
 - 根据真实搜索数据量和响应时间再决定是否增加索引；当前 AI 检索保持词法匹配，不引入向量库、Embedding、RAG 或外部搜索服务。

@@ -15,6 +15,7 @@ interface DailyReportSummary {
   date: string;
   headline: string | null;
   heroImageUrl: string | null;
+  heroImageVisualKind?: 'photo' | 'archive_photo' | 'illustration' | 'placeholder' | null;
   heroImageCredit?: string | null;
   heroImageSourceUrl?: string | null;
   heroImageLicenseUrl?: string | null;
@@ -246,7 +247,7 @@ export function DailyReportsPage() {
                 {item.heroImageLicenseUrl && item.heroImageLicenseUrl !== item.heroImageSourceUrl && <a href={item.heroImageLicenseUrl} target="_blank" rel="noopener noreferrer">许可说明</a>}
               </div>
             ) : null;
-            const isWidePlaceholder = (item: DailyReportSummary) => ['原创编辑插画，非新闻现场图片', '原创分类示意图，非新闻现场图片', '原创栏目占位图，非新闻现场图片'].includes(item.heroImageCredit || '');
+            const isWidePlaceholder = (item: DailyReportSummary) => item.heroImageVisualKind === 'illustration' || item.heroImageVisualKind === 'placeholder' || ['原创编辑插画，非新闻现场图片', '原创分类示意图，非新闻现场图片', '原创栏目占位图，非新闻现场图片'].includes(item.heroImageCredit || '');
             return (
               <>
                 <article className="daily-report-featured" key={latest.id}>

@@ -33,7 +33,8 @@ Knowledge Library V2 首次部署、令牌权限、分层验收和回滚见 [`do
 - D07 的 `/api/digest-v3/*` 登录态接口支持人工审核来源提交、按账号与截点读取事件历史及精确引用预览；它不自动匹配事件或发布正式日报。输入、错误状态和本地验证边界见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#d07-登录态本地接口2026-09-27)。
 - 日报设置提供“接收并转发本地日报”和“接收并转发 Cloud 日报”两个来源开关。两边的有效正式发布都会先写入生产服务器；未勾选来源保存为 `CANDIDATE`，不进入正式网页和邮件，可在日报页候选对照；勾选来源保存为 `RECEIVED`，网页和邮件按来源分别处理。
 - 日报由外部 V2 程序在 Validator 通过后通过专用接口发布；“日报邮件”是独立于每日摘要的设置，首次发布和后续内容更新都会为新的内容版本入队，同一来源和内容版本保持幂等；每一天的日报详情都支持手动重新发送。
-- 日报云端链路提供 OAuth PKCE、Cloud Context、MCP 和 `dry_run`/`PUBLISHED` 合同，与 Local 专用令牌链路并行。Cloud 内容完整性是硬闸门；兼容路径逐图 Best Effort，带媒体批次则保持严格校验。Shadow 必须显式传 `dry_run=true`；实际 Work 模式与生产状态需现场核对，不能从历史文档推断。详细边界见 [Cloud 文档](docs/CHATGPT-WORK-CLOUD.md)。
+- 兼容 V1 日报云端链路提供 OAuth PKCE、Cloud Context、MCP 和 `dry_run`/`PUBLISHED` 合同，与 Local 专用令牌链路并行。Cloud 内容完整性是硬闸门；兼容路径逐图 Best Effort，带媒体批次则保持严格校验。兼容 V1 的非正式校验显式传 `dry_run=true`；实际 Work 模式与生产状态需现场核对，不能从历史文档推断。详细边界见 [Cloud 文档](docs/CHATGPT-WORK-CLOUD.md)。
+- Daily Digest V2.5 是并行的 `daily-digest.v2` Cloud 路径：按账号读取 Calendar、Mail、Watchlist 快照，先校验再生成 Shadow 或正式发布；逐条新闻媒体须经精确来源规则审核并持久托管，正式模式按现有 Cloud 接收设置进入通知队列。当前中期上线范围与待验收项见 [路线图](docs/ROADMAP.md)。
 - 每日摘要按账号保存的时、分和时区入队；同一配置时间的重复扫描保持幂等，修改当天提醒时间后允许再次触发，不与单项提醒混用。
 - 高优先级、未完成且有明确开始时间的事件/待办，在开始前 15 分钟内发送固定邮件提醒；它不受邮件开关、免打扰和日报开关影响。
 - 可生成仅展示一次的只读日报令牌，供独立日报程序按日期读取当前账号日程；服务端只保存令牌哈希。

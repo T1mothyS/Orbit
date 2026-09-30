@@ -78,7 +78,7 @@ Phase 5 的所有权、等价性和迁移验收见 [Phase 5 验证记录](PHASE5
 
 ## 4. 持久化
 
-Daily Digest V2.5 使用原活动库中的 `digest_v2_runs`（账号/日期/输入快照/版本与诊断）和 `digest_v2_artifacts`（账号/日期/模式/内容哈希唯一的冻结产物）。`daily_reports`、通知、认证与备份入口复用；Shadow 不写正式表。快照七天过期，长期诊断不保留邮箱正文。媒体在 R2 和原媒体目录分别存内容寻址字节，文章来源/许可保留在账号产物引用中。账号恢复重映射运行与产物 ID，跨账号恢复不允许沿用旧输入运行。具体发布状态、失败恢复、媒体生命周期及限制见 [V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
+Daily Digest V2.5 使用原活动库中的 `digest_v2_runs`（账号/日期/输入快照/版本与诊断）和 `digest_v2_artifacts`（账号/日期/模式/内容哈希唯一的冻结产物）。`daily_reports`、通知、认证与备份入口复用；Shadow 不写正式表。快照七天过期，长期诊断不保留邮箱正文。媒体采用内容寻址字节：独立隔离服务的 Shadow 经测试 R2 并留本地镜像；正式服务可显式让 Shadow 与 production 使用原媒体目录的持久公开路径，另有 R2 选项。文章来源/许可保留在账号产物引用中。账号恢复重映射运行与产物 ID，跨账号恢复不允许沿用旧输入运行。具体发布状态、失败恢复、媒体生命周期及限制见 [V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 
 Daily Digest V3 Core 的四类事件记忆实体、三个引用表和 D09 本地冻结引用表已增量加入同一个 `activity.db`，由 `activity-store.ts` 接入 `digest-v3-store.ts`；D07 登录态路由提供受控提交、按截点分页历史和精确预览，D09 增加按本地日报具体版本的冻结和读取，没有 Work/MCP 写入、自动分类或正式发布接入。D13 研究详情可按登录账号读取其绑定的精确修订和来源。账号引用使用复合外键，封存版本和冻结记录禁止原位更新。全站数据库快照包含 V3 表；账号级备份当前保存八组行，恢复时校验引用，同账号合并或替换，跨账号重映射 V3 ID、引用与日报版本键。旧七组备份可合并，但不能替换已有冻结记录；完全不含 V3 的旧备份不能替换已有 V3 数据。字段、迁移与验收边界见 [V3 Core 合同](DAILY-DIGEST-V3-CORE-CONTRACT.md#d09-第一步人工核验引用冻结2026-09-28)。
 
@@ -112,6 +112,8 @@ server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与�
 | 备份与管理 | Settings、AdminModal | backup-service、admin API | 高风险操作确认、快照和回滚 |
 
 ## 6. 日报 V2 跨项目流程
+
+新新闻信息图由 `digest-v2-visuals.ts` 使用现有 sharp 和随包中文字体绘制；`digest-v2-service.ts` 在账号/运行输入校验后保存原持久媒体与 run manifest 绑定。`daily_report.prepare_visuals_v2` 不发布或发信；后续发布仍检查正文/证据哈希、媒体文件哈希和逐条图门禁。外站照片审核不变，详见 [原创信息图合同](CHATGPT-WORK-CLOUD.md#每日新新闻的原创信息图准备)。
 
 外部日报 V2 负责本地链路的采集、上下文、结构化生成、Validator、确定性渲染、本地媒体下载/校验和上传；Work Cloud 通过生产 MCP 读取输入并在服务端托管媒体。AI Calendar 负责令牌/OAuth 鉴权、根据调用身份固定 `local` 或 `cloud` 来源、媒体按内容哈希保存、日报按账号/日期/来源/内容版本幂等保存，以及按账号来源设置决定 `RECEIVED` 或 `CANDIDATE` 和邮件队列。Cloud `dry_run=true` 不写日报或邮件队列，`dry_run=false` 必须返回 `PUBLISHED` 才表示生产数据库已保存。
 

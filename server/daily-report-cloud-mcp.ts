@@ -1,5 +1,6 @@
 import express from 'express';
-import { readDigestV2Inputs, validateDigestRun, publishDigestV2 } from './digest-v2-service.js';
+import { readDigestV2Inputs, validateDigestRun, publishDigestV2, prepareDigestVisuals } from './digest-v2-service.js';
+import { NEWS_VISUAL_PLAN_SCHEMA } from './digest-v2-visuals.js';
 import { DIGEST_V2_SCHEMA } from './digest-v2-contract.js';
 import * as db from './db.js';
 import { previewDailyReportMedia, publishDailyReport } from './daily-report-service.js';
@@ -73,6 +74,7 @@ interface McpTool {
 const TOOL_SCOPES: Record<string, DailyReportCloudScope[]> = {
   'daily_report.read_inputs_v2': ['daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context', 'daily_report:read_history'],
   'daily_report.validate_v2': ['daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context'],
+  'daily_report.prepare_visuals_v2': ['daily_report:media_prepare', 'daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context'],
   'daily_report.publish_v2': ['daily_report:publish', 'daily_report:media_prepare', 'daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context'],
   'daily_report.read_inputs': [
     'daily_report:read_calendar',
@@ -97,6 +99,7 @@ function oauthSecurity(toolName: string): Array<{ type: 'oauth2'; scopes: string
 }
 
 const toolDefinitions: McpTool[] = [
+  { name: 'daily_report.prepare_visuals_v2', securitySchemes: oauthSecurity('daily_report.prepare_visuals_v2'), description: '为具体新闻生成原创事实信息图并保存本站持久媒体；标签必须来自该条标题/摘要，显式标明非现场照片。绑定当前账号、runId、新闻及证据，改稿需重新准备。返回带 media 的 digest；随后 validate_v2 并按授权发布。不批准外站照片、不发布、不发信。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, digest: DIGEST_V2_SCHEMA, visuals: NEWS_VISUAL_PLAN_SCHEMA }, required: ['runId', 'digest', 'visuals'], additionalProperties: false } },
   { name: 'daily_report.read_inputs_v2', securitySchemes: oauthSecurity('daily_report.read_inputs_v2'), description: '创建账号隔离的新版日报输入快照和 runId，有效期七天；不发布、不发信。', inputSchema: { type: 'object', properties: { date: { type: 'string' } }, required: ['date'], additionalProperties: false } },
   { name: 'daily_report.validate_v2', securitySchemes: oauthSecurity('daily_report.validate_v2'), description: '对照输入快照纯校验 daily-digest.v2 JSON；无媒体下载、持久化或通知副作用。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, digest: DIGEST_V2_SCHEMA }, required: ['runId', 'digest'], additionalProperties: false } },
   { name: 'daily_report.publish_v2', securitySchemes: oauthSecurity('daily_report.publish_v2'), description: '新版日报 dry_run 纯校验；shadow 保存隔离预览但不发信；production 必须由服务器单独启用。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, digest: DIGEST_V2_SCHEMA, mode: { type: 'string', enum: ['dry_run', 'shadow', 'production'], default: 'dry_run' } }, required: ['runId', 'digest'], additionalProperties: false } },
@@ -375,6 +378,7 @@ async function callTool(auth: OAuthBearerContext, name: string, rawArguments: un
   const args = objectValue(rawArguments);
   if (name === 'daily_report.read_inputs_v2') return readDigestV2Inputs(auth.userId, stringValue(args.date));
   if (name === 'daily_report.validate_v2') return validateDigestRun(auth.userId, stringValue(args.runId), args.digest);
+  if (name === 'daily_report.prepare_visuals_v2') return prepareDigestVisuals(auth.userId, stringValue(args.runId), args.digest, args.visuals);
   if (name === 'daily_report.publish_v2') return publishDigestV2(auth.userId, stringValue(args.runId), args.digest, args.mode === undefined ? 'dry_run' : stringValue(args.mode));
   if (name === 'daily_report.read_calendar') {
     const timezone = db.getReminder(auth.userId)?.timezone || process.env.APP_TIMEZONE || 'Asia/Shanghai';

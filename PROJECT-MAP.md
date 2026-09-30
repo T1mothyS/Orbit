@@ -48,7 +48,9 @@ CalDAV 入口为 `server/routes/caldav.ts`；`caldav-service` 共享手动/后�
 
 ### 1.2 日报 V2 Local 流程
 
-新版 V2.5 的独立 Cloud 分支由 `server/digest-v2-{contract,service,media,fetch,render}.ts` 实现，MCP 入口仍在 `daily-report-cloud-mcp.ts`。输入运行与隔离产物在原 `activity.db` 的 `digest_v2_runs`、`digest_v2_artifacts`；production 才写原日报/通知表。阅读复用 `reports-read.ts` 与 `DailyReportsPage.tsx`，R2 字节镜像进入原媒体/备份边界。V1 Local 图示仍适用于原链路，不能作为新版合同。详细字段、开关和 Shadow 边界见 [V2.5 合同](docs/CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
+Cloud 新新闻信息图准备入口为 `daily_report.prepare_visuals_v2`，绘图实现位于 `server/digest-v2-visuals.ts`，绑定与持久媒体复用原 run manifest 和媒体目录；不是 Local 照片审核或 V3。字段、安全与验收边界见 [原创信息图合同](docs/CHATGPT-WORK-CLOUD.md#每日新新闻的原创信息图准备)。
+
+新版 V2.5 的独立 Cloud 分支由 `server/digest-v2-{contract,service,media,fetch,render}.ts` 实现，MCP 入口仍在 `daily-report-cloud-mcp.ts`。输入运行与隔离产物在原 `activity.db` 的 `digest_v2_runs`、`digest_v2_artifacts`；production 才写原日报/通知表。阅读复用 `reports-read.ts` 与 `DailyReportsPage.tsx`，媒体字节镜像进入原媒体/备份边界；正式服务可显式让 Shadow 与 production 均使用持久本地媒体，独立隔离服务沿用测试 R2。V1 Local 图示仍适用于原链路，不能作为新版合同。详细字段、开关和 Shadow 边界见 [V2.5 合同](docs/CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 
 V3 Core 位于同一个 `activity.db`：`server/digest-v3-store.ts` 管理 Event/Revision/Evidence/Analysis、引用表与 D09 本地冻结行，`activity-store.ts` 负责初始化和可靠写回。原 `backup-service.ts` 账号备份当前包含八组 V3 行，兼容旧七组备份并保护已有冻结记录；同账号替换和跨账号 ID 重映射均有本地验证。D07 的 `digest-v3-local-flow.ts` 对人工审核来源做原子写入和精确预览，`routes/digest-v3.ts` 提供登录态的受控提交、按账号/截点分页历史，以及 D09 具体日报版本的引用冻结/读取。D08 的 `digest-v3-offline-match.ts` 只在隔离回放里给双轴建议，`digest-v3-offline-extract.ts` 只对有界短摘录作限定规则抽取并保留事实支持文本；两者均不写活动库。详见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#d09-第一步人工核验引用冻结2026-09-28)与[阶段事实安全评测](docs/DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)。没有人工纠正/恢复、Work/MCP 写入、正式日报发布或真实 Shadow 自动匹配。
 
