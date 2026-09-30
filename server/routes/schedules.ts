@@ -9,6 +9,8 @@ import * as reminderCalendarSync from '../reminder-calendar-sync.js';
 import { toggleScheduleCompletion } from '../schedule-completion-service.js';
 import { shiftScheduleDateValue } from '../schedule-actions.js';
 import { addLog } from '../log-service.js';
+import { withPersistenceTransaction } from '../persistence.js';
+import { scheduleFingerprint } from '../ai-plan.js';
 import { normaliseScheduleApiFields } from '../schedule-input.js';
 
 export function createSchedulesRouter({ authenticate }: Pick<ReturnType<typeof createAuth>, 'authenticate'>) {
@@ -69,7 +71,7 @@ export function createSchedulesRouter({ authenticate }: Pick<ReturnType<typeof c
         return res.status(403).json({ error: "无权访问该日程" });
       }
 
-      res.json({ schedule });
+      res.json({ schedule, expectedState: schedule ? scheduleFingerprint(schedule) : null });
     } catch (error: any) {
       console.error("[Schedule] Error:", error);
       res.status(500).json({ error: error?.message || "获取日程失败" });
@@ -123,6 +125,8 @@ export function createSchedulesRouter({ authenticate }: Pick<ReturnType<typeof c
         return res.status(403).json({ error: "无权修改该日程" });
       }
 
+      if (reminderCalendarSync.isReminderLinkedSchedule(id)) return res.status(400).json({ error: '周期事项请使用本周期安排日期入口' });
+      if (req.body.expectedState && scheduleFingerprint(existing) !== req.body.expectedState) return res.status(409).json({ error: '事项已发生变化，请重新打开后修改' });
       const updates = normaliseScheduleApiFields(req.body || {}, userId, existing);
       const updated = scheduleStore.updateSchedule(id, updates);
       addLog('info', 'schedule', '更新日程', {
@@ -145,6 +149,22 @@ export function createSchedulesRouter({ authenticate }: Pick<ReturnType<typeof c
     }
   });
 
+  app.patch('/api/schedules/:id/planned-date', authenticate, (req, res) => {
+    try {
+      const userId = (req as any).user.userId;
+      const target = scheduleStore.getSchedule(req.params.id);
+      if (!target || target.user_id !== userId || !reminderCalendarSync.isReminderLinkedSchedule(target.id)) return res.status(404).json({ error: '周期事项不存在' });
+      if (!req.body.expectedState || req.body.expectedState !== scheduleFingerprint(target)) return res.status(409).json({ error: '事项已发生变化，请重新打开后修改' });
+      const schedule = withPersistenceTransaction(() => {
+        const task = reminderStore.setCyclePlannedDate(target.id.slice('reminder-cycle:'.length), userId, req.body.date === null ? null : String(req.body.date));
+        const result = reminderCalendarSync.syncReminderTaskToCalendar(task);
+        if (result?.id !== target.id) throw new Error('该周期已不再是当前周期');
+        return result;
+      });
+      res.json({ schedule });
+    } catch (error: any) { res.status(400).json({ error: error.message }); }
+  });
+
   // 更新日程（PUT - 与 PATCH 行为相同）
   app.put("/api/schedules/:id", authenticate, (req, res) => {
     try {
@@ -159,6 +179,8 @@ export function createSchedulesRouter({ authenticate }: Pick<ReturnType<typeof c
         return res.status(403).json({ error: "无权修改该日程" });
       }
 
+      if (reminderCalendarSync.isReminderLinkedSchedule(id)) return res.status(400).json({ error: '周期事项请使用本周期安排日期入口' });
+      if (req.body.expectedState && scheduleFingerprint(existing) !== req.body.expectedState) return res.status(409).json({ error: '事项已发生变化，请重新打开后修改' });
       const updates = normaliseScheduleApiFields(req.body || {}, userId, existing);
       const updated = scheduleStore.updateSchedule(id, updates);
       addLog('info', 'schedule', '更新日程', {
@@ -198,6 +220,7 @@ export function createSchedulesRouter({ authenticate }: Pick<ReturnType<typeof c
         return res.status(403).json({ error: "无权删除该日程" });
       }
 
+      if (reminderCalendarSync.isReminderLinkedSchedule(id)) return res.status(400).json({ error: '周期事项请在周期提醒页面删除' });
       const success = scheduleStore.deleteSchedule(id);
       addLog('warn', 'schedule', `删除日程: ${id}`);
       res.json({ success: true });

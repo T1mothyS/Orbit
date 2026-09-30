@@ -358,3 +358,51 @@
   .note-board-scrim { display: block; position: fixed; z-index: 60; inset: 0; width: 100%; height: 100%; border: 0; background: rgba(15, 23, 42, .28); }
   .note-board-row { grid-template-columns: 32px minmax(0, 1fr) auto; gap: 7px; }
 }
+
+/* Orbit: existing business views remain available around the conversation workspace. */
+.orbit-workspace { gap: 0; }
+.orbit-conversations { width: 210px; flex: 0 0 210px; display: flex; flex-direction: column; gap: 12px; padding: 16px 12px; border-right: 1px solid var(--td-component-stroke); background: var(--td-bg-color-page); min-height: 0; }
+.orbit-sidebar-head { display: flex; align-items: center; justify-content: space-between; }
+.orbit-sidebar-head > button { display: none; }
+.orbit-conversation-list { display: flex; flex: 1; flex-direction: column; gap: 5px; min-height: 0; overflow-y: auto; }
+.orbit-conversation-list button { text-align: left; padding: 10px; border-radius: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--td-text-color-secondary); }
+.orbit-conversation-list button.active { background: var(--td-brand-color-light); color: var(--td-brand-color); }
+.orbit-conversation-list button:hover { background: var(--td-bg-color-component); }
+.orbit-preference { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.orbit-conversations small { color: var(--td-text-color-placeholder); font-size: 11px; }
+.orbit-chat-main { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; min-height: 0; }
+.orbit-chat-main > .schedule-ai-panel { flex: 1 1 auto; min-height: 0; min-width: 0; }
+.orbit-chat-toolbar { display: flex; align-items: center; gap: 12px; min-height: 43px; padding: 8px 16px; border-bottom: 1px solid var(--td-component-stroke); font-size: 12px; }
+.orbit-chat-toolbar strong { flex: 1; min-width: 0; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+.orbit-chat-toolbar button { flex-shrink: 0; color: var(--td-text-color-secondary); }
+.orbit-sidebar-toggle { display: none; }
+.orbit-dialog-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px; background: var(--td-bg-color-component); font-size: 12px; }
+.orbit-dialog-row input { flex: 1; min-width: 140px; padding: 8px; background: var(--td-bg-color-container); border: 1px solid var(--td-component-stroke); border-radius: 6px; }
+.orbit-request-list { width: min(100%,960px); margin: auto; }
+.orbit-request { display: flex; gap: 10px; padding: 10px 12px; margin-bottom: 6px; font-size: 12px; border: 1px solid var(--td-component-stroke); border-radius: 10px; }
+.orbit-request span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.orbit-request small { display: block; color: var(--td-text-color-placeholder); }
+.orbit-request button { flex-shrink: 0; color: var(--td-brand-color); }
+.orbit-error { padding: 10px 16px; display: flex; justify-content: space-between; background: var(--td-error-color-light); color: var(--td-error-color); font-size: 13px; }
+.orbit-modal-backdrop { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.orbit-modal { position: relative; background: var(--td-bg-color-container); border-radius: 16px; padding: 24px; max-width: 440px; width: 100%; max-height: 85vh; overflow: auto; display: flex; flex-direction: column; gap: 14px; font-size: 14px; }
+.orbit-modal h3 { font-weight: 700; font-size: 18px; padding-right: 20px; }
+.orbit-modal-close { position: absolute; right: 12px; top: 10px; font-size: 24px; }
+.orbit-modal input { display: block; width: 100%; padding: 10px; margin-top: 8px; border-radius: 8px; background: var(--td-bg-color-page); border: 1px solid var(--td-component-stroke); }
+.orbit-cycle-description { white-space: pre-line; color: var(--td-text-color-secondary); }
+.orbit-edit-error { position: fixed; z-index: 80; bottom: 20px; left: 50%; transform: translateX(-50%); width: min(90vw,460px); padding: 12px; border-radius: 8px; background: var(--td-error-color-light); color: var(--td-error-color); }
+.brand-mark img { width: 100%; height: 100%; object-fit: contain; border-radius: 7px; }
+.orbit-login-logo { width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 14px; }
+.ai-knowledge-sources details summary { color: var(--td-text-color-secondary); cursor: pointer; padding-block: 8px; font-size: 12px; }
+@media (max-width: 1100px) {
+  .orbit-conversations { display: none; position: fixed; left: 0; top: 0; bottom: 0; z-index: 72; width: min(280px,85vw); background: var(--td-bg-color-container); }
+  .orbit-conversations.is-open { display: flex; }
+  .orbit-sidebar-head > button { display: block; font-size: 22px; }
+  .orbit-sidebar-toggle { display: block; }
+  .orbit-drawer-backdrop { position: fixed; inset: 0; z-index: 71; background: rgba(0,0,0,.35); }
+}
+@media (max-width: 600px) {
+  .orbit-chat-toolbar { padding-inline: 12px; gap: 8px; font-size: 11px; }
+  .orbit-chat-toolbar strong { display: none; }
+  .orbit-chat-toolbar .orbit-sidebar-toggle { margin-right: auto; }
+}

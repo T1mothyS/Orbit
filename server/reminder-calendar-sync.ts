@@ -30,6 +30,7 @@ function descriptionFor(task: ReminderTaskSummary, cycle: ReminderCycle): string
   return [
     `周期事务到期：${task.name}`,
     `到期日期：${cycle.dueDate}`,
+    cycle.plannedDate ? `本周期安排日期：${cycle.plannedDate}` : '',
     actionGuide || '请前往“周期提醒”登记完成情况和证明。',
   ].join('\n');
 }
@@ -47,7 +48,7 @@ export function syncReminderCycleToCalendar(
     return null;
   }
 
-  const dateTime = `${cycle.dueDate}T00:00:00`;
+  const dateTime = `${cycle.plannedDate || cycle.dueDate}T00:00:00`;
   const common = {
     type: 'todo' as const,
     title: task.name,
@@ -66,7 +67,10 @@ export function syncReminderCycleToCalendar(
     is_high_risk: false,
   };
 
-  if (existing) return scheduleStore.updateSchedule(id, common);
+  if (existing) {
+    if (Object.entries(common).every(([key, value]) => JSON.stringify((existing as any)[key]) === JSON.stringify(value))) return existing;
+    return scheduleStore.updateSchedule(id, common);
+  }
   return scheduleStore.createSchedule({
     id,
     user_id: task.userId,

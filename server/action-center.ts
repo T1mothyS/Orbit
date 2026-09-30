@@ -12,6 +12,7 @@ export interface ActionItem {
   instanceId: string | null;
   title: string;
   dueAt: string;
+  plannedAt?: string | null;
   allDay: boolean;
   status: ActionItemStatus;
   priority: 'high' | 'medium' | 'low';
@@ -167,8 +168,8 @@ export function getActionCenter(userId: string, upcomingDays = 7, now = new Date
     if (completed && dateInTimezone(completion?.completedAt || cycle.completedAt || cycle.updatedAt, timezone) === today) status = 'completed';
     else if (completed || !task.enabled) continue;
     else if (cycle.status === 'expired' || cycle.dueDate < today) status = 'overdue';
-    else if (cycle.dueDate === today) status = 'today';
-    else if (cycle.dueDate <= windowEnd) status = 'upcoming';
+    else if ((cycle.plannedDate || cycle.dueDate) <= today) status = 'today';
+    else if ((cycle.plannedDate || cycle.dueDate) <= windowEnd) status = 'upcoming';
     if (!status) continue;
     const config = task.config as any;
     items.push({
@@ -178,6 +179,7 @@ export function getActionCenter(userId: string, upcomingDays = 7, now = new Date
       instanceId: cycle.id,
       title: task.name,
       dueAt: `${cycle.dueDate}T23:59:59`,
+      plannedAt: cycle.plannedDate ? `${cycle.plannedDate}T00:00:00` : null,
       allDay: true,
       status,
       priority: config.priority || 'medium',

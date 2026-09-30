@@ -1,14 +1,16 @@
-# AI Calendar 文档索引
+# Orbit 文档索引
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified version: `0.36.3-260928.1303`（2026-09-28，个人关注输入状态与图片占位口径本地修复；未隔离部署，正式生产与发信未验）。
+- Last verified local version: `0.37.0-260930.2101`（2026-09-30，Orbit 本地实现；真实 AI、生产、自然日报与收件箱未验；日报历史证据按各节日期使用）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。
 - Do not use for: 推断生产已部署、Work 已同步、邮件已到达或授予执行权限。
 
 ## 当前规范与合同
+
+Orbit 主站会话、队列、周期安排日期及恢复合同见 [架构](ARCHITECTURE.md#orbit-对话与操作合同)，阶段范围见 [路线图](ROADMAP.md#orbit-主站升级2026-09-30)。本轮本地实现不代表生产、真实 AI 或日报发信验收。
 
 新日期选题的 [原创新闻信息图准备](CHATGPT-WORK-CLOUD.md#每日新新闻的原创信息图准备) 复用现有 Cloud V2 输入运行与持久媒体；照片许可、逐条合格图门禁和不发信 Shadow 保持独立。
 

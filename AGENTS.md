@@ -1,10 +1,10 @@
-# AI Calendar 项目 Agent 工作规范
+# Orbit 项目 Agent 工作规范
 
 本文档是提交到仓库的通用协作规则。只写项目事实、可复用的安全边界和验证方式，不写本机绝对路径、服务器地址、凭据或个人数据。本机补充放在被忽略的 AGENTS.local.md；持续记录和部署 runbook 分别放在本地的 CONTINUOUS-REQUIREMENTS.md 与 DEPLOY.md。
 
 ## 1. 项目定位和技术结构
 
-AI Calendar 是面向个人和小规模使用的日程、周期事务、提醒、AI 助手和日报中心，提供 Web 和 Electron 两种入口。
+Orbit 是面向个人和小规模使用的日程、周期事务、提醒、AI 助手和日报中心，提供 Web 和 Electron 两种入口。
 
 - 前端是 React、TypeScript、Vite、TDesign React、Tailwind CSS。
 - 后端是 Node.js、Express、TypeScript、Nodemailer。

@@ -1,7 +1,7 @@
 {
   "name": "smart-schedule-agent",
-  "version": "0.36.4-260930.2006",
-  "description": "璺ㄥ钩鍙版櫤鑳芥棩绋嬭〃 Agent 搴旂敤",
+  "version": "0.37.0-260930.2101",
+  "description": "Orbit — chat-first personal workspace",
   "author": "Smart Schedule Team",
   "license": "MIT",
   "engines": {

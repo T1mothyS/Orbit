@@ -5,10 +5,11 @@ import { GlobalSearch } from './GlobalSearch';
 type Section = 'today' | 'schedule' | 'assistant' | 'reminders' | 'reports' | 'library';
 
 const productNavItems: Array<{ section: Section; label: string; icon?: string; Icon?: LucideIcon }> = [
+  { section: 'assistant', label: 'AI 对话', icon: '/navigation-icons/assistant.png' },
+
   { section: 'today', label: '今日', icon: '/navigation-icons/today.png' },
   { section: 'schedule', label: '日程', icon: '/navigation-icons/schedule.png' },
   { section: 'reminders', label: '周期提醒', icon: '/navigation-icons/reminders.png' },
-  { section: 'assistant', label: 'AI 对话', icon: '/navigation-icons/assistant.png' },
   { section: 'reports', label: '日报', Icon: Newspaper },
   { section: 'library', label: '知识库', Icon: BookOpen },
 ];
@@ -42,10 +43,10 @@ export function AppShell({
     <div className={`app-shell${mobileReader ? ' app-shell-mobile-reader' : ''}`}>
       <header className="reminder-topbar app-topbar">
         <div className="brand-lockup">
-          <div className="brand-mark"><BellRing size={18} /></div>
+          <div className="brand-mark"><img src="/orbit-logo.png" alt="" aria-hidden="true" /></div>
           <div>
-            <div className="brand-name">AI Calendar</div>
-            <div className="brand-subtitle">日程与周期提醒</div>
+            <div className="brand-name">Orbit</div>
+            <div className="brand-subtitle">个人事务中心</div>
           </div>
         </div>
 

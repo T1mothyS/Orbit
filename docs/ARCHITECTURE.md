@@ -1,8 +1,8 @@
-# AI Calendar 架构
+# Orbit 架构
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.36.1-260928.0746`（2026-09-28，D09 旧备份跨账号替换保护修复；其他领域保留各节时点，不代表生产或真实 Work）。
+- Last verified local version: `0.37.0-260930.2101`（2026-09-30，Orbit 本地实现；真实 AI、生产、自然日报与收件箱未验；日报历史证据按各节日期使用）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -115,7 +115,7 @@ server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与�
 
 新新闻信息图由 `digest-v2-visuals.ts` 使用现有 sharp 和随包中文字体绘制；`digest-v2-service.ts` 在账号/运行输入校验后保存原持久媒体与 run manifest 绑定。`daily_report.prepare_visuals_v2` 不发布或发信；后续发布仍检查正文/证据哈希、媒体文件哈希和逐条图门禁。外站照片审核不变，详见 [原创信息图合同](CHATGPT-WORK-CLOUD.md#每日新新闻的原创信息图准备)。
 
-外部日报 V2 负责本地链路的采集、上下文、结构化生成、Validator、确定性渲染、本地媒体下载/校验和上传；Work Cloud 通过生产 MCP 读取输入并在服务端托管媒体。AI Calendar 负责令牌/OAuth 鉴权、根据调用身份固定 `local` 或 `cloud` 来源、媒体按内容哈希保存、日报按账号/日期/来源/内容版本幂等保存，以及按账号来源设置决定 `RECEIVED` 或 `CANDIDATE` 和邮件队列。Cloud `dry_run=true` 不写日报或邮件队列，`dry_run=false` 必须返回 `PUBLISHED` 才表示生产数据库已保存。
+外部日报 V2 负责本地链路的采集、上下文、结构化生成、Validator、确定性渲染、本地媒体下载/校验和上传；Work Cloud 通过生产 MCP 读取输入并在服务端托管媒体。Orbit 负责令牌/OAuth 鉴权、根据调用身份固定 `local` 或 `cloud` 来源、媒体按内容哈希保存、日报按账号/日期/来源/内容版本幂等保存，以及按账号来源设置决定 `RECEIVED` 或 `CANDIDATE` 和邮件队列。Cloud `dry_run=true` 不写日报或邮件队列，`dry_run=false` 必须返回 `PUBLISHED` 才表示生产数据库已保存。
 
 本地 NoSend、发布接口返回、QUEUED、SMTP accepted 和收件箱到达属于不同证据层级，不能相互替代。Local 发布阶段不抓取外站新闻图；Cloud 服务端可受控获取显式媒体，无批次时逐图 Best Effort，有批次时检查 READY、归属与完整性，正文完整性保持硬闸门。`dry_run=true` 不保存日报或队列，但可能托管媒体文件。不得把外部项目凭据或运行数据带入仓库。完整合同见 [Cloud 文档](CHATGPT-WORK-CLOUD.md)。
 
@@ -134,3 +134,31 @@ Tools 的正式来源是 `protected-tools/manifest.json` 及各 slug 的 `index.
 `POST /api/ai/prompt-optimize` 仍保留为兼容性的纯优化接口：使用当前账号认证、凭据及首选模型，接收 `{ text }`，返回 `{ optimizedText }`；正文为 1–2000 字符，输出同上限，90 秒超时。该独立调用禁用工具、配置加载和会话持久化，不读取日程/知识库，不写业务或聊天历史。
 
 记事板使用 `POST /api/note-items/:id/optimize` 和 `POST /api/note-items/:id/revert-optimization` 完成原位覆盖与单步撤回。`note_items` 的 `is_optimized`、`optimization_count`、`optimization_previous_content` 和 `content_revision` 分别记录当前撤回状态、成功优化累计次数、服务端私有的上一版正文和正文版本；对外 `NoteItem` 只返回前三者中的公开状态字段 `isOptimized`、`optimizationCount`、`contentRevision`，不暴露上一版正文。优化/撤回接口要求客户端提交 `expectedContent + expectedRevision`，并以单条条件 UPDATE 防止账号隔离、重复优化、重复撤回和异步慢响应覆盖新正文；每次优化尝试另有内部 `runId` 仅用于请求日志关联，不写入提示词或正文。`PATCH /api/note-items/:id` 的正文修改会清除当前优化状态、保留累计次数并递增版本；只改颜色或完成状态不会清除撤回。旧数据库和旧备份缺少这些字段时按未优化、次数 0、版本 0 迁移。
+
+## Orbit 对话与操作合同
+
+2026-09-30 的本地实现使用现有 chat.db 和同步持久化事务，未增加数据库服务或框架。`orbit_conversations` 保存账号归属和会话标题；`ai_schedule_messages.conversation_id` 关联历史；旧记录首次访问时迁入默认会话。会话历史长期保留，模型仅使用最近 20 条、最多 12000 字符的历史，以及有界对象引用和当前账号事实。历史和知识资料不是系统指令，不能把历史计划视为已执行。模型查询明确关闭内置工具、继承配置、MCP 和 SDK 会话持久化；只有本站认证服务可以在确认后写入事务。
+
+`orbit_requests` 保存请求 ID、归属、输入、状态和结果。每账号一次执行一个 AI 请求；不同账号及短同步写操作可以并行。请求号在账号内唯一，重复提交返回原请求，号相同而内容不同拒绝。状态为 queued/running/completed/failed/cancelled/interrupted；页面关闭不取消后台任务，显式取消会中止 SDK 并禁止迟到历史/计划落库。启动时 running 转 interrupted，queued 继续执行；失败或中断需要手动重试。该队列不保证外部模型的计费撤销，也不重放备份中的外部请求。
+
+| 接口 | 合同 |
+| --- | --- |
+| GET/POST `/api/orbit/conversations` | 当前账号会话列表/创建 |
+| PATCH/DELETE `/api/orbit/conversations/:id` | 重命名/删除；存在 queued/running 时先取消；保留事务数据 |
+| GET/PATCH `/api/orbit/preferences` | 账号自动知识检索开关，默认 false |
+| POST `/api/orbit/requests` | 接受有 requestId/conversationId/text 的有界请求，返回 202 和状态；每账号最多 20 个等待/执行请求 |
+| GET `/api/orbit/requests?conversationId=...` | 指定账号会话最近 40 个请求状态 |
+| POST `/api/orbit/requests/:id/cancel`、`/retry` | 取消/重试；正在结束的同 ID 工作不能重入 |
+| POST `/api/ai-chat` | 兼容旧调用方的最终响应，执行同一队列 |
+| GET `/api/ai-schedule/history?conversationId=...` | 仅当前账号会话，日程卡片重新读取当前事实；已删除对象移除 |
+| PATCH `/api/schedules/:id/planned-date` | 周期投影专用；date 可为空以恢复到期日，expectedState 必填；原子更新周期本体和日历投影 |
+
+AI 生成的 update/delete 绑定真实对象 ID 和事实指纹，确认时拒绝已变化或丢失的目标。同名不能定位时要求选择，序号与最近卡片不一致时拒绝。计划编辑保留基线；确认结果与取消状态保存到历史，已删除会话或取消的计划不能执行。普通结果卡片使用现有日程详情/编辑表单，并提交 expectedState 防止覆盖期间的其他修改。
+
+`reminder_cycles.planned_date` 是可空扩展列；缺失时以 due_date 安排。改期仅修改当前未完成周期的工作日期；原到期日、提醒投递日期和未来周期规则不变。日历与行动中心读取 planned_date，行动中心同时返回 dueAt/plannedAt。手机 CalDAV 现有周期投影仍采用原到期日，不自动更改手机端提醒策略。
+
+知识检索只在明确请求、明确接续此前资料、或账号主动开启自动检索时进行。排名与摘要剥离 YAML frontmatter，优先展示摘要。模型给出真实条目 ID；服务端校验候选集合，并按正文首次引用编号排序。未被引用候选单独折叠，不能当作已用来源。当前搜索仍为词法匹配，不是向量检索；未做通用长期记忆、人物/项目实体自动建模。
+
+账号加密备份保存会话、消息、检索偏好及周期安排日期；新队列执行状态不随账号备份重放。旧备份缺少 Orbit 字段时保留现有会话；跨账号恢复重映射会话/消息 ID，并清除原账号的计划、日程和知识引用。完整系统备份仍通过既有数据库文件合同覆盖这些表。清空/删除账号清理新表。
+
+品牌改为 Orbit，应用内部数据库、备份魔数/格式、加密盐、认证存储键、appId 和既有桌面数据目录保留兼容身份。

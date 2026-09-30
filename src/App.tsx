@@ -27,21 +27,21 @@ function App() {
   // 动态更新 Tab 标题
   useEffect(() => {
     if (isLoading) {
-      document.title = 'AI Calendar - Loading...';
+      document.title = 'Orbit - Loading...';
       return;
     }
 
     if (!isAuthenticated) {
-      document.title = 'AI Calendar - 登录 / Login';
+      document.title = 'Orbit - 登录 / Login';
     } else {
       // 检查是否打开了设置弹窗
       const settingsDialog = document.querySelector('.settings-dialog-content');
       if (settingsDialog) {
-        document.title = 'AI Calendar - 设置 / Settings';
+        document.title = 'Orbit - 设置 / Settings';
       } else {
         document.title = /^\/project\/?$/.test(location.pathname)
-          ? 'AI Calendar - 项目成长'
-          : /^\/tools\/?$/.test(location.pathname) ? 'AI Calendar - Tools' : 'AI Calendar - 首页 / Home';
+          ? 'Orbit - 项目成长'
+          : /^\/tools\/?$/.test(location.pathname) ? 'Orbit - Tools' : 'Orbit - 首页 / Home';
       }
     }
   }, [isAuthenticated, isLoading, location.pathname]);
@@ -78,7 +78,7 @@ function App() {
           <Route path="/library/:id" element={<AppContent />} />
           <Route path="/tools" element={<AppContent />} />
           <Route path="/project" element={<AppContent />} />
-          <Route path="*" element={<Navigate to="/today" replace />} />
+          <Route path="*" element={<Navigate to="/assistant" replace />} />
         </>
       )}
     </Routes>
@@ -103,12 +103,12 @@ function AppContent() {
   // 设置弹窗打开/关闭时更新 Tab 标题
   useEffect(() => {
     document.title = showSettings
-      ? 'AI Calendar - 设置 / Settings'
+      ? 'Orbit - 设置 / Settings'
       : showAdmin
-      ? 'AI Calendar - 管理面板 / Admin'
+      ? 'Orbit - 管理面板 / Admin'
       : activeSection === null
-      ? isProjectPage ? 'AI Calendar - 项目成长' : 'AI Calendar - Tools'
-      : 'AI Calendar - 首页 / Home';
+      ? isProjectPage ? 'Orbit - 项目成长' : 'Orbit - Tools'
+      : activeSection === 'assistant' ? 'Orbit - 对话' : 'Orbit - 个人事务中心';
   }, [activeSection, showSettings, showAdmin, isProjectPage]);
 
   return (

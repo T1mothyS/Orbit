@@ -1,4 +1,4 @@
-/** Electron desktop shell for the hosted AI Calendar application. */
+/** Electron desktop shell for the hosted Orbit application. */
 import {
   app,
   BrowserWindow,
@@ -16,7 +16,9 @@ import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// Preserve the established desktop profile across the brand rename.
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+if (app.isPackaged) app.setPath('userData', path.join(app.getPath('appData'), '智能日程表'));
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -44,13 +46,13 @@ function resolveRendererUrl(): string {
     catch { throw new Error('安装包内的 app-url.json 已损坏'); }
   }
   const configured = process.env.ELECTRON_APP_URL || process.env.APP_URL || bundledUrl;
-  if (!configured) throw new Error('缺少 ELECTRON_APP_URL，安装包无法连接 AI Calendar 服务');
+  if (!configured) throw new Error('缺少 ELECTRON_APP_URL，安装包无法连接 Orbit 服务');
   return safeHttpUrl(configured, false).toString();
 }
 
 function iconPath(): string | undefined {
   const candidates = isDev
-    ? [path.resolve(__dirname, '../public/navigation-icons/schedule.png')]
+    ? [path.resolve(__dirname, '../public/orbit-logo.png')]
     : [path.resolve(__dirname, 'schedule.png')];
   return candidates.find(candidate => fs.existsSync(candidate));
 }
@@ -71,7 +73,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 390,
     minHeight: 640,
-    title: 'AI Calendar',
+    title: 'Orbit',
     ...(icon ? { icon } : {}),
     show: false,
     webPreferences: {
@@ -114,9 +116,9 @@ function createTray(): void {
   const icon = iconPath();
   if (!icon) return;
   tray = new Tray(nativeImage.createFromPath(icon).resize({ width: 24, height: 24 }));
-  tray.setToolTip('AI Calendar');
+  tray.setToolTip('Orbit');
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: '显示 AI Calendar', click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+    { label: '显示 Orbit', click: () => { mainWindow?.show(); mainWindow?.focus(); } },
     { type: 'separator' },
     { label: '退出', click: () => { quitting = true; app.quit(); } },
   ]));
@@ -159,7 +161,7 @@ ipcMain.handle('show-notification', (_event, input: unknown) => {
 app.whenReady().then(() => {
   try { rendererUrl = resolveRendererUrl(); }
   catch (error) {
-    dialog.showErrorBox('AI Calendar 无法启动', error instanceof Error ? error.message : '桌面端配置不正确');
+    dialog.showErrorBox('Orbit 无法启动', error instanceof Error ? error.message : '桌面端配置不正确');
     app.quit();
     return;
   }

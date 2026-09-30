@@ -138,3 +138,10 @@ test('AI 知识检索使用有效内容的词法匹配、返回来源卡片元�
   assert.equal(searchLibraryForAi(otherUserId, '搜索权限边界', 5).length, 1);
   assert.equal(searchLibraryForAi(userId, '其他用户的私有资料', 5).length, 0);
 });
+
+test('knowledge recall excludes YAML source metadata and prefers an honest content summary', () => {
+  const item=library.createLibraryEntry(userId,{kind:'article',type:'knowledge',title:'复习方法',content:'---\nsourceId: unique_metadata_only_123\nsourceType: pasted\n---\n\n使用间隔复习巩固记忆。',summary:'介绍间隔复习和主动回忆',tags:['复习'],status:'active',sourceType:'manual'});
+  assert.equal(searchLibraryForAi(userId,'unique_metadata_only_123').length,0);
+  const result=searchLibraryForAi(userId,'复习').find(match=>match.id===item.entry.id)!;
+  assert.ok(result);assert.ok(!result.snippet.includes('sourceId'));assert.equal(result.summary,'介绍间隔复习和主动回忆');
+});

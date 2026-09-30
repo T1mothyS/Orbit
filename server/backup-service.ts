@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import zlib from 'zlib';
 import * as db from './db.js';
+import { exportOrbit, restoreOrbit } from './orbit-store.js';
 import * as scheduleStore from './schedule-store.js';
 import * as reminderStore from './reminder-store.js';
 import * as activityStore from './activity-store.js';
@@ -33,6 +34,7 @@ interface UserBackupPayload {
   account: { email: string | null; reminder: unknown };
   schedule: ReturnType<typeof scheduleStore.exportUserScheduleData>;
   reminder: ReturnType<typeof reminderStore.exportUserReminderData>;
+  orbit?: ReturnType<typeof exportOrbit>;
   noteItems?: ReturnType<typeof db.exportUserNoteItems>;
   libraryEntries?: ReturnType<typeof db.exportUserLibraryEntries>;
   dailyReportCloudContext?: ReturnType<typeof dailyReportCloudStore.getDailyReportCloudContext>;
@@ -319,6 +321,7 @@ export function createUserBackup(userId: string, password: string, allowMissingD
     account: { email: accountData.user?.email || null, reminder: accountData.reminder },
     schedule: scheduleStore.exportUserScheduleData(userId),
     reminder: reminderStore.exportUserReminderData(userId),
+    orbit: exportOrbit(userId),
     noteItems: db.exportUserNoteItems(userId),
     libraryEntries: db.exportUserLibraryEntries(userId),
     dailyReportCloudContext: dailyReportCloudStore.getDailyReportCloudContext(userId),
@@ -413,6 +416,7 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
   const attachmentFailures: Array<{ originalName: string; error: string }> = [];
   const missingMedia = [...new Set((payload.activity.dailyReports || []).flatMap((row: any) => [...String(row.markdown || '').matchAll(/\/daily-report-media\/([a-f0-9]{64}\.(?:jpg|png|webp|ico|svg))/g)].map(match => match[1])))].filter(name => !fs.existsSync(path.join(dailyReportMediaRoot(), name)));
   const result = withPersistenceTransaction(() => {
+    if (payload.orbit) restoreOrbit(userId,payload.orbit,mode,isForeignAccount);
     if (mode === 'replace') db.deleteUserOperationResults(userId);
     const schedule = scheduleStore.restoreUserScheduleData(userId, payload.schedule, mode);
     const reminder = reminderStore.restoreUserReminderData(userId, payload.reminder, mode);

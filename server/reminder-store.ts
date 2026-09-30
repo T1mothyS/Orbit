@@ -1,3 +1,4 @@
+import { isValidDateKey } from './date-key.js';
 import { registerPersistence, persistDatabase, recoverPersistence, assertPersistenceReady } from './persistence.js';
 import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import fs from 'fs';
@@ -73,6 +74,7 @@ export interface ReminderCycle {
   cycleKey: string;
   periodStart: string;
   dueDate: string;
+  plannedDate?: string | null;
   status: ReminderCycleStatus;
   completedAt: string | null;
   completedNote: string | null;
@@ -304,6 +306,7 @@ function rowToCycle(row: any): ReminderCycle {
     cycleKey: row.cycle_key,
     periodStart: row.period_start,
     dueDate: row.due_date,
+    plannedDate: row.planned_date || null,
     status: row.status,
     completedAt: row.completed_at,
     completedNote: row.completed_note,
@@ -419,6 +422,8 @@ export async function initReminderDb(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_reminder_cycles_task ON reminder_cycles(task_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_reminder_deliveries_due ON reminder_deliveries(status, scheduled_date);
   `);
+
+  if (!queryAll<any>('PRAGMA table_info(reminder_cycles)').some(row => row.name === 'planned_date')) db.run('ALTER TABLE reminder_cycles ADD COLUMN planned_date TEXT');
 
   applyCycleReminderDefaultsMigration();
 
@@ -903,10 +908,10 @@ export function restoreUserReminderData(
   for (const cycle of data.cycles || []) {
     if (!acceptedTaskIds.has(cycle.taskId) || queryOne('SELECT id FROM reminder_cycles WHERE id = ?', [cycle.id])) continue;
     db.run(
-      `INSERT INTO reminder_cycles (id, task_id, cycle_key, period_start, due_date, status, completed_at, completed_note, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO reminder_cycles (id, task_id, cycle_key, period_start, due_date, status, completed_at, completed_note, created_at, updated_at, planned_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [cycle.id, cycle.taskId, cycle.cycleKey, cycle.periodStart, cycle.dueDate, cycle.status, cycle.completedAt,
-        cycle.completedNote, cycle.createdAt || nowIso(), cycle.updatedAt || nowIso()],
+        cycle.completedNote, cycle.createdAt || nowIso(), cycle.updatedAt || nowIso(), cycle.plannedDate && isValidDateKey(cycle.plannedDate) ? cycle.plannedDate : null],
     );
     cycles++;
   }
@@ -919,4 +924,15 @@ export function restoreUserReminderData(
     }
   }
   return { tasks, cycles };
+}
+
+/** Changes this cycle's working date without moving its deadline or future rule. */
+export function setCyclePlannedDate(cycleId: string, userId: string, date: string | null): ReminderTaskSummary {
+  if (date !== null && !isValidDateKey(date)) throw new Error('安排日期格式不正确');
+  const cycle = getCycleInternal(cycleId);
+  const task = cycle && getTaskInternal(cycle.taskId);
+  if (!cycle || !task || task.userId !== userId) throw new Error('周期事项不存在或无权访问');
+  if (!['pending', 'expired'].includes(cycle.status)) throw new Error('只能调整尚未完成周期的安排日期');
+  run('UPDATE reminder_cycles SET planned_date = ?, updated_at = ? WHERE id = ?', [date, nowIso(), cycleId]);
+  return getReminderTask(task.id, userId)!;
 }

@@ -1,5 +1,5 @@
 appId: com.smartschedule.agent
-productName: 智能日程表
+productName: Orbit
 electronVersion: 43.4.1
 npmRebuild: false
 directories:

@@ -54,6 +54,13 @@ export function applyChatSchema(db: Database, { queryAll, queryOne }: SchemaQuer
   `);
 
   migrateAiHistory(db, { queryAll, queryOne });
+  db.run(`CREATE TABLE IF NOT EXISTS orbit_conversations (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,title TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS orbit_preferences (user_id TEXT PRIMARY KEY,auto_knowledge INTEGER NOT NULL DEFAULT 0)`);
+  db.run(`CREATE TABLE IF NOT EXISTS orbit_requests (id TEXT NOT NULL,user_id TEXT NOT NULL,conversation_id TEXT NOT NULL,state TEXT NOT NULL,body TEXT NOT NULL,result TEXT,error TEXT,created_at TEXT NOT NULL,PRIMARY KEY(user_id,id))`);
+  const orbitColumns=queryAll<{name:string}>('PRAGMA table_info(ai_schedule_messages)');
+  if(!orbitColumns.some(c=>c.name==='conversation_id'))db.run('ALTER TABLE ai_schedule_messages ADD COLUMN conversation_id TEXT');
+  db.run('CREATE INDEX IF NOT EXISTS orbit_history_conversation ON ai_schedule_messages(user_id,conversation_id,created_at)');
+
 
   db.run(`
     CREATE TABLE IF NOT EXISTS users (

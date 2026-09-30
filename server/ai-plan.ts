@@ -4,6 +4,8 @@ export interface PendingAiOperation {
   key: string;
   type: AiPlanOperationType;
   scheduleId?: string;
+  expectedState?: string;
+  before?: Record<string, any>;
   data: Record<string, any>;
   recurrence?: Record<string, any> | null;
 }
@@ -20,6 +22,7 @@ export interface AiPlanOperationPreview {
   isUnscheduled: boolean;
   location: string | null;
   notes: string | null;
+  before?: Record<string, any>;
   recurrence: {
     frequency: string;
     interval: number;
@@ -91,6 +94,7 @@ export function previewAiPlanOperation(operation: PendingAiOperation, index = Nu
     type: operation.type,
     scheduleType: data.type === 'todo' ? 'todo' : 'event',
     scheduleId: operation.scheduleId,
+    before: operation.before,
     title: text(data.title || (operation as any).title, '标题', 160) || '未命名事项',
     startTime: data.start_time == null ? null : String(data.start_time),
     endTime: data.end_time == null ? null : String(data.end_time),
@@ -201,4 +205,8 @@ export function buildAiPlanSnapshot(input: {
 export function rawOperationsFromSnapshot(snapshot: any): PendingAiOperation[] {
   if (Array.isArray(snapshot?.rawOperations)) return normaliseAiPlanOperations(snapshot.rawOperations);
   return [];
+}
+
+export function scheduleFingerprint(schedule: Record<string, any>): string {
+  return JSON.stringify(Object.fromEntries(Object.entries(schedule).filter(([key]) => !['created_at', 'updated_at'].includes(key)).sort(([a], [b]) => a.localeCompare(b))));
 }

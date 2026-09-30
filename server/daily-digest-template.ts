@@ -646,7 +646,7 @@ function MailTasks(digest: DailyDigest, absoluteMediaUrl = false): string {
 
 function Footer(detailUrl = ''): string {
   const link = detailUrl && safeUrl(detailUrl)
-    ? `<div><a href="${escapeHtml(detailUrl)}" target="_blank" rel="noopener noreferrer" style="color:#0d5c4b;font-weight:750">在 AI Calendar 中查看私有日报</a></div>`
+    ? `<div><a href="${escapeHtml(detailUrl)}" target="_blank" rel="noopener noreferrer" style="color:#0d5c4b;font-weight:750">在 Orbit 中查看私有日报</a></div>`
     : '';
   return `<footer style="margin-top:38px;padding:25px 0 34px;border-top:1px solid #bfc0ba;color:#777b74;font-size:11px;line-height:1.7">` +
     `${link}<div>由日报 V2 自动整理 · 数据仅供参考 · 参考时区 Asia/Shanghai</div></footer>`;
@@ -725,6 +725,6 @@ export function renderDailyDigestPlainText(markdown: string, detailUrl = ''): st
   lines.push('');
   lines.push('Worth Your Time');
   lines.push(...digest.worthYourTime.map(item => `- ${item.title} · ${item.url}`));
-  if (detailUrl) lines.push('', `在 AI Calendar 中查看私有日报：${detailUrl}`);
+  if (detailUrl) lines.push('', `在 Orbit 中查看私有日报：${detailUrl}`);
   return lines.join('\n').trim();
 }

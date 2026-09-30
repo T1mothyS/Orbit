@@ -19,6 +19,7 @@ export interface DbMessage {
 }
 
 export interface DbAiScheduleMessage {
+  conversation_id?: string | null;
   id: string;
   user_id: string;
   role: 'user' | 'assistant';

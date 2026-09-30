@@ -1,6 +1,6 @@
-# AI Calendar（智能日程与周期事务中心）
+# Orbit（以对话为入口的个人事务中心）
 
-AI Calendar 是一个面向个人用户的日程、待办和周期事务管理服务。它把原有日历、AI 对话、账户与邮件能力统一到同一套前端中，并增加今日行动中心、周期事务模板、可靠提醒、完成证明、备份恢复和 AI 智能导入。
+Orbit 是一个以对话为入口的个人事务管理服务。它把原有日历、AI 对话、账户与邮件能力统一到同一套前端中，并增加今日行动中心、周期事务模板、可靠提醒、完成证明、备份恢复和 AI 智能导入。
 
 本文档适用于本仓库当前版本，包含本地启动、邮件配置、环境变量、目录说明、部署入口、数据安全和常见故障排查。
 
@@ -24,7 +24,7 @@ Knowledge Library V2 首次部署、令牌权限、分层验收和回滚见 [`do
 - 支持可读 JSON/CSV 导出、用户加密导出/恢复和管理员全站快照。
 - AI 可从自然语言或截图生成待确认草稿；确认前不会写入正式数据。
 - AI 助手支持普通问答；配置常驻城市/区县后，可查询 Open-Meteo 实时与未来天气。
-- 知识库 V2 链路以 `C:\Users\Elysia\Documents\Codex_Knowledge_Library` 为唯一内容入口：本地 Codex 负责 Markdown 加工、关系清单和生命周期操作，AI Calendar 负责只读呈现、评论、版本、原文导出和本地发布令牌；网页不再编辑正文。普通处理完成后默认自动 `publish`，`retire`、`restore` 和 `purge` 仍需显式选择。
+- 知识库 V2 链路以 `C:\Users\Elysia\Documents\Codex_Knowledge_Library` 为唯一内容入口：本地 Codex 负责 Markdown 加工、关系清单和生命周期操作，Orbit 负责只读呈现、评论、版本、原文导出和本地发布令牌；网页不再编辑正文。普通处理完成后默认自动 `publish`，`retire`、`restore` 和 `purge` 仍需显式选择。
 - 全局搜索以只读方式聚合日程、NoteBoard、Daily Report 和 Knowledge Library；结果按账号隔离并支持日程日期/详情直达，不会通过搜索写入知识库或建立关系。
 - AI 对话移动端使用独立的 NoteBoard 入口和未完成数量角标；管理员入口沿用 Settings V2 的响应式结构，桌面端为侧边分区，手机端为全屏卡片/列表和日志筛选。
 - 每日邮件摘要包含天气、进度、分类日程和完整明细，不与单项提醒混用。
@@ -345,7 +345,7 @@ cp .env.example .env
 | `.env.example` | 可提交的环境变量模板，新机器通过它创建 `.env` |
 | `.gitignore` | 排除密钥、数据库、附件、依赖和构建产物 |
 | `README.md` | 项目主说明，也就是本文档 |
-| `PROJECT-MAP.md` | AI Calendar、日报 V2 和旧日报的逻辑结构、接口边界、任务路由与验证地图 |
+| `PROJECT-MAP.md` | Orbit、日报 V2 和旧日报的逻辑结构、接口边界、任务路由与验证地图 |
 | `DEPLOY.md` | 阿里云服务器、Nginx、HTTPS、PM2 和升级部署的详细步骤 |
 | `package.json` | npm 脚本、依赖版本范围、Electron 打包配置和项目元数据 |
 | `electron-builder.yml` | 只针对 `dist-desktop/` 最小桌面壳的跨平台打包配置 |
@@ -547,7 +547,7 @@ npm run build
 
 “设置”同时提供可读 JSON 和 CSV 导出，均只包含当前账号的非敏感业务数据。日报联动令牌只在生成/轮换时展示一次，可随时吊销；它允许读取当前账号的日程与 QQ 未读摘要，也允许上传日报媒体、发布日报，不能修改日程。`/api/integrations/daily-report/agenda` 是只读、限定当前账号并要求显式日期的日程接口。
 
-“设置”中的“日报邮箱（QQ）”用于按个人账号保存 QQ 邮箱账号和客户端授权码。授权码在服务端以独立密钥加密保存，测试读取和日报接口只返回未读邮件摘要，不返回授权码，也不影响 AI Calendar 固定的 163 发件邮箱。
+“设置”中的“日报邮箱（QQ）”用于按个人账号保存 QQ 邮箱账号和客户端授权码。授权码在服务端以独立密钥加密保存，测试读取和日报接口只返回未读邮件摘要，不返回授权码，也不影响 Orbit 固定的 163 发件邮箱。
 
 云端候选链路通过 OAuth Authorization Code + PKCE 和 `/mcp` 接口供 ChatGPT Work 使用。Work 连接只接触当前账号的结构化输入和服务端生成的日报，不读取本地 `日报-v2` worktree；服务端负责媒体托管、日报幂等和邮件入队。Cloud Context 通过登录态 `/api/daily-report/cloud-context` 维护，MCP 对 Context 和活动证据只读。当前生产候选发布为 `workspace-20260909-cloud-mcp-11`，已完成 Work 连接、脱敏 Context `v1` 导入和一次返回 `VALIDATED_NOT_PUBLISHED` 的 shadow dry-run；Work 中已创建并启用每日 `16:40`（`Asia/Shanghai`）的 `日报 V2 Cloud Shadow`。现有本地 `v2-chatgpt` 任务未停用，正式切换须按 [`docs/CHATGPT-WORK-CLOUD.md`](docs/CHATGPT-WORK-CLOUD.md) 的连续 shadow、故障对照、通知分层和收件箱证据门槛执行。
 
@@ -696,3 +696,11 @@ pm2 restart smart-schedule --update-env
 ## 16. License
 
 MIT
+
+## Orbit 对话入口
+
+登录后默认进入 `/assistant`，日程、今日、周期提醒、日报和知识库仍可从导航打开。支持新建、切换、重命名和删除对话；删除会话不会删除已创建的事务。旧 AI 历史归入“已有对话”，不再按三天自动清理。
+
+生成期间可以继续输入、将下一条消息加入队列、修改结果卡片和操作记事。请求可取消、失败可重试；后台生成保留到页面切换后，服务重启中断的生成需要手动重试。AI 写操作仍先给计划，再由用户确认。
+
+知识库自动检索默认关闭，可以在对话侧栏开启。卡片优先显示两行摘要，正文引用按首次引用顺序对应卡片，未引用候选折叠。周期事项改期只改变本周期安排日期，原到期日、提醒及未来规则不变。当前边界及 API 见 [架构](docs/ARCHITECTURE.md#orbit-对话与操作合同)。

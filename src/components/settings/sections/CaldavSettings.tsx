@@ -48,7 +48,7 @@ export function CaldavSettings({ authHeaders }: { authHeaders: SettingsAuthHeade
   const summary = plan || status?.summary;
   const actions: Record<string, number> = {};
   plan?.operations.forEach(op => { actions[op.action] = (actions[op.action] || 0) + 1; });
-  return <SettingSection id="caldav" title="荣耀日历同步" description="AI Calendar 是唯一数据来源；手机只读。服务器每 5 分钟检查变化，手机刷新时间由系统决定。">
+  return <SettingSection id="caldav" title="荣耀日历同步" description="Orbit 是唯一数据来源；手机只读。服务器每 5 分钟检查变化，手机刷新时间由系统决定。">
     <SettingRow label="同步状态">
       <div className="settings-status" role="status">
         <strong>{status ? (status.enabled ? '自动同步已开启' : '自动同步已暂停') : error ? '暂不可用' : '正在加载…'}</strong>

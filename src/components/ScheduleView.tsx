@@ -187,7 +187,7 @@ export function ScheduleView() {
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
               <Calendar className="w-7 h-7 text-blue-500" />
-              智能日程表
+              Orbit 日程
             </h1>
           </div>
           

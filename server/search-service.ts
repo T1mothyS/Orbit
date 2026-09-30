@@ -55,7 +55,7 @@ function normalizeQuery(value: unknown): string {
 }
 
 function plainText(value: unknown): string {
-  return String(value ?? '')
+  return String(value ?? '').replace(/^\s*---[\s\S]*?\r?\n---(?:\r?\n|$)/, '')
     .replace(/<[^>]*>/gu, ' ')
     .replace(/!\[([^\]]*)\]\([^)]*\)/gu, '$1')
     .replace(/\[([^\]]+)\]\([^)]*\)/gu, '$1')

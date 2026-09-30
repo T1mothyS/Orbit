@@ -8,6 +8,7 @@ export function ScheduleDetailModal({
   onDelete,
   onToggle,
   onEdit,
+  closeAfterAction = true,
   completionProof,
   onEditCompletion,
 }: {
@@ -16,6 +17,7 @@ export function ScheduleDetailModal({
   onDelete: (id: string) => void;
   onToggle: (id: string) => void;
   onEdit: (s: Schedule) => void;
+  closeAfterAction?: boolean;
   completionProof?: CompletionProofDisplay | null;
   onEditCompletion?: () => void;
 }) {
@@ -95,21 +97,21 @@ export function ScheduleDetailModal({
 
         <div className="flex gap-2">
           <button
-            onClick={() => { onDelete(schedule.id); onClose(); }}
+            onClick={() => { onDelete(schedule.id); if(closeAfterAction) onClose(); }}
             className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm font-medium"
             style={{ backgroundColor: '#FEF2F2', color: '#EF4444' }}
           >
             <Trash2 className="w-3.5 h-3.5" />删除
           </button>
           <button
-            onClick={() => { onToggle(schedule.id); onClose(); }}
+            onClick={() => { onToggle(schedule.id); if(closeAfterAction) onClose(); }}
             className="flex-1 py-2 rounded-lg text-sm font-medium"
             style={{ backgroundColor: 'var(--td-brand-color-light)', color: 'var(--td-brand-color)' }}
           >
             {schedule.is_completed ? '标记未完成' : '标记完成'}
           </button>
           <button
-            onClick={() => { onEdit(schedule); onClose(); }}
+            onClick={() => { onEdit(schedule); if(closeAfterAction) onClose(); }}
             className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm font-medium"
             style={{ backgroundColor: 'var(--td-bg-color-component)', color: 'var(--td-text-color-secondary)' }}
           >

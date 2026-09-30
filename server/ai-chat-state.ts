@@ -1,3 +1,5 @@
+import { queryOne as dbQueryOne, run as dbQueryRun } from './database/connection.js';
+import { orbitContext, conversation, getRequest } from './orbit-store.js';
 import { normaliseScheduleApiFields } from './schedule-input.js';
 import { normaliseReminderConfig } from './reminder-input.js';
 import { getLocalDateString } from './local-date.js';
@@ -11,7 +13,7 @@ import * as reminderCalendarSync from './reminder-calendar-sync.js';
 import { getDailyWeather, type WeatherLocation } from './weather-service.js';
 import { addLog } from './log-service.js';
 import { type KnowledgeSearchMatch } from './search-service.js';
-import { rawOperationsFromSnapshot, type PendingAiOperation } from './ai-plan.js';
+import { rawOperationsFromSnapshot, scheduleFingerprint, type PendingAiOperation } from './ai-plan.js';
 import * as db from './db.js';
 import { parseHistoryJson } from './ai-history.js';
 
@@ -306,8 +308,20 @@ export function saveAiScheduleHistoryMessage(input: {
   plan?: unknown;
   knowledgeSources?: unknown;
 }): dbModule.DbAiScheduleMessage {
+  const context=orbitContext.getStore();
+  if(context?.controller?.signal.aborted) throw new Error('生成已取消');
+  if(context) {
+    conversation(input.userId,context.conversationId);
+    const user=db.getUserById(input.userId);if(!user || user.disabled) throw new Error('账号不可用');
+    if(context.requestId && !getRequest(input.userId,context.requestId)) throw new Error('请求已移除');
+  }
+  const id = context?.requestId && input.role === 'user' ? `orbit-user:${input.userId}:${context.requestId}` : uuidv4();
+  const existing = context?.requestId && input.role==='user' ? dbQueryOne<dbModule.DbAiScheduleMessage>('SELECT * FROM ai_schedule_messages WHERE id=? AND user_id=?',[id,input.userId]) : null;
+  if(existing) return existing;
+  if(context?.conversationId) dbQueryRun('UPDATE orbit_conversations SET updated_at=? WHERE id=? AND user_id=?',[new Date().toISOString(),context.conversationId,input.userId]);
   return db.createAiScheduleMessage({
-    id: uuidv4(),
+    conversation_id: context?.conversationId || null,
+    id,
     user_id: input.userId,
     role: input.role,
     type: input.type,
@@ -499,6 +513,18 @@ export function executeAiScheduleOperationBatch(plan: PendingAiSchedulePlan) {
       try {
         const target = scheduleStore.getSchedule(op.scheduleId);
         if (!target || target.user_id !== plan.userId) throw new Error('目标日程不存在或无权访问');
+        if (op.expectedState && scheduleFingerprint(target) !== op.expectedState) throw new Error('目标事项已发生变化，请重新生成计划');
+        if (reminderCalendarSync.isReminderLinkedSchedule(target.id)) {
+          if (!op.data.start_time) throw new Error('请指定本周期的安排日期');
+          for (const key of ['title','notes','location','category','priority','is_completed','type']) {
+            if(op.data[key] !== undefined && (op.data[key] || null) !== ((target as any)[key] || null)) throw new Error('周期事项这里只能调整本周期安排日期，其他字段请前往周期提醒编辑');
+          }
+          const task = reminderStore.setCyclePlannedDate(target.id.slice('reminder-cycle:'.length), plan.userId, String(op.data.start_time).slice(0, 10));
+          const updated = reminderCalendarSync.syncReminderTaskToCalendar(task);
+          if (!updated || updated.id !== target.id) throw new Error('该周期已不再是当前周期');
+          updatedSchedules.push(updated);
+          continue;
+        }
         const updates = normaliseScheduleApiFields(op.data, plan.userId, target);
         const updated = scheduleStore.updateSchedule(op.scheduleId, updates);
         if (!updated) throw new Error('更新日程失败');
@@ -511,6 +537,8 @@ export function executeAiScheduleOperationBatch(plan: PendingAiSchedulePlan) {
       try {
         const target = scheduleStore.getSchedule(op.scheduleId);
         if (!target || target.user_id !== plan.userId) throw new Error('目标日程不存在或无权访问');
+        if (reminderCalendarSync.isReminderLinkedSchedule(target.id)) throw new Error('周期事项请前往周期提醒删除');
+        if (op.expectedState && scheduleFingerprint(target) !== op.expectedState) throw new Error('目标事项已发生变化，请重新生成计划');
         if (!scheduleStore.deleteSchedule(op.scheduleId)) throw new Error('删除日程失败');
         deletedIds.push(op.scheduleId);
       } catch (error: any) {

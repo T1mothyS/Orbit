@@ -1,3 +1,4 @@
+import { recoverOrbitQueue } from './orbit-queue.js';
 import { cleanupAiScheduleHistory } from './ai-history.js';
 import { resolveAiImportCredential } from './ai-credentials.js';
 import { createRetiredRouter } from './routes/retired.js';
@@ -142,7 +143,7 @@ if (isProduction) registerSpaFallback(app, path.resolve(__dirname, '../dist'));
 
 export const initializeServer = createStoreInitializer({
   config: runtimeConfig, onDatabaseReady: value => { db = value; },
-  onInviteCodesReady: ready => { inviteCodesInitialized = ready; }, onReady: () => { dbInitialized = true; },
+  onInviteCodesReady: ready => { inviteCodesInitialized = ready; }, onReady: () => { dbInitialized = true; recoverOrbitQueue(); },
 });
 
 export const backgroundJobs = createBackgroundJobs({ isReady: () => dbInitialized, resolveAiImportCredential, cleanupAiScheduleHistory });

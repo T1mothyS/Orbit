@@ -4,8 +4,8 @@ import * as db from './db.js';
 export const AI_SCHEDULE_HISTORY_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
 export function cleanupAiScheduleHistory(userId?: string): number {
-  const cutoff = new Date(Date.now() - AI_SCHEDULE_HISTORY_TTL_MS).toISOString();
-  return db.deleteExpiredAiScheduleMessages(cutoff, userId);
+  // Orbit retains conversation history until the user deletes the conversation.
+  return 0;
 }
 
 export function parseHistoryJson(value: string | null): any {
@@ -16,6 +16,7 @@ export function parseHistoryJson(value: string | null): any {
 export function toAiScheduleHistoryMessage(message: dbModule.DbAiScheduleMessage) {
   return {
     id: message.id,
+    conversationId: message.conversation_id,
     role: message.role,
     type: message.type,
     text: message.content,

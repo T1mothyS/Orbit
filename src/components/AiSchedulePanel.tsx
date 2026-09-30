@@ -2,6 +2,7 @@ import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHand
 import { Bot, BookOpen, Send, Loader2, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useOrbitChat } from '../hooks/useOrbitChat';
 import { SCHEDULE_CATEGORY_COLORS, SCHEDULE_CATEGORY_LABELS } from '../utils/scheduleCategories';
 
 // ==================== 类型 ====================
@@ -26,6 +27,7 @@ interface AiPlanOperation {
   key: string;
   type: 'create' | 'create_recurring' | 'update' | 'delete';
   scheduleId?: string;
+  before?: { title?: string; startTime?: string };
   scheduleType?: 'event' | 'todo';
   title: string;
   startTime?: string | null;
@@ -52,6 +54,7 @@ interface AiSchedulePlan {
 }
 
 interface KnowledgeSource {
+  referenced?: boolean;
   id: string;
   title: string;
   summary?: string;
@@ -92,6 +95,7 @@ interface AiSchedulePanelProps {
 
 export interface AiSchedulePanelHandle {
   resetHistory: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 // ==================== 常量 ====================
@@ -226,6 +230,7 @@ function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, 
         {operation.type !== 'delete' && <button type="button" className="ai-plan-edit-button" onClick={event => { event.stopPropagation(); onStartEdit(); }} aria-label={`编辑计划项 ${operation.title}`}><Edit3 size={13} /> 编辑</button>}
       </div>
       <div className="text-[11px] mt-0.5" style={{ color: 'var(--td-text-color-secondary)' }}>{actionLabel[operation.type] || '处理'} · {timeLabel}</div>
+      {operation.before && <div className="text-[11px] mt-1" style={{color:'var(--td-text-color-secondary)'}}>原事项：{operation.before.title} · {operation.before.startTime?.replace('T',' ')} → {operation.startTime?.replace('T',' ') || '保留原时间'}{operation.scheduleId?.startsWith('reminder-cycle:') ? '（仅本周期安排日期）' : ''}</div>}
       {operation.location && <div className="text-[11px] mt-0.5" style={{ color: 'var(--td-text-color-secondary)' }}>地点：{operation.location}</div>}
       {operation.notes && <div className="text-[11px] mt-0.5 whitespace-pre-line" style={{ color: 'var(--td-text-color-secondary)' }}>备注：{operation.notes}</div>}
       {operation.type === 'delete' && <div className="text-[11px] mt-1" style={{ color: '#B45309' }}>删除计划不能编辑；如需调整，请取消后重新描述。</div>}
@@ -448,7 +453,7 @@ function MessageBubble({ msg, onOpenSchedule, onOpenScheduleMenu, onConfirmPlan,
                   className={`text-xs leading-relaxed whitespace-pre-line ${msg.type === 'text' ? 'font-normal' : 'font-medium'}`}
                   style={{ color: msg.type === 'text' ? 'var(--td-text-color-primary)' : '#10B981' }}
                 >
-                  {msg.text}
+                  {msg.text.split(/(\[打开日报\]\(\/reports\/\d{4}-\d{2}-\d{2}\?source=(?:local|cloud)\))/g).map((part,index)=>{const match=part.match(/^\[打开日报\]\((.+)\)$/);return match ? <Link key={index} to={match[1]} className="text-blue-600 underline">打开日报</Link> : part;})}
                 </span>
               </div>
             )}
@@ -457,14 +462,15 @@ function MessageBubble({ msg, onOpenSchedule, onOpenScheduleMenu, onConfirmPlan,
               <div className="ai-knowledge-sources" aria-label="参考知识库">
                 <div className="ai-knowledge-sources-title"><BookOpen size={13} aria-hidden="true" />参考知识库 · {msg.knowledgeSources.length} 条</div>
                 <div className="ai-knowledge-source-list">
-                  {msg.knowledgeSources.map(source => (
+                  {msg.knowledgeSources.filter(source=>source.referenced !== false).map((source,index) => (
                     <Link key={source.id} className="ai-knowledge-source" to={source.target?.path || `/library/${encodeURIComponent(source.id)}`}>
-                      <span className="ai-knowledge-source-head"><strong>{source.title}</strong><span>查看</span></span>
-                      {source.snippet && <span className="ai-knowledge-source-snippet">{source.snippet}</span>}
-                      <small>{source.sourceId || source.sourceType || source.type || '知识库内容'}</small>
+                      <span className="ai-knowledge-source-head"><strong>{source.referenced ? `${index+1}. ` : ''}{source.title}</strong><span>查看</span></span>
+                      {(source.summary || source.snippet) && <span className="ai-knowledge-source-snippet">{source.summary || source.snippet}</span>}
+                      <small>{({knowledge:'知识',experience:'经验',idea:'想法'} as Record<string,string>)[source.type || ''] || '知识库内容'}</small>
                     </Link>
                   ))}
                 </div>
+                {msg.knowledgeSources.some(source=>source.referenced===false) && <details><summary>其他检索结果 · {msg.knowledgeSources.filter(source=>source.referenced===false).length} 条</summary>{msg.knowledgeSources.filter(source=>source.referenced===false).map(source=><Link key={source.id} className="ai-knowledge-source" to={source.target?.path || `/library/${encodeURIComponent(source.id)}`}><strong>{source.title}</strong><span className="ai-knowledge-source-snippet">{source.summary || source.snippet}</span></Link>)}</details>}
               </div>
             )}
 
@@ -491,7 +497,7 @@ function MessageBubble({ msg, onOpenSchedule, onOpenScheduleMenu, onConfirmPlan,
                 <div className="flex justify-end gap-2 mt-2.5">
                   <button type="button" className="secondary-button" onClick={() => onDiscardPlan?.(msg.id)} disabled={confirmingPlanId === msg.plan.id}>取消</button>
                   <button type="button" className="primary-button" onClick={() => onConfirmPlan?.(msg.id, msg.plan!.id)} disabled={confirmingPlanId === msg.plan.id}>
-                    {confirmingPlanId === msg.plan.id ? '正在创建…' : '确认并创建'}
+                    {confirmingPlanId === msg.plan.id ? '正在执行…' : '确认并执行'}
                   </button>
                 </div>
               </div>
@@ -529,7 +535,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   onChatStateChange,
 }, ref) {
   const [inputText, setInputText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [confirmingPlanId, setConfirmingPlanId] = useState<string | null>(null);
   const [savingPlanOperationKey, setSavingPlanOperationKey] = useState<string | null>(null);
@@ -539,38 +545,26 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const { isAuthenticated, authHeaders } = useAuth();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const retryRequestIdsRef = useRef(new Map<string, { requestId: string; expiresAt: number }>());
+  const orbit = useOrbitChat(authHeaders,isAuthenticated);
+  const isLoading = orbit.requests.some(r => r.state === 'running' || r.state === 'queued');
+  const [conversationDrawer, setConversationDrawer] = useState(false);
+  const [renameTitle, setRenameTitle] = useState<string | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState(false);
   const inputRevisionRef = useRef(0);
+  const drafts = useRef(new Map<string,string>());
+  useEffect(()=>{inputRevisionRef.current++;setInputText(drafts.current.get(orbit.cid)||'');setRenameTitle(null);setDeleteDialog(false);},[orbit.cid]);
 
   useEffect(() => {
     onChatStateChange?.({ hasMessages: messages.length > 0, busy: isLoading });
   }, [isLoading, messages.length, onChatStateChange]);
 
-  // 加载历史消息
   useEffect(() => {
-    if (!isAuthenticated) return;
-    fetch('/api/ai-schedule/history', { headers: authHeaders() })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.messages) {
-          const msgs = data.messages.map((m: any) => ({
-            id: m.id,
-            role: m.role,
-            type: m.type || ((m.role === 'assistant' && m.intent) ? 'schedules' : 'text'),
-            text: m.text || m.content || m.reply || '',
-            intent: m.intent,
-            scheduleItems: m.scheduleItems || m.schedule_items || undefined,
-            plan: m.plan,
-            knowledgeSources: m.knowledgeSources || m.knowledge_sources || undefined,
-            timestamp: [m.timestamp, m.created_at]
-              .map(value => typeof value === 'string' && value.trim() ? value : null)
-              .find(value => parseMessageTimestamp(value) !== null) || null,
-          })) as ChatMessage[];
-          setMessages(msgs);
-        }
-      })
-      .catch(() => {});
-  }, [isAuthenticated, authHeaders]);
+    setMessages(orbit.history.map(m => ({
+      id: m.id, role: m.role, type: m.type || 'text', text: m.text || m.content || '',
+      intent: m.intent, scheduleItems: m.scheduleItems, plan: m.plan, knowledgeSources: m.knowledgeSources,
+      timestamp: m.timestamp || m.created_at || null,
+    })));
+  }, [orbit.history]);
 
   // 自动滚到底部
   useEffect(() => {
@@ -610,113 +604,28 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     }
   }, [authHeaders]);
 
-  const submitMessage = useCallback(async (rawText: string, options: {
-    clearComposer?: boolean;
-  } = {}) => {
-    const text = rawText.trim();
-    if (!text || isLoading) return;
-
-    const clearComposer = options.clearComposer !== false;
-    const draftRevision = inputRevisionRef.current;
-    const clearedRevision = draftRevision + (clearComposer ? 1 : 0);
-    const today = getLocalDateString();
-    const targetCalendarId = 'personal';
-    const requestSignature = `${today}|${targetCalendarId}|${text}`;
-    const retryEntry = retryRequestIdsRef.current.get(requestSignature);
-    const requestId = retryEntry && retryEntry.expiresAt > Date.now() ? retryEntry.requestId : createRequestId();
-    if (clearComposer) {
-      inputRevisionRef.current = clearedRevision;
-      setInputText('');
-    }
-    setIsLoading(true);
-
-    // 先添加用户消息；来源记事也作为当前对话中的普通用户消息显示。
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      type: 'text',
-      text,
-      timestamp: new Date().toISOString(),
-    };
-    setMessages(prev => [...prev, userMsg]);
-
+  const submitMessage = useCallback(async (rawText: string, options: { clearComposer?: boolean } = {}) => {
+    const text = rawText.trim();if(!text) return;
+    const revision = inputRevisionRef.current;
     try {
-      const res = await fetch('/api/ai-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        signal: AbortSignal.timeout(AI_RESPONSE_TIMEOUT_MS),
-        body: JSON.stringify({
-          text,
-          targetDate: today,
-          calendarId: targetCalendarId,
-          requestId,
-        }),
-      });
-
-      const data = await readJsonResponse(res);
-      if (!res.ok) throw new Error(data.error || '处理失败');
-      retryRequestIdsRef.current.delete(requestSignature);
-
-      const aiMsg: ChatMessage = {
-        id: data.historyMessageId || (Date.now() + 1).toString(),
-        role: 'assistant',
-        type: data.requiresConfirmation ? 'plan' : data.intent === 'chat' || data.intent === 'query' || data.intent === 'weather' ? 'text' :
-              data.intent === 'update' || data.intent === 'delete' ? 'update' : 'schedules',
-        intent: data.intent,
-        text: data.reply,
-        scheduleItems: data.scheduleItems || [],
-        plan: data.plan,
-        knowledgeSources: data.knowledgeSources || [],
-        timestamp: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, aiMsg]);
-
-      // 如果有日程变更，通知父组件刷新。
-      if (data.changed) onSchedulesCreated?.(data.changedDetails?.created || []);
-    } catch (err: any) {
-      const errorMsg = err.message || '';
-      const isLoginError = errorMsg.includes('未登录') || errorMsg.includes('登录');
-      const isPending = errorMsg.includes('仍在处理中');
-      const mayStillBeProcessing = err?.name === 'TimeoutError' || errorMsg.includes('非 JSON 内容') || isPending;
-      if (mayStillBeProcessing) {
-        retryRequestIdsRef.current.set(requestSignature, { requestId, expiresAt: Date.now() + AI_RETRY_WINDOW_MS });
-        // AI 生成期间用户可以继续输入；只有草稿没有发生变化时才恢复本次请求内容。
-        if (clearComposer && inputRevisionRef.current === clearedRevision) {
-          inputRevisionRef.current += 1;
-          setInputText(text);
-        }
-      }
-
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        type: 'error',
-        text: isLoginError
-          ? (errorMsg || '请先在设置中保存个人 API Key')
-          : mayStillBeProcessing
-            ? '请求已超出前端等待时间，服务端可能仍在整理计划。本次内容已保留；生成期间新增的输入不会被覆盖，稍后再次发送可取得同一结果。'
-            : (errorMsg || '处理失败，请重试'),
-        timestamp: new Date().toISOString(),
-      }]);
-    } finally {
-      setIsLoading(false);
-      textareaRef.current?.focus();
-    }
-  }, [authHeaders, isLoading, onSchedulesCreated]);
+      const accepted = await orbit.send(text,{targetDate:getLocalDateString(),calendarId:'personal'});
+      if(accepted && options.clearComposer !== false && revision === inputRevisionRef.current) {inputRevisionRef.current++;setInputText('');drafts.current.delete(orbit.cid);}
+    } catch(error) {orbit.setError(error instanceof Error?error.message:'发送失败，请重试');}
+  }, [orbit.send,orbit.setError]);
 
   const handleSubmit = useCallback(() => {
     void submitMessage(inputText, { clearComposer: true });
   }, [inputText, submitMessage]);
 
   const handleSaveNotes = useCallback(async () => {
-    if (isLoading || savingNotes || !inputText.trim()) return;
+    if (savingNotes || !inputText.trim()) return;
     const draftRevision = inputRevisionRef.current;
     setSavingNotes(true);
     try {
       await onSaveNote(inputText);
       if (inputRevisionRef.current === draftRevision) {
         inputRevisionRef.current += 1;
-        setInputText('');
+        setInputText('');drafts.current.delete(orbit.cid);
       }
     } catch (error) {
       setMessages(previous => [...previous, {
@@ -730,7 +639,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
       setSavingNotes(false);
       textareaRef.current?.focus();
     }
-  }, [inputText, isLoading, onSaveNote, savingNotes]);
+  }, [inputText, onSaveNote, savingNotes]);
 
 
   const handleConfirmPlan = useCallback(async (messageId: string, planId: string) => {
@@ -795,11 +704,6 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   }, [authHeaders, messages]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (isLoading) {
-      // 生成期间保留普通输入和换行，但不允许发送或保存记事。
-      if (e.key === 'Enter' && e.ctrlKey) e.preventDefault();
-      return;
-    }
     if (noteMode) {
       if (!e.nativeEvent.isComposing && e.key === 'Enter' && e.ctrlKey) {
         e.preventDefault();
@@ -813,26 +717,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     }
   };
 
-  const clearHistory = useCallback(async () => {
-    try {
-      const response = await fetch('/api/ai-schedule/history', { method: 'DELETE', headers: authHeaders() });
-      const data = await readJsonResponse(response);
-      if (!response.ok) throw new Error(data.error || '重置对话失败');
-      setMessages([]);
-    } catch (error) {
-      setMessages(previous => [...previous, {
-        id: (Date.now() + 4).toString(),
-        role: 'assistant',
-        type: 'error',
-        text: error instanceof Error ? error.message : '重置对话失败',
-        timestamp: new Date().toISOString(),
-      }]);
-    }
-  }, [authHeaders]);
-
-  useImperativeHandle(ref, () => ({
-    resetHistory: clearHistory,
-  }), [clearHistory]);
+  useImperativeHandle(ref, () => ({ resetHistory: orbit.create, refresh: orbit.refresh }), [orbit.create,orbit.refresh]);
 
   const EXAMPLES = [
     '今天上午去车站接人，下午两点开会，晚上约朋友吃饭',
@@ -842,7 +727,21 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     '帮我分析一下如何安排深度工作时间',
   ];
   return (
-    <div className="ai-assistant-workspace">
+    <div className="ai-assistant-workspace orbit-workspace">
+      <aside className={`orbit-conversations${conversationDrawer ? ' is-open' : ''}`} aria-label="对话列表">
+        <div className="orbit-sidebar-head"><strong>Orbit</strong><button type="button" aria-label="关闭对话列表" onClick={() => setConversationDrawer(false)}>×</button></div>
+        <button type="button" className="primary-button" onClick={() => {void orbit.create().catch(e=>orbit.setError(e.message));setConversationDrawer(false);}}>＋ 新对话</button>
+        <div className="orbit-conversation-list">{orbit.conversations.map(c => <button key={c.id} type="button" className={c.id===orbit.cid?'active':''} onClick={() => {orbit.select(c.id);setConversationDrawer(false);}} title={c.title}>{c.title}</button>)}</div>
+        <label className="orbit-preference"><input type="checkbox" checked={orbit.autoKnowledge} onChange={e => {void orbit.preference(e.target.checked).catch(e=>orbit.setError(e.message));}} />自动检索知识库</label>
+        <small>关闭时，明确提到知识库才检索。</small>
+      </aside>
+      {conversationDrawer && <button type="button" className="orbit-drawer-backdrop" aria-label="关闭对话列表" onClick={() => setConversationDrawer(false)} />}
+      <div className="orbit-chat-main">
+      <div className="orbit-chat-toolbar"><button type="button" className="orbit-sidebar-toggle" onClick={() => setConversationDrawer(true)}>对话列表</button><strong>{orbit.conversations.find(c=>c.id===orbit.cid)?.title || '对话'}</strong><button type="button" onClick={() => setRenameTitle(orbit.conversations.find(c=>c.id===orbit.cid)?.title || '')}>重命名</button><button type="button" onClick={() => setDeleteDialog(true)}>删除对话</button></div>
+      {renameTitle!==null && <form className="orbit-dialog-row" onSubmit={e => {e.preventDefault();void orbit.rename(renameTitle).then(()=>setRenameTitle(null)).catch(e=>orbit.setError(e.message));}}><input aria-label="对话名称" value={renameTitle} maxLength={100} onChange={e=>setRenameTitle(e.target.value)} autoFocus /><button type="submit">保存</button><button type="button" onClick={()=>setRenameTitle(null)}>取消</button></form>}
+      {deleteDialog && <div className="orbit-dialog-row" role="alertdialog" aria-label="删除对话确认"><span>删除这段对话？已创建的事务会保留。</span><button type="button" onClick={()=>{void orbit.remove().then(()=>setDeleteDialog(false)).catch(e=>orbit.setError(e.message));}}>确认删除</button><button type="button" onClick={()=>setDeleteDialog(false)}>取消</button></div>}
+      {orbit.error && <div className="orbit-error" role="alert">{orbit.error}<button type="button" onClick={()=>orbit.setError('')} aria-label="关闭提示">×</button></div>}
+
       <div className="flex flex-col h-full schedule-ai-panel" style={{ backgroundColor: 'var(--td-bg-color-container)' }}>
       {!collapsed && (
         <>
@@ -858,10 +757,10 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
                 <Bot className="w-6 h-6" style={{ color: 'var(--td-brand-color)' }} />
               </div>
               <div className="text-sm font-medium" style={{ color: 'var(--td-text-color-primary)' }}>
-                你好，我是 AI 日程助手
+                你好，我是 Orbit
               </div>
               <div className="text-xs mt-1" style={{ color: 'var(--td-text-color-placeholder)' }}>
-                告诉我你的安排，或者问我修改日程
+                安排事务、查询知识，或者继续上次的对话
               </div>
             </div>
             <div className="space-y-1.5">
@@ -919,7 +818,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
 
           </div>
 
-            <div />
+            <div className="orbit-request-list" aria-live="polite">{orbit.requests.filter(r=>r.state!=='completed').map(r=><div key={r.id} className="orbit-request"><span><b>{({queued:'等待中',running:'生成中',cancelled:'已取消',failed:'失败',interrupted:'已中断'} as Record<string,string>)[r.state]}</b> · {r.text}<small>{r.error}</small></span>{['queued','running'].includes(r.state)?<button type="button" onClick={()=>{void orbit.action(r.id,'cancel').catch(e=>orbit.setError(e.message));}}>取消</button>:<button type="button" onClick={()=>{void orbit.action(r.id,'retry').catch(e=>orbit.setError(e.message));}}>重试</button>}</div>)}</div>
           </div>
 
           {/* 输入框 */}
@@ -934,7 +833,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
                 type="button"
                 className="schedule-ai-note-toggle"
                 onClick={() => setNoteMode(mode => !mode)}
-                disabled={isLoading || savingNotes}
+                disabled={orbit.submitting || savingNotes}
                 aria-pressed={noteMode}
                 aria-label={noteMode ? '关闭记事模式' : '打开记事模式'}
                 title={noteMode ? '关闭记事模式' : '打开记事模式'}
@@ -945,7 +844,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
               <textarea
                 ref={textareaRef}
                 value={inputText}
-                onChange={e => { inputRevisionRef.current += 1; setInputText(e.target.value); }}
+                onChange={e => { inputRevisionRef.current += 1; setInputText(e.target.value);drafts.current.set(orbit.cid,e.target.value); }}
                 onKeyDown={handleKeyDown}
                 placeholder={noteMode ? '每行一条，轻松记录' : '输入日程、修改要求或随意聊天...'}
                 rows={1}
@@ -957,21 +856,21 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
               <button
                 type="button"
                 onClick={noteMode ? () => { void handleSaveNotes(); } : handleSubmit}
-                disabled={!inputText.trim() || isLoading || savingNotes}
+                disabled={!inputText.trim() || orbit.submitting || savingNotes}
                 className="schedule-ai-send-button flex items-center justify-center rounded-lg text-xs font-medium transition-all"
                 style={{
-                  backgroundColor: (!inputText.trim() || isLoading || savingNotes)
+                  backgroundColor: (!inputText.trim() || orbit.submitting || savingNotes)
                     ? 'var(--td-bg-color-component)'
                     : 'var(--td-brand-color)',
-                  color: (!inputText.trim() || isLoading || savingNotes)
+                  color: (!inputText.trim() || orbit.submitting || savingNotes)
                     ? 'var(--td-text-color-disabled)'
                     : '#fff',
-                  cursor: (!inputText.trim() || isLoading || savingNotes) ? 'not-allowed' : 'pointer',
+                  cursor: (!inputText.trim() || orbit.submitting || savingNotes) ? 'not-allowed' : 'pointer',
                 }}
-                aria-label={isLoading ? '正在处理' : noteMode ? '保存记事' : '发送'}
+                aria-label={noteMode ? '保存记事' : isLoading ? '加入队列' : '发送'}
                 title={noteMode ? 'Ctrl+Enter 保存记事' : 'Ctrl+Enter 发送'}
               >
-                {isLoading || savingNotes
+                {orbit.submitting || savingNotes
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   : noteMode ? <Save className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />
                 }
@@ -980,6 +879,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
           </div>
         </>
       )}
+      </div>
       </div>
     </div>
   );

@@ -71,7 +71,7 @@ export const AI_LINKAGE_GUIDE_ITEMS: AiLinkageGuideItem[] = [
     configuration: '登录后进入“设置 → 日报集成”生成或轮换令牌；明文只显示一次。',
     steps: ['生成令牌并立即复制到本地日报项目的忽略配置。', '先用日报 V2 的 `-NoSend` 和本地验证流程检查结构与媒体。', '只在校验通过后调用日报读取、媒体上传和发布接口。'],
     test: '设置页查看令牌状态；日报 V2 的本地 `-NoSend`/接口健康检查。',
-    commonFailures: ['令牌已撤销、轮换或不属于当前账号。', '媒体未先托管到 AI Calendar，日报发布被拒绝。', '把 `PUBLISHED`、`QUEUED` 或 SMTP accepted 误认为收件箱最终到达。'],
+    commonFailures: ['令牌已撤销、轮换或不属于当前账号。', '媒体未先托管到 Orbit，日报发布被拒绝。', '把 `PUBLISHED`、`QUEUED` 或 SMTP accepted 误认为收件箱最终到达。'],
     boundary: '令牌是日报专用最小权限凭据，不能修改日程、读取授权码或访问其他账号数据。',
   },
   {
@@ -150,7 +150,7 @@ export const AI_IMPORT_LINKAGE_RULES = [
 export function getAiLinkageGuides() {
   return {
     version: AI_LINKAGE_GUIDE_VERSION,
-    title: 'AI Calendar 接入与联动指南',
+    title: 'Orbit 接入与联动指南',
     items: AI_LINKAGE_GUIDE_ITEMS,
     rules: AI_LINKAGE_RULES,
     examples: AI_LINKAGE_EXAMPLES,

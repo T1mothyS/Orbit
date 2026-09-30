@@ -1,21 +1,21 @@
-# AI Calendar 跨项目地图
+# Orbit 跨项目地图
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified version: `0.36.3-260928.1303`（2026-09-28，日报关注输入状态与占位图口径本地修复；隔离服务尚未部署，不代表正式生产或发信验收）。
+- Last verified local version: `0.37.0-260930.2101`（2026-09-30，Orbit 本地实现；真实 AI、生产、自然日报与收件箱未验；日报历史证据按各节日期使用）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
 - Do not use for: 推断当前生产部署、Work 配置或邮件收件箱状态。
 
-本文档是 AI Calendar 主仓库与个人情报日报 V2 的逻辑地图。它只记录可提交的模块、边界和验证入口，不记录绝对个人路径、用户数据、令牌、授权码或运行机器上的真实配置。
+本文档是 Orbit 主仓库与个人情报日报 V2 的逻辑地图。它只记录可提交的模块、边界和验证入口，不记录绝对个人路径、用户数据、令牌、授权码或运行机器上的真实配置。
 
 ## 1. 项目与边界
 
 | 逻辑项目名 | 仓库范围 | 当前定位 | 允许的关系 |
 | --- | --- | --- | --- |
-| AI Calendar | `smart-schedule-agent/` | 主应用：Web、Electron、Express API、日程、提醒、账户和日报服务端 | 接收 V2 的已校验日报发布与媒体上传；按账号隔离保存 |
-| 个人情报日报 V2 | `日报-v2/` | 当前日报采集、结构化生成、校验、媒体本地化和发布程序 | 通过只读/发布专用接口与 AI Calendar 交互；默认本地 `-NoSend` 验收 |
+| Orbit | `smart-schedule-agent/` | 主应用：Web、Electron、Express API、日程、提醒、账户和日报服务端 | 接收 V2 的已校验日报发布与媒体上传；按账号隔离保存 |
+| 个人情报日报 V2 | `日报-v2/` | 当前日报采集、结构化生成、校验、媒体本地化和发布程序 | 通过只读/发布专用接口与 Orbit 交互；默认本地 `-NoSend` 验收 |
 | `LEGACY_PROJECT` | `旧版日报/` | 只读参考与可恢复回滚边界 | 不修改代码、Prompt、配置、产物、邮件投递或定时任务 |
 
 ### 1.1 主仓库结构
@@ -65,7 +65,7 @@ flowchart LR
     Validate --> Render[确定性 Markdown / HTML / 纯文本模板]
     Render --> Media[本地下载、签名校验、SHA256 媒体缓存]
     Media --> Upload[上传本站媒体]
-    Upload --> Publish[发布到 AI Calendar]
+    Upload --> Publish[发布到 Orbit]
     Publish --> Store[生产记录：账号 + 日期 + 来源 + 内容哈希]
     Store --> Policy{来源接收设置}
     Policy -->|已勾选| Receive[RECEIVED：正式网页 + 邮件队列]
@@ -105,9 +105,9 @@ flowchart LR
 | CodeBuddy Agent SDK / Codex CLI | 主应用 AI、V2 结构化生成 | 只处理必要的结构化输入；模型失败不能绕过确认或 Validator |
 | Open-Meteo | 主应用天气与 V2 相关上下文 | 网络/地点失败必须显式表示，不伪造天气 |
 | QQ IMAP | 用户 QQ 未读邮件摘要 | 单独授权码、只读摘要、按账号隔离 |
-| 163 SMTP | AI Calendar 官方通知与回滚投递 | 仅报告传输层结果；最终到达需收件箱证据 |
+| 163 SMTP | Orbit 官方通知与回滚投递 | 仅报告传输层结果；最终到达需收件箱证据 |
 | 阿里云 OSS | 可选加密备份离机保存 | 私有 Bucket、最小权限；不把备份凭据放进仓库 |
-| PM2 / Nginx / HTTPS | AI Calendar 生产运行 | 只按 `DEPLOY.md` 的预构建、备份、原子切换和健康检查流程执行 |
+| PM2 / Nginx / HTTPS | Orbit 生产运行 | 只按 `DEPLOY.md` 的预构建、备份、原子切换和健康检查流程执行 |
 
 ## 4. 任务路由与源码入口
 
@@ -128,7 +128,7 @@ flowchart LR
 
 ## 5. 验证与证据
 
-### AI Calendar
+### Orbit
 
 ```text
 npm run typecheck
@@ -156,3 +156,7 @@ pwsh -NoProfile -File scripts/run_daily.ps1 -Date YYYY-MM-DD -NoSend
 - `server/digest-media-worker.ts`：独立Cloudflare Worker，验证短时签名并受控下载图片；不持有主应用数据库或R2凭据。
 - `server/digest-v2-relay.ts`：新版媒体下载适配器；许可/解码/存储仍归`digest-v2-media.ts`，来源图标和新闻图分开呈现及统计。
 - 接入与回滚权威说明见[Cloud合同](docs/CHATGPT-WORK-CLOUD.md#cloudflare-worker-代抓与来源图标)，外部连通性和实际部署状态见本机时点记录。
+
+### Orbit 对话工作区
+
+`server/orbit-store.ts`、`orbit-queue.ts` 和 `routes/ai.ts` 管理账号会话、请求队列与 AI 计划；`src/hooks/useOrbitChat.ts`、`AiSchedulePanel`、`OrbitScheduleEditor` 管理会话视图和结果编辑。字段/API/恢复语义只维护在 [架构合同](docs/ARCHITECTURE.md#orbit-对话与操作合同)。

@@ -5,10 +5,13 @@ import { AiImportPage } from '../components/AiImportPage';
 import { AiNoteBoardHost, useAiNoteBoard } from '../components/AiNoteBoardHost';
 import { AiSchedulePanel, type AiSchedulePanelHandle } from '../components/AiSchedulePanel';
 
+import { OrbitScheduleEditor } from '../components/OrbitScheduleEditor';
+
 export function AiAssistantPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTool = searchParams.get('tool') === 'email-import' ? 'email-import' : 'chat';
   const chatPanelRef = useRef<AiSchedulePanelHandle>(null);
+  const [openScheduleId, setOpenScheduleId] = useState<string | null>(null);
   const [chatState, setChatState] = useState({ hasMessages: false, busy: false });
   const noteBoard = useAiNoteBoard({
     initialNoteId: searchParams.get('note') || undefined,
@@ -22,20 +25,16 @@ export function AiAssistantPage() {
     setSearchParams(next);
   };
 
-  const resetDisabled = activeTool !== 'chat' || chatState.busy || !chatState.hasMessages;
-  const resetTitle = activeTool !== 'chat'
-    ? '邮箱导入模式没有对话历史可重置'
-    : chatState.busy
-      ? '正在处理，暂时不能重置对话'
-      : chatState.hasMessages ? '重置对话' : '当前没有可重置的对话';
+  const resetDisabled = activeTool !== 'chat';
+  const resetTitle = '新建对话';
 
   return (
     <div className="ai-assistant-page">
       <div className="ai-assistant-page-main">
         <header className="ai-assistant-topbar">
           <div className="ai-assistant-topbar-title">
-            <span className="eyebrow">AI WORKSPACE</span>
-            <strong>AI 对话</strong>
+            <span className="eyebrow">ORBIT</span>
+            <strong>个人事务中心</strong>
           </div>
           <nav className="ai-assistant-tabs" role="tablist" aria-label="AI 工作区">
             <button
@@ -73,7 +72,7 @@ export function AiAssistantPage() {
               aria-label={resetTitle}
             >
               <RotateCcw size={16} aria-hidden="true" />
-              <span>重置</span>
+              <span>新对话</span>
             </button>
             <button
               type="button"
@@ -104,6 +103,7 @@ export function AiAssistantPage() {
                 <AiSchedulePanel
                   ref={chatPanelRef}
                   onSaveNote={saveNote}
+                  onOpenSchedule={setOpenScheduleId}
                   onChatStateChange={setChatState}
                 />
               </section>
@@ -111,7 +111,8 @@ export function AiAssistantPage() {
           )}
         </section>
       </div>
-      <AiNoteBoardHost controller={noteBoard} aiBusy={chatState.busy} />
+      <AiNoteBoardHost controller={noteBoard} />
+      {openScheduleId && <OrbitScheduleEditor id={openScheduleId} onClose={() => setOpenScheduleId(null)} onSaved={() => {void chatPanelRef.current?.refresh();}} />}
     </div>
   );
 }

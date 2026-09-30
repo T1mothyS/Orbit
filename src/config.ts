@@ -7,13 +7,13 @@ import packageJson from '../package.json';
 
 export const APP_CONFIG = {
   /** 应用名称 */
-  name: 'AI Calendar',
+  name: 'Orbit',
   
   /** 应用名称首字母（用于 Logo） */
-  nameInitial: 'A',
+  nameInitial: 'O',
   
   /** 应用描述 */
-  description: '日程与周期事务中心',
+  description: '以对话为入口的个人事务中心',
   
   /** 版本号 */
   version: packageJson.version,

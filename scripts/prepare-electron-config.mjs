@@ -17,7 +17,7 @@ if (path.dirname(targetDir) !== projectRoot || path.basename(targetDir) !== 'dis
 const requiredFiles = {
   main: path.resolve(projectRoot, 'dist-electron/main.js'),
   preload: path.resolve(projectRoot, 'dist-electron/preload.js'),
-  icon: path.resolve(projectRoot, 'public/navigation-icons/schedule.png'),
+  icon: path.resolve(projectRoot, 'public/orbit-logo.png'),
 };
 for (const [label, source] of Object.entries(requiredFiles)) {
   if (!fs.existsSync(source)) throw new Error(`Electron ${label} build input is missing: ${source}`);

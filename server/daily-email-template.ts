@@ -178,7 +178,7 @@ export function renderDailyReminderEmail(input: {
         ${renderBacklogSection('无固定期限', unscheduled, input.appUrl)}
         <tr><td style="padding:10px 26px 28px;text-align:center">
           <a href="${escapeEmailHtml(input.appUrl)}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 20px;border-radius:9px">打开今日行动中心</a>
-          <div style="margin-top:16px;font-size:11px;line-height:1.5;color:#94a3b8">天气来自 Open-Meteo；提醒内容以 AI Calendar 当前数据为准。</div>
+          <div style="margin-top:16px;font-size:11px;line-height:1.5;color:#94a3b8">天气来自 Open-Meteo；提醒内容以 Orbit 当前数据为准。</div>
         </td></tr>
       </table>
     </td></tr>

@@ -15,6 +15,7 @@ interface ActionItem {
   instanceId: string | null;
   title: string;
   dueAt: string;
+  plannedAt?: string | null;
   allDay: boolean;
   status: 'upcoming' | 'today' | 'overdue' | 'completed';
   priority: 'high' | 'medium' | 'low';
@@ -277,7 +278,7 @@ function ActionList({ title, hint, items, tone, menuScope, headerControl, onComp
         aria-label={item.sourceType === 'schedule' ? `编辑日程：${item.title}` : undefined}
       >
         {item.itemType === 'recurring' ? <div className="recurring-priority" title="周期事务" aria-label="周期事务"><RefreshCw size={22} strokeWidth={1.8} aria-hidden="true" /><span className={'priority-dot ' + item.priority} /></div> : <div className={'priority-dot ' + item.priority} />}
-        <div className="action-row-main"><div className="action-row-title">{item.title}</div><div className="action-row-meta"><span>{item.itemType === 'recurring' ? '周期事务' : item.itemType === 'todo' ? '待办' : '日程'}</span><span>{formatDate(item.dueAt, item.allDay)}</span>{item.nextAction && <span>{item.nextAction}</span>}</div></div>
+        <div className="action-row-main"><div className="action-row-title">{item.title}</div><div className="action-row-meta"><span>{item.itemType === 'recurring' ? '周期事务' : item.itemType === 'todo' ? '待办' : '日程'}</span><span>{item.plannedAt ? `安排 ${formatDate(item.plannedAt, true)} · 到期 ${formatDate(item.dueAt,true)}` : formatDate(item.dueAt, item.allDay)}</span>{item.nextAction && <span>{item.nextAction}</span>}</div></div>
         <div className="action-row-actions">
           <button
             type="button"
@@ -715,7 +716,7 @@ export function ActionCenterPage() {
               <div className="action-row-title">{item.title}</div>
               <div className="action-row-meta">
                 <span>{item.itemType === 'recurring' ? '周期事务' : item.itemType === 'todo' ? '待办' : '日程'}</span>
-                <span>{formatDate(item.dueAt, item.allDay)}</span>
+                <span>{item.plannedAt ? `安排 ${formatDate(item.plannedAt, true)} · 到期 ${formatDate(item.dueAt,true)}` : formatDate(item.dueAt, item.allDay)}</span>
                 {item.completedAt && <span>完成于 {formatDate(item.completedAt)}</span>}
                 {item.nextAction && <span>{item.nextAction}</span>}
                 {item.proof?.note && <span>备注：{item.proof.note}</span>}

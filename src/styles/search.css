@@ -50,5 +50,8 @@
 .ai-knowledge-source-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ai-knowledge-source-head strong { min-width: 0; overflow: hidden; color: var(--td-brand-color); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .ai-knowledge-source-head span { flex: 0 0 auto; color: var(--td-brand-color); font-size: 10px; }
-.ai-knowledge-source-snippet { display: -webkit-box; margin-top: 4px; overflow: hidden; color: var(--td-text-color-secondary); font-size: 10px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.ai-knowledge-source-snippet { display: -webkit-box; margin-top: 4px; overflow: hidden; color: var(--td-text-color-secondary); font-size: 10px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .ai-knowledge-source small { display: block; margin-top: 5px; overflow-wrap: anywhere; color: var(--td-text-color-placeholder); font-size: 9px; }
+
+.ai-knowledge-source-snippet { font-size: 12px; }
+.ai-knowledge-source-head strong { font-size: 13px; }

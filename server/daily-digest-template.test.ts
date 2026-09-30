@@ -192,7 +192,7 @@ test('邮件页面和纯文本均由同一结构化内容生成', () => {
   assert.ok(email);
   assert.ok(text);
   assert.match(email, /max-width:680px/);
-  assert.match(email, /在 AI Calendar 中查看私有日报/);
+  assert.match(email, /在 Orbit 中查看私有日报/);
   assert.match(email, /src="[^"]*\/daily-report-media\/[a-f0-9]{64}\.(?:jpg|webp)"/);
   assert.doesNotMatch(email, /example\.com\/trade\.jpg|favicon\.ico/i);
   assert.match(text, /Today at a Glance/);

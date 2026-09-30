@@ -52,7 +52,7 @@ export function projectEvent(event: Schedule, options: ProjectionOptions): Proje
   if (!event.is_repeated && event.repeat_rule) throw new CaldavError('INCONSISTENT_RECURRENCE');
   if (!event.title.trim()) throw new CaldavError('MISSING_TITLE');
   const id = digest(JSON.stringify([event.user_id, event.calendar_id, event.id]));
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AI Calendar//One-way bridge v1//EN',
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Orbit//One-way bridge v1//EN',
     'BEGIN:VEVENT', `UID:aical-${id}@calendar.invalid`,
     `DTSTAMP:${utc(instant(event.updated_at, 'UTC'))}`, `CREATED:${utc(instant(event.created_at, 'UTC'))}`,
     `LAST-MODIFIED:${utc(instant(event.updated_at, 'UTC'))}`, `SUMMARY:${escapeText(event.title)}`];
@@ -80,7 +80,7 @@ export function projectEvent(event: Schedule, options: ProjectionOptions): Proje
   if (options.alarms && event.reminders.length) {
     // One alarm matches the existing form; multiple legacy reminders need explicit semantics.
     if (event.all_day || event.reminders.length !== 1 || !/^\d{1,5}$/.test(event.reminders[0]) || +event.reminders[0] > 10080) throw new CaldavError('UNSUPPORTED_ALARM');
-    lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `TRIGGER:-PT${+event.reminders[0]}M`, 'DESCRIPTION:AI Calendar', 'END:VALARM');
+    lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `TRIGGER:-PT${+event.reminders[0]}M`, 'DESCRIPTION:Orbit', 'END:VALARM');
   }
   lines.push('END:VEVENT', 'END:VCALENDAR');
   const ical = lines.map(fold).join('\r\n') + '\r\n';

@@ -259,11 +259,11 @@ export function generateCode(): string {
 
 // 发送验证码邮件
 export async function sendVerificationEmail(to: string, code: string, purpose: 'register' | 'reset_password'): Promise<EmailSendResult> {
-  const subject = purpose === 'register' ? '【AI Calendar】注册验证码' : '【AI Calendar】重置密码验证码';
+  const subject = purpose === 'register' ? '【Orbit】注册验证码' : '【Orbit】重置密码验证码';
   const html = purpose === 'register' ? `
     <div style="font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #f9fafb; border-radius: 12px;">
       <div style="background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-        <h2 style="color: #1a1a1a; font-size: 20px; margin-bottom: 24px; text-align: center;">📅 AI Calendar</h2>
+        <h2 style="color: #1a1a1a; font-size: 20px; margin-bottom: 24px; text-align: center;">📅 Orbit</h2>
         <div style="background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; text-align: center; padding: 24px; border-radius: 8px; margin-bottom: 24px;">
           <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">您的验证码是</div>
           <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; font-family: monospace;">${code}</div>
@@ -275,7 +275,7 @@ export async function sendVerificationEmail(to: string, code: string, purpose: '
   ` : `
     <div style="font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; max-width: 500px; margin: 0 auto; padding: 30px; background: #f9fafb; border-radius: 12px;">
       <div style="background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-        <h2 style="color: #1a1a1a; font-size: 20px; margin-bottom: 24px; text-align: center;">📅 AI Calendar</h2>
+        <h2 style="color: #1a1a1a; font-size: 20px; margin-bottom: 24px; text-align: center;">📅 Orbit</h2>
         <div style="background: linear-gradient(135deg, #ef4444, #f97316); color: #fff; text-align: center; padding: 24px; border-radius: 8px; margin-bottom: 24px;">
           <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">您的验证码是</div>
           <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; font-family: monospace;">${code}</div>
@@ -287,7 +287,7 @@ export async function sendVerificationEmail(to: string, code: string, purpose: '
   `;
 
   return sendEmail({
-    from: `"AI Calendar" <${OFFICIAL_SENDER_EMAIL}>`,
+    from: `"Orbit" <${OFFICIAL_SENDER_EMAIL}>`,
     to,
     subject,
     html,
@@ -342,7 +342,7 @@ export async function sendDailyReminderEmail(to: string, userId: string, dateOve
   });
 
   return sendEmail({
-    from: `"AI Calendar" <${OFFICIAL_SENDER_EMAIL}>`,
+    from: `"Orbit" <${OFFICIAL_SENDER_EMAIL}>`,
     to,
     subject: rendered.subject,
     html: rendered.html,
@@ -371,12 +371,12 @@ export async function sendDailyReportEmail(to: string, date: string, markdown: s
     <div style="font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; max-width: 920px; margin: 0 auto; padding: 24px; color: #1f2937;">
       <h1 style="font-size: 24px; margin: 0 0 20px;">${escapeHtml(subject)}</h1>
       <article class="daily-report-markdown" style="line-height: 1.75;">${renderMarkdown(markdown)}</article>
-      <p style="margin-top: 28px; font-size: 13px;"><a href="${escapeHtml(url)}">在 AI Calendar 中查看私有日报页面</a></p>
+      <p style="margin-top: 28px; font-size: 13px;"><a href="${escapeHtml(url)}">在 Orbit 中查看私有日报页面</a></p>
     </div>
   `;
-  const text = (v2 ? digestV2Text(v2) : null) || renderDailyDigestPlainText(markdown, url) || `${subject}\n\n${markdown}\n\n在 AI Calendar 中查看私有日报页面：${url}`;
+  const text = (v2 ? digestV2Text(v2) : null) || renderDailyDigestPlainText(markdown, url) || `${subject}\n\n${markdown}\n\n在 Orbit 中查看私有日报页面：${url}`;
   return sendEmail({
-    from: `"AI Calendar" <${OFFICIAL_SENDER_EMAIL}>`,
+    from: `"Orbit" <${OFFICIAL_SENDER_EMAIL}>`,
     to,
     subject,
     html,
@@ -446,13 +446,13 @@ export async function sendCycleReminderEmail(input: {
   }
 
   return sendEmail({
-    from: `"AI Calendar" <${OFFICIAL_SENDER_EMAIL}>`,
+    from: `"Orbit" <${OFFICIAL_SENDER_EMAIL}>`,
     to,
     subject,
     html: `
       <div style="font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f4f7fb;color:#182230">
         <div style="background:#fff;border:1px solid #e5eaf1;border-radius:18px;padding:28px">
-          <div style="font-size:13px;color:#6b7280;margin-bottom:10px">AI Calendar · 周期提醒</div>
+          <div style="font-size:13px;color:#6b7280;margin-bottom:10px">Orbit · 周期提醒</div>
           <h2 style="margin:0 0 18px;color:#14213d">${safeName}</h2>
           ${body}
           ${delayed ? '<p style="color:#b45309;background:#fff7ed;padding:10px;border-radius:8px">本提醒因服务中断而延迟发送。</p>' : ''}
@@ -468,13 +468,13 @@ export async function sendCycleReminderEmail(input: {
 export async function sendQueuedNotificationEmail(to: string, title: string, body: string): Promise<EmailSendResult> {
   const appUrl = process.env.APP_URL || 'http://localhost:3000/today';
   return sendEmail({
-    from: `"AI Calendar" <${OFFICIAL_SENDER_EMAIL}>`,
+    from: `"Orbit" <${OFFICIAL_SENDER_EMAIL}>`,
     to,
     subject: title,
     html: `
       <div style="font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#f4f7fb;color:#182230">
         <div style="background:#fff;border:1px solid #e5eaf1;border-radius:18px;padding:28px">
-          <div style="font-size:13px;color:#6b7280;margin-bottom:10px">AI Calendar · 行动提醒</div>
+          <div style="font-size:13px;color:#6b7280;margin-bottom:10px">Orbit · 行动提醒</div>
           <h2 style="margin:0 0 16px;color:#14213d">${escapeHtml(title)}</h2>
           <p style="line-height:1.7">${escapeHtml(body).replace(/\n/g, '<br>')}</p>
           <a href="${escapeHtml(appUrl)}" style="display:inline-block;margin-top:12px;background:#2563eb;color:#fff;padding:11px 18px;border-radius:10px;text-decoration:none">打开今日行动中心</a>
@@ -487,7 +487,7 @@ export async function sendQueuedNotificationEmail(to: string, title: string, bod
 
 export async function sendReminderTestEmail(to: string): Promise<EmailSendResult> {
   return sendEmail({
-    from: `"AI Calendar" <${OFFICIAL_SENDER_EMAIL}>`,
+    from: `"Orbit" <${OFFICIAL_SENDER_EMAIL}>`,
     to,
     subject: '【测试成功】周期提醒系统邮件发送正常',
     text: [

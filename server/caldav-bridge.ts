@@ -141,7 +141,7 @@ export function createCaldavBridge(config: BridgeConfig, stateFile: string, read
       const state = [!task.enabled ? '已停用' : '', cycle.status === 'cancelled' ? '已取消' : ''].filter(Boolean);
       rows.push({ id: mapping.sourceId, user_id: task.userId, calendar_id: '@cycles', type: 'event', title: `${state.map(s => `【${s}】`).join('')}周期事务：${task.name}`,
         start_time: cycle.dueDate, all_day: true, is_completed: cycle.status === 'completed', is_repeated: false, reminders: [],
-        description: `${current === false ? '历史' : '当前'}周期到期日；使用当前事务名称。${state.join('；')}。请在 AI Calendar 周期事务中登记完成。`, category: 'other', priority: 'medium', is_high_risk: false,
+        description: `${current === false ? '历史' : '当前'}周期到期日；使用当前事务名称。${state.join('；')}。请在 Orbit 周期事务中登记完成。`, category: 'other', priority: 'medium', is_high_risk: false,
         created_at: cycle.createdAt, updated_at: [cycle.updatedAt, task.updatedAt].sort().at(-1)! });
     }
     for (const row of rows) {

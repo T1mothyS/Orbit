@@ -120,8 +120,8 @@ export function getAiScheduleMessages(userId: string, limit = 20): DbAiScheduleM
 export function createAiScheduleMessage(message: DbAiScheduleMessage): DbAiScheduleMessage {
   run(
     `INSERT INTO ai_schedule_messages
-      (id, user_id, role, type, content, intent, schedule_items, plan, knowledge_sources, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (id, user_id, role, type, content, intent, schedule_items, plan, knowledge_sources, created_at, conversation_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       message.id,
       message.user_id,
@@ -133,6 +133,7 @@ export function createAiScheduleMessage(message: DbAiScheduleMessage): DbAiSched
       message.plan,
       message.knowledge_sources ?? null,
       message.created_at,
+      message.conversation_id ?? null,
     ],
   );
   return message;

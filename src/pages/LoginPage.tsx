@@ -41,7 +41,7 @@ export function LoginPage() {
   // 工具页面是受保护的原始 HTML，登录后需要完整跳转让服务器交付文件。
   useEffect(() => {
     if (isAuthenticated) {
-      window.location.replace(nextPath || '/today');
+      window.location.replace(nextPath || '/assistant');
     }
   }, [isAuthenticated, nextPath]);
 
@@ -91,7 +91,7 @@ export function LoginPage() {
         await login(email, password);
         MessagePlugin.success('登录成功！');
         // 强制刷新确保所有全局状态重置
-        window.location.href = nextPath || '/today';
+        window.location.href = nextPath || '/assistant';
       } catch (e: any) {
         MessagePlugin.error(e.message);
       } finally {
@@ -128,9 +128,8 @@ export function LoginPage() {
         <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="text-5xl mb-3">📅</div>
-          <h1 className="text-3xl font-bold text-white mb-1">AI Calendar</h1>
-          <p className="text-white/70 text-sm">智能日程管理，让每一天更高效</p>
+          <img src="/orbit-logo.png" alt="Orbit" className="orbit-login-logo" /><h1 className="text-3xl font-bold text-white mb-1">Orbit</h1>
+          <p className="text-white/70 text-sm">以对话为入口，管理你的个人事务</p>
         </div>
 
         {/* 表单卡片 */}
@@ -249,7 +248,7 @@ export function LoginPage() {
         </div>
 
           <p className="text-center text-white/50 text-xs mt-6">
-            AI Calendar © 2026
+            Orbit © 2026
           </p>
         </div>
       </main>

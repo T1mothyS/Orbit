@@ -142,7 +142,7 @@ function NoteRow({
 }) {
   const color = normaliseNoteColor(note.color);
   const colorStyle = NOTE_COLOR_STYLES[color];
-  const disabled = aiBusy || saving || mergeBusy || optimizing;
+  const disabled = saving || mergeBusy || optimizing;
   const mergeTitle = mergeSourceSelected
     ? '取消合并来源'
     : mergeSourceExists
@@ -188,7 +188,7 @@ function NoteRow({
         >
           {note.isOptimized ? <RotateCcw size={15} /> : <Sparkles size={15} />}
         </button>
-        <button type="button" className="note-board-action" onClick={onCopy} disabled={disabled} title={copyFeedback === 'success' ? '已复制' : copyFeedback === 'error' ? '复制失败' : '复制正文'} aria-label={`复制记事：${note.content}`}>
+        <button type="button" className="note-board-action" onClick={onCopy} title={copyFeedback === 'success' ? '已复制' : copyFeedback === 'error' ? '复制失败' : '复制正文'} aria-label={`复制记事：${note.content}`}>
           {copyFeedback === 'success' ? <Check size={15} /> : copyFeedback === 'error' ? <CircleX size={15} /> : <Copy size={15} />}
         </button>
         <button type="button" className="note-board-action" onClick={onToggleCompleted} disabled={disabled} title={note.completed ? '恢复到进行中' : '移入废纸篓'} aria-label={note.completed ? `恢复记事：${note.content}` : `完成记事并移入废纸篓：${note.content}`}>
@@ -300,8 +300,9 @@ export function NoteBoard({
     optimizationAbortRef.current?.abort();
   }, []);
 
+  const currentEditing = useRef(editingId);currentEditing.current=editingId;
   const startEdit = (note: NoteItem) => {
-    if (aiBusy || optimizationBusyId !== null) return;
+    if (optimizationBusyId === note.id) return;
     setEditingId(note.id);
     setEditValue(note.content);
     setColorPickerId(null);
@@ -330,7 +331,7 @@ export function NoteBoard({
   const hasUnsavedEdit = Boolean(editingNote && editValue !== editingNote.content);
 
   const runOptimization = async (note: NoteItem) => {
-    if (aiBusy || optimizationBusyId !== null) return;
+    if (optimizationBusyId !== null) return;
     if (hasUnsavedEdit) return;
 
     if (editingId !== note.id) {
@@ -346,8 +347,7 @@ export function NoteBoard({
       const item = note.isOptimized
         ? await onRevertOptimization(note, controller.signal)
         : await onOptimize(note, controller.signal);
-      setEditingId(item.id);
-      setEditValue(item.content);
+      if(currentEditing.current===note.id) {setEditingId(item.id);setEditValue(item.content);}
     } catch {
       // 父组件负责显示错误；失败时保留原正文和当前编辑态。
     } finally {
