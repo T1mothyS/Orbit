@@ -3,6 +3,12 @@
 
 set -e
 
+# 日常 2 GB 升级使用 docs/RELEASE.md 与 DEPLOY.md §8.1 的本地预构建路径。
+if [ "${1:-}" != "--bootstrap" ]; then
+  printf '%s\n' '拒绝执行旧服务器安装流程；仅首次安装/明确资源例外使用 --bootstrap，且须已有对应授权。' >&2
+  exit 64
+fi
+
 echo "=== 智能日程表部署脚本 ==="
 
 # 1. 安装 Node.js 22
@@ -20,4 +26,4 @@ cd ~/smart-schedule-agent
 # git clone https://your-repo.git . || echo "请手动上传代码到 ~/smart-schedule-agent"
 
 echo "请把代码上传到 ~/smart-schedule-agent 目录后，继续执行："
-echo "  cd ~/smart-schedule-agent && bash deploy-continue.sh"
+echo "  cd ~/smart-schedule-agent && bash deploy-continue.sh --server-install"

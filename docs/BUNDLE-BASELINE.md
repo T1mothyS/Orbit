@@ -58,7 +58,7 @@ JS 共 97 个，其中 96 个不属于首屏静态闭包。此快照使用 Node 
 
 ## Phase 2 对照（2026-09-15）
 
-版本 0.21.1-260915.1408；[完整快照](baselines/bundle-phase2-2026-09-15.json)、[模块闭包](baselines/modules-phase2-2026-09-15.json)、[验收报告](PHASE2-FRONTEND-LOADING.md)。保留首次快照，未修改预算或 warning 阈值。
+版本 0.21.1-260915.1408；[完整快照](baselines/bundle-phase2-2026-09-15.json)、[模块闭包](baselines/modules-phase2-2026-09-15.json)、[验收报告](archive/engineering/PHASE2-FRONTEND-LOADING.md)。保留首次快照，未修改预算或 warning 阈值。
 
 | 指标 | Phase 1 raw / gzip | Phase 2 raw / gzip | gzip 变化 |
 |---|---:|---:|---:|

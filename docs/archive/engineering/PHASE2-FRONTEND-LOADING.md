@@ -29,13 +29,13 @@
 
 生产构建在不含真实 .env/data 的临时源码副本完成，沿用现有 node_modules；Electron URL 使用合成地址。未执行全新 npm ci 或远程 CI，未启动真实后端。
 
-[完整体积对照](BUNDLE-BASELINE.md)、[构建快照](baselines/bundle-phase2-2026-09-15.json)、[模块闭包证据](baselines/modules-phase2-2026-09-15.json)。JS gzip 从 456,761 降至 113,164（-75.22%），CSS 从 56,269 降至 29,830（-46.99%）。全部 JS gzip 略增 0.94%，这是加载时机优化，不是全部资源总体积减少，也不代表 LCP 已测。
+[完整体积对照](../../BUNDLE-BASELINE.md)、[构建快照](../../baselines/bundle-phase2-2026-09-15.json)、[模块闭包证据](../../baselines/modules-phase2-2026-09-15.json)。JS gzip 从 456,761 降至 113,164（-75.22%），CSS 从 56,269 降至 29,830（-46.99%）。全部 JS gzip 略增 0.94%，这是加载时机优化，不是全部资源总体积减少，也不代表 LCP 已测。
 
 模块证据来自相同源码/配置的 Vite generateBundle 观察插件：从 isEntry chunk 沿 imports 遍历，检查每个 chunk.modules；不沿 dynamicImports 遍历。插件只观察、write:false，不改构建配置或依赖。
 
 ## 浏览器范围与复现
 
-入口：[scripts/browser-smoke.cjs](../scripts/browser-smoke.cjs)，用法见 [TEST-MATRIX](TEST-MATRIX.md)。只启动回环静态服务器，API 全部合成，外部网络阻断。
+入口：[scripts/browser-smoke.cjs](../../../scripts/browser-smoke.cjs)，用法见 [TEST-MATRIX](TEST-MATRIX-20261001.md)。只启动回环静态服务器，API 全部合成，外部网络阻断。
 
 - 390×844、430×932、768×1024、1440×900：Today、日程、周期提醒、AI、日报、知识库空数据/合成列表加载。
 - 四尺寸 Settings 浅色/暗色打开关闭；Admin 打开关闭，截图检查。

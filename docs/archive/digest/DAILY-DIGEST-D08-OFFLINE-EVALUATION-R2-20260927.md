@@ -2,7 +2,7 @@
 
 - Status: VERIFICATION-SNAPSHOT / OFFLINE / D08 CONTINUE。
 - Scope: 修正遗漏旧事实与双未知指标两项误判；用 12 条新核对的官方来源短摘录组成 13 组保留比较，分别评测人工 V3 字段和独立规则抽取字段。
-- Authority: [匹配规则](../server/digest-v3-offline-match.ts)、[抽取规则](../server/digest-v3-offline-extract.ts)、[有界来源](digest-v3-d08-r2-bounded-sources.json)、[人工字段](digest-v3-d08-r2-manual-fields.json)、[评分专用答案](digest-v3-d08-r2-oracle.json)及 `npm run digest:eval-offline-r2`。逐项机器结果写入被忽略的 `dist-shadow/d08-r2-offline-*/result.json`。
+- Authority: [匹配规则](../../../server/digest-v3-offline-match.ts)、[抽取规则](../../../server/digest-v3-offline-extract.ts)、[有界来源](../../digest-v3-d08-r2-bounded-sources.json)、[人工字段](../../digest-v3-d08-r2-manual-fields.json)、[评分专用答案](../../digest-v3-d08-r2-oracle.json)及 `npm run digest:eval-offline-r2`。逐项机器结果写入被忽略的 `dist-shadow/d08-r2-offline-*/result.json`。
 - Do not use for: 宣称原网页通用抓取、真实 Work/Shadow、自动入库或事件合并、D09 已放行、正式日报、部署与发信。本快照没有给历史 [第一轮评测](DAILY-DIGEST-D08-OFFLINE-EVALUATION-20260927.md)改分。
 
 ## 故障复现、修复与冻结

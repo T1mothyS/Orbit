@@ -2,7 +2,7 @@
 
 - Status: VERIFICATION-SNAPSHOT / OFFLINE。仅限本地只读建议；无活动库写入、事件合并、Work、发布或发信。
 - Baseline: `c90babbfbaebcdc4f269a19f4ba2883acd2aa750` / `0.35.0-260927.1717`。第二轮历史评分仍由其原抽取器副本复现，不用新规则改写历史结论。
-- Rule freeze: 修复和开发反例测试通过后，先固定 [抽取器](../server/digest-v3-offline-extract.ts) LF 规范化 SHA-256 `3cbab1841081eb86cef800df7d9993dcf0f293bd10f8d08a673797fffcda8644`，随后才编写 [20 条新合成短摘录](digest-v3-d08-r3-bounded-sources.json)及独立[评分答案](digest-v3-d08-r3-oracle.json)。输入哈希 `26f93500ee8f31dc4828e46e58546560b44f6ccfcb8eb3d0a306f4ae32bd5b23`，答案哈希 `72010ae39d65611b034257a57c70f0d27edd3cf83a4bed71c69a5d42a4092de1`。样本、URL 和 Crew 编号均为虚构；不得外推为真实 NASA 页面准确率。
+- Rule freeze: 修复和开发反例测试通过后，先固定 [抽取器](../../../server/digest-v3-offline-extract.ts) LF 规范化 SHA-256 `3cbab1841081eb86cef800df7d9993dcf0f293bd10f8d08a673797fffcda8644`，随后才编写 [20 条新合成短摘录](../../digest-v3-d08-r3-bounded-sources.json)及独立[评分答案](../../digest-v3-d08-r3-oracle.json)。输入哈希 `26f93500ee8f31dc4828e46e58546560b44f6ccfcb8eb3d0a306f4ae32bd5b23`，答案哈希 `72010ae39d65611b034257a57c70f0d27edd3cf83a4bed71c69a5d42a4092de1`。样本、URL 和 Crew 编号均为虚构；不得外推为真实 NASA 页面准确率。
 
 ## 复现、修复与评分口径
 
@@ -43,4 +43,4 @@
 
 本抽取器只针对有界英语标题/短摘录中的 `NASA Crew-数字` 任务和有限的发射、对接、落地表述；FOMC 会议/目标利率仍沿用第二轮的限定规则，本轮只为其事实补精确支持片段，没有扩大或重新证明其语气处理。没有通用网页抓取、引语归属、复杂否定作用域、跨句时间线、代词回指、同一任务多次飞行的身份分辨、多语言或开放式阶段/人数抽取能力。现在时 `launches/docks` 若被用于预告而缺少明确计划词，仍可能误判为完成，必须人工审阅。`completed its docking`、`completed a splashdown` 和连续两个实际阶段已在保留集成为已知漏取；更多未见措辞可能出现错误事实，不能凭 0/20 宣称安全放行。
 
-D08 自动抽取和自动消费匹配建议仍不具备放行条件。D09 可在**另行授权**后以 D07 的人工核验数据作为输入进行本地建设，明确禁止自动应用任何 D08 建议；精确引用冻结和人工纠正/恢复的顺序及依赖见 [路线图](ROADMAP.md#daily-digest-15-张里程碑卡2026-09-26-调整)。D10 的自动匹配回放与真实 Shadow 闸门仍需 D08 质量复核。此次没有启动 D09。
+D08 自动抽取和自动消费匹配建议仍不具备放行条件。D09 可在**另行授权**后以 D07 的人工核验数据作为输入进行本地建设，明确禁止自动应用任何 D08 建议；精确引用冻结和人工纠正/恢复的顺序及依赖见 [路线图](../plans/ROADMAP-20261001.md#daily-digest-15-张里程碑卡2026-09-26-调整)。D10 的自动匹配回放与真实 Shadow 闸门仍需 D08 质量复核。此次没有启动 D09。

@@ -2,14 +2,14 @@
 
 - Status: VERIFICATION-SNAPSHOT / OFFLINE / D08 CONTINUE。
 - Scope: S2-01 固定 15 组/30 条官方来源的已核对摘要、7 组预留合成样例，以及原七期模拟的 21 条未经过人工 `selected` 筛选的候选。
-- Authority: `npm run digest:eval-offline` 的规则 `d08-r1`、[匿名输入字段](digest-v3-d08-source-fields.json)、[双轴人工答案](digest-v3-d08-oracle.json)、[预留样例](digest-v3-d08-holdout.json)和当前源码。本机逐条完整理由、匿名 Evidence ID、输入投影和 JSON 结果位于运行时输出的被忽略目录 `dist-shadow/d08-offline-*`。
+- Authority: `npm run digest:eval-offline` 的规则 `d08-r1`、[匿名输入字段](../../digest-v3-d08-source-fields.json)、[双轴人工答案](../../digest-v3-d08-oracle.json)、[预留样例](../../digest-v3-d08-holdout.json)和当前源码。本机逐条完整理由、匿名 Evidence ID、输入投影和 JSON 结果位于运行时输出的被忽略目录 `dist-shadow/d08-offline-*`。
 - Do not use for: 声称从网页自动抽取事件身份与事实、真实 Work/Shadow、生产、D09、跨日改写转载已解决、A01 历史截点或邮件收件箱验收。
 
 ## 合同与输入隔离
 
-事件关系与事实/指标变化分别评分。不同 FOMC 会议必须是不同 Event；相同目标利率只允许在相同 `factKey/scope/unit` 下判指标无变化。A01 的两页为同一发布物/任务背景，但事实互相冲突，保留 `same_event + unknown`，汇总为 `ambiguous`，不允许用候选 Event ID 自动挂接。[合同](DAILY-DIGEST-V3-CORE-CONTRACT.md#d08-第一轮离线匹配与双轴变化合同2026-09-27)及 [A01 复核](DAILY-DIGEST-V3-S2-01-CASES-20260924.md#a01-来源冲突复核2026-09-27)记录判别边界。
+事件关系与事实/指标变化分别评分。不同 FOMC 会议必须是不同 Event；相同目标利率只允许在相同 `factKey/scope/unit` 下判指标无变化。A01 的两页为同一发布物/任务背景，但事实互相冲突，保留 `same_event + unknown`，汇总为 `ambiguous`，不允许用候选 Event ID 自动挂接。[合同](../../DAILY-DIGEST-V3-CORE-CONTRACT.md#d08-第一轮离线匹配与双轴变化合同2026-09-27)及 [A01 复核](DAILY-DIGEST-V3-S2-01-CASES-20260924.md#a01-来源冲突复核2026-09-27)记录判别边界。
 
-固定案例的 `sourceFact` 与 URL/发布时间来自 [S2-01 快照](daily-digest-v3-s2-01-cases.json)，结构化事件键、文档身份和事实由人工从有界来源摘要抽取，不是模型或规则自行发现。评测程序只将匿名化来源投影传给[匹配器](../server/digest-v3-offline-match.ts)；五类标准答案、双轴答案、`selected`、预期关系、案例编号及原模拟 `eventKey` 留在评分侧。投影字段和未知字段拒绝有测试覆盖，输出包含匿名 Evidence ID、候选 Event ID 与理由。七期候选的原来源 ID/URL 路径含分类词，投影时改为不可读哈希 URL；保留同一来源 ID 的相等性，不传入语义标签。
+固定案例的 `sourceFact` 与 URL/发布时间来自 [S2-01 快照](../../daily-digest-v3-s2-01-cases.json)，结构化事件键、文档身份和事实由人工从有界来源摘要抽取，不是模型或规则自行发现。评测程序只将匿名化来源投影传给[匹配器](../../../server/digest-v3-offline-match.ts)；五类标准答案、双轴答案、`selected`、预期关系、案例编号及原模拟 `eventKey` 留在评分侧。投影字段和未知字段拒绝有测试覆盖，输出包含匿名 Evidence ID、候选 Event ID 与理由。七期候选的原来源 ID/URL 路径含分类词，投影时改为不可读哈希 URL；保留同一来源 ID 的相等性，不传入语义标签。
 
 本轮仅计算建议，未读取或修改 `activity.db`，未创建/合并 Event、Revision、Evidence、Analysis，没有进入 Work、D13、D14/D15、调度或正式日报。英文/西语 A01 网页仅用于人工复核冲突，不属于离线匹配运行时输入抓取。
 
@@ -51,7 +51,7 @@
 
 7 组预留合成样例（两次会议同值、同任务进展、不同任务同状态、冲突译文、相同译文、同会异文档、同对象不同飞行）在第一次评测前固定，未依据它们的错误调整规则：事件 **7/7**、事实 **7/7**。此样例组在本轮开发中已被查看，不能代替后续独立盲测。15 组固定与 7 组预留均交换 A/B 回放，事件、事实、类别、候选 ID、引用和理由保持相同。
 
-七期模拟直接投影[原始候选](../scripts/digest-seven-day-simulation.ts)，不用人工 `selected` 生成匹配建议。同一期改变输入顺序后逐条结果一致。共 **21** 条：`new_event` **12**、`progress` **1**、`duplicate` **5**、`no_material_change` **1**、`ambiguous` **1**、截点后待下一期 **1**。其中 13 条 `new_event/progress` 与人工入选数 13 相符，但不能把这一合成吻合当真实新闻召回。5 条旧闻复用同一匿名来源 ID，另 1 条同文换 ID 只判“同事件无变化”。D5 的 B 改写转载没有可核验的原始发布物关系和等价事实，仍为 **ambiguous**；它是人工排除的 8 条之一，不能计作自动去重成功。D6 截点后的 E 来源延到 D7 才成为候选。逐条建议、目标比较来源和人工答案见本机 `result.json` / `report.md`。
+七期模拟直接投影[原始候选](../../../scripts/digest-seven-day-simulation.ts)，不用人工 `selected` 生成匹配建议。同一期改变输入顺序后逐条结果一致。共 **21** 条：`new_event` **12**、`progress` **1**、`duplicate` **5**、`no_material_change` **1**、`ambiguous` **1**、截点后待下一期 **1**。其中 13 条 `new_event/progress` 与人工入选数 13 相符，但不能把这一合成吻合当真实新闻召回。5 条旧闻复用同一匿名来源 ID，另 1 条同文换 ID 只判“同事件无变化”。D5 的 B 改写转载没有可核验的原始发布物关系和等价事实，仍为 **ambiguous**；它是人工排除的 8 条之一，不能计作自动去重成功。D6 截点后的 E 来源延到 D7 才成为候选。逐条建议、目标比较来源和人工答案见本机 `result.json` / `report.md`。
 
 ## 复核指纹与下一步判断
 

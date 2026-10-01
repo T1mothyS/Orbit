@@ -8,7 +8,7 @@
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
 - Do not use for: 推断当前生产部署、Work 配置或邮件收件箱状态。
 
-本文档前半部分描述当前源码中的 OAuth/MCP、来源隔离、内容与媒体合同；末尾单独保存历史运行快照。当前增量验证见[格式与安全修复快照](FORMAT-SECURITY-REPAIR-20260919.md)，不证明生产版本或 Work 任务配置。历史中既有 Shadow，也有单次受控正式发布，它们不能互相替代，也不能证明定时任务已切换。
+本文档前半部分描述当前源码中的 OAuth/MCP、来源隔离、内容与媒体合同；末尾单独保存历史运行快照。当前增量验证见[格式与安全修复快照](archive/engineering/FORMAT-SECURITY-REPAIR-20260919.md)，不证明生产版本或 Work 任务配置。历史中既有 Shadow，也有单次受控正式发布，它们不能互相替代，也不能证明定时任务已切换。
 
 这里的“云端”指 ChatGPT Work 的后台任务运行环境；它不能直接读取本机 `日报-v2` worktree 或本地令牌。本地 Skill/插件文件不是 Work 资源安装证明。运行模式须核对实际任务中保存的提示、显式 `dry_run` 参数、版本和频率，不能从此文档推断。
 
@@ -125,8 +125,6 @@ dry-run 返回 `VALIDATED_NOT_PUBLISHED` 才能进行同正文正式发布。兼
 
 `daily_report.read_inputs` 返回 `markdownContract`；版本及字段以 `server/daily-digest-contract.ts` 为准。调用端应使用完整合成模板和字段约束，不能只写“使用 daily-digest.v1”。解析失败返回 `INVALID_DIGEST_FORMAT`、`validationIssues` 和合同版本，发生于媒体处理、日报入库和邮件入队之前。输入完整性仍单独检查 Calendar、Mail、市场与观察名单等要求。排障步骤见 [Cloud 排障手册](CLOUD-DIGEST-RECOVERY.md)。
 
-<a id="cloud-run-history"></a>
-
 ## Daily Digest V2.5：隔离新版合同
 
 本节适用于 `daily-digest.v2`，产品阶段为 V2.5，应用版本独立维护。2026-09-21 本地实现基线为 `0.31.0-260921.1951`；真实 R2 测试成功不代表隔离 Work 的逐条新闻配图、跨日期运行、生产切换或收件箱验收。上文 V1 与外部 Local Prompt 保持兼容，不应将新版字段或降级规则套到 V1。
@@ -184,14 +182,14 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 - 源站在服务器侧不可达时，操作者可提供私有 `sourceFile` 与原始 `sourceSha256`，仅允许绑定一个精确图片URL且具有完整署名的规则。读取前验证普通文件、大小和SHA-256，再执行相同解码/缩放/R2流程；Work不能提交本机路径。回执 `sourceTransport=audited_copy` 与 `network` 分开，审核副本成功不算服务器直连源站成功。原始URL及哈希随产物保留，私有路径不进入产物。回退旧代码前先禁用新增规则，避免旧实现忽略精确限制。
 
 - 服务端许可文件为 JSON 数组：`[{"pageHost":"publisher.example.com","imageHosts":["images.example.com"],"policy":"OWNED_OPEN","licenseRef":"审核证据或授权说明"}]`。支持 `OWNED_OPEN`、`LICENSED`、`EXTERNAL_ALLOWED`，只由操作者配置；Work 的许可声明不能授权。未知或受限来源不抓取，转分类图。需要公开的新闻图片才能进入此流程，私人邮件图片、附件和敏感预览不得加入许可名单。
-- 逐图许可的日期证据另存审核快照；[2026-09-23 NASA Earth Observatory 单图审核](DAILY-DIGEST-MEDIA-SOURCE-AUDIT-20260923.md)仅限精确文章和图片，不扩大为整域许可或正式发布；其隔离下载、处理与引用结果见 [S1-R3b 技术验收](DAILY-DIGEST-MEDIA-R3B-VERIFICATION-20260923.md)。
+- 逐图许可的日期证据另存审核快照；[2026-09-23 NASA Earth Observatory 单图审核](archive/digest/DAILY-DIGEST-MEDIA-SOURCE-AUDIT-20260923.md)仅限精确文章和图片，不扩大为整域许可或正式发布；其隔离下载、处理与引用结果见 [S1-R3b 技术验收](archive/digest/DAILY-DIGEST-MEDIA-R3B-VERIFICATION-20260923.md)。
 - 复用现有下载大小/超时、SSRF、签名验证和内容哈希；新增 HTTPS DNS 地址固定与每次重定向许可校验。JPEG/PNG/WebP 解码，20MP 像素上限、最小 80×80、缩放至最多 1200×900，去元数据并转 JPEG；分类图由程序生成 PNG。未知图片/403/404/超时等进入分类图；R2 不可用则纯文字。
 - 图片内容按哈希去重；每篇文章的媒体 ID、来源、许可、账号产物引用独立保留。`2026-09-26.1` 起服务端对缺少真实图的新闻自动生成类别图形；`2026-09-28.1` 起明确将其标为“原创栏目占位图，非新闻现场图片”，回执 `imageCoverage` 分别记录总数、真实图、贴题插画、类别占位图与缺图。类别模板只提供占位，不能作为贴题图片验收；`illustration` 只用于确实围绕具体新闻制作且可辨识的插画。原有冻结 Shadow 中的图片与数据不改写，旧图片在新版阅读器中的署名会按真实属性显示为占位图。R2 失败仍保留文字并计为缺图。日报列表封面、标题和短摘要取同一条有图的重点新闻；若没有可展示新闻图，列表不预留空白图片栏。`2026-09-27.1` 起详情页把同一张头条图作为文章开头的首屏大图，标题放在图下，正文不重复展示该图；正常媒体不可用时如实展示无图状态。
-- 本地 `0.36.2` 修复生成插画作为列表、详情和邮件封面时的比例：这类 3:1 插画完整呈现，真实照片仍采用原有封面裁切；是否在隔离或正式服务生效须按实际部署版本核对。[9/28 代表性图文评审](DAILY-DIGEST-REPRESENTATIVE-REVIEW-20260928.md)记录了本地候选与未部署隔离服务的差异，不据本地截图宣布线上阅读通过。
+- 本地 `0.36.2` 修复生成插画作为列表、详情和邮件封面时的比例：这类 3:1 插画完整呈现，真实照片仍采用原有封面裁切；是否在隔离或正式服务生效须按实际部署版本核对。[9/28 代表性图文评审](archive/digest/DAILY-DIGEST-REPRESENTATIVE-REVIEW-20260928.md)记录了本地候选与未部署隔离服务的差异，不据本地截图宣布线上阅读通过。
 - 新版详情和邮件的展示栏目名由新闻有无确定为“今日重点新闻”或“今日情报简报”，日期单列；Shadow 列表最新卡片统一标为“最新日报 · 新版隔离预览”，避免空新闻早版被标成重点新闻。历史隔离稿的原始 `digest.title` 仍留在不可变产物中供核对，展示不再重复版本、日期和验收字样。`2026-09-27.1` 起新闻段落和 Watchlist 用编号角标跳转到文末“来源”；同一证据复用编号，图片专用证据从新闻来源列表排除并在图片署名中保留。文末逐项显示来源名称、原始发布时间或“时间未知”、原文链接；正文不显示“证据已核对”“发布时间未提供”。旧 renderer 保留原有标题和来源语义。
 - 测试使用专用 Bucket 和受限对象令牌；生产使用自定义域名，拒绝 `r2.dev`。Shadow 真实图和来源图标写 `tmp/<日报日期>/<哈希文件名>`，旧产物仍可引用原 `tmp/<哈希文件名>`；生产真实图写 `published/`，原创插画写 `fallback/`。同一日期的相同字节共用临时对象，不同日期使用不同键，避免后一期引用继承前一期的到期时间。Bucket 生命周期只对 `tmp/` 保留 7 天，不对 `published/` 或 `fallback/` 设置到期删除；新临时对象使用 `Cache-Control: no-store`，长期图片仍使用不可变缓存。超过 7 天的 Shadow 可能失去在线图片，其私有本地备份仍保留。R2 自定义域的 CDN 清除须按单个精确 URL 进行，删除源对象或收到清除回执后还应核对实际公共读回；`r2.dev` 不支持 CDN 缓存验收。
 - 每个上传对象先保存独立本地镜像，正式/Shadow 产物存对象键与 SHA-256；账号加密备份按哈希文件名去重附带媒体字节，全站备份沿现有媒体目录收集。仅有 URL 不能算完整备份。恢复账号备份先校验文件名、大小与哈希；R2 对象恢复使用 `restoreDigestObjects`，先校验整批键、文件名、字节数、MIME 与哈希，再按唯一键上传并下载核验；旧 `tmp/<哈希文件名>` 继续可恢复。不自动重发邮件，也不自动清除 CDN 缓存。
-- 不自动删除内容寻址的本地镜像，避免共享图片引用被误删。临时本地镜像和不再使用的分类图可能累积。需要下架时先冻结后续发布、核对所有账号/历史产物的共享引用，保留私有审计备份；再同步处理正文引用、R2 对象以及自定义域名 CDN 缓存。[S1-R4 测试对象验收](DAILY-DIGEST-MEDIA-R4-RETIREMENT-VERIFICATION-20260923.md)是 2026-09-23 的对象删除与恢复快照，当时测试桶没有 CDN 自定义域。2026-09-27 测试桶已绑定独立自定义域，两个合成长期对象完成缓存命中、源站删除、单 URL 精确清除和读回 404 的隔离验收；临时对象 `no-store` 与删除后立即 404 也已实测。此验收不覆盖真实媒体下架，不能把仅删对象报告为完成下架。
+- 不自动删除内容寻址的本地镜像，避免共享图片引用被误删。临时本地镜像和不再使用的分类图可能累积。需要下架时先冻结后续发布、核对所有账号/历史产物的共享引用，保留私有审计备份；再同步处理正文引用、R2 对象以及自定义域名 CDN 缓存。[S1-R4 测试对象验收](archive/digest/DAILY-DIGEST-MEDIA-R4-RETIREMENT-VERIFICATION-20260923.md)是 2026-09-23 的对象删除与恢复快照，当时测试桶没有 CDN 自定义域。2026-09-27 测试桶已绑定独立自定义域，两个合成长期对象完成缓存命中、源站删除、单 URL 精确清除和读回 404 的隔离验收；临时对象 `no-store` 与删除后立即 404 也已实测。此验收不覆盖真实媒体下架，不能把仅删对象报告为完成下架。
 - 真实媒体下架当前没有可审计的引用替换入口。9/27 只读核对发现同一对象可被多份冻结 Shadow 产物引用；删除 R2 对象会让这些页面继续输出失效 URL。安全下架的实施闸门是：先完整列出目标键在相关账号和历史产物中的引用，独立备份并逐字节核对；再提供可恢复、可审计的列表和详情显示降级，使被下架 URL 不再从阅读接口输出；最后才删除目标对象、按精确 URL 清除 CDN，并实测目标 404、无关图片继续 200。恢复演练还需验证字节哈希和页面引用。上述引用降级机制未实现前，不对真实图片执行删除演练。
 
 ### 隔离 Work 执行提示与验收
@@ -210,9 +208,9 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 
 先执行普通日、零重大新闻、大新闻、数据修订、来源失败、个人输入失败、图片全部失败这七类固定样本。合成样本只能证明工程分支。2026-09-22、09-23、09-26 三个真实日期已足以证明当前持续缺图，不等待更多日期才修复。改进后至少在两个不同真实日期进行真实 Work Shadow，逐条统计新闻总数、真实相关图片数、其他明确标注的视觉素材数和缺图数，并与旧版对照遗漏、重复、证据、耗时及 OAuth 跨期续用；另用固定样本验证图片失败时的明确降级。记录 Work 实际 Prompt、工具权限和合同版本。额外七日观察用于发现长期波动，不作为修复缺图或完成本轮定向验收的硬性前置。真实桌面/手机邮箱测试需单独授权测试发信，邮件浏览器预览不等于收件箱显示。
 
-2026-09-27 验收补充：以上跨日期运行证明集成，不单凭次数判定内容合格。内容评审与本地/生产分层放行统一见 [路线图](ROADMAP.md#d02-内容质量闸门2026-09-27-审计修订) 和 [测试矩阵](TEST-MATRIX.md#daily-digest-内容与运行验收分层)。当前 `validate_v2` 只做结构、引用及输入覆盖等检查，不联网核实事实，也未阻断已知发表时间晚于截点或不同 ID 的同内容新闻；空新闻通过不能证明检索充分。时间/重复诊断和加粗降为提示是后续实现候选，本次没有改变 schema、工具、运行中 Prompt 或现行加粗硬校验。
+2026-09-27 验收补充：以上跨日期运行证明集成，不单凭次数判定内容合格。内容评审与本地/生产分层放行统一见 [路线图](archive/plans/ROADMAP-20261001.md#d02-内容质量闸门2026-09-27-审计修订) 和 [测试矩阵](archive/engineering/TEST-MATRIX-20261001.md#daily-digest-内容与运行验收分层)。当前 `validate_v2` 只做结构、引用及输入覆盖等检查，不联网核实事实，也未阻断已知发表时间晚于截点或不同 ID 的同内容新闻；空新闻通过不能证明检索充分。时间/重复诊断和加粗降为提示是后续实现候选，本次没有改变 schema、工具、运行中 Prompt 或现行加粗硬校验。
 
-2026-09-27 后续 D02 本地增量：上述“未阻断时间/重复”的描述是前次审计时点结论；新 `2026-09-27.2` 已实现已知来源时间和相同内容的最小硬检查，以及空新闻审阅提示。固定历史回放和缺证边界见 [D02 定向回放快照](DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)。本次没有改 Work 任务、重新生成真实日报、部署或调整加粗硬校验；`reviewIssues` 不能代替真实候选记录。
+2026-09-27 后续 D02 本地增量：上述“未阻断时间/重复”的描述是前次审计时点结论；新 `2026-09-27.2` 已实现已知来源时间和相同内容的最小硬检查，以及空新闻审阅提示。固定历史回放和缺证边界见 [D02 定向回放快照](archive/digest/DAILY-DIGEST-D02-TARGETED-REPLAY-20260927.md)。本次没有改 Work 任务、重新生成真实日报、部署或调整加粗硬校验；`reviewIssues` 不能代替真实候选记录。
 
 2026-09-27 晚间隔离定时验收规则：每次按 Asia/Shanghai 的真实日报日期与实际运行时间确定目标截点，18:00 定时运行的截点不得早于 18:00；迟到或补跑须写实际时间。已有 Shadow 只有同时满足日期、目标截点、合同与 `generationVersion`、公开检索范围和成功个人输入覆盖、逐条来源与图片许可证据，才能用于本轮内容结论。上午早版不能替代晚间检查。自前一内容截点至本轮截点必须留检索时段、候选来源、纳入或排除理由及失败项；未检索或关键来源失败不得写“无重要新闻”。若发现重要新增或遗漏，仅保存同日新 Shadow 修订并保留旧稿；同日修订不增加真实日期数。没有合格新增时可沿用原稿，但必须保存增量检查证据；缺目标截点或关键证据时标受限，不宣布内容验收通过。`read_inputs_v2` 会创建隔离输入快照与 runId，不称为严格零写入。D02 校验可提示空新闻人工复核，不能代替上述来源研究。隔离服务从已运行的 `0.31.14-260927.1103` 单独切到 `0.31.18-260927.1825`，仅纳入 D02 校验差异；未启用 V3/D13 新写入路由。该规则只作用于隔离 Work/Shadow，不改变正式 16:40 Work、主站生产、发布或发信。
 
@@ -234,69 +232,8 @@ Worker 只代下载字节，主应用仍执行签名检查、安全SVG检查、�
 
 回滚：移除应用的两个relay配置恢复原直抓；保留已有发布快照、R2对象和备份，不自动重发。Worker可独立回退版本或停止调用，既有图片URL不依赖Worker继续运行。运行结果只追加到本机时点记录，不将模块上线等同隔离Work验收通过。
 
+<a id="cloud-run-history"></a>
+
 ## 历史运行快照（不作为当前状态）
 
-以下内容保留各次运行当时的证据边界。“当前”“尚未”“本轮”均指对应历史时点；2026-09-14 前段的“未正式发布”后来有同日单次受控发布记录，不再用于推断现状。生产、实际 Prompt、定时切换、SMTP 和收件箱须分别现场核对。
-
-### 第二阶段第一轮状态（2026-09-13）
-
-- 本地已实现并测试 `media_prepare_start`、`media_prepare`、`media_prepare_status`、批次归属/生命周期、候选 fallback、服务器受控抓取和严格批次发布检查；生产基线为 commit `6767ae8`、版本 `0.20.4-260913.2139`。
-- 第一轮真实 Work 负向矩阵已完成：批次 `19f8cb8e-6a5c-433c-a498-1e8bc6af2f26` 处理 12 个 asset，`PREPARING`、`hostedCount=1`、`failedCount=11`、`totalBytes=30320`。`gstatic.com` 的 WebP 成功托管；HTTP 403/404、HTML/错误 MIME、SSRF/private IP 均由服务器归因。`upload.wikimedia.org` 在阿里云服务器侧连接超时，属于服务器到源站的网络不可达，不是 Work 没有提交 URL。
-- 正向真实 Work 复核已通过：新批次 `e61b22b4-2bf8-40f5-a433-73ebf7d9120d`、runId `cloud-media-1cd4ba3b-7a9a-4dab-8011-8c8063497202`，状态 `READY`，4/4 托管、0 失败、总计 `134598` bytes。`hero-fallback` 先收到 HTTP 404，再使用第二候选成功；PNG、JPEG、WebP 均返回服务器生成的 MIME、字节数、SHA-256 和 `hostedUrl`。Work 的 `media_prepare` 与 `media_prepare_status` 明细完全一致。
-- 服务器独立复核确认 4 个文件真实存在于 `data/daily-report-media`，磁盘 hash/大小与数据库一致，4 个 `hostedUrl` 均返回 HTTP 200 且 MIME/长度匹配；本轮发生过一次 OAuth 重新授权，未观察到人工审批。
-- 现有 Local V2 与 Cloud 兼容发布路径保留；`CLOUD_DAILY_REPORT_MEDIA_BATCH_REQUIRED` 未开启，正式 Work 定时任务未改写，relay 未部署。本轮未调用 publish、未入队、未发邮件。
-
-### 第三阶段：内容完整性优先与媒体降级（2026-09-14）
-
-- 主项目 `main` 已建立本地 checkpoint `9c039d5b1acc6ab92a6ab1fd75335b7e0bf956ae`，版本为 `0.20.5-260914.0808`；Cloud 兼容路径保留 Calendar 日程、Mail Briefing、金融与市场、观察名单和新闻结构硬闸门。每个 Calendar schedule 的标题必须出现在 `atAGlance`，避免日程在云端生成时被静默遗漏。
-- 未提供 `mediaBatchId` 的 Cloud 兼容路径改为逐图 Best Effort：失败图片/来源图标降级为空图片位，并返回 `candidateImageCount`、`mediaFailureCount` 和脱敏 `mediaFailures`；严格媒体批次路径仍保持 READY、文件归属、完整媒体和失败即阻断。生产 `CLOUD_DAILY_REPORT_MEDIA_BATCH_REQUIRED` 未开启，兼容路径保持 `false`，未改变批次语义。
-- V2 `main` checkpoint 为 `9dcee55`，插件清单版本为 `0.1.5`；源 Skill、插件副本、Prompt 和确定性渲染器已同步。V2 本地默认严格媒体规则不变，只有 Cloud 兼容路径放宽图片硬闸门。
-- 本地验证通过：主项目 Cloud 定向测试 `16/16`、全量 `npm test` `173/173`、`npm run typecheck`、临时 HTTPS `ELECTRON_APP_URL` 的 `npm run build`；V2 `python -m pytest -q` `73 passed`。构建保留既有主 JavaScript chunk 超过 500 kB 的警告。
-- 生产按 `DEPLOY.md §8.1` 使用本地预构建归档 `workspace-20260914-0808-cloud-best-effort.tar.gz`，217 个条目，SHA-256 `868371de4291ec615f08c73fb05d85463824c958d867489033405ba4d4fc1c73`；最终成功发布 ID 为 `workspace-20260914-0830-cloud-best-effort`。两次早期收尾校验假失败分别自动回滚，失败现场/备份保留，未丢失 `data`、`.env` 或 `node_modules`；服务器未执行安装、测试或构建。
-- 最终公网核验通过：`/api/health`、首页、`/today`、OAuth 保护资源元数据均为 HTTP `200`；实际静态 JS 为 `1,256,211` bytes、`application/javascript`，SHA-256 `4871FABE3B8884CDB914B84D6385E2DBBA0073F835F194D4EC4953E2B96063B2` 与本地构建一致；无凭据 `POST /mcp` 返回预期 `401`。
-- 正式 Work 任务 `日报 V2 Cloud Shadow` 仍保持每日 `16:40`、`Asia/Shanghai` 和 `dry_run=true` 边界；本轮没有调用云端正式 `publish`、没有入邮件队列或发送邮件，也没有把本地插件文件路径冒充为 Work 侧已安装证明。
-
-### 既有 Work 运行证据（2026-09-09）
-
-- 生产候选服务：`gotimothy.online` 当前发布标识为 `workspace-20260909-cloud-mcp-11`，基于 Calendar 候选分支的 `fb77c8a`；公网 health、OAuth metadata、保护资源和未授权 `/mcp` 已完成状态检查。
-- Work 连接：已完成 OAuth 授权并确认 Daily Report Cloud 工具可调用；脱敏 Cloud Context 已通过设置页导入，云端显示版本 `v1`。本地临时导出文件已删除，原始本地 Context 仍是编辑源。
-- Shadow：2026-09-09 的 Calendar、Mail、Context、History 和公开新闻输入均返回可用；首轮缺少固定标题被服务端拒绝，修正为逐字包含 `# Daily Digest`、`<!-- daily-digest.v1 -->`、`## Today at a Glance` 后，`daily_report.publish(dry_run=true)` 返回 `VALIDATED_NOT_PUBLISHED`，媒体数量为 `0`，未写入日报或邮件队列。
-- Work 调度：已创建并启用 `日报 V2 Cloud Shadow`，任务编辑器显示每天 `16:40`，提示词固定使用 `Asia/Shanghai`，并明确禁止 `dry_run=false`、正式发布、发邮件和修改本地链路。
-- 并行边界：本地 `v2-chatgpt` 任务和本地采集/发布链路未修改，生产服务保留部署前备份和 rollback 目录。
-
-### 当次未完成事项（2026-09-14，单次正式发布之前）
-
-- 尚未完成至少 3 个日期的连续 shadow，也未覆盖 Calendar 无数据/不可用、邮箱部分失败或不可用和公开新闻源异常的对照测试。
-- 没有执行云端正式 `PUBLISHED`，也没有验证通知队列、SMTP/provider 或收件箱最终到达；本轮公网 200、`QUEUED` 或服务健康均不替代这些分层验收。
-- 尚未证明当前 Work 侧已安装并执行本地 `cloud_digest.py` 等打包资源；当前任务仍按 Shadow 处理，不把本地插件同步或一次 `VALIDATED_NOT_PUBLISHED` 当作迁移完成。
-- 已证明 Work 能把公开图片 URL 交给服务器受控抓取和托管；尚未证明所有新闻源在阿里云出口均可达，Wikimedia 本轮即为连接超时。正式日报仍需在实际新闻候选集合上做来源分布和成功率验收。
-- 尚未验证正式定时运行中的上传/发布是否会被工作区策略暂停等待人工审批；本轮仅验证了 Work 对话中的 OAuth 重新授权路径。
-- 暂存媒体的自动 GC 尚未实现；过期的未引用批次仍有短期文件积累风险。
-- 没有暂停、改写或删除现有 `v2-chatgpt` 本地任务。
-- 没有把本地公开资料采集器强行改成云端 prompt；Work 运行时需要按 Skill 使用云端网络重新核实新闻、市场和图片。
-
-切换前按 V2 分支的 `skills/daily-report-cloud/references/cutover.md` 执行至少三个日期的 shadow、故障矩阵、通知分层和回滚演练。
-
-### 第三阶段单次 Work 排障记录（2026-09-14）
-
-- 第一轮部署后单次 Shadow 已实际到达生产 MCP：`read_inputs`、Work 公开新闻核实和 Calendar/Mail/Context/History/Market/Watchlist 输入均返回可用；输入显示有 `3` 条未读邮件。`daily_report.publish(dry_run=true)` 在媒体处理前返回 `INVALID_ARGUMENT`，错误为正文无法解析为 `daily-digest.v1`，因此没有 `contentHash`、媒体完成统计或邮件状态。这不是媒体降级路径失败。
-- 根因范围已收窄：当前正式 Work 任务仍保存旧版且相互冲突的 Markdown 模板，要求空置 `Worth Your Time`，但没有把 `Mail Briefing`、`Mail Tasks`、`金融与市场`、`观察名单` 和 Calendar 标题覆盖写成同一份可执行结构；该模板与已部署的 Cloud 内容完整性 contract 不一致。服务端当前返回的是解析阶段的通用错误，未暴露具体缺失行，因此不能把某一个字段缺失写成已确认的唯一原因。
-- 第二轮使用单次消息明确补齐当前 parser 顺序和 Mail/Market/Watchlist/Calendar 要求，并只要求 `dry_run=true`；但 Work 在调用生产 MCP 前提示 `Daily Report Cloud` OAuth 连接已过期，未执行任何新的 `read_inputs` 或 `publish`。重连入口已打开到账号登录页；本次未代填账号、密码或授权。
-- 结论：生产部署与本地兼容媒体实现仍有效；当前业务复测阻塞在 Work OAuth 会话，正式 Work 定时任务没有修改，也没有调用 `dry_run=false`、入队或发信。完成登录后应先复跑同一单次结构验证，再根据 `VALIDATED_NOT_PUBLISHED` 决定是否进入单次正式发布验收。
-
-### 第三阶段受控正式发布记录（2026-09-14）
-
-- 重连后同一单次结构验证返回 `VALIDATED_NOT_PUBLISHED`：Calendar、Mail、Context、History、Public News 均 OK；5 个图片候选中 4 个成功、1 个 HTTP 404，`mediaFailureCount=1`，失败未阻断正文校验。
-- 随后对同一日期、同一正文执行唯一一次 `dry_run=false`，生产回执为 `status=PUBLISHED`、`source=cloud`、`reportStatus=CREATED`、`deliveryStatus=RECEIVED`，`contentHash=f0d226a11d6dcb435451bca8f1f761acc2a5643c9d73792947dfab8d8cc7d199`，媒体候选 5、成功 4、失败 1（`FETCH_ERROR`）。
-- Work 回执的邮件状态为 `QUEUED`；随后生产日志确认 SMTP `acceptedCount=1`、`rejectedCount=0`、`pendingCount=0` 并记录 `notification_sent`。这证明 SMTP/provider 接受，不证明目标收件箱最终到达；本轮未独立使用 IMAP 读取收件箱。
-- 本次发布是当前会话中的单次受控操作；正式 `16:40` Work 任务、本地日报任务和 V2 自动化均未修改，未调用 Media Prepare，未新增第二次发布。
-
-### Markdown 合同与解析诊断交付记录（contract 2026-09-14.2）
-
-`daily_report.read_inputs` 现在返回 `markdownContract`，包含与解析器验证过的完整合成示例、精确字段顺序和长度限制。运行端应使用该合同替换示例资料，不能把完整模板简写成“使用 daily-digest.v1”。金融与市场和观察名单是 `Category Digest` 下的三级分类标题。
-
-解析失败保持 `isError=true`，同时返回 `structuredContent.code=INVALID_DIGEST_FORMAT`、`validationIssues[{path,expected}]` 和合同版本。普通文本回执也包含同一定位信息，因此只读取 text 的客户端仍能修正。日志事件 `cloud_digest_parse_failed` 只记录固定字段路径与约束，不记录 Markdown、邮件、URL 或凭据。错误出现在媒体处理、入库和邮件排队之前。
-
-`parseDailyDigestMarkdown` 仍保持失败返回 null 的兼容接口；发布验证抛出带定位信息的错误。超长或过短的编号概览现在明确拒绝，避免静默删掉包含日程的条目后仍通过。正文完整性与既有媒体策略保持不变。
-
-验证包括有效模板、标题/字段/长度错误、隐私回执、MCP 错误结构和跨项目模板一致性；隔离集成测试不能证明生产 Work 已使用新合同。生产升级后仍需真实 dry-run，OAuth 需要跨 access token 过期后的真实刷新证据，正式发布与收件箱分别验收。
+逐次原始记录已归档到 [历史运行记录](archive/digest/CLOUD-RUN-HISTORY-20260909-20260914.md)。当前合同只维护上述章节，任务状态见 [TASKS](TASKS.md)。

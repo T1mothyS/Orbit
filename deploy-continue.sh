@@ -3,6 +3,12 @@
 
 set -e
 
+# 日常 2 GB 升级使用 docs/RELEASE.md 与 DEPLOY.md §8.1 的本地预构建路径。
+if [ "${1:-}" != "--server-install" ]; then
+  printf '%s\n' '拒绝执行旧服务器安装流程；仅首次安装/明确资源例外使用 --server-install，且须已有对应授权。' >&2
+  exit 64
+fi
+
 cd ~/smart-schedule-agent
 
 node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major < 22 || (major === 22 && minor < 12)) { console.error("需要 Node.js 22.12.0 或更高版本，当前为 " + process.versions.node); process.exit(1); }'

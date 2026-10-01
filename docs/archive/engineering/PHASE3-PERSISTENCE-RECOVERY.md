@@ -61,7 +61,7 @@ AI 输入仍只生成待确认草稿。已确认操作按账号和稳定 plan/im
 npx tsx --test server/persistence.test.ts server/persistence-crash.test.ts server/phase3-api.test.ts
 ```
 
-请在无真实配置/数据的源码副本执行测试与构建。测试自行创建系统临时目录；crash fixture 只允许带合成标记的临时目录。浏览器使用合成 API，不连接真实后端；400 响应是刻意注入的错误场景。浏览器结果见 [JSON](baselines/browser-phase3-2026-09-15.json)。
+请在无真实配置/数据的源码副本执行测试与构建。测试自行创建系统临时目录；crash fixture 只允许带合成标记的临时目录。浏览器使用合成 API，不连接真实后端；400 响应是刻意注入的错误场景。浏览器结果见 [JSON](../../baselines/browser-phase3-2026-09-15.json)。
 
 ## 未验证与残余风险
 

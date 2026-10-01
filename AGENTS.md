@@ -68,7 +68,9 @@ Orbit 是面向个人和小规模使用的日程、周期事务、提醒、AI �
 
 ## 6. 本地和 CI 验证
 
-常规提交前至少运行：
+代码、依赖、构建或执行入口变更提交前至少运行一轮以下检查；同一基线不为形式重复。纯文档变更可引用同一源码的有效结果并检查链接/diff，正式发布需有冻结目标的构建证据。发布细节见 docs/RELEASE.md。
+
+常规检查：
 
 - npm run typecheck
 - npm test
@@ -124,5 +126,7 @@ Orbit 是面向个人和小规模使用的日程、周期事务、提醒、AI �
 - docs/ARCHITECTURE.md：当前运行时和数据架构。
 - docs/UI-GUIDELINES.md：界面和响应式约束。
 - docs/TEST-MATRIX.md：自动、手工和生产验收层级。
-- docs/ROADMAP.md：阶段顺序和明确不做的事项。
+- route.md：阶段顺序和明确不做的事项；docs/TASKS.md：当前完成/待修复/待验收。
+- CHANGELOG.md：具体版本成果；docs/RELEASE.md：发布流程与效率规则。
+- docs/archive/README.md：历史证据归档及旧路径对照。
 - DEPLOY.md：本地保留的生产部署、备份和回滚 runbook。

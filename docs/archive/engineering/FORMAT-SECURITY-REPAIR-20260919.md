@@ -44,4 +44,4 @@
 - 媒体计数是有界诊断，严格批次质量规则保持不变。旧日报和未变正文重试不补写统计；公开图片是否可用仍依赖实际源站。
 - 回滚代码可独立恢复此 checkpoint；活动库新增可空列可由旧代码忽略。运行中的 Cloud Prompt 是独立配置，其保存/回读及原频率核验记入本机连续记录；代码回滚不自动回滚任务说明。
 
-数据说明见[日历数据人话版](CALENDAR-DATA-GUIDE.md)，媒体字段见[Cloud 合同](CHATGPT-WORK-CLOUD.md#markdown-合同与解析诊断)。
+数据说明见[日历数据人话版](../../CALENDAR-DATA-GUIDE.md)，媒体字段见[Cloud 合同](../../CHATGPT-WORK-CLOUD.md#markdown-合同与解析诊断)。

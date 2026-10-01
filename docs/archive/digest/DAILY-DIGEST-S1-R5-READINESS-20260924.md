@@ -2,7 +2,7 @@
 
 - Status: READINESS-SNAPSHOT；2026-09-24 07:35（Asia/Hong_Kong）。**S1-R5 汇总已完成；第一阶段整体验收未通过，正式上线不是当前候选。**
 - Scope: 汇总截至 2026-09-23 的隔离 Work、测试账号、测试 R2 和本地工程证据；今天尚未计入新的真实 Shadow 日期。运行次数和外部状态是时点快照，不是持续运行保证。
-- Authority: 当前源码、[Cloud 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)、[测试矩阵](TEST-MATRIX.md)、本机连续记录的逐次运行回执，以及下列 S1-R3/R4 专项快照。测试账号的输入原文、凭据、对象令牌和生产数据不纳入本文。
+- Authority: 当前源码、[Cloud 合同](../../CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)、[测试矩阵](../engineering/TEST-MATRIX-20261001.md)、本机连续记录的逐次运行回执，以及下列 S1-R3/R4 专项快照。测试账号的输入原文、凭据、对象令牌和生产数据不纳入本文。
 - Baseline: `codex/daily-digest-v25` / `3c06764`；应用 `package.json` 版本 `0.31.5-260923.2032`。分支尚未 push 或合入 `main`；隔离服务与正式服务分开。
 - Do not use for: 推断生产已切换、七日真实 Shadow 已完成、新闻照片在真实日报中稳定显示、正式邮件或桌面/手机收件箱已验收。
 

@@ -2,7 +2,7 @@
 
 - Status: CASE BASELINE / NO V3 IMPLEMENTATION
 - Scope: 15 组、30 条互不重复的 NASA/JPL 与美联储官方网页，供以后事件匹配和变化判断回放。
-- Authority: [固定案例 JSON](daily-digest-v3-s2-01-cases.json) 中逐条记录的原始 URL、来源发布时间和预期关系；原始机构网页为事实来源。
+- Authority: [固定案例 JSON](../../daily-digest-v3-s2-01-cases.json) 中逐条记录的原始 URL、来源发布时间和预期关系；原始机构网页为事实来源。
 - Update trigger: 原始网页撤回或更正、预期关系被证伪、S2-02 字段合同需要新增明确的判别字段。
 - Do not use for: 宣称事件算法已实现、30 例自动回归已通过、第一阶段已收口或 V3 已上线。
 
@@ -18,7 +18,7 @@
 | 跟踪项无变化 | 3 | U01–U03：只对**联邦基金利率目标区间**判“无变化”；各次会议仍是不同事件，措辞、经济判断或缩表政策需分别判断。 |
 | 易混淆 | 3 | A01–A03：译文更新不同步、同一会议的声明与数周后纪要、同一时刻的决议与预测材料，保留独立证据并标出冲突或文档类型。 |
 
-JSON 对每组提供 `expectedCategory`、`reprintRelation`、`expectedDecision` 与两条来源的 `publishedAt`、精度、URL 和事实摘要。这些字段在 [S2-02 字段与状态合同](DAILY-DIGEST-V3-CORE-CONTRACT.md) 中已有静态映射与人工纠正约束；S2-12 才有资格报告实际算法回放通过率。本案例基线只交付人工核实的输入和期望输出，没有运行 V3 自动分类器。
+JSON 对每组提供 `expectedCategory`、`reprintRelation`、`expectedDecision` 与两条来源的 `publishedAt`、精度、URL 和事实摘要。这些字段在 [S2-02 字段与状态合同](../../DAILY-DIGEST-V3-CORE-CONTRACT.md) 中已有静态映射与人工纠正约束；S2-12 才有资格报告实际算法回放通过率。本案例基线只交付人工核实的输入和期望输出，没有运行 V3 自动分类器。
 
 ## 核对边界
 

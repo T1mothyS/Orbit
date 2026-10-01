@@ -1,2 +1,5 @@
 # Preserve the reviewed standalone tool bytes across Windows/Linux checkouts.
 protected-tools/codex-usage-dashboard-v3-1/index.html -text
+
+# Shell entrypoints must stay LF on Windows and Linux.
+*.sh text eol=lf

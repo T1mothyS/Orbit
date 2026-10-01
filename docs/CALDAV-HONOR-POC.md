@@ -13,7 +13,7 @@
 
 [荣耀配置说明](https://www.honor.com/cn/support/content/zh-cn15893090/)介绍用户名、密码和服务器地址，但页面适用产品有限，不能外推为本机型所有协议行为已确认。[Radicale 官方文档](https://radicale.org/v3.html)提供 WSGI、认证和权限接口；本 POC 使用固定 `3.8.0` 版本。[RFC 5545](https://www.rfc-editor.org/rfc/rfc5545.html)为日历数据语义依据，[RFC 4791](https://www.rfc-editor.org/rfc/rfc4791.html)为 CalDAV 协议依据。
 
-**当前结论：2026-09-18 用户报告支持连接与基本呈现可行，可推进本地手动桥接试点；真实日程及自动同步尚未放行。** 见[真机初测快照](CALDAV-HONOR-POC-TEST-REPORT-20260918.md)和[桥接合同](CALDAV-BRIDGE.md)。修改/删除到手机、只读交互、实际提醒、后台稳定性证据仍待补齐；服务端协议 CRUD 不代替手机验收。当前采用成熟服务加应用内桥接，避免自行承担协议栈。
+**当前结论：2026-09-18 用户报告支持连接与基本呈现可行，可推进本地手动桥接试点；真实日程及自动同步尚未放行。** 见[真机初测快照](archive/caldav/CALDAV-HONOR-POC-TEST-REPORT-20260918.md)和[桥接合同](CALDAV-BRIDGE.md)。修改/删除到手机、只读交互、实际提醒、后台稳定性证据仍待补齐；服务端协议 CRUD 不代替手机验收。当前采用成熟服务加应用内桥接，避免自行承担协议栈。
 
 ## 当前项目字段与缺口
 

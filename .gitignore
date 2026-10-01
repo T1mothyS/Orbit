@@ -34,3 +34,6 @@ data/.*.pre-restore-*
 data/*.pending-*
 
 dist-shadow/
+
+# Local-only archived deployment history
+.local-docs/

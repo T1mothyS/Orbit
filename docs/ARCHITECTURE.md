@@ -52,7 +52,7 @@ App 保留登录、产品壳和 Today；SchedulePage、AiAssistantPage、Reminde
 - CalendarView 与 Today 共用 calendar/ScheduleFormModal、ScheduleDetailModal、schedule-types、schedule-presentation；共享层不得反向引用 CalendarView 或 lunar。
 - LibraryPage 负责列表；library/LibraryDetailPage 负责阅读、评论和版本。仅出现公式节点才导入 katex-renderer（含 KaTeX CSS）；Mermaid 仍按内容动态导入，保留源码和异步取消保护。
 - Library/Admin 专属 CSS 跟随功能加载；Settings 沿用自己的样式。Phase 5 将其余样式按原顺序拆到 src/styles/，index.css 仅负责导入；这些公共及混合规则继续全局加载。
-- 路由、API、数据库和业务确认合同保持原有语义。证据与边界见 [Phase 2 验收](PHASE2-FRONTEND-LOADING.md)。
+- 路由、API、数据库和业务确认合同保持原有语义。证据与边界见 [Phase 2 验收](archive/engineering/PHASE2-FRONTEND-LOADING.md)。
 
 ## 3. 后端
 
@@ -64,9 +64,9 @@ Phase 5 后，server/routes/ 拥有全部领域 HTTP 处理器，包括日程、
 
 挂载工具保留现有 API 的 Bearer JWT 认证，同时为原始 HTML 页面和资源使用同一 JWT 派生的 `HttpOnly`、`SameSite=Lax` 页面 Cookie。登录/注册写入该 Cookie，`/api/auth/me` 为已有 Bearer 会话补写，退出接口清理；Cookie 校验仍检查账号禁用状态和 `auth_version`，不会替代 API 鉴权。
 
-领域路由保持已有认证、所有权及 Phase 3 可靠写入协议；固定路径先于参数路由，SPA fallback 最后安装。关闭 runtime 会停止新调度并等待在途 HTTP 与后台 Promise；外部服务超时和强制终止的边界见 [Phase 4 验证记录](PHASE4-APP-RUNTIME-ROUTERS.md)。
+领域路由保持已有认证、所有权及 Phase 3 可靠写入协议；固定路径先于参数路由，SPA fallback 最后安装。关闭 runtime 会停止新调度并等待在途 HTTP 与后台 Promise；外部服务超时和强制终止的边界见 [Phase 4 验证记录](archive/engineering/PHASE4-APP-RUNTIME-ROUTERS.md)。
 
-Phase 5 的所有权、等价性和迁移验收见 [Phase 5 验证记录](PHASE5-DOMAIN-BOUNDARIES.md)。
+Phase 5 的所有权、等价性和迁移验收见 [Phase 5 验证记录](archive/engineering/PHASE5-DOMAIN-BOUNDARIES.md)。
 
 ### 挂载工具边界
 
@@ -95,7 +95,7 @@ server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与�
 
 数据库文件、附件、日报媒体、备份和日志都是运行时资产，不能提交 Git。备份服务在导出和恢复时处理四个数据库及允许的附件/媒体内容；恢复前必须检查版本、冲突和快照路径。
 
-系统快照包含四库、附件和日报媒体；用户备份包含账号范围记录、附件和所引用的新版日报媒体字节。部署配置由独立部署备份负责。Phase 3 为四库提供原子替换，并为完成、AI 确认和用户恢复提供同步跨库提交及启动 undo 恢复；系统恢复另有文件切换清单。chat.db 的 operation_results 保存按账号隔离的确认结果。未包装的其他多步业务不自动获得跨库事务保证。协议、故障证据、平台限制与降级步骤见 [Phase 3 验收](PHASE3-PERSISTENCE-RECOVERY.md)。
+系统快照包含四库、附件和日报媒体；用户备份包含账号范围记录、附件和所引用的新版日报媒体字节。部署配置由独立部署备份负责。Phase 3 为四库提供原子替换，并为完成、AI 确认和用户恢复提供同步跨库提交及启动 undo 恢复；系统恢复另有文件切换清单。chat.db 的 operation_results 保存按账号隔离的确认结果。未包装的其他多步业务不自动获得跨库事务保证。协议、故障证据、平台限制与降级步骤见 [Phase 3 验收](archive/engineering/PHASE3-PERSISTENCE-RECOVERY.md)。
 
 ## 5. 领域边界
 

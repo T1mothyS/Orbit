@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified local version: `0.37.0-260930.2101`（2026-09-30，Orbit 本地实现；真实 AI、生产、自然日报与收件箱未验；日报历史证据按各节日期使用）。
+- Source review: 2026-10-01；版本以 package.json 为准，状态以 docs/TASKS.md 为准。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -52,7 +52,7 @@ Cloud 新新闻信息图准备入口为 `daily_report.prepare_visuals_v2`，绘�
 
 新版 V2.5 的独立 Cloud 分支由 `server/digest-v2-{contract,service,media,fetch,render}.ts` 实现，MCP 入口仍在 `daily-report-cloud-mcp.ts`。输入运行与隔离产物在原 `activity.db` 的 `digest_v2_runs`、`digest_v2_artifacts`；production 才写原日报/通知表。阅读复用 `reports-read.ts` 与 `DailyReportsPage.tsx`，媒体字节镜像进入原媒体/备份边界；正式服务可显式让 Shadow 与 production 均使用持久本地媒体，独立隔离服务沿用测试 R2。V1 Local 图示仍适用于原链路，不能作为新版合同。详细字段、开关和 Shadow 边界见 [V2.5 合同](docs/CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
 
-V3 Core 位于同一个 `activity.db`：`server/digest-v3-store.ts` 管理 Event/Revision/Evidence/Analysis、引用表与 D09 本地冻结行，`activity-store.ts` 负责初始化和可靠写回。原 `backup-service.ts` 账号备份当前包含八组 V3 行，兼容旧七组备份并保护已有冻结记录；同账号替换和跨账号 ID 重映射均有本地验证。D07 的 `digest-v3-local-flow.ts` 对人工审核来源做原子写入和精确预览，`routes/digest-v3.ts` 提供登录态的受控提交、按账号/截点分页历史，以及 D09 具体日报版本的引用冻结/读取。D08 的 `digest-v3-offline-match.ts` 只在隔离回放里给双轴建议，`digest-v3-offline-extract.ts` 只对有界短摘录作限定规则抽取并保留事实支持文本；两者均不写活动库。详见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#d09-第一步人工核验引用冻结2026-09-28)与[阶段事实安全评测](docs/DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)。没有人工纠正/恢复、Work/MCP 写入、正式日报发布或真实 Shadow 自动匹配。
+V3 Core 位于同一个 `activity.db`：`server/digest-v3-store.ts` 管理 Event/Revision/Evidence/Analysis、引用表与 D09 本地冻结行，`activity-store.ts` 负责初始化和可靠写回。原 `backup-service.ts` 账号备份当前包含八组 V3 行，兼容旧七组备份并保护已有冻结记录；同账号替换和跨账号 ID 重映射均有本地验证。D07 的 `digest-v3-local-flow.ts` 对人工审核来源做原子写入和精确预览，`routes/digest-v3.ts` 提供登录态的受控提交、按账号/截点分页历史，以及 D09 具体日报版本的引用冻结/读取。D08 的 `digest-v3-offline-match.ts` 只在隔离回放里给双轴建议，`digest-v3-offline-extract.ts` 只对有界短摘录作限定规则抽取并保留事实支持文本；两者均不写活动库。详见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#d09-第一步人工核验引用冻结2026-09-28)与[阶段事实安全评测](docs/archive/digest/DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)。没有人工纠正/恢复、Work/MCP 写入、正式日报发布或真实 Shadow 自动匹配。
 
 D13 本地 Research/Thesis 位于同一活动库：`server/digest-research-store.ts` 管理研究历史、提案与确认版本，登录态 API 位于 `server/routes/research.ts`，网页 `/research` 从日报页进入。账号级备份/恢复包含三张新表；Workspace Agent 触发仅有合成协议探针，真实 Work 与结果回传尚未接通。完整边界见 [研究与观点合同](docs/DAILY-DIGEST-RESEARCH-THESIS.md)。
 
@@ -160,3 +160,8 @@ pwsh -NoProfile -File scripts/run_daily.ps1 -Date YYYY-MM-DD -NoSend
 ### Orbit 对话工作区
 
 `server/orbit-store.ts`、`orbit-queue.ts` 和 `routes/ai.ts` 管理账号会话、请求队列与 AI 计划；`src/hooks/useOrbitChat.ts`、`AiSchedulePanel`、`OrbitScheduleEditor` 管理会话视图和结果编辑。字段/API/恢复语义只维护在 [架构合同](docs/ARCHITECTURE.md#orbit-对话与操作合同)。
+
+
+## 文档任务路由
+
+路线与阶段顺序见 [route.md](route.md)，具体版本见 [CHANGELOG](CHANGELOG.md)，完成/待修复/待验收见 [TASKS](docs/TASKS.md)，发布见 [RELEASE](docs/RELEASE.md)，历史证据见 [archive](docs/archive/README.md)。模块地图不复制它们的状态。
