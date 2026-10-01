@@ -13,7 +13,7 @@ import { collectFact, isSource, nonemptyLines } from '../scripts/project-evoluti
 const readData = () => JSON.parse(fs.readFileSync('project-evolution/generated.json', 'utf8')) as EvolutionData;
 test('evolution curated record validates and metrics retain unknown tests', () => {
   const data = readData(); validateEvolution(data);
-  assert.equal(data.milestones.length, 15);
+  assert.ok(data.milestones.length >= 15, 'The original growth history must remain available');
   assert.equal(data.milestones[0].tests, null);
   assert.equal(data.facts[0].version, '1.0.0');
 });
