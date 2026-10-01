@@ -40,11 +40,11 @@ function App() {
         document.title = 'Orbit - 设置 / Settings';
       } else {
         document.title = /^\/project\/?$/.test(location.pathname)
-          ? 'Orbit - 项目成长'
-          : /^\/tools\/?$/.test(location.pathname) ? 'Orbit - Tools' : 'Orbit - 首页 / Home';
+          ? (new URLSearchParams(location.search).get('view')==='statistics'?'Orbit - 使用统计':'Orbit - 项目成长')
+          : /^\/tools\/?$/.test(location.pathname) ? 'Orbit - Tools' : /^\/assistant\/?$/.test(location.pathname)?'Orbit - 对话':'Orbit - 首页 / Home';
       }
     }
-  }, [isAuthenticated, isLoading, location.pathname]);
+  }, [isAuthenticated, isLoading, location.pathname,location.search]);
 
   if (isLoading) {
     return (
@@ -139,6 +139,7 @@ function AppContent() {
         onOpenAdmin={() => { setShowSettings(false); setShowAdmin(true); }}
         onOpenTools={() => { setShowSettings(false); navigate('/tools'); }}
         onOpenProject={() => { setShowSettings(false); navigate('/project'); }}
+        onOpenStatistics={() => { setShowSettings(false); navigate('/project?view=statistics'); }}
       /></FeatureBoundary>}
 
       {/* 管理员弹层 */}

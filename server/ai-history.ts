@@ -25,5 +25,6 @@ export function toAiScheduleHistoryMessage(message: dbModule.DbAiScheduleMessage
     plan: parseHistoryJson(message.plan),
     knowledgeSources: parseHistoryJson(message.knowledge_sources || null),
     timestamp: message.created_at,
+    orbitMeta: parseHistoryJson(message.orbit_meta || null),
   };
 }

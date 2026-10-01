@@ -3,6 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 export interface OrbitConversation {
     id: string;
     title: string;
+    is_main?: number;
+    scope_schedule_id?: string | null;
+    unread?: number;
 }
 export interface OrbitRequest {
     id: string;
@@ -17,6 +20,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     const [history, setHistory] = useState<any[]>([]);
     const [error, setError] = useState('');
     const [autoKnowledge, setAutoKnowledge] = useState(false);
+    const [proactiveEnabled,setProactiveEnabled]=useState(false),[runnerEnabled,setRunnerEnabled]=useState(false);
     const [submitting, setSubmitting] = useState(false);
     const submittingRef = useRef(false);
     const pendingSubmission = useRef<{
@@ -42,11 +46,13 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         if (!cid)
             return;
         const revision = ++refreshRevision.current;
-        const [messages, jobs] = await Promise.all([api(`/api/ai-schedule/history?conversationId=${encodeURIComponent(cid)}`), api(`/api/orbit/requests?conversationId=${encodeURIComponent(cid)}`)]);
+        const [messages, jobs, list] = await Promise.all([api(`/api/ai-schedule/history?conversationId=${encodeURIComponent(cid)}`), api(`/api/orbit/requests?conversationId=${encodeURIComponent(cid)}`),api('/api/orbit/conversations')]);
         if (current.current !== cid || refreshRevision.current !== revision)
             return;
         setHistory(previous => JSON.stringify(previous) === JSON.stringify(messages.messages) ? previous : messages.messages);
         setRequests(previous => JSON.stringify(previous) === JSON.stringify(jobs.requests) ? previous : jobs.requests);
+        setConversations(previous=>JSON.stringify(previous)===JSON.stringify(list.conversations)?previous:list.conversations);
+        if(document.visibilityState==='visible' && list.conversations.some((c:OrbitConversation)=>c.id===cid && c.unread)) await api(`/api/orbit/conversations/${encodeURIComponent(cid)}/read`,'POST',{observedAt:messages.messages.at(-1)?.timestamp});
     }, [api, cid]);
     const refreshConversations = useCallback(async () => {
         const data = await api('/api/orbit/conversations');
@@ -60,7 +66,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         void refreshConversations().then(items => { if (alive && !current.current && items[0])
             select(items[0].id); }).catch(e => setError(e.message));
         void api('/api/orbit/preferences').then(data => { if (alive)
-            setAutoKnowledge(data.autoKnowledge); }).catch(e => setError(e.message));
+            {setAutoKnowledge(data.autoKnowledge);setProactiveEnabled(data.proactiveEnabled);setRunnerEnabled(data.runnerEnabled);} }).catch(e => setError(e.message));
         return () => { alive = false; };
     }, [authenticated, api, refreshConversations, select]);
     useEffect(() => {
@@ -85,8 +91,8 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         void tick();
         return () => { stopped = true; clearTimeout(timer); };
     }, [authenticated, cid, refresh]);
-    const create = useCallback(async () => {
-        const data = await api('/api/orbit/conversations', 'POST', {});
+    const create = useCallback(async (scopeScheduleId?: string, title?: string) => {
+        const data = await api('/api/orbit/conversations', 'POST', {scopeScheduleId,title});
         await refreshConversations();
         select(data.conversation.id);
     }, [api, refreshConversations, select]);
@@ -113,9 +119,12 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         }
     }, [api, cid, refresh]);
     const action = useCallback(async (id: string, verb: 'cancel' | 'retry') => { await api(`/api/orbit/requests/${encodeURIComponent(id)}/${verb}`, 'POST', {}); await refresh(); }, [api, refresh]);
-    const rename = useCallback(async (title: string) => { await api(`/api/orbit/conversations/${encodeURIComponent(cid)}`, 'PATCH', { title }); await refreshConversations(); }, [api, cid, refreshConversations]);
-    const remove = useCallback(async () => { await api(`/api/orbit/conversations/${encodeURIComponent(cid)}`, 'DELETE'); const items = await refreshConversations(); if (items[0])
+    const rename = useCallback(async (title: string, id=cid) => { await api(`/api/orbit/conversations/${encodeURIComponent(id)}`, 'PATCH', { title }); await refreshConversations(); }, [api, cid, refreshConversations]);
+    const remove = useCallback(async (id=cid) => { await api(`/api/orbit/conversations/${encodeURIComponent(id)}`, 'DELETE'); const items = await refreshConversations(); if (items[0] && current.current===id)
         select(items[0].id); }, [api, cid, refreshConversations, select]);
+    const clear = useCallback(async (id=cid)=>{await api(`/api/ai-schedule/history?conversationId=${encodeURIComponent(id)}`,'DELETE');await refresh();},[api,cid,refresh]);
     const preference = useCallback(async (value: boolean) => { await api('/api/orbit/preferences', 'PATCH', { autoKnowledge: value }); setAutoKnowledge(value); }, [api]);
-    return { cid, conversations, requests, history, error, setError, autoKnowledge, submitting, select, create, send, action, rename, remove, preference, refresh };
+    const proactivePreference=useCallback(async(value:boolean)=>{await api('/api/orbit/preferences','PATCH',{proactiveEnabled:value});setProactiveEnabled(value);},[api]);
+    const reminderAction=useCallback(async(id:string,action:string)=>{await api(`/api/orbit/reminders/${encodeURIComponent(id)}/${action}`,'POST',{});await refresh();},[api,refresh]);
+    return { cid, conversations, requests, history, error, setError, autoKnowledge,proactiveEnabled,runnerEnabled, submitting, select, create, send, action, rename, remove, clear, preference,proactivePreference,reminderAction, refresh };
 }

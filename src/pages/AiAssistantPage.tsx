@@ -12,6 +12,7 @@ export function AiAssistantPage() {
   const activeTool = searchParams.get('tool') === 'email-import' ? 'email-import' : 'chat';
   const chatPanelRef = useRef<AiSchedulePanelHandle>(null);
   const [openScheduleId, setOpenScheduleId] = useState<string | null>(null);
+  const [chatError,setChatError]=useState('');
   const [chatState, setChatState] = useState({ hasMessages: false, busy: false });
   const noteBoard = useAiNoteBoard({
     initialNoteId: searchParams.get('note') || undefined,
@@ -112,7 +113,8 @@ export function AiAssistantPage() {
         </section>
       </div>
       <AiNoteBoardHost controller={noteBoard} />
-      {openScheduleId && <OrbitScheduleEditor id={openScheduleId} onClose={() => setOpenScheduleId(null)} onSaved={() => {void chatPanelRef.current?.refresh();}} />}
+      {chatError&&<div className="orbit-error" role="alert">{chatError}<button type="button" onClick={()=>setChatError('')}>关闭</button></div>}
+      {openScheduleId && <OrbitScheduleEditor id={openScheduleId} onClose={() => setOpenScheduleId(null)} onSaved={() => {void chatPanelRef.current?.refresh();}} onChat={(id,title)=>{void chatPanelRef.current?.startConversation(id,title).then(()=>setOpenScheduleId(null)).catch(e=>setChatError(e.message));}} />}
     </div>
   );
 }

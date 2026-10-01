@@ -19,6 +19,7 @@ export interface DbMessage {
 }
 
 export interface DbAiScheduleMessage {
+  orbit_meta?:string|null;
   conversation_id?: string | null;
   id: string;
   user_id: string;

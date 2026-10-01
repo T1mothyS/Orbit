@@ -5,6 +5,7 @@ import { APP_CONFIG } from '../config';
 import { getStoredAuthHeaders } from '../hooks/useAuth';
 import { architectureChanges, type EvolutionData, type EvolutionMilestone, type EvolutionSnapshot } from '../types/project-evolution';
 import '../styles/project-evolution.css';
+import { UsageStatisticsView } from '../components/UsageStatisticsView';
 
 const day = (date: string) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Hong_Kong', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
 const changes: Record<string, string> = { added: '新增', changed: '变化', removed: '移除', unchanged: '已有' };
@@ -18,6 +19,10 @@ function edgePath(a: { x: number; y: number }, b: { x: number; y: number }) {
 }
 
 export function ProjectEvolutionPage() {
+  const [params]=useSearchParams();
+  return params.get('view')==='statistics'?<UsageStatisticsView/>:<ProjectEvolutionContent/>;
+}
+function ProjectEvolutionContent() {
   const [data, setData] = useState<EvolutionData | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -69,7 +74,7 @@ export function ProjectEvolutionPage() {
   }, [milestone?.id, view]);
 
   return <main className="evolution-page">
-    <header className="evolution-header"><span className="evolution-kicker">AI CALENDAR / PROJECT EVOLUTION</span><Link to="/today"><ArrowLeft size={15} /> 返回应用</Link></header>
+    <header className="evolution-header"><span className="evolution-kicker">ORBIT / PROJECT EVOLUTION</span><Link to="/project?view=statistics">使用统计</Link><Link to="/today"><ArrowLeft size={15} /> 返回应用</Link></header>
     <section className="evolution-hero">
       <div><p className="evolution-eyebrow">一个项目，持续生长</p><h1 ref={heading} tabIndex={-1}>从一张日历，<br />到个人信息系统。</h1><p className="evolution-intro">回看每一次能力的增加，也看清它们如何连接在一起。</p></div>
       <div className="evolution-current"><span>当前应用版本</span><strong>V{APP_CONFIG.version}</strong><p>历史收录与应用版本独立更新</p>{data && <small>收录截止提交 <code>{data.baseline.slice(0, 7)}</code><br />最早可追溯记录 {data.facts[0] ? day(data.facts[0].date) : '—'}</small>}</div>

@@ -1,6 +1,7 @@
 import { Clock, Edit3, MapPin, Trash2, X } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_LABELS, formatTime, PRIORITY_COLORS } from './schedule-presentation';
 import type { CompletionProofDisplay, Schedule } from './schedule-types';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 export function ScheduleDetailModal({
   schedule,
@@ -11,6 +12,7 @@ export function ScheduleDetailModal({
   closeAfterAction = true,
   completionProof,
   onEditCompletion,
+  extraActions,
 }: {
   schedule: Schedule;
   onClose: () => void;
@@ -20,8 +22,11 @@ export function ScheduleDetailModal({
   closeAfterAction?: boolean;
   completionProof?: CompletionProofDisplay | null;
   onEditCompletion?: () => void;
+  extraActions?:ReactNode;
 }) {
   const pColor = PRIORITY_COLORS[schedule.priority] || PRIORITY_COLORS.medium;
+  const dialogRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{const previous=document.activeElement as HTMLElement|null;dialogRef.current?.focus();return()=>{if(previous?.isConnected)previous.focus();};},[]);
   const catColor = CATEGORY_COLORS[schedule.category] || '#6B7280';
 
   return (
@@ -32,6 +37,8 @@ export function ScheduleDetailModal({
     >
       <div
         className="rounded-2xl p-5 w-full max-w-sm shadow-2xl"
+        ref={dialogRef} role="dialog" aria-modal="true" aria-label={schedule.title} tabIndex={-1}
+        onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();onClose();}if(e.key==='Tab'){const controls=[...dialogRef.current!.querySelectorAll<HTMLElement>('button,input,select,a[href]')].filter(el=>!el.matches(':disabled'));const first=controls[0],last=controls.at(-1);if(e.shiftKey&&(document.activeElement===first||document.activeElement===dialogRef.current)){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}}
         style={{ backgroundColor: 'var(--td-bg-color-container)' }}
         onMouseDown={e => e.stopPropagation()}
       >
@@ -55,7 +62,7 @@ export function ScheduleDetailModal({
               {schedule.title}
             </h3>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:opacity-60 ml-2">
+          <button onClick={onClose} aria-label="关闭事项详情" className="p-1 rounded-lg hover:opacity-60 ml-2">
             <X className="w-4 h-4" style={{ color: 'var(--td-text-color-secondary)' }} />
           </button>
         </div>
@@ -95,6 +102,7 @@ export function ScheduleDetailModal({
           )}
         </div>
 
+        {extraActions}
         <div className="flex gap-2">
           <button
             onClick={() => { onDelete(schedule.id); if(closeAfterAction) onClose(); }}

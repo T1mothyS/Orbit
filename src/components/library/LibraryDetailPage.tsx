@@ -61,6 +61,7 @@ export function LibraryDetailPage({ id }: { id: string }) {
   }, [id]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(()=>{if(!detail)return;const record=()=>{if(document.visibilityState==='visible')void fetch(`/api/orbit/knowledge/${encodeURIComponent(id)}/read`,{method:'POST',headers:authHeaders()}).catch(()=>{});};record();document.addEventListener('visibilitychange',record);return()=>document.removeEventListener('visibilitychange',record);},[detail,id,authHeaders]);
 
   useEffect(() => {
     const root = markdownRef.current;

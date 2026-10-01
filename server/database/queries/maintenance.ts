@@ -5,6 +5,7 @@ import { deleteUserOperationResults } from './operations.js';
 
 export function deleteUser(userId: string): boolean {
   try {
+    for(const table of ['orbit_schedule_reminders','orbit_knowledge_events','orbit_proactive_events'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
     deleteUserOperationResults(userId);
     run('DELETE FROM daily_report_tokens WHERE user_id = ?', [userId]);
     deleteDailyReportCloudData(userId);
@@ -37,6 +38,7 @@ export function deleteUser(userId: string): boolean {
 
 export function clearUserData(userId: string): { schedules: number; sessions: number } {
   try {
+    for(const table of ['orbit_schedule_reminders','orbit_knowledge_events','orbit_proactive_events'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
     deleteUserOperationResults(userId);
     run('DELETE FROM user_api_keys WHERE user_id = ?', [userId]);
     run('DELETE FROM user_mail_accounts WHERE user_id = ?', [userId]);

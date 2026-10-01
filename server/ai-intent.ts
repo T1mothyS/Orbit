@@ -3,7 +3,8 @@ export function isReadOnlyScheduleQuery(text: string): boolean {
   if (/(添加|新建|创建|修改|改成|推迟|提前|取消|删除|删掉|标记完成|帮我安排|给我安排|提醒我)/.test(normalized)) {
     return false;
   }
-  return /(有什么安排|有哪些安排|什么安排|有什么日程|有哪些日程|查看.*(?:安排|日程)|查询.*(?:安排|日程)|几点有会)/.test(normalized);
+  if(/(?:今天|今日|明天|本周|下周).*?(?:有啥.*(?:做|干|安排)|有什么要(?:做|干)|要做什么|要干什么)/.test(normalized))return true;
+  return /(有什么安排|有哪些安排|什么安排|有什么日程|有哪些日程|有哪些待办|有什么(?:事情?|任务|待办)(?:要|需要|得)?(?:做|干|处理|办)?|(?:今天|今日|明天|本周|下周).*?(?:要做什么|要干什么|要处理什么|有什么要做|有什么要干)|查看.*(?:安排|日程|待办)|查询.*(?:安排|日程|待办)|几点有会)/.test(normalized);
 }
 
 const KNOWLEDGE_CONTEXT_TRIGGER = /知识库|knowledge\s+library/i;

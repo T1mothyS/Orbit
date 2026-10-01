@@ -712,6 +712,10 @@ export function listAllDailyReports(userId: string): DailyReportRecord[] {
   ).map(rowToDailyReport);
 }
 
+export function listDailyReportStatistics(userId: string): Array<{id:string;reportDate:string;source:string;deliveryStatus:string}> {
+  return queryAll<any>('SELECT id,report_date,source,delivery_status FROM daily_reports WHERE user_id=? ORDER BY updated_at DESC,id DESC',[userId]).map(r=>({id:r.id,reportDate:r.report_date,source:r.source,deliveryStatus:r.delivery_status}));
+}
+
 export function listDailyReportsPage(
   userId: string,
   limit = 100,

@@ -42,6 +42,7 @@ export function readRuntimeConfig() {
 
   return { PORT, isProduction, JWT_SECRET, LEGACY_ADMIN_INVITE_CODE, LEGACY_USER_INVITE_CODE,
     backgroundJobsEnabled: process.env.BACKGROUND_JOBS_ENABLED === 'true',
+    proactiveJobsEnabled: process.env.ORBIT_PROACTIVE_ENABLED === 'true',
     trustProxyHops: Number(process.env.TRUST_PROXY_HOPS || 0),
     initializeEnvironment() {
       process.env.APP_URL = validate();

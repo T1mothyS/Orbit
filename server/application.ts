@@ -4,6 +4,8 @@ import { resolveAiImportCredential } from './ai-credentials.js';
 import { createRetiredRouter } from './routes/retired.js';
 import { createAiImportsRouter } from './routes/ai-imports.js';
 import { createAiRouter } from './routes/ai.js';
+import { createOrbitFeatureRouter } from './routes/orbit.js';
+import { createProactiveJobs } from './orbit-proactive.js';
 
 import { createSchedulesRouter } from './routes/schedules.js';
 import { createCaldavRouter } from './routes/caldav.js';
@@ -94,6 +96,7 @@ app.use(createSettingsRouter({ authenticate, JWT_SECRET }));
 app.use(createRetiredRouter({ authenticate }));
 
 app.use(createAiRouter({ authenticate }));
+app.use(createOrbitFeatureRouter({authenticate}));
 
 app.use(createAccountsRouter({ authenticate, signUserToken, setPageSessionCookie, setPageSessionFromBearer, clearPageSessionCookie }));
 
@@ -147,6 +150,8 @@ export const initializeServer = createStoreInitializer({
 });
 
 export const backgroundJobs = createBackgroundJobs({ isReady: () => dbInitialized, resolveAiImportCredential, cleanupAiScheduleHistory });
+export const proactiveJobs=createProactiveJobs(()=>dbInitialized);
+export const runtimeProactiveEnabled=runtimeConfig.proactiveJobsEnabled;
 export function logServiceStarted() {
   addLog('info', 'system', '启动配置已记录', { event: 'service_started', pid: process.pid, nodeVersion: process.version,
     backgroundJobsEnabled, appTimezone: process.env.APP_TIMEZONE || 'Asia/Shanghai',

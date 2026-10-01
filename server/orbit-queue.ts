@@ -1,4 +1,5 @@
-import { getUserById } from './db.js';
+import { getUserById, getReminder } from './db.js';
+import { dateInZone } from './orbit-time.js';
 import { queryAll, run } from './database/connection.js';
 import { conversation, getRequest, orbitContext, type ChatRequest } from './orbit-store.js';
 import { aiChatRequestRecords, isAiChatRequestId } from './ai-chat-state.js';
@@ -37,7 +38,9 @@ export function submitOrbitRequest(userId: string, body: any) {
     }
     if (queryAll("SELECT id FROM orbit_requests WHERE user_id=? AND state IN ('queued','running')", [userId]).length >= 20)
         throw new Error('等待队列已满，请先处理已有请求');
-    run('INSERT INTO orbit_requests (id,user_id,conversation_id,state,body,created_at) VALUES (?,?,?,?,?,?)', [id, userId, cid, 'queued', JSON.stringify({ ...body, text }), new Date().toISOString()]);
+    const submittedAt = new Date();
+    const targetDate = body.targetDate || dateInZone(submittedAt, getReminder(userId)?.timezone || 'Asia/Shanghai');
+    run('INSERT INTO orbit_requests (id,user_id,conversation_id,state,body,created_at) VALUES (?,?,?,?,?,?)', [id, userId, cid, 'queued', JSON.stringify({ ...body, text, targetDate }), submittedAt.toISOString()]);
     void pump(userId);
     return getRequest(userId, id)!;
 }

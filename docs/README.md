@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 当前规范、操作手册、历史证据与工程验证入口。
-- Last verified local version: `0.37.0-260930.2101`（2026-09-30，Orbit 本地实现；真实 AI、生产、自然日报与收件箱未验；日报历史证据按各节日期使用）。
+- Last verified local version: `0.38.0-261001.0922`（2026-10-01，主对话/统计/主动提醒本地验证；真实 AI、生产、自然定时与收件箱未验；日报历史证据按各节日期使用）。
 - Authority: 源码、自动测试与实际构建优先；仍有效的 AGENTS 硬约束其次。
 - Update trigger: 新增/移动文档，修改 API、数据归属、媒体或验收规则。
 - Supersedes: 无；现有文档路径保留。

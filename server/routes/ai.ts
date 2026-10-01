@@ -31,6 +31,8 @@ import * as reminderStore from '../reminder-store.js';
 import { syncReminderTasksToCalendar } from '../reminder-calendar-sync.js';
 import { listDailyReportViews, getDailyReportView } from '../daily-report-service.js';
 import { selectKnowledgeReferences } from '../orbit-knowledge.js';
+import { schedulesForQuery } from '../orbit-schedule-context.js';
+import { getProactivePreference, setProactivePreference } from '../orbit-proactive.js';
 
 export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAuth>, 'authenticate'>) {
   const app = Router();
@@ -38,11 +40,12 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
   const safe = (fn: (req: any, res: any) => any) => (req: any, res: any) => { try { fn(req, res); } catch (error: any) { res.status(400).json({ error: error.message }); } };
   const requestView = (row: orbit.ChatRequest) => ({ id: row.id, conversationId: row.conversation_id, state: row.state, text: JSON.parse(row.body).text, error: row.error, createdAt: row.created_at });
   app.get('/api/orbit/conversations', authenticate, safe((req,res) => res.json({ conversations: orbit.listConversations(user(req)) })));
-  app.post('/api/orbit/conversations', authenticate, safe((req,res) => res.json({ conversation: orbit.createConversation(user(req), String(req.body?.title || '新对话')) })));
+  app.post('/api/orbit/conversations', authenticate, safe((req,res) => res.json({ conversation: orbit.createConversation(user(req), String(req.body?.title || '新对话'),req.body?.scopeScheduleId) })));
+  app.post('/api/orbit/conversations/:id/read', authenticate, safe((req,res) => {orbit.markConversationRead(user(req),req.params.id,req.body?.observedAt);res.json({success:true});}));
   app.patch('/api/orbit/conversations/:id', authenticate, safe((req,res) => { orbit.renameConversation(user(req),req.params.id,String(req.body?.title || ''));res.json({success:true}); }));
   app.delete('/api/orbit/conversations/:id', authenticate, safe((req,res) => { orbit.deleteConversation(user(req),req.params.id);res.json({success:true}); }));
-  app.get('/api/orbit/preferences', authenticate, safe((req,res) => res.json({ autoKnowledge: orbit.getAiPreference(user(req)) })));
-  app.patch('/api/orbit/preferences', authenticate, safe((req,res) => { if(typeof req.body?.autoKnowledge!=='boolean') throw new Error('知识库检索设置格式不正确');orbit.setAiPreference(user(req),req.body.autoKnowledge);res.json({success:true}); }));
+  app.get('/api/orbit/preferences', authenticate, safe((req,res) => res.json({ autoKnowledge: orbit.getAiPreference(user(req)),proactiveEnabled:getProactivePreference(user(req)),runnerEnabled:process.env.ORBIT_PROACTIVE_ENABLED==='true' })));
+  app.patch('/api/orbit/preferences', authenticate, safe((req,res) => { const body=req.body||{};if(typeof body.autoKnowledge!=='boolean'&&typeof body.proactiveEnabled!=='boolean')throw new Error('提醒或检索设置格式不正确');if(body.autoKnowledge!==undefined){if(typeof body.autoKnowledge!=='boolean')throw new Error('检索设置格式不正确');orbit.setAiPreference(user(req),body.autoKnowledge);}if(body.proactiveEnabled!==undefined){if(typeof body.proactiveEnabled!=='boolean')throw new Error('提醒设置格式不正确');setProactivePreference(user(req),body.proactiveEnabled);}res.json({success:true}); }));
   app.post('/api/orbit/requests', authenticate, safe((req,res) => res.status(202).json({ request: requestView(orbitQueue.submitOrbitRequest(user(req),req.body || {})) })));
   app.get('/api/orbit/requests', authenticate, safe((req,res) => res.json({ requests: orbitQueue.listOrbitRequests(user(req),String(req.query.conversationId || '')).map(requestView) })));
   app.post('/api/orbit/requests/:id/cancel', authenticate, safe((req,res) => res.json({ request: requestView(orbitQueue.cancelOrbitRequest(user(req),req.params.id)) })));
@@ -74,7 +77,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       orbit.conversation(payload.userId,cid);
       const messages = queryAll<dbModule.DbAiScheduleMessage>('SELECT * FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? ORDER BY created_at,rowid',[payload.userId,cid]);
       hydratePendingAiSchedulePlans(payload.userId, messages);
-      res.json({ messages: messages.map(m => {const view=toAiScheduleHistoryMessage(m);if(Array.isArray(view.scheduleItems)) view.scheduleItems=view.scheduleItems.flatMap((item:any)=>{const live=scheduleStore.getSchedule(item.id);return live?.user_id===payload.userId?[live]:[];});return view;}) });
+      res.json({ messages: messages.map(m => {const view=toAiScheduleHistoryMessage(m);if(view.orbitMeta?.eventId)view.orbitMeta.state=queryAll<any>('SELECT state FROM orbit_proactive_events WHERE user_id=? AND id=?',[payload.userId,view.orbitMeta.eventId])[0]?.state||'discarded';if(Array.isArray(view.scheduleItems)) view.scheduleItems=view.scheduleItems.flatMap((item:any)=>{const live=scheduleStore.getSchedule(item.id);return live?.user_id===payload.userId?[live]:[];});return view;}) });
     } catch (error: any) {
       console.error("[AI History] Error:", error);
       res.status(400).json({ error: '无法读取这个会话' });
@@ -177,9 +180,12 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     const previousKnowledge = context ? orbit.previousKnowledgeIds(userId,context.conversationId) : [];
     const knowledgeFollowUp = previousKnowledge.length > 0 && /(第.+[篇条]|这篇|刚才.*知识|上面.*资料)/.test(text);
     const includeKnowledgeContext = requestsKnowledgeContext(text) || orbit.getAiPreference(userId) || body.knowledgeScope === true || knowledgeFollowUp;
-    const previousContext = context ? orbit.historyContext(userId,context.conversationId) : '';
+    const previousContext = context ? orbit.historyContext(userId,context.conversationId) + '\n' + orbit.workingContext(userId,context.conversationId,text,targetDate || reminderStore.todayInTimezone(db.getReminder(userId)?.timezone || 'Asia/Shanghai')) : '';
+    const queryTimezone = db.getReminder(userId)?.timezone || 'Asia/Shanghai';
     const objectRefs = context ? orbit.recentObjectReferences(userId,context.conversationId) : [];
     const referencedIds = new Set(objectRefs.flatMap(row => row.map((s:any)=>s.id)));
+    const scopeId=context ? orbit.conversation(userId,context.conversationId).scope_schedule_id : null;
+    if(scopeId)referencedIds.add(scopeId);
     const noteContext = /记事|记事板|便签/.test(text) ? db.listNoteItems(userId).filter(n=>!n.completed).slice(0,8).map(n=>({id:n.id,content:n.content})):[];
     const assertActive = () => {
       if (context?.controller?.signal.aborted) throw new Error('生成已取消');
@@ -211,12 +217,12 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
 
     // 只读日程查询直接使用本地数据，不依赖外部 AI 或 API Key。
     if (authenticatedUser && isReadOnlyScheduleQuery(text) && !includeKnowledgeContext) {
-      const today = targetDate || getLocalDateString();
+      const today = targetDate || reminderStore.todayInTimezone(queryTimezone);
       const queryDates = parseQueryDatesForCards(text, today);
       const scheduleItems: any[] = [];
       const seenScheduleIds = new Set<string>();
       for (const dateStr of queryDates) {
-        const schedules = scheduleStore.getSchedulesByDate(dateStr, userId);
+        const schedules = schedulesForQuery(userId, dateStr, queryTimezone);
         for (const schedule of schedules) {
           if (!seenScheduleIds.has(schedule.id)) {
             seenScheduleIds.add(schedule.id);
@@ -229,7 +235,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       const response = {
         success: true,
         intent: 'query',
-        reply: buildCompactScheduleQueryReply(scheduleItems, queryDates, today),
+        reply: buildCompactScheduleQueryReply(scheduleItems, queryDates, today) + `\n\n查询日期：${queryDates.join("、")}（${queryTimezone}）`,
         scheduleItems,
         knowledgeSources: [],
         changed: false,
@@ -339,7 +345,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       return res.status(401).json({ error: error?.message || 'API Key 认证失败' });
     }
 
-    const today = targetDate || getLocalDateString();
+    const today = targetDate || reminderStore.todayInTimezone(queryTimezone);
     const selectedModel = reqModel || db.getUserPreferredModel(userId, defaultModel);
     const targetCalendarId = calendarId || 'personal';
     cleanupExpiredAiScheduleState();
@@ -357,7 +363,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     }
 
     // 普通问答不附带用户日程；只有明确的查询或排期请求才加载所需日期的数据。
-    const includeScheduleContext = needsScheduleContext(text) || /(那个|第[一二三四五六七八九十\d]+[个项]|刚才|上面)/.test(text) || (referencedIds.size > 0 && /(修改|改成|改到|调到|挪|移到|删除|完成)/.test(text));
+    const includeScheduleContext = !!scopeId || needsScheduleContext(text) || /(那个|第[一二三四五六七八九十\d]+[个项]|刚才|上面)/.test(text) || (referencedIds.size > 0 && /(修改|改成|改到|调到|挪|移到|删除|完成)/.test(text));
     const queryDates = includeScheduleContext ? parseQueryDatesForCards(text, today) : [];
     console.log('[AI Chat] Query dates for AI context:', queryDates);
 
@@ -365,7 +371,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     const contextSchedules: any[] = [];
     const seenIds = new Set<string>();
     for (const dateStr of queryDates) {
-      const schedules = scheduleStore.getSchedulesByDate(dateStr, userId);
+      const schedules = schedulesForQuery(userId, dateStr, queryTimezone);
       for (const s of schedules) {
         if (!seenIds.has(s.id)) {
           seenIds.add(s.id);
@@ -683,7 +689,7 @@ priority 识别：
       })() : {
         success: true,
         intent: parsed.intent || 'chat',
-        reply: parsed.intent === 'query' && !includeKnowledgeContext
+        reply: parsed.intent === 'query' && !includeKnowledgeContext && queryDates.length > 0
           ? buildCompactScheduleQueryReply(sortedSchedules, queryDates, today)
           : (parsed.reply || '好的'),
         scheduleItems: sortedSchedules,

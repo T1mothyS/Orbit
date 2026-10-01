@@ -16,159 +16,9 @@ import { type KnowledgeSearchMatch } from './search-service.js';
 import { rawOperationsFromSnapshot, scheduleFingerprint, type PendingAiOperation } from './ai-plan.js';
 import * as db from './db.js';
 import { parseHistoryJson } from './ai-history.js';
+import { recordKnowledgeCitations } from './orbit-statistics.js';
 
-export function parseQueryDatesForCards(message: string, todayStr: string): string[] {
-  const now = new Date();
-  const today = todayStr || getLocalDateString(now);
-  const msgLower = message.toLowerCase();
-  const msgRaw = message;
-  const dates: string[] = [];
-
-  const addDate = (dateStr: string) => {
-    if (!dates.includes(dateStr)) dates.push(dateStr);
-  };
-
-  // 【关键修复】先检测"今天"，否则默认返回今天
-  const hasToday = msgLower.includes('今天') || msgLower.includes('今日') || msgLower.includes('本日');
-  if (hasToday) {
-    addDate(today);
-  }
-
-  // 辅助函数：计算N天后的日期（本地时区）
-  const getDateStr = (offset: number) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() + offset);
-    return getLocalDateString(d);
-  };
-
-  const tomorrowStr = getDateStr(1);
-  const dayAfterTomorrowStr = getDateStr(2);
-  const yesterdayStr = getDateStr(-1);
-
-  // 检测"明天"
-  const hasTomorrow = msgLower.includes('明天') || msgLower.includes('明日') || msgLower.includes('tomorrow');
-  if (hasTomorrow) {
-    addDate(tomorrowStr);
-  }
-
-  // 检测"后天"
-  const hasDayAfter = msgLower.includes('后天') || msgLower.includes('后日');
-  if (hasDayAfter) {
-    addDate(dayAfterTomorrowStr);
-  }
-
-  // 【新增】检测"两天后"、"3天后"等
-  const afterMatch = msgRaw.match(/(\d+)天后?/);
-  if (afterMatch) {
-    const days = parseInt(afterMatch[1]);
-    if (days >= 1 && days <= 30) {
-      addDate(getDateStr(days));
-    }
-  }
-
-  // 检测"昨天"
-  const hasYesterday = msgLower.includes('昨天') || msgLower.includes('昨日') || msgLower.includes('yesterday');
-  if (hasYesterday) {
-    addDate(yesterdayStr);
-  }
-
-  // 【新增】检测"大前天"、"前天"
-  const hasDayBeforeYesterday = msgLower.includes('大前天') || msgLower.includes('大前日');
-  if (hasDayBeforeYesterday) {
-    addDate(getDateStr(-3));
-  }
-  const hasTwoDaysAgo = msgLower.includes('前天');
-  if (hasTwoDaysAgo) {
-    addDate(getDateStr(-2));
-  }
-
-  // 【新增】检测"本周"
-  const hasThisWeek = msgLower.includes('本周') || msgLower.includes('这周') || msgLower.includes('this week');
-  if (hasThisWeek) {
-    // 本周：从今天到本周日
-    const dayOfWeek = now.getDay();
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-    for (let i = 0; i <= daysUntilSunday; i++) {
-      addDate(getDateStr(i));
-    }
-  }
-
-  // 【新增】检测"下周"
-  const hasNextWeek = msgLower.includes('下周') || msgLower.includes('下星期') || msgLower.includes('next week');
-  if (hasNextWeek) {
-    const nextWeekStart = getDateStr(7 - now.getDay() + 1); // 下周一
-    for (let i = 0; i < 7; i++) {
-      addDate(getDateStr(7 - now.getDay() + 1 + i));
-    }
-  }
-
-  // 【新增】检测"本月"
-  const hasThisMonth = msgLower.includes('本月') || msgLower.includes('这月');
-  if (hasThisMonth) {
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    for (let d = now.getDate(); d <= lastDay; d++) {
-      const dt = new Date(now.getFullYear(), now.getMonth(), d);
-      addDate(getLocalDateString(dt));
-    }
-  }
-
-  // 下周几
-  const getNextWeekday = (d: number) => {
-    const daysUntil = (d - now.getDay() + 7) % 7 || 7;
-    const dt = new Date(now);
-    dt.setDate(dt.getDate() + daysUntil);
-    return getLocalDateString(dt);
-  };
-
-  if (msgLower.includes('下周一') || msgLower.includes('下星期一')) addDate(getNextWeekday(1));
-  if (msgLower.includes('下周二') || msgLower.includes('下星期二')) addDate(getNextWeekday(2));
-  if (msgLower.includes('下周三') || msgLower.includes('下星期三')) addDate(getNextWeekday(3));
-  if (msgLower.includes('下周四') || msgLower.includes('下星期四')) addDate(getNextWeekday(4));
-  if (msgLower.includes('下周五') || msgLower.includes('下星期五')) addDate(getNextWeekday(5));
-  if (msgLower.includes('下周六') || msgLower.includes('下星期六')) addDate(getNextWeekday(6));
-  if (msgLower.includes('下周日') || msgLower.includes('下星期日') || msgLower.includes('下周末')) addDate(getNextWeekday(0));
-
-  // 周几（本周）
-  const getThisWeekday = (d: number) => {
-    const daysUntil = (d - now.getDay() + 7) % 7;
-    const dt = new Date(now);
-    dt.setDate(dt.getDate() + daysUntil);
-    return getLocalDateString(dt);
-  };
-
-  if (msgLower.includes('周一') || msgLower.includes('星期一')) addDate(getThisWeekday(1));
-  if (msgLower.includes('周二') || msgLower.includes('星期二')) addDate(getThisWeekday(2));
-  if (msgLower.includes('周三') || msgLower.includes('星期三')) addDate(getThisWeekday(3));
-  if (msgLower.includes('周四') || msgLower.includes('星期四')) addDate(getThisWeekday(4));
-  if (msgLower.includes('周五') || msgLower.includes('星期五')) addDate(getThisWeekday(5));
-  if (msgLower.includes('周六') || msgLower.includes('星期六')) addDate(getThisWeekday(6));
-  if (msgLower.includes('周日') || msgLower.includes('星期日') || msgLower.includes('周末')) addDate(getThisWeekday(0));
-
-  // 具体日期：4月10号、4-10、2026-04-10
-  const patterns = [/(\d{1,2})月(\d{1,2})[日号]?/g, /(\d{1,2})-(\d{1,2})/g, /(\d{4})-(\d{1,2})-(\d{1,2})/g];
-  for (const p of patterns) {
-    let m;
-    while ((m = p.exec(msgRaw)) !== null) {
-      let year = now.getFullYear(), month, day;
-      if (m[3]) { year = parseInt(m[1]); month = parseInt(m[2]); day = parseInt(m[3]); }
-      else { month = parseInt(m[1]); day = parseInt(m[2]); }
-      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-        const dt = new Date(year, month - 1, day);
-        const daysDiff = Math.floor((dt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysDiff >= -7 && daysDiff <= 60) addDate(getLocalDateString(dt));
-      }
-    }
-  }
-
-  // 【关键】默认只返回今天
-  if (dates.length === 0) {
-    addDate(today);
-    // 如果没有检测到任何日期引用，默认也添加明天以便AI有更多上下文
-    addDate(tomorrowStr);
-  }
-
-  return dates;
-}
+export { resolveQueryDates as parseQueryDatesForCards } from './orbit-time.js';
 
 // 检查登录状态的辅助函数
 export const AI_CATEGORY_LABELS_CN: Record<string, string> = {
@@ -319,7 +169,7 @@ export function saveAiScheduleHistoryMessage(input: {
   const existing = context?.requestId && input.role==='user' ? dbQueryOne<dbModule.DbAiScheduleMessage>('SELECT * FROM ai_schedule_messages WHERE id=? AND user_id=?',[id,input.userId]) : null;
   if(existing) return existing;
   if(context?.conversationId) dbQueryRun('UPDATE orbit_conversations SET updated_at=? WHERE id=? AND user_id=?',[new Date().toISOString(),context.conversationId,input.userId]);
-  return db.createAiScheduleMessage({
+  const message=db.createAiScheduleMessage({
     conversation_id: context?.conversationId || null,
     id,
     user_id: input.userId,
@@ -332,6 +182,8 @@ export function saveAiScheduleHistoryMessage(input: {
     knowledge_sources: input.knowledgeSources === undefined ? null : JSON.stringify(input.knowledgeSources),
     created_at: new Date().toISOString(),
   });
+  if(input.role==='assistant')recordKnowledgeCitations(input.userId,message.id,input.knowledgeSources);
+  return message;
 }
 
 export function saveAiScheduleResponseHistory(userId: string, response: any): dbModule.DbAiScheduleMessage {

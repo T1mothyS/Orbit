@@ -1,5 +1,5 @@
 import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle } from 'react';
-import { Bot, BookOpen, Send, Loader2, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote } from 'lucide-react';
+import { Bot, BookOpen, Send, Loader2, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useOrbitChat } from '../hooks/useOrbitChat';
@@ -72,6 +72,7 @@ type MessageRole = 'user' | 'assistant';
 type MessageType = 'text' | 'schedules' | 'update' | 'plan' | 'error';
 
 interface ChatMessage {
+  orbitMeta?:{origin:string;eventId:string;enhanced:boolean;state?:string};
   id: string;
   role: MessageRole;
   type: MessageType;
@@ -95,6 +96,7 @@ interface AiSchedulePanelProps {
 
 export interface AiSchedulePanelHandle {
   resetHistory: () => Promise<void>;
+  startConversation:(id:string,title:string)=>Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -319,8 +321,8 @@ function ScheduleMiniCard({ schedule, onOpen, onOpenMenu }: {
 }) {
   const color = CATEGORY_COLORS[schedule.category] || '#6B7280';
   const pColor = PRIORITY_COLORS[schedule.priority] || '#F59E0B';
-  const dateStr = formatDate(schedule.start_time);
-  const startStr = schedule.all_day ? '全天' : formatTime(schedule.start_time);
+  const dateStr = schedule.is_unscheduled ? '无固定日期' : formatDate(schedule.start_time);
+  const startStr = schedule.is_unscheduled ? '' : schedule.all_day ? '全天' : formatTime(schedule.start_time);
   const endStr = schedule.end_time && !schedule.all_day ? ` - ${formatTime(schedule.end_time)}` : '';
 
   return (
@@ -382,8 +384,9 @@ function ScheduleMiniCard({ schedule, onOpen, onOpenMenu }: {
 
 // ==================== 消息气泡 ====================
 
-function MessageBubble({ msg, onOpenSchedule, onOpenScheduleMenu, onConfirmPlan, onDiscardPlan, onUpdatePlanOperation, confirmingPlanId, savingPlanOperationKey }: {
+function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMenu, onConfirmPlan, onDiscardPlan, onUpdatePlanOperation, confirmingPlanId, savingPlanOperationKey }: {
   msg: ChatMessage;
+  onReminderAction?:(id:string,action:string)=>Promise<void>;
   onOpenSchedule?: (id: string) => void;
   onOpenScheduleMenu?: (id: string, x: number, y: number) => void;
   onConfirmPlan?: (messageId: string, planId: string) => void;
@@ -394,6 +397,7 @@ function MessageBubble({ msg, onOpenSchedule, onOpenScheduleMenu, onConfirmPlan,
 }) {
   const isUser = msg.role === 'user';
   const [editingOperationKey, setEditingOperationKey] = useState<string | null>(null);
+  const [reminderBusy,setReminderBusy]=useState(false),[reminderError,setReminderError]=useState('');
   const timestamp = parseMessageTimestamp(msg.timestamp);
   const messageTime = <time className={`ai-message-timestamp${isUser ? ' is-user' : ''}${msg.type === 'error' ? ' is-error' : ''}`} dateTime={timestamp ? msg.timestamp || undefined : undefined}>{formatMessageTimestamp(msg.timestamp)}</time>;
 
@@ -516,6 +520,7 @@ function MessageBubble({ msg, onOpenSchedule, onOpenScheduleMenu, onConfirmPlan,
                 ))}
               </div>
             )}
+            {msg.orbitMeta?.origin==='proactive' && <div className="orbit-reminder-actions"><small>{msg.orbitMeta.enhanced?'Orbit 主动提醒':'Orbit 主动提醒 · 基于事项信息'}</small><div>{[['complete','完成'],['snooze','15 分钟后'],['tomorrow','明天 09:00 再提醒']].map(([action,label])=><button type="button" key={action} disabled={reminderBusy||msg.orbitMeta?.state!=='sent'} onClick={()=>{setReminderBusy(true);setReminderError('');void onReminderAction?.(msg.orbitMeta!.eventId,action).catch(e=>setReminderError(e.message)).finally(()=>setReminderBusy(false));}}>{label}</button>)}</div>{msg.orbitMeta.state==='handled'&&<span>已处理</span>}{reminderError&&<p role="alert">{reminderError}</p>}</div>}
             {messageTime}
           </div>
         )}
@@ -550,6 +555,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const [conversationDrawer, setConversationDrawer] = useState(false);
   const [renameTitle, setRenameTitle] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
+  const [targetConversation, setTargetConversation] = useState('');
   const inputRevisionRef = useRef(0);
   const drafts = useRef(new Map<string,string>());
   useEffect(()=>{inputRevisionRef.current++;setInputText(drafts.current.get(orbit.cid)||'');setRenameTitle(null);setDeleteDialog(false);},[orbit.cid]);
@@ -561,7 +567,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   useEffect(() => {
     setMessages(orbit.history.map(m => ({
       id: m.id, role: m.role, type: m.type || 'text', text: m.text || m.content || '',
-      intent: m.intent, scheduleItems: m.scheduleItems, plan: m.plan, knowledgeSources: m.knowledgeSources,
+      intent: m.intent, scheduleItems: m.scheduleItems, plan: m.plan, knowledgeSources: m.knowledgeSources,orbitMeta:m.orbitMeta,
       timestamp: m.timestamp || m.created_at || null,
     })));
   }, [orbit.history]);
@@ -608,7 +614,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     const text = rawText.trim();if(!text) return;
     const revision = inputRevisionRef.current;
     try {
-      const accepted = await orbit.send(text,{targetDate:getLocalDateString(),calendarId:'personal'});
+      const accepted = await orbit.send(text,{calendarId:'personal'});
       if(accepted && options.clearComposer !== false && revision === inputRevisionRef.current) {inputRevisionRef.current++;setInputText('');drafts.current.delete(orbit.cid);}
     } catch(error) {orbit.setError(error instanceof Error?error.message:'发送失败，请重试');}
   }, [orbit.send,orbit.setError]);
@@ -717,7 +723,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     }
   };
 
-  useImperativeHandle(ref, () => ({ resetHistory: orbit.create, refresh: orbit.refresh }), [orbit.create,orbit.refresh]);
+  useImperativeHandle(ref, () => ({ resetHistory: orbit.create, refresh: orbit.refresh,startConversation:(id:string,title:string)=>orbit.create(id,title) }), [orbit.create,orbit.refresh]);
 
   const EXAMPLES = [
     '今天上午去车站接人，下午两点开会，晚上约朋友吃饭',
@@ -731,15 +737,16 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
       <aside className={`orbit-conversations${conversationDrawer ? ' is-open' : ''}`} aria-label="对话列表">
         <div className="orbit-sidebar-head"><strong>Orbit</strong><button type="button" aria-label="关闭对话列表" onClick={() => setConversationDrawer(false)}>×</button></div>
         <button type="button" className="primary-button" onClick={() => {void orbit.create().catch(e=>orbit.setError(e.message));setConversationDrawer(false);}}>＋ 新对话</button>
-        <div className="orbit-conversation-list">{orbit.conversations.map(c => <button key={c.id} type="button" className={c.id===orbit.cid?'active':''} onClick={() => {orbit.select(c.id);setConversationDrawer(false);}} title={c.title}>{c.title}</button>)}</div>
+        <div className="orbit-conversation-list">{orbit.conversations.map(c => <div key={c.id} className={`orbit-conversation-row${c.id===orbit.cid?' active':''}`}><button type="button" className="orbit-conversation-select" onClick={() => {orbit.select(c.id);setConversationDrawer(false);}} title={c.title}>{c.is_main ? <Pin size={13} aria-hidden="true"/> : null}<span>{c.title}</span>{!!c.unread && <em aria-label={`${c.unread} 条未读提醒`}>{c.unread}</em>}</button><div className="orbit-conversation-actions">{!c.is_main && <button type="button" aria-label={`重命名对话：${c.title}`} title="重命名" onClick={()=>{setTargetConversation(c.id);setRenameTitle(c.title);setConversationDrawer(false);}}><Edit3 size={14}/></button>}<button type="button" aria-label={`${c.is_main?'清理历史':'删除对话'}：${c.title}`} title={c.is_main?'清理主对话历史':'删除对话'} onClick={()=>{setTargetConversation(c.id);setDeleteDialog(true);setConversationDrawer(false);}}><Trash2 size={14}/></button></div></div>)}</div>
         <label className="orbit-preference"><input type="checkbox" checked={orbit.autoKnowledge} onChange={e => {void orbit.preference(e.target.checked).catch(e=>orbit.setError(e.message));}} />自动检索知识库</label>
         <small>关闭时，明确提到知识库才检索。</small>
+        <label className="orbit-preference"><input type="checkbox" checked={orbit.proactiveEnabled} onChange={e=>{void orbit.proactivePreference(e.target.checked).catch(e=>orbit.setError(e.message));}}/>主动聊天提醒</label><small>{orbit.runnerEnabled?'默认提前 15 分钟，提醒会发到 Orbit 主对话。':'提醒服务未启用，设置会保留。'}</small>
       </aside>
       {conversationDrawer && <button type="button" className="orbit-drawer-backdrop" aria-label="关闭对话列表" onClick={() => setConversationDrawer(false)} />}
       <div className="orbit-chat-main">
-      <div className="orbit-chat-toolbar"><button type="button" className="orbit-sidebar-toggle" onClick={() => setConversationDrawer(true)}>对话列表</button><strong>{orbit.conversations.find(c=>c.id===orbit.cid)?.title || '对话'}</strong><button type="button" onClick={() => setRenameTitle(orbit.conversations.find(c=>c.id===orbit.cid)?.title || '')}>重命名</button><button type="button" onClick={() => setDeleteDialog(true)}>删除对话</button></div>
-      {renameTitle!==null && <form className="orbit-dialog-row" onSubmit={e => {e.preventDefault();void orbit.rename(renameTitle).then(()=>setRenameTitle(null)).catch(e=>orbit.setError(e.message));}}><input aria-label="对话名称" value={renameTitle} maxLength={100} onChange={e=>setRenameTitle(e.target.value)} autoFocus /><button type="submit">保存</button><button type="button" onClick={()=>setRenameTitle(null)}>取消</button></form>}
-      {deleteDialog && <div className="orbit-dialog-row" role="alertdialog" aria-label="删除对话确认"><span>删除这段对话？已创建的事务会保留。</span><button type="button" onClick={()=>{void orbit.remove().then(()=>setDeleteDialog(false)).catch(e=>orbit.setError(e.message));}}>确认删除</button><button type="button" onClick={()=>setDeleteDialog(false)}>取消</button></div>}
+      <div className="orbit-chat-toolbar"><button type="button" className="orbit-sidebar-toggle" onClick={() => setConversationDrawer(true)}>对话列表</button><strong>{orbit.conversations.find(c=>c.id===orbit.cid)?.title || '对话'}</strong></div>
+      {renameTitle!==null && <form className="orbit-dialog-row" onSubmit={e => {e.preventDefault();void orbit.rename(renameTitle,targetConversation).then(()=>setRenameTitle(null)).catch(e=>orbit.setError(e.message));}}><input aria-label="对话名称" value={renameTitle} maxLength={100} onChange={e=>setRenameTitle(e.target.value)} autoFocus /><button type="submit">保存</button><button type="button" onClick={()=>setRenameTitle(null)}>取消</button></form>}
+      {deleteDialog && <div className="orbit-dialog-row" role="alertdialog" aria-label="删除对话确认"><span>{orbit.conversations.find(c=>c.id===targetConversation)?.is_main?'清理主对话的历史？Orbit 入口保留。':'删除这段对话？'}已创建的事务会保留。</span><button type="button" onClick={()=>{const operation=orbit.conversations.find(c=>c.id===targetConversation)?.is_main?orbit.clear(targetConversation):orbit.remove(targetConversation);void operation.then(()=>setDeleteDialog(false)).catch(e=>orbit.setError(e.message));}}>确认</button><button type="button" onClick={()=>setDeleteDialog(false)}>取消</button></div>}
       {orbit.error && <div className="orbit-error" role="alert">{orbit.error}<button type="button" onClick={()=>orbit.setError('')} aria-label="关闭提示">×</button></div>}
 
       <div className="flex flex-col h-full schedule-ai-panel" style={{ backgroundColor: 'var(--td-bg-color-container)' }}>
@@ -796,6 +803,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
             key={msg.id}
             msg={msg}
             onOpenSchedule={onOpenSchedule}
+            onReminderAction={orbit.reminderAction}
             onOpenScheduleMenu={onOpenScheduleMenu}
             onConfirmPlan={handleConfirmPlan}
             onDiscardPlan={handleDiscardPlan}

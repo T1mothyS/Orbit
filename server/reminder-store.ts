@@ -451,7 +451,7 @@ function createDelivery(task: ReminderTask, cycle: ReminderCycle, reminderType: 
   );
 }
 
-function cycleReminderDates(task: ReminderTask, cycle: ReminderCycle): Array<{ type: string; date: string }> {
+export function cycleReminderDates(task: ReminderTask, cycle: ReminderCycle): Array<{ type: string; date: string }> {
   const config = task.config;
   if (task.type === 'sim') {
     const sim = config as SimConfig;

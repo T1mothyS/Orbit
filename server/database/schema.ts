@@ -57,8 +57,23 @@ export function applyChatSchema(db: Database, { queryAll, queryOne }: SchemaQuer
   db.run(`CREATE TABLE IF NOT EXISTS orbit_conversations (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,title TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS orbit_preferences (user_id TEXT PRIMARY KEY,auto_knowledge INTEGER NOT NULL DEFAULT 0)`);
   db.run(`CREATE TABLE IF NOT EXISTS orbit_requests (id TEXT NOT NULL,user_id TEXT NOT NULL,conversation_id TEXT NOT NULL,state TEXT NOT NULL,body TEXT NOT NULL,result TEXT,error TEXT,created_at TEXT NOT NULL,PRIMARY KEY(user_id,id))`);
+  const conversationColumns=queryAll<{name:string}>('PRAGMA table_info(orbit_conversations)');
+  for(const [name,type] of [['is_main','INTEGER NOT NULL DEFAULT 0'],['scope_schedule_id','TEXT'],['last_read_at','TEXT']]) {
+    if(!conversationColumns.some(c=>c.name===name)) db.run(`ALTER TABLE orbit_conversations ADD COLUMN ${name} ${type}`);
+  }
+  db.run('CREATE UNIQUE INDEX IF NOT EXISTS orbit_main_user ON orbit_conversations(user_id) WHERE is_main=1');
+  const preferenceColumns=queryAll<{name:string}>('PRAGMA table_info(orbit_preferences)');
+  if(!preferenceColumns.some(c=>c.name==='proactive_enabled'))db.run('ALTER TABLE orbit_preferences ADD COLUMN proactive_enabled INTEGER NOT NULL DEFAULT 0');
+  db.run(`CREATE TABLE IF NOT EXISTS orbit_knowledge_events (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,entry_id TEXT NOT NULL,kind TEXT NOT NULL,created_at TEXT NOT NULL,UNIQUE(user_id,id))`);
+  db.run('CREATE INDEX IF NOT EXISTS orbit_knowledge_events_period ON orbit_knowledge_events(user_id,kind,created_at)');
+  db.run('CREATE TABLE IF NOT EXISTS orbit_metrics_meta (key TEXT PRIMARY KEY,value TEXT NOT NULL)');
+  db.run('INSERT OR IGNORE INTO orbit_metrics_meta (key,value) VALUES (?,?)',['knowledge_tracking_since',new Date().toISOString()]);
+  db.run(`CREATE TABLE IF NOT EXISTS orbit_schedule_reminders (user_id TEXT NOT NULL,schedule_id TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 1,minutes INTEGER NOT NULL DEFAULT 15,snoozed_until TEXT,PRIMARY KEY(user_id,schedule_id))`);
+  db.run(`CREATE TABLE IF NOT EXISTS orbit_proactive_events (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,schedule_id TEXT NOT NULL,instance_id TEXT,expected_state TEXT NOT NULL,trigger_at TEXT NOT NULL,state TEXT NOT NULL,message_id TEXT,error TEXT,created_at TEXT NOT NULL,UNIQUE(user_id,schedule_id,expected_state,trigger_at))`);
+  db.run('CREATE UNIQUE INDEX IF NOT EXISTS orbit_proactive_trigger ON orbit_proactive_events(user_id,schedule_id,trigger_at)');
   const orbitColumns=queryAll<{name:string}>('PRAGMA table_info(ai_schedule_messages)');
   if(!orbitColumns.some(c=>c.name==='conversation_id'))db.run('ALTER TABLE ai_schedule_messages ADD COLUMN conversation_id TEXT');
+  if(!orbitColumns.some(c=>c.name==='orbit_meta'))db.run('ALTER TABLE ai_schedule_messages ADD COLUMN orbit_meta TEXT');
   db.run('CREATE INDEX IF NOT EXISTS orbit_history_conversation ON ai_schedule_messages(user_id,conversation_id,created_at)');
 
 

@@ -406,3 +406,14 @@
   .orbit-chat-toolbar strong { display: none; }
   .orbit-chat-toolbar .orbit-sidebar-toggle { margin-right: auto; }
 }
+.orbit-conversation-row { display:flex; align-items:center; min-width:0; border-radius:10px; }
+.orbit-conversation-row.active { background:var(--td-brand-color-light); }
+.orbit-conversation-select { display:flex; align-items:center; gap:6px; min-width:0; flex:1; padding:10px 8px; text-align:left; background:none; border:0; color:inherit; }
+.orbit-conversation-select span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.orbit-conversation-select em { font-style:normal; font-size:11px; color:var(--td-brand-color); }
+.orbit-conversation-actions { display:flex; flex-shrink:0; visibility:hidden; }
+.orbit-conversation-actions button { padding:7px; color:var(--td-text-color-secondary); border:0; background:none; border-radius:6px; }
+.orbit-conversation-row:hover .orbit-conversation-actions,.orbit-conversation-row:focus-within .orbit-conversation-actions,.orbit-conversation-row.active .orbit-conversation-actions { visibility:visible; }
+@media (hover:none), (max-width:1100px) { .orbit-conversation-actions { visibility:visible; } }
+.orbit-reminder-actions{display:flex;flex-direction:column;gap:8px;margin-top:12px}.orbit-reminder-actions>div{display:flex;flex-wrap:wrap;gap:8px}.orbit-reminder-actions button{border:1px solid var(--td-component-border);border-radius:6px;background:var(--td-bg-color-container);color:var(--td-text-color-primary);padding:6px 10px;font-size:12px;cursor:pointer}.orbit-reminder-actions button:disabled{opacity:.5}
+.orbit-reminder-settings{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:15px 0;padding:12px;border:1px solid var(--td-component-border);border-radius:8px;font-size:12px}.orbit-reminder-settings strong,.orbit-reminder-settings small{width:100%}.orbit-reminder-settings input[type=number]{width:65px;background:var(--td-bg-color-container);color:var(--td-text-color-primary);border:1px solid var(--td-component-border)}.orbit-reminder-settings button,.orbit-scope-chat{padding:6px 10px;border-radius:6px;background:var(--td-brand-color-light);color:var(--td-brand-color)}.orbit-scope-chat{width:100%;margin-bottom:12px}
