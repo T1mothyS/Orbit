@@ -462,6 +462,8 @@ export function ActionCenterPage() {
 
   const openCompletionEditor = (item: ActionItem) => {
     if (!item.completionId) return window.alert('当前事项没有可编辑的完成记录，请先重新完成一次。');
+    setDetailSchedule(null);
+    setCompletedDetail(null);
     setCompletionEditTarget(item);
     setCompletionExistingFiles(item.proof?.attachments || []);
     setCompletionRemovedFileIds([]);
@@ -629,7 +631,7 @@ export function ActionCenterPage() {
       setCompletedDetail(null);
       await loadActions(false);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : '删除日程失败');
+      throw error instanceof Error ? error : new Error('删除日程失败');
     }
   };
 
@@ -642,7 +644,7 @@ export function ActionCenterPage() {
       setCompletedDetail(null);
       await loadActions(false);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : '更新完成状态失败');
+      throw error instanceof Error ? error : new Error('更新完成状态失败');
     }
   };
 
@@ -659,7 +661,7 @@ export function ActionCenterPage() {
       setEditingSchedule(null);
       await loadActions(false);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : '保存日程失败');
+      throw error instanceof Error ? error : new Error('保存日程失败');
     }
   };
 

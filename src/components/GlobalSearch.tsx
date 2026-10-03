@@ -3,6 +3,7 @@ import { ArrowRight, BookOpen, CalendarDays, FileText, Loader2, Search, StickyNo
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useDialogLifecycle } from '../hooks/useDialogLifecycle';
 
 type SearchResultType = 'schedule' | 'note' | 'report' | 'library';
 
@@ -46,6 +47,8 @@ export function GlobalSearch() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useDialogLifecycle(dialogRef, open);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -53,14 +56,9 @@ export function GlobalSearch() {
         event.preventDefault();
         setOpen(true);
       }
-      if (event.key === 'Escape' && open) setOpen(false);
     };
     window.addEventListener('keydown', handleShortcut);
     return () => window.removeEventListener('keydown', handleShortcut);
-  }, [open]);
-
-  useEffect(() => {
-    if (open) window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
 
   useEffect(() => {
@@ -73,12 +71,13 @@ export function GlobalSearch() {
       return;
     }
     let cancelled = false;
+    const abort = new AbortController();
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
       try {
         const params = new URLSearchParams({ q: value, scope: 'all', limit: '40' });
-        const result = await fetch(`/api/search?${params.toString()}`, { headers: authHeaders() });
+        const result = await fetch(`/api/search?${params.toString()}`, { headers: authHeaders(), signal: abort.signal });
         if (!result.ok) throw new Error('搜索暂时不可用');
         const payload = await result.json() as SearchResponse;
         if (!cancelled) setResponse(payload);
@@ -93,6 +92,7 @@ export function GlobalSearch() {
     }, 220);
     return () => {
       cancelled = true;
+      abort.abort();
       window.clearTimeout(timer);
     };
   }, [authHeaders, open, query]);
@@ -119,7 +119,7 @@ export function GlobalSearch() {
     navigate(result.target.path);
   };
 
-  const closeFromOverlay = (event: React.MouseEvent<HTMLDivElement>) => {
+  const closeFromOverlay = (event: React.MouseEvent<HTMLDialogElement>) => {
     if (event.target === event.currentTarget) close();
   };
 
@@ -138,8 +138,8 @@ export function GlobalSearch() {
       </button>
 
       {open && createPortal((
-        <div className="global-search-overlay" role="presentation" onMouseDown={closeFromOverlay} onClick={closeFromOverlay}>
-          <section className="global-search-dialog" role="dialog" aria-modal="true" aria-labelledby="global-search-title" onMouseDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
+        <dialog ref={dialogRef} className="global-search-overlay orbit-dialog-viewport" aria-labelledby="global-search-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); close(); }} onClick={closeFromOverlay}>
+          <section className="global-search-dialog" onClick={event => event.stopPropagation()}>
             <div className="global-search-head">
               <div className="global-search-input-wrap">
                 <Search size={18} aria-hidden="true" />
@@ -192,7 +192,7 @@ export function GlobalSearch() {
               </div>
             </div>
           </section>
-        </div>
+        </dialog>
       ), document.body)}
     </>
   );

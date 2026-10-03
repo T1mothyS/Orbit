@@ -8,6 +8,7 @@ import { configureSearch,searchStatus } from '../orbit-search.js';
 import { activateAiPlan, activeAiPlan, resolveAiPlan, setAiPlanState, assertPlanRevision, reviseAiPlan, pendingInteraction,retryFailedPlan } from '../ai-chat-state.js';
 import { OptimizeError } from '../prompt-optimize.js';
 import { createPromptOptimizationRunId, runPromptOptimization } from '../note-prompt-optimization.js';
+import { parseAiSelection } from '../../src/utils/ai-selection.js';
 import { Router } from 'express';
 import {createHash} from 'node:crypto';
 import type { createAuth } from '../auth.js';
@@ -57,8 +58,20 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
   app.post('/api/orbit/conversations/:id/read', authenticate, safe((req,res) => {orbit.markConversationRead(user(req),req.params.id,req.body?.observedAt);res.json({success:true});}));
   app.patch('/api/orbit/conversations/:id', authenticate, safe((req,res) => { orbit.renameConversation(user(req),req.params.id,String(req.body?.title || ''));res.json({success:true}); }));
   app.delete('/api/orbit/conversations/:id', authenticate, safe((req,res) => {const uid=user(req),cid=req.params.id;if(orbit.conversation(uid,cid).is_main)throw new Error('主对话不能删除');if(queryAll("SELECT id FROM orbit_requests WHERE user_id=? AND conversation_id=? AND state IN ('queued','running')",[uid,cid]).length)throw new Error('请先取消请求');clearConversationAttachments(uid,cid);orbit.deleteConversation(uid,cid);res.json({success:true}); }));
-  app.get('/api/orbit/preferences', authenticate, safe((req,res) => res.json({ autoKnowledge: orbit.getAiPreference(user(req)),proactiveEnabled:getProactivePreference(user(req)),runnerEnabled:process.env.ORBIT_PROACTIVE_ENABLED==='true' })));
-  app.patch('/api/orbit/preferences', authenticate, safe((req,res) => { const body=req.body||{};if(typeof body.autoKnowledge!=='boolean'&&typeof body.proactiveEnabled!=='boolean')throw new Error('提醒或检索设置格式不正确');if(body.autoKnowledge!==undefined){if(typeof body.autoKnowledge!=='boolean')throw new Error('检索设置格式不正确');orbit.setAiPreference(user(req),body.autoKnowledge);}if(body.proactiveEnabled!==undefined){if(typeof body.proactiveEnabled!=='boolean')throw new Error('提醒设置格式不正确');setProactivePreference(user(req),body.proactiveEnabled);}res.json({success:true}); }));
+  app.get('/api/orbit/preferences', authenticate, safe((req,res) => res.json({ autoKnowledge: orbit.getAiPreference(user(req)),aiSelection:orbit.getAiSelection(user(req)),proactiveEnabled:getProactivePreference(user(req)),runnerEnabled:process.env.ORBIT_PROACTIVE_ENABLED==='true' })));
+  app.patch('/api/orbit/preferences', authenticate, safe((req,res) => {
+    const body = req.body || {};
+    if (body.autoKnowledge === undefined && body.proactiveEnabled === undefined && body.aiSelection === undefined) throw new Error('偏好设置格式不正确');
+    // Validate every supplied field before changing any preference.
+    if (body.autoKnowledge !== undefined && typeof body.autoKnowledge !== 'boolean') throw new Error('检索设置格式不正确');
+    if (body.proactiveEnabled !== undefined && typeof body.proactiveEnabled !== 'boolean') throw new Error('提醒设置格式不正确');
+    const selection = body.aiSelection === undefined ? undefined : parseAiSelection(body.aiSelection);
+    const uid = user(req);
+    if (body.autoKnowledge !== undefined) orbit.setAiPreference(uid, body.autoKnowledge);
+    if (body.proactiveEnabled !== undefined) setProactivePreference(uid, body.proactiveEnabled);
+    if (selection) orbit.setAiSelection(uid, selection);
+    res.json({success:true});
+  }));
   app.post('/api/orbit/requests', authenticate, safe((req,res) => res.status(202).json({ request: requestView(orbitQueue.submitOrbitRequest(user(req),req.body || {})) })));
   app.get('/api/orbit/requests', authenticate, safe((req,res) => res.json({ requests: orbitQueue.listOrbitRequests(user(req),String(req.query.conversationId || '')).map(requestView) })));
   app.post('/api/orbit/requests/:id/cancel', authenticate, safe((req,res) => res.json({ request: requestView(orbitQueue.cancelOrbitRequest(user(req),req.params.id)) })));

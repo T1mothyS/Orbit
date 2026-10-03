@@ -64,6 +64,7 @@ export function applyChatSchema(db: Database, { queryAll, queryOne }: SchemaQuer
   db.run('CREATE UNIQUE INDEX IF NOT EXISTS orbit_main_user ON orbit_conversations(user_id) WHERE is_main=1');
   const preferenceColumns=queryAll<{name:string}>('PRAGMA table_info(orbit_preferences)');
   if(!preferenceColumns.some(c=>c.name==='proactive_enabled'))db.run('ALTER TABLE orbit_preferences ADD COLUMN proactive_enabled INTEGER NOT NULL DEFAULT 0');
+  if(!preferenceColumns.some(c=>c.name==='ai_selection'))db.run('ALTER TABLE orbit_preferences ADD COLUMN ai_selection TEXT');
   db.run(`CREATE TABLE IF NOT EXISTS orbit_knowledge_events (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,entry_id TEXT NOT NULL,kind TEXT NOT NULL,created_at TEXT NOT NULL,UNIQUE(user_id,id))`);
   db.run('CREATE INDEX IF NOT EXISTS orbit_knowledge_events_period ON orbit_knowledge_events(user_id,kind,created_at)');
   db.run('CREATE TABLE IF NOT EXISTS orbit_metrics_meta (key TEXT PRIMARY KEY,value TEXT NOT NULL)');

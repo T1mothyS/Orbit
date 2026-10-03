@@ -63,7 +63,7 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '操作失败');
       setEditing(null); setSelected(null); await load(); onChanged();
-    } catch (e) { setError(e instanceof Error ? e.message : '操作失败'); }
+    } catch (e) { if (editing) throw e; setError(e instanceof Error ? e.message : '操作失败'); }
     finally { setBusy(false); }
   };
   const completed = rows.filter(row => row.is_completed).length;
@@ -104,7 +104,7 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
     </div>
     {editing && <div className="unscheduled-editor" aria-busy={busy}>
       {error && <p className="unscheduled-edit-error" role="alert">{error}</p>}
-      <ScheduleFormModal editingSchedule={editing} defaultDate={new Date()} onClose={dismissEditor} onSave={body => void mutate(editing.id, 'PUT', body)} />
+      <ScheduleFormModal editingSchedule={editing} defaultDate={new Date()} onClose={dismissEditor} confirmDiscard={false} onSave={body => mutate(editing.id, 'PUT', body)} />
     </div>}
   </dialog>, document.body);
 }

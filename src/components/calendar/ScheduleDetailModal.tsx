@@ -1,7 +1,8 @@
 import { Clock, Edit3, MapPin, Trash2, X } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_LABELS, formatTime, PRIORITY_COLORS } from './schedule-presentation';
 import type { CompletionProofDisplay, Schedule } from './schedule-types';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useDialogLifecycle } from '../../hooks/useDialogLifecycle';
 
 export function ScheduleDetailModal({
   schedule,
@@ -16,8 +17,8 @@ export function ScheduleDetailModal({
 }: {
   schedule: Schedule;
   onClose: () => void;
-  onDelete: (id: string) => void;
-  onToggle: (id: string) => void;
+  onDelete: (id: string) => void | boolean | Promise<void | boolean>;
+  onToggle: (id: string) => void | boolean | Promise<void | boolean>;
   onEdit: (s: Schedule) => void;
   closeAfterAction?: boolean;
   completionProof?: CompletionProofDisplay | null;
@@ -25,24 +26,39 @@ export function ScheduleDetailModal({
   extraActions?:ReactNode;
 }) {
   const pColor = PRIORITY_COLORS[schedule.priority] || PRIORITY_COLORS.medium;
-  const dialogRef=useRef<HTMLDivElement>(null);
-  useEffect(()=>{const previous=document.activeElement as HTMLElement|null;dialogRef.current?.focus();return()=>{if(previous?.isConnected)previous.focus();};},[]);
+  const dialogRef=useRef<HTMLDialogElement>(null);
+  useDialogLifecycle(dialogRef);
+  const actionRef = useRef(false);
+  const actionFocus = useRef<HTMLElement | null>(null);
+  const [busy, setBusy] = useState(false);
+  useLayoutEffect(() => { if (!busy && actionFocus.current?.isConnected) { actionFocus.current.focus({preventScroll:true}); actionFocus.current = null; } }, [busy]);
+  const [error, setError] = useState('');
+  const dismiss = () => { if (!actionRef.current) onClose(); };
+  const runAction = async (action: typeof onDelete) => {
+    if (actionRef.current) return;
+    actionFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    actionRef.current = true; setBusy(true); setError('');
+    try { const result = await action(schedule.id); if (result === false) setError('操作未完成，事项已保留，请稍后重试。'); if (result !== false && closeAfterAction) onClose(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : '操作失败，请重试。'); }
+    finally { actionRef.current = false; setBusy(false); }
+  };
+
   const catColor = CATEGORY_COLORS[schedule.category] || '#6B7280';
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+    <dialog ref={dialogRef} aria-label={schedule.title}
+      className="orbit-dialog-viewport fixed inset-0 z-50 flex items-center justify-center"
+      onCancel={event => { event.preventDefault(); event.stopPropagation(); dismiss(); }}
       style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
-      onMouseDown={onClose}
+      onClick={event => { if (event.target === event.currentTarget) dismiss(); }}
     >
       <div
-        className="rounded-2xl p-5 w-full max-w-sm shadow-2xl"
-        ref={dialogRef} role="dialog" aria-modal="true" aria-label={schedule.title} tabIndex={-1}
-        onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();onClose();}if(e.key==='Tab'){const controls=[...dialogRef.current!.querySelectorAll<HTMLElement>('button,input,select,a[href]')].filter(el=>!el.matches(':disabled'));const first=controls[0],last=controls.at(-1);if(e.shiftKey&&(document.activeElement===first||document.activeElement===dialogRef.current)){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}}}
+        className="schedule-detail-surface rounded-2xl p-5 w-full max-w-sm shadow-2xl"
+
         style={{ backgroundColor: 'var(--td-bg-color-container)' }}
         onMouseDown={e => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between mb-3">
+        <div className="schedule-detail-header flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span
@@ -62,12 +78,12 @@ export function ScheduleDetailModal({
               {schedule.title}
             </h3>
           </div>
-          <button onClick={onClose} aria-label="关闭事项详情" className="p-1 rounded-lg hover:opacity-60 ml-2">
+          <button disabled={busy} onClick={dismiss} aria-label="关闭事项详情" className="p-1 rounded-lg hover:opacity-60 ml-2">
             <X className="w-4 h-4" style={{ color: 'var(--td-text-color-secondary)' }} />
           </button>
         </div>
 
-        <div className="space-y-2 mb-4">
+        <div className="schedule-detail-body space-y-2 mb-4">
           <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--td-text-color-secondary)' }}>
             <Clock className="w-4 h-4" />
             {schedule.all_day
@@ -102,23 +118,27 @@ export function ScheduleDetailModal({
           )}
         </div>
 
+        {error && <p className="orbit-inline-error" role="alert">{error}</p>}
         {extraActions}
-        <div className="flex gap-2">
+        <div className="schedule-detail-actions flex gap-2">
           <button
-            onClick={() => { onDelete(schedule.id); if(closeAfterAction) onClose(); }}
+            disabled={busy}
+            onClick={() => { if (window.confirm(`确定删除“${schedule.title}”吗？`)) void runAction(onDelete); }}
             className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm font-medium"
             style={{ backgroundColor: '#FEF2F2', color: '#EF4444' }}
           >
             <Trash2 className="w-3.5 h-3.5" />删除
           </button>
           <button
-            onClick={() => { onToggle(schedule.id); if(closeAfterAction) onClose(); }}
+            disabled={busy}
+            onClick={() => void runAction(onToggle)}
             className="flex-1 py-2 rounded-lg text-sm font-medium"
             style={{ backgroundColor: 'var(--td-brand-color-light)', color: 'var(--td-brand-color)' }}
           >
-            {schedule.is_completed ? '标记未完成' : '标记完成'}
+            {busy ? '处理中…' : schedule.is_completed ? '标记未完成' : '标记完成'}
           </button>
           <button
+            disabled={busy}
             onClick={() => { onEdit(schedule); if(closeAfterAction) onClose(); }}
             className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm font-medium"
             style={{ backgroundColor: 'var(--td-bg-color-component)', color: 'var(--td-text-color-secondary)' }}
@@ -126,6 +146,7 @@ export function ScheduleDetailModal({
             <Edit3 className="w-3.5 h-3.5" />编辑
           </button>
           {onEditCompletion && <button
+            disabled={busy}
             onClick={onEditCompletion}
             className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm font-medium"
             style={{ backgroundColor: 'var(--td-bg-color-component)', color: 'var(--td-text-color-secondary)' }}
@@ -134,6 +155,6 @@ export function ScheduleDetailModal({
           </button>}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

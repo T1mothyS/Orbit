@@ -1,8 +1,9 @@
 import { Bell, Calendar, CheckCircle2, Clock, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { SCHEDULE_CATEGORIES } from '../../utils/scheduleCategories';
 import { CATEGORY_COLORS, formatScheduleDate, formatTime, PRIORITY_COLORS, toDateKey } from './schedule-presentation';
 import type { Schedule } from './schedule-types';
+import { useDialogLifecycle } from '../../hooks/useDialogLifecycle';
 
 function SmartTimePicker({
   value,
@@ -58,7 +59,7 @@ function SmartTimePicker({
   };
 
   return (
-    <div className="relative flex-1" ref={useRef(null)}>
+    <div className="relative flex-1" ref={useRef(null)} onKeyDown={event => { if (open && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); event.currentTarget.querySelector<HTMLButtonElement>('button')?.focus(); } }}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -202,7 +203,7 @@ function ReminderPicker({
   };
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={ref} onKeyDown={event => { if (open && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); event.currentTarget.querySelector<HTMLButtonElement>('button')?.focus(); } }}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -291,14 +292,21 @@ export function ScheduleFormModal({
   defaultCategory,
   onSave,
   onClose,
+  confirmDiscard = true,
 }: {
   defaultDate: Date;
   editingSchedule?: Schedule | null;
   defaultCategory?: string;
-  onSave: (s: Partial<Schedule>) => void;
+  onSave: (s: Partial<Schedule>) => void | Promise<void>;
   onClose: () => void;
+  confirmDiscard?: boolean;
 }) {
   const isEditing = !!editingSchedule;
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useDialogLifecycle(dialogRef, true, '[aria-label="日程标题"]');
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({
     type: (editingSchedule?.type || 'event') as 'event' | 'todo',
     title: editingSchedule?.title || '',
@@ -323,17 +331,25 @@ export function ScheduleFormModal({
     repeat: (editingSchedule?.is_repeated ? (editingSchedule as any).repeat_rule || 'daily' : '') as '' | 'daily' | 'weekly' | 'monthly',
   });
 
-  const set = (k: string, v: any) => setForm(prev => ({ ...prev, [k]: v }));
+  const initialForm = useRef(JSON.stringify(form));
+  const saveFocus = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => { if (!saving && saveFocus.current?.isConnected) { saveFocus.current.focus({preventScroll:true}); saveFocus.current = null; } }, [saving]);
+  const dismiss = () => {
+    if (savingRef.current) return;
+    if (confirmDiscard && initialForm.current !== JSON.stringify(form) && !window.confirm('放弃本次未保存的编辑？')) return;
+    onClose();
+  };
+  const set = (k: string, v: any) => { setError(''); setForm(prev => ({ ...prev, [k]: v })); };
   const selectedDate = formatScheduleDate(form.date);
   const isUnscheduled = form.type === 'todo' && form.isUnscheduled;
 
   // 类别颜色配置
   const catColor = CATEGORY_COLORS[form.category] || '#6B7280';
 
-  const handleSave = () => {
-    if (!form.title.trim()) return;
+  const handleSave = async () => {
+    if (savingRef.current || !form.title.trim()) return;
     if (!isUnscheduled && (!/^\d{4}-\d{2}-\d{2}$/.test(form.date) || Number.isNaN(Date.parse(form.date)))) {
-      window.alert('请选择执行日期'); return;
+      setError('请选择执行日期'); return;
     }
     const startTime = isUnscheduled
       ? editingSchedule?.start_time || new Date().toISOString()
@@ -345,7 +361,11 @@ export function ScheduleFormModal({
       ? undefined
       : `${form.date}T${form.endTime}:00`;
 
-    onSave({
+    savingRef.current = true;
+    saveFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSaving(true);
+    setError('');
+    try { await onSave({
       type: form.type,
       title: form.title.trim(),
       calendar_id: form.calendarId,
@@ -360,7 +380,12 @@ export function ScheduleFormModal({
       reminders: isUnscheduled ? [] : (form.reminder ? [form.reminder] : []),
       is_repeated: isUnscheduled ? false : !!form.repeat,
       repeat_rule: isUnscheduled ? undefined : (form.repeat || undefined),
-    });
+    }); } catch (cause) {
+      setError(cause instanceof Error && cause.name === 'TimeoutError'
+        ? '保存结果暂未确认，输入已保留。请先重新加载核对，避免重复创建。'
+        : cause instanceof TypeError ? '网络连接失败，输入已保留。请先核对日程，再重试保存。'
+        : cause instanceof Error ? cause.message : '保存失败，输入已保留，请重试。');
+    } finally { savingRef.current = false; setSaving(false); }
   };
 
   const priorityConfig = PRIORITY_COLORS[form.priority];
@@ -373,28 +398,31 @@ export function ScheduleFormModal({
   }));
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+    <dialog
+      ref={dialogRef}
+      aria-label={isEditing ? '编辑日程' : '新增日程'}
+      className="orbit-dialog-viewport fixed inset-0 z-50 flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
-      onMouseDown={onClose}
+      onCancel={event => { event.preventDefault(); event.stopPropagation(); dismiss(); }}
+      onClick={event => { if (event.target === event.currentTarget) dismiss(); }}
     >
       <div
         className="schedule-form-modal rounded-2xl p-6 w-full max-w-md shadow-2xl"
         style={{ backgroundColor: 'var(--td-bg-color-container)' }}
         onMouseDown={e => e.stopPropagation()}
       >
-        <div className="schedule-form-scroll">
         {/* 标题 */}
         <div className="flex items-center justify-between mb-5">
           <h3 className="schedule-form-heading" style={{ color: 'var(--td-text-color-primary)' }}>
             {isEditing ? '编辑日程' : '新增日程'}
           </h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:opacity-60">
+          <button onClick={dismiss} disabled={saving} aria-label="关闭日程编辑" className="p-1 rounded-lg hover:opacity-60">
             <X className="w-4 h-4" style={{ color: 'var(--td-text-color-secondary)' }} />
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="schedule-form-scroll">
+        <fieldset disabled={saving} className="space-y-4 schedule-form-fields">
           {/* 类型切换 */}
           <div className="flex gap-2">
             {(['event', 'todo'] as const).map(t => (
@@ -420,9 +448,9 @@ export function ScheduleFormModal({
           <input
             type="text"
             placeholder="输入日程标题..."
+            aria-label="日程标题"
             value={form.title}
             onChange={e => set('title', e.target.value)}
-            autoFocus
             className="schedule-title-input w-full px-3 py-2.5 rounded-lg outline-none"
             style={{
               backgroundColor: 'var(--td-bg-color-component)',
@@ -667,30 +695,31 @@ export function ScheduleFormModal({
             </div>
           </div>}
           </div>
+        </fieldset>
         </div>
-
-        <div className="flex gap-2 mt-6">
+        {error && <p className="orbit-inline-error" role="alert">{error}</p>}
+        <div className="flex gap-2 mt-6" aria-busy={saving}>
           <button
-            onClick={onClose}
+            onClick={dismiss}
+            disabled={saving}
             className="flex-1 py-2.5 rounded-lg text-sm font-medium"
             style={{ backgroundColor: 'var(--td-bg-color-component)', color: 'var(--td-text-color-secondary)' }}
           >
             取消
           </button>
           <button
-            onClick={handleSave}
-            disabled={!form.title.trim()}
+            onClick={() => void handleSave()}
+            disabled={saving || !form.title.trim()}
             className="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all"
             style={{
               backgroundColor: form.title.trim() ? 'var(--td-brand-color)' : 'var(--td-bg-color-component)',
               color: form.title.trim() ? '#fff' : 'var(--td-text-color-disabled)',
             }}
           >
-            {isEditing ? '保存修改' : '添加日程'}
+            {saving ? '保存中…' : isEditing ? '保存修改' : '添加日程'}
           </button>
         </div>
-        </div>
       </div>
-    </div>
+    </dialog>
   );
 }

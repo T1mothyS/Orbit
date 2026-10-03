@@ -98,7 +98,7 @@ export function AgendaView({
     if (!element) return;
     if (programmaticScrollTimerRef.current != null) window.clearTimeout(programmaticScrollTimerRef.current);
     programmaticScrollRef.current = true;
-    element.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    element.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     programmaticScrollTimerRef.current = window.setTimeout(() => {
       programmaticScrollRef.current = false;
       programmaticScrollTimerRef.current = null;

@@ -22,7 +22,7 @@ Plus,
 Trash2,
 X
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useRef, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { getScheduleCategory } from '../utils/scheduleCategories';
 import {
@@ -1105,6 +1105,10 @@ export function CalendarView({
   const [currentDate, setCurrentDate] = useState<Date>(selectedDate || new Date());
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [mutationError, setMutationError] = useState('');
+  const pendingMutations = useRef(new Set<string>());
+  const [mutating, setMutating] = useState(false);
   const { authHeaders } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
@@ -1160,20 +1164,21 @@ export function CalendarView({
   }, []);
 
   const fetchSchedules = useCallback(async () => {
-    setLoading(true);
+    setLoading(true); setLoadError('');
     try {
       const res = await fetch('/api/schedules', { headers: authHeaders() });
       const data = await res.json();
-      const list: Schedule[] = data.schedules || [];
+      if (!res.ok || !Array.isArray(data.schedules)) throw new Error(data.error || '日程加载失败');
+      const list: Schedule[] = data.schedules;
       setSchedules(list);
       // 为有提醒设置的日程注册通知
       list.forEach(s => scheduleReminder(s));
     } catch (e) {
-      console.error('Fetch schedules failed', e);
+      setLoadError(e instanceof Error ? e.message : '日程加载失败，已有内容已保留。');
     } finally {
       setLoading(false);
     }
-  }, [scheduleReminder]);
+  }, [scheduleReminder, authHeaders]);
 
   useEffect(() => {
     fetchSchedules();
@@ -1332,63 +1337,44 @@ export function CalendarView({
     return `${currentDate.getFullYear()}年${currentDate.getMonth() + 1}月`;
   };
 
-  const handleToggle = useCallback(async (id: string) => {
+  const mutateSchedule = useCallback(async (id: string, deleting: boolean) => {
+    if (pendingMutations.current.has(id)) return false;
+    pendingMutations.current.add(id); setMutating(true); setMutationError('');
     try {
-      const res = await fetch(`/api/schedules/${id}/toggle`, { method: 'POST', headers: authHeaders() });
-      const data = await res.json();
-      if (data.schedule) {
-        setSchedules(prev => prev.map(s => s.id === id ? data.schedule : s));
-      }
-    } catch {}
-  }, []);
-
-  const handleDelete = useCallback(async (id: string) => {
-    try {
-      await fetch(`/api/schedules/${id}`, { method: 'DELETE', headers: authHeaders() });
-      setSchedules(prev => prev.filter(s => s.id !== id));
-    } catch {}
-  }, []);
-
-  const handleAddSchedule = async (form: Partial<Schedule>) => {
-    try {
-      const res = await fetch('/api/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({
-          ...form,
-          calendar_id: 'personal',
-          category: form.category || 'other',
-          priority: form.priority || 'medium',
-          is_completed: false,
-          is_repeated: false,
-        })
+      const res = await fetch(`/api/schedules/${encodeURIComponent(id)}${deleting ? '' : '/toggle'}`, {
+        method: deleting ? 'DELETE' : 'POST', headers: authHeaders(), signal: AbortSignal.timeout(20000),
       });
       const data = await res.json();
-      if (data.schedule) {
-        setSchedules(prev => [...prev, data.schedule]);
-        // 为新日程设置提醒
-        scheduleReminder(data.schedule);
-      }
-      setShowAddModal(false);
-    } catch {}
+      if (!res.ok || (!deleting && !data.schedule)) throw new Error(data.error || '操作失败');
+      setSchedules(prev => deleting ? prev.filter(s => s.id !== id) : prev.map(s => s.id === id ? data.schedule : s));
+      return true;
+    } catch (cause) {
+      setMutationError(cause instanceof Error && cause.name === 'TimeoutError'
+        ? '操作结果暂未确认，请刷新日程核对后再操作。'
+        : cause instanceof Error ? cause.message : '操作失败，事项已保留。');
+      return false;
+    } finally { pendingMutations.current.delete(id); setMutating(pendingMutations.current.size > 0); }
+  }, [authHeaders]);
+  const handleToggle = useCallback((id: string) => mutateSchedule(id, false), [mutateSchedule]);
+  const handleDelete = useCallback((id: string) => mutateSchedule(id, true), [mutateSchedule]);
+
+  const saveSchedule = async (form: Partial<Schedule>, editing?: Schedule) => {
+    const res = await fetch(editing ? `/api/schedules/${encodeURIComponent(editing.id)}` : '/api/schedules', {
+      method: editing ? 'PUT' : 'POST',
+      signal: AbortSignal.timeout(30000),
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(editing ? form : { ...form, calendar_id: 'personal', category: form.category || 'other', priority: form.priority || 'medium', is_completed: false, is_repeated: false }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.schedule) throw new Error(data.error || '保存失败，输入已保留。');
+    setSchedules(prev => editing ? prev.map(s => s.id === editing.id ? data.schedule : s) : [...prev, data.schedule]);
+    scheduleReminder(data.schedule);
+    if (editing) setEditingSchedule(null); else setShowAddModal(false);
   };
-
-  const handleEditSchedule = async (form: Partial<Schedule>) => {
-    if (!editingSchedule) return;
-    try {
-      const res = await fetch(`/api/schedules/${editingSchedule.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (data.schedule) {
-        setSchedules(prev => prev.map(s => s.id === editingSchedule.id ? data.schedule : s));
-        // 为更新的日程重新设置提醒
-        scheduleReminder(data.schedule);
-      }
-      setEditingSchedule(null);
-    } catch {}
+  const handleAddSchedule = (form: Partial<Schedule>) => saveSchedule(form);
+  const handleEditSchedule = (form: Partial<Schedule>) => {
+    if (!editingSchedule) return Promise.reject(new Error('编辑的日程已关闭，请重新打开。'));
+    return saveSchedule(form, editingSchedule);
   };
 
   const handleMonthDayClick = (day: Date) => {
@@ -1609,9 +1595,15 @@ export function CalendarView({
         );
       })()}
 
+      {(loadError || mutationError) && <div className="orbit-inline-error calendar-operation-feedback" role="alert">
+        <span>{loadError || mutationError}</span><button type="button" disabled={loading || mutating} onClick={() => { setMutationError(''); void fetchSchedules(); }}>重新加载</button>
+        <button type="button" aria-label="关闭日程提示" onClick={() => { setLoadError(''); setMutationError(''); }}>×</button>
+      </div>}
+      {mutating && <p className="calendar-operation-feedback" role="status">正在更新事项…</p>}
+      {loading && schedules.length > 0 && <p className="calendar-operation-feedback" role="status">正在刷新日程…</p>}
       {/* 日程内容区 */}
       <div className={`calendar-content-viewport calendar-content-${viewMode} flex-1 overflow-hidden`}>
-        {loading ? (
+        {loading && !schedules.length ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-sm" style={{ color: 'var(--td-text-color-secondary)' }}>加载中...</div>
           </div>

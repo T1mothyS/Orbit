@@ -45,6 +45,21 @@ test('Orbit migrates old messages, retains history, and scopes conversations and
     assert.equal(store.getAiPreference('owner'), true);
     assert.equal(store.getAiPreference('other'), false);
 });
+test('account model preferences survive backup and preserve other preferences, legacy replace clears selection', () => {
+    const selection = { provider: 'chatgpt', models: { workbuddy: 'glm-5.1', chatgpt: 'previous-luna' } };
+    store.setAiPreference('preference-a', true);
+    store.setAiSelection('preference-a', selection);
+    assert.deepEqual(store.getAiSelection('preference-a'), selection);
+    assert.equal(store.getAiSelection('preference-b'), null);
+    assert.equal(store.getAiPreference('preference-a'), true);
+    const snapshot = store.exportOrbit('preference-a');
+    store.restoreOrbit('preference-b', snapshot, 'merge', true);
+    assert.deepEqual(store.getAiSelection('preference-b'), selection);
+    store.restoreOrbit('preference-b', { conversations: [], messages: [], autoKnowledge: false }, 'merge');
+    assert.deepEqual(store.getAiSelection('preference-b'), selection);
+    store.restoreOrbit('preference-b', { conversations: [], messages: [], autoKnowledge: false }, 'replace');
+    assert.equal(store.getAiSelection('preference-b'), null);
+});
 test('queue serializes one account, allows short writes and other accounts, cancellation and idempotent retry', async () => {
     const cid = store.createConversation('owner').id, otherCid = store.createConversation('other').id;
     const order: string[] = [];
@@ -158,6 +173,17 @@ test('HTTP conversation, history, queue and planned-date routes enforce authenti
     const request = (url: string, user = 0, method = 'GET', body?: unknown) => fetch(base + url, { method, headers: { Authorization: 'Bearer ' + api.signUserToken(users[user]), 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     try {
         assert.equal((await fetch(base + '/api/orbit/conversations')).status, 401);
+        assert.equal((await fetch(base + '/api/orbit/preferences')).status, 401);
+        const selected = { provider: 'chatgpt', models: { chatgpt: 'saved-luna', workbuddy: 'glm-5.1' } };
+        assert.equal((await request('/api/orbit/preferences', 0, 'PATCH', { aiSelection: selected })).status, 200);
+        assert.deepEqual((await (await request('/api/orbit/preferences')).json()).aiSelection, selected);
+        assert.equal((await (await request('/api/orbit/preferences', 1)).json()).aiSelection, null);
+        const autoBefore = store.getAiPreference('owner');
+        assert.equal((await request('/api/orbit/preferences', 0, 'PATCH', { autoKnowledge: !autoBefore, aiSelection: { provider: 'invalid', models: {} } })).status, 400);
+        assert.equal(store.getAiPreference('owner'), autoBefore);
+        assert.deepEqual(store.getAiSelection('owner'), selected);
+        assert.equal((await request('/api/orbit/preferences', 0, 'PATCH', { autoKnowledge: !autoBefore, proactiveEnabled: 'bad' })).status, 400);
+        assert.equal(store.getAiPreference('owner'), autoBefore);
         const cid = (await (await request('/api/orbit/conversations', 0, 'POST', { title: 'HTTP fixture' })).json()).conversation.id;
         assert.equal((await request('/api/orbit/conversations/' + cid, 1, 'PATCH', { title: 'forbidden' })).status, 400);
         assert.equal((await request('/api/ai-schedule/history?conversationId=' + cid, 1)).status, 400);

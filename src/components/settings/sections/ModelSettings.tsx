@@ -63,7 +63,7 @@ export function ModelSettings({ authHeaders }: { authHeaders: SettingsAuthHeader
   };
 
   return (
-    <SettingRow label="日程 AI 模型" description="影响日程解析和普通对话；模型列表不可用时保留常用选项。">
+    <SettingRow label="Work Buddy 默认解析模型" description="用于未指定模型的日程解析。Orbit 聊天的具体模型在输入栏“＋”中选择，并单独记忆。">
       {loadError && <div className="settings-status" role="alert">{loadError}<Button tag="button" variant="outline" onClick={loadSelection}>重试模型设置</Button></div>}
       <Select aria-label="日程 AI 模型" popupProps={{ overlayClassName: 'settings-select-popup' }} value={selectedModel} disabled={!loaded || saving || !!loadError} onChange={value => setSelectedModel(String(value))} options={options.map(model => ({ value: model.modelId, label: model.name || model.modelId }))} />
       <div className="settings-actions">

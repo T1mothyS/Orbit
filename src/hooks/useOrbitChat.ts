@@ -21,6 +21,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     const [requests, setRequests] = useState<OrbitRequest[]>([]);
     const [history, setHistory] = useState<any[]>([]);
     const [error, setError] = useState('');
+    const [refreshError, setRefreshError] = useState('');
     const [autoKnowledge, setAutoKnowledge] = useState(false);
     const [proactiveEnabled,setProactiveEnabled]=useState(false),[runnerEnabled,setRunnerEnabled]=useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -55,6 +56,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         const [messages, jobs, list] = await Promise.all([api(`/api/ai-schedule/history?conversationId=${encodeURIComponent(cid)}`), api(`/api/orbit/requests?conversationId=${encodeURIComponent(cid)}`),api('/api/orbit/conversations')]);
         if (current.current !== cid || refreshRevision.current !== revision)
             return;
+        setRefreshError('');
         setHistory(previous => JSON.stringify(previous) === JSON.stringify(messages.messages) ? previous : messages.messages);
         setRequests(previous => JSON.stringify(previous) === JSON.stringify(jobs.requests) ? previous : jobs.requests);
         setConversations(previous=>JSON.stringify(previous)===JSON.stringify(list.conversations)?previous:list.conversations);
@@ -87,7 +89,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
             return;
         setHistory([]);
         setRequests([]);
-        setError('');
+        setError(''); setRefreshError('');
         let stopped = false;
         let timer: ReturnType<typeof setTimeout>;
         const tick = async () => {
@@ -96,7 +98,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
             }
             catch (e) {
                 if (!stopped)
-                    setError(e instanceof Error ? e.message : '加载失败');
+                    setRefreshError(e instanceof Error && e.name === 'TimeoutError' ? '状态刷新超时，正在重新连接…' : '状态暂时无法刷新，正在重新连接…');
             }
             if (!stopped)
                 timer = setTimeout(tick, 2000);
@@ -130,10 +132,12 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
             const signature=JSON.stringify(body);
             const id = old?.text === text && old.cid === cid && old.signature===signature ? old.id : crypto.randomUUID();
             pendingSubmission.current = { text, cid, id,signature };
-            await api('/api/orbit/requests', 'POST', { ...body, text, requestId: id, conversationId: cid });
+            setError('');
+            try { await api('/api/orbit/requests', 'POST', { ...body, text, requestId: id, conversationId: cid }); }
+            catch (cause) { throw cause instanceof Error && cause.name === 'TimeoutError' ? new Error('发送结果暂未确认，输入已保留；重试相同内容会核对同一条请求。') : cause; }
             pendingSubmission.current = null;
             // An accepted request stays accepted even if the subsequent status read fails.
-            try { await refresh(); } catch { setError('消息已加入队列，状态暂时无法刷新；请稍后查看，避免重复发送。'); }
+            try { await refresh(); } catch { setRefreshError('消息已加入队列，状态暂时无法刷新；正在重新连接…'); }
             return true;
         }
         finally {
@@ -149,5 +153,5 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     const preference = useCallback(async (value: boolean) => { await api('/api/orbit/preferences', 'PATCH', { autoKnowledge: value }); setAutoKnowledge(value); }, [api]);
     const proactivePreference=useCallback(async(value:boolean)=>{await api('/api/orbit/preferences','PATCH',{proactiveEnabled:value});setProactiveEnabled(value);},[api]);
     const reminderAction=useCallback(async(id:string,action:string)=>{await api(`/api/orbit/reminders/${encodeURIComponent(id)}/${action}`,'POST',{});await refresh();},[api,refresh]);
-    return { cid, conversations, requests, history, error, setError, autoKnowledge,proactiveEnabled,runnerEnabled, submitting, creating, select, create, send, action, rename, remove, clear, preference,proactivePreference,reminderAction, refresh };
+    return { cid, conversations, requests, history, error, refreshError, setError, autoKnowledge,proactiveEnabled,runnerEnabled, submitting, creating, select, create, send, action, rename, remove, clear, preference,proactivePreference,reminderAction, refresh };
 }

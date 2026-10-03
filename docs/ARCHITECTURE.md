@@ -147,7 +147,7 @@ Orbit 使用现有 chat.db 和同步持久化事务，未增加数据库服务�
 | --- | --- |
 | GET/POST `/api/orbit/conversations` | 当前账号会话列表/创建 |
 | PATCH/DELETE `/api/orbit/conversations/:id` | 重命名/删除；存在 queued/running 时先取消；保留事务数据 |
-| GET/PATCH `/api/orbit/preferences` | 账号自动知识检索开关，默认 false |
+| GET/PATCH `/api/orbit/preferences` | 账号自动知识检索、主动聊天开关及 aiSelection；PATCH 全部字段校验后才写入 |
 | POST `/api/orbit/requests` | 接受有 requestId/conversationId/text 的有界请求，返回 202 和状态；每账号最多 20 个等待/执行请求 |
 | GET `/api/orbit/requests?conversationId=...` | 指定账号会话最近 40 个请求状态 |
 | POST `/api/orbit/requests/:id/cancel`、`/retry` | 取消/重试；正在结束的同 ID 工作不能重入 |
@@ -164,6 +164,14 @@ AI 生成的 update/delete 绑定真实对象 ID 和事实指纹，确认时拒�
 账号加密备份保存会话、消息、检索偏好及周期安排日期；新队列执行状态不随账号备份重放。旧备份缺少 Orbit 字段时保留现有会话；跨账号恢复重映射会话/消息 ID，并清除原账号的计划、日程和知识引用。完整系统备份仍通过既有数据库文件合同覆盖这些表。清空/删除账号清理新表。
 
 品牌改为 Orbit，应用内部数据库、备份魔数/格式、加密盐、认证存储键、appId 和既有桌面数据目录保留兼容身份。
+
+### 聊天模型偏好
+
+`orbit_preferences.ai_selection` 是增量可空 TEXT 列，保存 `{provider: 'workbuddy'|'chatgpt', models: {workbuddy?: string, chatgpt?: string}}`；活动 Provider 必须有具体模型 ID。接口按认证账号读写，严格校验类型/长度/控制字符，剥离未知顶层字段，不保存凭据；无偏好返回 null。PATCH 同时提交多个偏好时先完整校验，避免部分写入。
+
+前端从当前账号实际 Provider/模型目录恢复精确 ID，新模型和目录排序不自动替换选择；无偏好且 ChatGPT 已连接才选择目录中的 Luna。缺失模型保留原 ID 并要求手动选择；未连接不切换 Provider。每次请求继续冻结 Provider/模型。偏好写入与连接刷新使用版本保护；保存失败与目录失败分别反馈。Work Buddy 原有默认解析模型接口保持独立。
+
+Orbit 账号备份的 aiSelection 随偏好导出并在恢复前校验，不包含 OAuth/Key。旧备份缺此字段时，合并保留当前偏好，替换清空后重新初始化；有字段按备份恢复。跨账号恢复仅迁移模型偏好，连接与模型可用性重新检查，既有业务引用清理规则不变。
 
 ### Orbit 主对话、统计和主动提醒
 
