@@ -1,4 +1,5 @@
-import { getUserById, getReminder } from './db.js';
+import { getUserById, getReminder, getUserPreferredModel } from './db.js';
+import { defaultModel } from './ai-credentials.js';
 import { dateInZone } from './orbit-time.js';
 import { queryAll, run } from './database/connection.js';
 import { conversation, getRequest, orbitContext, type ChatRequest } from './orbit-store.js';
@@ -27,7 +28,8 @@ export function submitOrbitRequest(userId: string, body: any) {
     const text = String(body.text || '').trim();
     if (!text || text.length > 20000)
         throw new Error('请输入 1–20000 字的内容');
-    const allowed = new Set(['text', 'requestId', 'conversationId', 'targetDate', 'model', 'calendarId', 'knowledgeScope']);
+    const allowed = new Set(['text', 'requestId', 'conversationId', 'targetDate', 'model', 'calendarId', 'knowledgeScope', 'provider']);
+    if(body.provider!==undefined && body.provider!=='workbuddy')throw new Error('Provider 当前不可用');
     if (Object.keys(body).some(key => !allowed.has(key)))
         throw new Error('请求包含不支持的字段');
     const old = getRequest(userId, id);
@@ -40,7 +42,7 @@ export function submitOrbitRequest(userId: string, body: any) {
         throw new Error('等待队列已满，请先处理已有请求');
     const submittedAt = new Date();
     const targetDate = body.targetDate || dateInZone(submittedAt, getReminder(userId)?.timezone || 'Asia/Shanghai');
-    run('INSERT INTO orbit_requests (id,user_id,conversation_id,state,body,created_at) VALUES (?,?,?,?,?,?)', [id, userId, cid, 'queued', JSON.stringify({ ...body, text, targetDate }), submittedAt.toISOString()]);
+    run('INSERT INTO orbit_requests (id,user_id,conversation_id,state,body,created_at) VALUES (?,?,?,?,?,?)', [id, userId, cid, 'queued', JSON.stringify({ ...body, text, targetDate, provider:body.provider||'workbuddy',model:body.model||getUserPreferredModel(userId,defaultModel) }), submittedAt.toISOString()]);
     void pump(userId);
     return getRequest(userId, id)!;
 }

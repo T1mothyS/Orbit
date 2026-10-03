@@ -1,5 +1,6 @@
 import { query, type ImageMediaType, type UserMessage } from '@tencent-ai/agent-sdk';
 import { v4 as uuidv4 } from 'uuid';
+import { ORBIT_AI_QUERY_POLICY } from './orbit-ai-policy.js';
 import { buildCodeBuddyEnv } from './codebuddy-env.js';
 import { AI_IMPORT_LINKAGE_RULES, AI_LINKAGE_GUIDE_VERSION } from './ai-linkage-guide.js';
 import { extractAiMessageText, parseAiJsonCandidates } from './ai-json.js';
@@ -136,6 +137,7 @@ export async function parseAiImport(input: {
     const stream = query({
       prompt: createPrompt(input.text?.trim() || '', images),
       options: {
+        ...ORBIT_AI_QUERY_POLICY,
         cwd: process.cwd(),
         model: input.model,
         maxTurns: 1,

@@ -1,4 +1,5 @@
 import { ORBIT_AI_QUERY_POLICY } from '../orbit-ai-policy.js';
+import { workBuddyProvider } from '../ai-provider-workbuddy.js';
 import { activateAiPlan, activeAiPlan, resolveAiPlan, setAiPlanState, assertPlanRevision, reviseAiPlan, pendingInteraction } from '../ai-chat-state.js';
 import { OptimizeError } from '../prompt-optimize.js';
 import { createPromptOptimizationRunId, runPromptOptimization } from '../note-prompt-optimization.js';
@@ -41,6 +42,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
   const safe = (fn: (req: any, res: any) => any) => (req: any, res: any) => { try { fn(req, res); } catch (error: any) { res.status(400).json({ error: error.message }); } };
   const requestView = (row: orbit.ChatRequest) => ({ id: row.id, conversationId: row.conversation_id, state: row.state, text: JSON.parse(row.body).text, error: row.error, createdAt: row.created_at });
   app.get('/api/orbit/conversations', authenticate, safe((req,res) => res.json({ conversations: orbit.listConversations(user(req)) })));
+  app.get('/api/orbit/providers',authenticate,safe((req,res)=>res.json({providers:[{id:'workbuddy',name:'WorkBuddy',connected:!!resolveCodeBuddyCredential(user(req))}]})));
   app.post('/api/orbit/conversations', authenticate, safe((req,res) => res.json({ conversation: orbit.createConversation(user(req), String(req.body?.title || '新对话'),req.body?.scopeScheduleId) })));
   app.post('/api/orbit/conversations/:id/read', authenticate, safe((req,res) => {orbit.markConversationRead(user(req),req.params.id,req.body?.observedAt);res.json({success:true});}));
   app.patch('/api/orbit/conversations/:id', authenticate, safe((req,res) => { orbit.renameConversation(user(req),req.params.id,String(req.body?.title || ''));res.json({success:true}); }));
@@ -623,26 +625,7 @@ priority 识别：
     try {
 
       // 【修复数据隔离】使用该用户的 API Key
-      const stream = query({
-        prompt: modelPrompt,
-        options: {
-          ...ORBIT_AI_QUERY_POLICY,
-          cwd: process.cwd(),
-          model: selectedModel,
-          maxTurns: 1,
-          abortController: context?.controller,
-          systemPrompt,
-          env: buildCodeBuddyEnv(userCredential),
-        }
-      });
-
-      for await (const msg of stream) {
-        if (msg.type === 'assistant') {
-          assistantText += extractAiMessageText(msg);
-        } else if (msg.type === 'result') {
-          resultText = extractAiMessageText(msg);
-        }
-      }
+      resultText=await workBuddyProvider.generate({userId,model:selectedModel,instructions:systemPrompt,input:[{type:'text',text:modelPrompt}],controller:context?.controller});
 
       const parsedResult = parseAiJsonCandidates([assistantText, resultText]);
       const parsed = parsedResult.value;

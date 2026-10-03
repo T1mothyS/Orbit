@@ -187,3 +187,6 @@ Provider 合同位于 server/ai-provider-contract.ts：模型目录声明与真�
 #### 当前操作状态
 待确认计划的消息快照为持久来源，内存 Map 仅为缓存；会话 active_plan_message_id 指向唯一活跃草稿。revision 用于编辑/确认冲突校验，取消/挂起/过期保留快照。确认接口独立恢复，无需先读取历史。明确时间与日期短句只修订该草稿，文字确认仍需按钮；新话题挂起，恢复需显式操作。恢复备份不会激活草稿。
 主动提醒保存 handled_action、handled_at、next_reminder_at；旧 handled 仅显示已处理。正式日程写入、所有权、指纹与 operation_results 幂等边界不变。
+
+#### Provider 适配边界
+WorkBuddy 主聊天经 ai-provider-workbuddy.ts 调用；旧 Key/验证/模型接口保持兼容。目录可用时补充 SDK 原始能力字段，不可用时返回 unknown 而不使旧模型列表失败。请求入队冻结 Provider 和模型。进程内 MCP 工具采用 Orbit 白名单，拒绝命令、文件、外部 MCP 和继承设置；SDK 内置工具仍为 tools: []。图片导入同步权限策略。zod 沿 SDK 已有 v4 版本显式声明。

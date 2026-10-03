@@ -3,6 +3,7 @@ import * as dbModule from './db.js';
 import { buildCodeBuddyEnv } from './codebuddy-env.js';
 import { createModelService } from './model-service.js';
 import * as db from './db.js';
+import { workBuddyModel } from './ai-provider-contract.js';
 
 export const defaultModel = "glm-5.1";
 export const modelService = createModelService<any>({
@@ -20,10 +21,15 @@ export function getAvailableModels(
     userId,
     credentialVersion: credential.updated_at,
     forceRefresh,
-    createSession: () => unstable_v2_createSession({
-      cwd: process.cwd(),
-      env: buildCodeBuddyEnv(credential),
-    }),
+    createSession: () => {
+      const session=unstable_v2_createSession({cwd:process.cwd(),env:buildCodeBuddyEnv(credential)});
+      return {close:()=>session.close(),getAvailableModels:async()=>{
+        const models=await session.getAvailableModels();
+        // Experimental capability lookup must never break the existing model list.
+        let raw:Record<string,any>[]=[];try{raw=await session.getAvailableModelsRaw();}catch{}
+        return models.map(model=>({...model,orbit:workBuddyModel({...model,...raw.find(r=>r.id===model.modelId)})}));
+      }};
+    },
   });
 }
 
