@@ -39,3 +39,7 @@
 | `docs/CHATGPT-WORK-CLOUD.md` 历史章节 | [Cloud 历史运行](digest/CLOUD-RUN-HISTORY-20260909-20260914.md) |
 
 本机 DEPLOY 的原历史仅存忽略的 .local-docs，未复制生产配置/数据。
+
+## 专项审计快照
+
+- [Orbit Interaction & Motion Audit（2026-10-03）](engineering/ORBIT-INTERACTION-MOTION-AUDIT-20261003.md)：基于当日源码与隔离页面检查的全站 UI / UX / Motion 提升计划，待确认，未实施。当前规范和实施状态仍见 UI-GUIDELINES 与 TASKS。
