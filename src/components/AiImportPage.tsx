@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clipboard, Mail, RefreshCw, Sparkles, Trash2, WandSparkles } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { requestError } from '../utils/request-error';
 
 interface Draft {
   kind: 'schedule' | 'recurring';
@@ -47,24 +48,36 @@ export function AiImportPage() {
   const [pendingImports, setPendingImports] = useState<ImportRecord[]>([]);
   const [imapConfigured, setImapConfigured] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
+  const [importsLoading, setImportsLoading] = useState(true);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [importsError, setImportsError] = useState('');
+  const [settingsError, setSettingsError] = useState('');
 
   const loadPendingImports = useCallback(() => {
-    return fetch('/api/ai/imports?status=draft', { headers: authHeaders() })
-      .then(response => response.json())
+    setImportsLoading(true); setImportsError('');
+    return fetch('/api/ai/imports?status=draft', { headers: authHeaders(), signal: AbortSignal.timeout(20000) })
+      .then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || '导入草稿读取失败'); return data; })
       .then(data => setPendingImports(data.imports || []))
-      .catch(() => undefined);
+      .catch(error => setImportsError('导入草稿：' + requestError(error, '暂时无法读取')))
+      .finally(() => setImportsLoading(false));
   }, [authHeaders]);
 
-  useEffect(() => {
-    fetch('/api/email-import/settings', { headers: authHeaders() })
-      .then(response => response.json())
+  const loadEmailSettings = useCallback(() => {
+    setSettingsLoading(true); setSettingsError('');
+    return fetch('/api/email-import/settings', { headers: authHeaders(), signal: AbortSignal.timeout(20000) })
+      .then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || '邮箱导入设置读取失败'); return data; })
       .then(data => {
         setEmailSetting(data.setting || null);
         setImapConfigured(!!data.imapConfigured);
       })
-      .catch(() => setNotice({ type: 'error', message: '邮箱导入设置暂时无法读取' }));
+      .catch(error => setSettingsError('邮箱设置：' + requestError(error, '暂时无法读取')))
+      .finally(() => setSettingsLoading(false));
+  }, [authHeaders]);
+
+  useEffect(() => {
+    void loadEmailSettings();
     void loadPendingImports();
-  }, [authHeaders, loadPendingImports]);
+  }, [loadEmailSettings, loadPendingImports]);
 
   const update = (key: keyof Draft, value: any) => setDraft(current => current ? { ...current, [key]: value } : current);
 
@@ -163,7 +176,12 @@ export function AiImportPage() {
       <WandSparkles size={34} aria-hidden="true" />
     </header>
 
-    {notice && <div className={'notice ' + notice.type} role="status">
+    {(importsError || settingsError) && <div className="notice error" role="alert">
+      <AlertTriangle size={17} /><span>{[settingsError, importsError].filter(Boolean).join('；')}</span>
+      <button type="button" className="secondary-button" disabled={settingsLoading || importsLoading} onClick={() => { void loadEmailSettings(); void loadPendingImports(); }}>重新读取</button>
+    </div>}
+    {importsLoading && <p role="status">正在读取导入草稿…</p>}
+    {notice && <div className={'notice ' + notice.type} role={notice.type === 'error' ? 'alert' : 'status'}>
       {notice.type === 'success' ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
       <span>{notice.message}</span>
     </div>}
@@ -181,7 +199,7 @@ export function AiImportPage() {
 
     <section className="email-import-card ai-import-token-card">
       <div className="ai-card-title"><Mail size={18} /><div><h2>邮箱导入设置</h2><span>主题中包含专属标记，系统才会收集并交给 AI。</span></div></div>
-      {!emailSetting ? <div className="ai-import-loading">正在读取邮箱导入设置…</div> : <>
+      {!emailSetting ? <div className="ai-import-loading" role="status">{settingsLoading ? '正在读取邮箱导入设置…' : settingsError ? '请重新读取邮箱导入设置。' : '当前没有可用的邮箱导入设置。'}</div> : <>
         <div className="email-import-status-row">
           <span className={`email-import-status${emailSetting.enabled ? ' enabled' : ''}`}><i aria-hidden="true" />{emailSetting.enabled ? '邮箱导入已开启' : '邮箱导入未开启'}</span>
           <span className={imapConfigured ? 'email-import-configured' : 'email-import-unconfigured'}>{imapConfigured ? 'IMAP 已配置' : '服务端尚未配置 IMAP'}</span>
