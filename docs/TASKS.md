@@ -43,7 +43,7 @@
 | --- | --- | --- |
 | P0/P1 | 能力证据合同、持久草稿/revision、短句修订/取消/挂起、失败项新草稿、提醒终态 | 真实模型任务连续性与自然提醒待验 |
 | P2/P3 | WorkBuddy 兼容适配、Orbit 工具白名单、搜索预算/公开网页防护、来源/步骤持久化 | 真实 Key、Tool Calling、Tavily 时效及第三方额度待验 |
-| P4 | 主账号 ChatGPT OAuth 助手、HTTPS 导入、串行轮换、Responses/namespace tools 与撤销反馈 | 实际个人资格/授权/模型/额度及官方通道行为待验，当前只用于手动聊天 |
+| P4 | 主账号 ChatGPT OAuth 助手、HTTPS 导入、串行轮换、Responses/namespace tools 与撤销反馈 | 2026-10-03 本地真实账号授权/签名验证已通过；服务器导入、模型/额度及工具通道仍需独立验收，当前只用于手动聊天 |
 | P5 | 安全 Markdown、终态/进度卡、认证 SSE+轮询、近底部滚动、设置索引、CSS Motion | 本地合成 UI；真实使用满意度、系统 reduced-motion 和低性能设备待验 |
 | P6/P7 | 所有权附件/历史引用、图片原生输入、有界文档 worker、Office ZIP 预检、备份关联、能力手动验证 | 真实模型附件质量、生产恢复演练待验；不自动入知识库 |
 
@@ -72,6 +72,8 @@
 字段与权限以 [Cloud](CHATGPT-WORK-CLOUD.md)、[V3](DAILY-DIGEST-V3-CORE-CONTRACT.md)、[Research/Thesis](DAILY-DIGEST-RESEARCH-THESIS.md)为准；逐期评审保存在 [归档](archive/README.md)。V3/D13 源码存在和随 main 发布，不等于真实自动链已启用或质量已放行。
 
 ## 待修复、优化和待验收
+
+2026-10-03 发布后授权浏览器实测：WorkBuddy GLM-5.1 合成工具调用、GLM-5v-Turbo 合成图片输入通过；隔离对话完成 9 点草稿→10 点同一 revision→刷新恢复→取消，无正式事项写入；合成 TXT 上传并由真实模型正确读取。ChatGPT 本地授权已获得官方返回的注册身份及套餐调用权限；服务器 HTTPS 导入识别同机代理的补丁另有传输回归，网络、模型调用和令牌续用不能由本地授权成功替代。具体发布/网络现场只记录在本机连续记录。
 
 | ID / 优先级 | 类型 | 当前问题与最小下一步 | 完成条件 |
 | --- | --- | --- | --- |

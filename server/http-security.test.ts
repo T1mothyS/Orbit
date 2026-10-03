@@ -1,6 +1,46 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { InMemoryRateLimitStore, securityHeaders } from './http-security.js';
+import { InMemoryRateLimitStore, securityHeaders, isCredentialImportSecure } from './http-security.js';
+import express from 'express';
+import { once } from 'node:events';
+import { request } from 'node:http';
+
+test('凭据导入识别同机 TLS 代理，但拒绝远程伪造和歧义协议头', () => {
+  const req = { secure: false, hostname: 'orbit.example', headers: {}, socket: { remoteAddress: '203.0.113.10' } };
+  assert.equal(isCredentialImportSecure({ ...req, secure: true }), true);
+  for (const remoteAddress of ['203.0.113.10', '::ffff:203.0.113.10', undefined]) {
+    assert.equal(isCredentialImportSecure({ ...req, headers: { 'x-forwarded-proto': 'https' }, socket: { remoteAddress } }), false);
+  }
+  for (const remoteAddress of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) {
+    const local = { ...req, socket: { remoteAddress } };
+    assert.equal(isCredentialImportSecure({ ...local, headers: { 'x-forwarded-proto': 'https' } }), true);
+    assert.equal(isCredentialImportSecure({ ...local, hostname: 'localhost' }), true);
+    for (const proto of [undefined, 'http', 'https,http', 'http, https', ['https']]) {
+      assert.equal(isCredentialImportSecure({ ...local, headers: { 'x-forwarded-proto': proto } }), false);
+      if (proto !== undefined) assert.equal(isCredentialImportSecure({ ...local, hostname: 'localhost', headers: { 'x-forwarded-proto': proto } }), false);
+    }
+    assert.equal(isCredentialImportSecure({ ...local, hostname: 'localhost', headers: { 'x-forwarded-for': '203.0.113.10' } }), false);
+  }
+});
+
+test('默认 Express 配置的 HTTPS loopback 代理可导入，公网 Host 的明文请求被拒绝', async () => {
+  const app = express();
+  app.post('/import-transport', (req, res) => res.sendStatus(isCredentialImportSecure(req) ? 204 : 400));
+  const listener = app.listen(0, '127.0.0.1');
+  try {
+    await once(listener, 'listening');
+    const url = `http://127.0.0.1:${(listener.address() as { port: number }).port}/import-transport`;
+    const status = (headers: Record<string, string>) => new Promise<number | undefined>((resolve, reject) => {
+      const probe = request(url, { method: 'POST', headers }, res => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+      probe.on('error', reject); probe.end();
+    });
+    assert.equal(await status({ Host: 'orbit.example', 'X-Forwarded-Proto': 'https' }), 204);
+    assert.equal(await status({ Host: 'orbit.example' }), 400);
+    assert.equal(await status({ Host: 'localhost', 'X-Forwarded-Proto': 'http' }), 400);
+  } finally {
+    await new Promise<void>((resolve, reject) => listener.close(error => error ? reject(error) : resolve()));
+  }
+});
 
 test('限流窗口内拒绝超额请求并在窗口结束后恢复', () => {
   const store = new InMemoryRateLimitStore();

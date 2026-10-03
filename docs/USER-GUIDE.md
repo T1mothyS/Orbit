@@ -146,7 +146,7 @@ cp .env.example .env
 | `APP_TIMEZONE` | 建议 | 业务时区，当前建议 `Asia/Shanghai` |
 | `APP_URL` | 是 | 邮件按钮跳转地址和邮件图片的公开站点地址；生产环境填写 HTTPS 域名，例如 `https://example.com/today` |
 | `APP_ENV` | 是 | 本地为 `development`，服务器为 `production`；避免 Vite 读取 `NODE_ENV` 产生构建警告 |
-| `TRUST_PROXY_HOPS` | 反向代理时必需 | Nginx 直接代理到 Node 时通常为 `1`；本地直连保持 `0` |
+| `TRUST_PROXY_HOPS` | 按代理拓扑配置 | 只有 Node 入口受到保护、不能绕过代理且跳数已确认时才填写；本地直连保持 `0`。ChatGPT 凭据导入可独立识别同机 TLS 代理，无须扩大全局代理信任 |
 | `BACKGROUND_JOBS_ENABLED` | 是 | 默认 `false`；本地实际验收提醒时临时设为 `true`，生产环境只允许唯一 worker 开启，额外实例保持 `false` 防止重复发信 |
 | `ORBIT_PROACTIVE_ENABLED` | 否 | 默认 `false`；独立启用主动聊天提醒，不启动邮件/备份。仅唯一 worker 开启，用户还需打开对话侧栏“主动聊天提醒”。 |
 | `ELECTRON_APP_URL` | Electron 打包必需 | 写入安装包的公开 HTTPS 页面地址，不包含任何密钥 |
@@ -317,6 +317,8 @@ pm2 restart smart-schedule --update-env
 
 ### ChatGPT 个人试点
 当前只开放 ORBIT_CHATGPT_OWNER_ID 指定账号；未指定时为最早创建的有效管理员。Orbit 登录和 ChatGPT 连接是两个独立身份。运行 npm run chatgpt:connect，在系统浏览器完成 loopback/PKCE 授权，在设置 → AI 导入授权文件。个人服务器导入须使用 HTTPS，服务端保留自己的 host ID，独占刷新。导入后删除传输副本；重新授权使用设置中下载的非敏感注册信息并传 --registration 参数。
+
+同机 Nginx 必须用 `proxy_set_header X-Forwarded-Proto $scheme` 覆盖客户端协议头，并通过 loopback 连接 Node。导入接口只接受直接 TLS、本机直连或该本机代理标注的 HTTPS；外部连接的协议头、逗号分隔或多值协议头不能作为 HTTPS 证据。不同机器上的代理须按受保护的实际拓扑配置，不能直接套用本机代理规则。
 访问令牌和旋转刷新令牌保存在独立加密目录，不进入普通数据导出或备份。应保护服务账号专属目录权限，单实例运行；进程崩溃留下凭据锁时，停服后核对并清理该锁。断开连接会尝试官方撤销；失败会明确显示远程撤销未确认。
 灾后恢复不能依赖普通数据备份恢复 OAuth 或搜索 Key；丢失独立凭据目录/加密密钥时重新授权并重新配置搜索。保护凭据目录的专门运维备份不得交给普通用户或放入公开发布包。
 模型取授权账号实际列表，不静默切换 WorkBuddy 或付费 API。仅手动聊天使用 ChatGPT；原日报与主动提醒链路保持独立。套餐资格、真实额度、OAuth 和模型工具行为仍须个人账号实测。官方流程：[注册](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)、[个人 VM](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms)、[调用限制](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations)。

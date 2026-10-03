@@ -196,6 +196,8 @@ Orbit 工具复用日历、词法知识库和已发布日报服务；知识沿�
 搜索 Key 使用独立 AES-GCM 凭据目录，默认主机密钥不进入普通用户或全站数据库/附件备份；Windows 应使用运行账号专属目录 ACL。模型和工具均无正式写权限。
 
 #### ChatGPT 适配
+
+授权导入的传输检查复用 http-security 的 isCredentialImportSecure：直接 TLS 或本机直连可用；同机 TLS 代理须覆盖 X-Forwarded-Proto，且实际 socket peer 为 loopback、协议头精确为 https。远程伪造/多值头拒绝，不为该接口自动扩大 Express 全局 trust proxy；后续仍验证身份签名、scope 与账号归属。
 本地授权助手使用 127.0.0.1 /auth/callback、state/nonce/PKCE，保存 issued client ID 并验证 JWKS/issuer/audience/sub。服务器导入再次验证身份与访问令牌的 resource/scope，保留本机 host。刷新使用进程合并和独占文件锁，原子保存旋转 token；临时失败保留凭据，失效令牌要求重授权。
 直接公共 Responses HTTP/SSE 强制 store:false、stream:true，不使用 previous_response_id 或后台参数。仅完成事件视为成功，工具按官方 namespace 发送；工具结果纳入后续本地 input。OAuth 连接从普通备份排除，后台 AI 不迁移到此连接。
 ### 会话附件与共享解析

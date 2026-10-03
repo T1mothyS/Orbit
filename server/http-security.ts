@@ -1,6 +1,20 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { publicDigestUrl } from './digest-v2-contract.js';
 
+export function isCredentialImportSecure(req: {
+  secure: boolean; hostname: string; headers: Request['headers']; socket: { remoteAddress?: string };
+}): boolean {
+  if (req.secure) return true;
+  const loopback = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress || '');
+  // A same-host TLS proxy must overwrite X-Forwarded-Proto. Never trust this
+  // header from remote peers, even when Node's port is directly reachable.
+  if (!loopback) return false;
+  const protocol = req.headers['x-forwarded-proto'];
+  if (protocol !== undefined) return protocol === 'https';
+  return ['127.0.0.1', 'localhost', '[::1]'].includes(req.hostname)
+    && !req.headers['x-forwarded-for'] && !req.headers['x-forwarded-host'] && !req.headers.forwarded;
+}
+
 interface RateRule {
   name: string;
   limit: number;
