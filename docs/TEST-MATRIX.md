@@ -48,3 +48,5 @@ UI/交互改动使用实际浏览器：390×844、430×932、768×1024、1440×9
 未执行的层明确写未验，不为验收自动发信/切换 Work。流程见 [发布](RELEASE.md)和[部署](DEPLOYMENT-PATHS.md)。
 
 - Orbit 当前操作回归：server/orbit-plan-state.test.ts 覆盖短句修订、原始日期锚点/时长、账号隔离、挂起/取消、过期、缓存清空后直接确认、revision 冲突、重复确认和备份挂起。实际模型召回质量仍需独立验收。
+
+- ChatGPT 合成合同：chatgpt-provider.test.ts 覆盖 JWT 签名/nonce/audience、登录权限不足、账号隔离、本机 host 保留、loopback/PKCE、并发刷新与令牌替换、临时失败、namespace 工具、SSE 断线/错误和撤销失败。通过不代表真实 OAuth/额度/模型能力通过。

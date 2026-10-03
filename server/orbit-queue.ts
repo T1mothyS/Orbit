@@ -1,5 +1,6 @@
 import { getUserById, getReminder, getUserPreferredModel } from './db.js';
 import { defaultModel } from './ai-credentials.js';
+import { chatGPTStatus } from './chatgpt-connection.js';
 import { dateInZone } from './orbit-time.js';
 import { queryAll, run } from './database/connection.js';
 import { conversation, getRequest, orbitContext, type ChatRequest } from './orbit-store.js';
@@ -29,7 +30,8 @@ export function submitOrbitRequest(userId: string, body: any) {
     if (!text || text.length > 20000)
         throw new Error('请输入 1–20000 字的内容');
     const allowed = new Set(['text', 'requestId', 'conversationId', 'targetDate', 'model', 'calendarId', 'knowledgeScope', 'provider']);
-    if(body.provider!==undefined && body.provider!=='workbuddy')throw new Error('Provider 当前不可用');
+    if(body.provider!==undefined && !['workbuddy','chatgpt'].includes(body.provider))throw new Error('Provider 当前不可用');
+    if(body.provider==='chatgpt' && (!chatGPTStatus(userId).connected || !body.model))throw new Error('请连接 ChatGPT 并选择该账号可用模型');
     if (Object.keys(body).some(key => !allowed.has(key)))
         throw new Error('请求包含不支持的字段');
     const old = getRequest(userId, id);

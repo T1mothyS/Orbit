@@ -1,5 +1,7 @@
 import { ORBIT_AI_QUERY_POLICY } from '../orbit-ai-policy.js';
 import { workBuddyProvider } from '../ai-provider-workbuddy.js';
+import { chatGPTProvider } from '../ai-provider-chatgpt.js';
+import { chatGPTStatus } from '../chatgpt-connection.js';
 import { createOrbitTools } from '../orbit-tools.js';
 import { configureSearch,searchStatus } from '../orbit-search.js';
 import { activateAiPlan, activeAiPlan, resolveAiPlan, setAiPlanState, assertPlanRevision, reviseAiPlan, pendingInteraction } from '../ai-chat-state.js';
@@ -44,7 +46,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
   const safe = (fn: (req: any, res: any) => any) => (req: any, res: any) => { try { fn(req, res); } catch (error: any) { res.status(400).json({ error: error.message }); } };
   const requestView = (row: orbit.ChatRequest) => ({ id: row.id, conversationId: row.conversation_id, state: row.state, text: JSON.parse(row.body).text, error: row.error, createdAt: row.created_at,steps:queryAll('SELECT id,label,state,query,at FROM orbit_request_steps WHERE user_id=? AND request_id=? ORDER BY at',[row.user_id,row.id]) });
   app.get('/api/orbit/conversations', authenticate, safe((req,res) => res.json({ conversations: orbit.listConversations(user(req)) })));
-  app.get('/api/orbit/providers',authenticate,safe((req,res)=>res.json({providers:[{id:'workbuddy',name:'WorkBuddy',connected:!!resolveCodeBuddyCredential(user(req))}]})));
+  app.get('/api/orbit/providers',authenticate,safe((req,res)=>res.json({providers:[{id:'workbuddy',name:'WorkBuddy',connected:!!resolveCodeBuddyCredential(user(req))},{id:'chatgpt',name:'ChatGPT',...chatGPTStatus(user(req))}]})));
   app.get('/api/orbit/search',authenticate,safe((_req,res)=>res.json(searchStatus())));
   app.put('/api/orbit/search',authenticate,safe((req,res)=>{if(db.getUserById(user(req))?.role!=='admin')return res.status(403).json({error:'仅管理员可配置搜索'});if(typeof req.body?.key!=='string')throw new Error('Key 格式不正确');configureSearch(req.body.key.trim());res.json(searchStatus());}));
   app.post('/api/orbit/conversations', authenticate, safe((req,res) => res.json({ conversation: orbit.createConversation(user(req), String(req.body?.title || '新对话'),req.body?.scopeScheduleId) })));
@@ -216,6 +218,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     addLog('info', 'ai', '收到对话请求', { userId, targetDate, model: reqModel, textLength: text.length });
 
     const userCredential = resolveCodeBuddyCredential(userId);
+    const isChatGPT=body.provider==='chatgpt';
     const authenticatedUser = true;
 
     if (authenticatedUser) {
@@ -338,7 +341,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     }
 
     // 检查用户是否有 API Key
-    if (!userCredential) {
+    if (!userCredential && !isChatGPT) {
       const missingCredentialMessage = getMissingCodeBuddyCredentialMessage(userId);
       addLog('warn', 'ai', `用户 ${userId} 未配置可用 API`, { userId });
       try { saveAiScheduleHistoryMessage({ userId, role: 'assistant', type: 'error', content: missingCredentialMessage }); } catch {}
@@ -352,9 +355,10 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     let needsLogin = false;
     let loginError: string | undefined;
     try {
+      if(!isChatGPT) {
       await unstable_v2_authenticate({
         environment: 'internal',
-        env: buildCodeBuddyEnv(userCredential),
+        env: buildCodeBuddyEnv(userCredential!),
         onAuthUrl: async () => {
           needsLogin = true;
           loginError = 'API Key 无效，请检查或重新输入';
@@ -363,6 +367,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       if (needsLogin) {
         try { saveAiScheduleHistoryMessage({ userId, role: 'assistant', type: 'error', content: loginError || 'API Key 无效，请检查或重新输入' }); } catch {}
         return res.status(401).json({ error: loginError });
+      }
       }
     } catch (error: any) {
       try { saveAiScheduleHistoryMessage({ userId, role: 'assistant', type: 'error', content: error?.message || 'API Key 认证失败' }); } catch {}
@@ -631,7 +636,7 @@ priority 识别：
     try {
 
       // 【修复数据隔离】使用该用户的 API Key
-      resultText=await workBuddyProvider.generate({userId,model:selectedModel,instructions:systemPrompt,input:[{type:'text',text:modelPrompt}],controller:context?.controller,tools:toolContext.tools});
+      resultText=await (isChatGPT?chatGPTProvider:workBuddyProvider).generate({userId,model:selectedModel,instructions:systemPrompt,input:[{type:'text',text:modelPrompt}],controller:context?.controller,tools:toolContext.tools});
 
       const parsedResult = parseAiJsonCandidates([assistantText, resultText]);
       const parsed = parsedResult.value;
@@ -709,7 +714,7 @@ priority 识别：
       };
       try {
         const historyMessage = saveAiScheduleResponseHistory(userId, response);
-        run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({formatVersion:1,provider:'workbuddy',model:selectedModel,steps,sources:toolContext.sources}),historyMessage.id,userId]);
+        run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({formatVersion:1,provider:isChatGPT?'chatgpt':'workbuddy',model:selectedModel,steps,sources:toolContext.sources}),historyMessage.id,userId]);
         response.historyMessageId = historyMessage.id;
         if (response.requiresConfirmation) {
           const pendingPlan = aiSchedulePlans.get(response.plan?.id);

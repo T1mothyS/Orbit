@@ -2,6 +2,7 @@ import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHand
 import { Bot, BookOpen, Send, Loader2, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { AiProviderSelect } from './AiProviderSelect';
 import { useOrbitChat } from '../hooks/useOrbitChat';
 import { SCHEDULE_CATEGORY_COLORS, SCHEDULE_CATEGORY_LABELS } from '../utils/scheduleCategories';
 
@@ -543,6 +544,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   onChatStateChange,
 }, ref) {
   const [inputText, setInputText] = useState('');
+  const [aiConnection,setAiConnection]=useState<{provider:string;model?:string}>({provider:'workbuddy'});
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [confirmingPlanId, setConfirmingPlanId] = useState<string | null>(null);
@@ -615,10 +617,10 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     const text = rawText.trim();if(!text) return;
     const revision = inputRevisionRef.current;
     try {
-      const accepted = await orbit.send(text,{calendarId:'personal'});
+      const accepted = await orbit.send(text,{calendarId:'personal',...aiConnection});
       if(accepted && options.clearComposer !== false && revision === inputRevisionRef.current) {inputRevisionRef.current++;setInputText('');drafts.current.delete(orbit.cid);}
     } catch(error) {orbit.setError(error instanceof Error?error.message:'发送失败，请重试');}
-  }, [orbit.send,orbit.setError]);
+  }, [orbit.send,orbit.setError,aiConnection]);
 
   const handleSubmit = useCallback(() => {
     void submitMessage(inputText, { clearComposer: true });
@@ -820,6 +822,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
             className="flex-shrink-0 schedule-ai-composer-wrap"
             style={{ borderTop: '1px solid var(--td-component-stroke)' }}
           >
+            {!noteMode&&<AiProviderSelect authHeaders={authHeaders} onChange={(provider,model)=>setAiConnection({provider,model})}/>}
             <div
               className={`rounded-xl transition-all schedule-ai-composer${noteMode ? ' is-note-mode' : ''}`}
             >

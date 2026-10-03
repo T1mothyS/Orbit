@@ -4,6 +4,7 @@ import { resolveAiImportCredential } from './ai-credentials.js';
 import { createRetiredRouter } from './routes/retired.js';
 import { createAiImportsRouter } from './routes/ai-imports.js';
 import { createAiRouter } from './routes/ai.js';
+import { createAiProvidersRouter } from './routes/ai-providers.js';
 import { createOrbitFeatureRouter } from './routes/orbit.js';
 import { createProactiveJobs } from './orbit-proactive.js';
 
@@ -96,6 +97,7 @@ app.use(createSettingsRouter({ authenticate, JWT_SECRET }));
 app.use(createRetiredRouter({ authenticate }));
 
 app.use(createAiRouter({ authenticate }));
+app.use(createAiProvidersRouter({authenticate}));
 app.use(createOrbitFeatureRouter({authenticate}));
 
 app.use(createAccountsRouter({ authenticate, signUserToken, setPageSessionCookie, setPageSessionFromBearer, clearPageSessionCookie }));

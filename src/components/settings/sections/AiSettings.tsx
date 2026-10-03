@@ -5,6 +5,7 @@ import { SettingRow, SettingInput } from '../SettingRow';
 import type { SettingsAuthHeaders } from '../types';
 import { ModelSettings } from './ModelSettings';
 import { SearchSettings } from './SearchSettings';
+import { ChatGPTSettings } from './ChatGPTSettings';
 
 interface LoginStatus {
   isLoggedIn: boolean;
@@ -169,6 +170,7 @@ export function AiSettings({ authHeaders,isAdmin=false }: { authHeaders: Setting
         )}
       </SettingRow>
       <ModelSettings authHeaders={authHeaders} />
+      <ChatGPTSettings authHeaders={authHeaders}/>
       <SearchSettings authHeaders={authHeaders} isAdmin={isAdmin}/>
     </SettingSection>
   );
