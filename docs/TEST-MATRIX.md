@@ -50,6 +50,7 @@ UI/交互改动使用实际浏览器：390×844、430×932、768×1024、1440×9
 - Orbit 当前操作回归：server/orbit-plan-state.test.ts 覆盖短句修订、原始日期锚点/时长、账号隔离、挂起/取消、过期、缓存清空后直接确认、revision 冲突、重复确认和备份挂起。实际模型召回质量仍需独立验收。
 
 - ChatGPT 合成合同：chatgpt-provider.test.ts 覆盖 JWT 签名/nonce/audience、登录权限不足、账号隔离、本机 host 保留、loopback/PKCE、并发刷新与令牌替换、临时失败、namespace 工具及加密上下文原样接续、SSE 断线/错误和撤销失败。通过不代表真实 OAuth/额度/模型能力通过。
+- ChatGPT 原生搜索：同文件覆盖显式启用、Tavily 工具排除、流式步骤/完成项目收集、失败/中断和可观测调用上限、Unicode 引用、安全 URL 与重复来源、引用处理不改变操作 JSON，以及能力探测不隐式启用搜索。真实账号搜索、时效性/来源质量和刷新后展示另行验收；客户端调用上限不代表服务端硬计费上限。
 - 套餐流式形态：覆盖完成事件 output 为空、output_item.done 乱序收集、工具与加密项目保留，以及项目已完成但整体失败/中断的拒绝；真实本地 Orbit 适配器文本、namespace 工具往返及合成纯色图片理解已验证，服务器通道独立验收。
 - ChatGPT 导入传输：http-security.test.ts 用真实 HTTP 请求模拟同机 HTTPS 代理与公网 Host 的明文请求，并验证远程伪造、IPv4/IPv6 loopback 和歧义协议头；不需要真实凭据或改变全局代理配置。
 - Provider 代理隔离：codebuddy-env.test.ts 启动真实 Node 子进程与本机 HTTP fixture，验证 SDK 环境覆盖继承的原生代理开关、请求成功且父进程不变；真实 WorkBuddy/ChatGPT 同时可用仍需生产账号回归。

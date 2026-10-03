@@ -197,6 +197,8 @@ WorkBuddy 主聊天经 ai-provider-workbuddy.ts 调用；旧 Key/验证/模型�
 
 #### 联网工具
 Orbit 工具复用日历、词法知识库和已发布日报服务；知识沿明确请求/自动检索偏好/明确资料追问开放，跨对话历史工具只在明确请求时开放。Tavily 固定 basic，每轮两次、每次五条；月度请求保守计数，额度错误锁定本月，不自动切换。公开网页读取复用 HTTPS/DNS 地址固定防护，逐跳校验、超时和大小限制。结果记录真实 URL、发布时间（未知为空）和抓取时间。
+手动 ChatGPT 聊天在公共 Responses 请求中提供原生 `web_search`，采用 low 搜索上下文，由模型按需调用；同时移除该请求的 Tavily search 函数，其他 Orbit 读取工具保留。WorkBuddy 的 Tavily 路径保持独立。原生搜索受模型/账号策略和套餐额度约束，失败明确反馈，不静默切换搜索商或付费 API；模型能力探测及后台链路不会因此获得搜索工具。
+原生搜索的流式工具项目映射为现有请求步骤；完成项目及 URL citation annotations 提取来源，校验 HTTP(S) 地址并拒绝 URL 凭据。发布时间未知为空，不推断发布时间。引用在结构化回复解析后转成可点击 Markdown，来源及步骤随消息保存；不改操作 JSON 或正式写入边界。与函数工具合计最多六个可观测工具项目，超过时终止客户端流；该计数及 low 上下文不构成 OpenAI 服务端硬计费上限，原生搜索不计入 Tavily 月度预算。官方合同见 [Web search](https://developers.openai.com/api/docs/guides/tools-web-search) 与 [套餐通道限制](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations)。
 搜索 Key 使用独立 AES-GCM 凭据目录，默认主机密钥不进入普通用户或全站数据库/附件备份；Windows 应使用运行账号专属目录 ACL。模型和工具均无正式写权限。
 
 #### ChatGPT 适配

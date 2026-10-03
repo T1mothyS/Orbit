@@ -18,6 +18,8 @@ export interface OrbitTool {
 export interface ProviderRequest {
   userId: string; model: string; instructions: string; input: AiInputPart[];
   controller?: AbortController; tools?: OrbitTool[]; onStep?: (step: AiStep) => void;
+  webSearch?: boolean; onWebSource?: (source: import('./orbit-search.js').WebSource) => void;
+  onWebCitation?: (citation: {marker: string; url: string; title: string}) => void;
 }
 export interface AiProvider { id: AiProviderId; generate(request: ProviderRequest): Promise<string> }
 const capability = (value: unknown): ModelCapability => ({ supported: typeof value === 'boolean' ? value : null, evidence: typeof value === 'boolean' ? 'catalog' : 'unknown' });
