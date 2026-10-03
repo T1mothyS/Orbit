@@ -202,6 +202,8 @@ Orbit 工具复用日历、词法知识库和已发布日报服务；知识沿�
 直接公共 Responses HTTP/SSE 强制 store:false、stream:true，不使用 previous_response_id 或后台参数。仅完成事件视为成功，工具按官方 namespace 发送；工具结果纳入后续本地 input。OAuth 连接从普通备份排除，后台 AI 不迁移到此连接。
 ### 会话附件与共享解析
 
+普通聊天回复优先按结构化消息解析；无活跃草稿、非事项专属对话且输入没有日程意图时，可接收纯文本并封装为 `chat`、空 operations/knowledgeSourceIds，元数据记录 `textFallback`。显式“不操作日程”不会单独阻止文件问答，但与新增/修改请求混用时仍拒绝文本降级。空响应、破损操作 JSON、日程请求和导入/主动提醒继续严格解析；普通 chat 不渲染偶然关键词匹配的事项卡。
+
 聊天附件复用 activity.db 的 attachments、账号配额与 data/attachments 哈希文件；chat.db 增量保存 orbit_attachments（会话、解析状态/块）和 orbit_message_attachments（消息引用）。原附件/完成记录接口保持类型边界，文档扩展只在聊天与备份恢复明确启用。上传需认证、会话归属，10MB/文件、3 个/轮、20MB/轮、默认 500MB/账号；图片经 sharp 校验、2048px 压缩并去除 EXIF。
 
 共享 file-parser 服务在最多两个 192MB heap worker 中解析，15s 超时与取消，最多 100 页 PDF/一百万字符正文/2,000 个解析块，与备份恢复上限一致。PDF.js 使用本地字体资源，不执行 PDF JavaScript、不抓取外链；PDF.js optional canvas 是服务端依赖，Node 最低 22.13，部署需保留 npm 的平台 optional dependencies。扫描/加密 PDF 明确失败。解析能力供后续知识库复用，上传不写知识库。

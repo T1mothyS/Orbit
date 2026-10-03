@@ -22,9 +22,9 @@ import { v4 as uuidv4 } from 'uuid';
 import * as dbModule from '../db.js';
 import * as scheduleStore from '../schedule-store.js';
 import { buildCodeBuddyEnv } from '../codebuddy-env.js';
-import { extractAiMessageText, parseAiJsonCandidates } from '../ai-json.js';
+import { extractAiMessageText, parseAiChatCandidates } from '../ai-json.js';
 import { extractWeatherLocationQuery, getDailyWeather, getWeatherErrorKind, isWeatherQuestion, searchLocations } from '../weather-service.js';
-import { isReadOnlyScheduleQuery, needsScheduleContext, requestsKnowledgeContext } from '../ai-intent.js';
+import { isReadOnlyScheduleQuery, needsScheduleContext, requestsKnowledgeContext, allowsPlainChatReply } from '../ai-intent.js';
 import { addLog } from '../log-service.js';
 import { searchLibraryForAi } from '../search-service.js';
 import { buildAiPlanSnapshot, scheduleFingerprint, normaliseAiPlanOperations, previewAiPlanOperation as planOperationPreview, updateAiPlanOperation } from '../ai-plan.js';
@@ -658,7 +658,8 @@ priority 识别：
       if(attached.images){const models=isChatGPT?await chatGPTModels(userId):await getAvailableModels(userId,userCredential!);const model=isChatGPT?models.find(m=>m.id===selectedModel):models.find(m=>m.modelId===selectedModel)?.orbit;if(model?.capabilities.images.supported!==true)throw new Error('当前模型未声明支持图片输入，请在设置中刷新模型列表并选择支持图片的模型');}
       resultText=await (isChatGPT?chatGPTProvider:workBuddyProvider).generate({userId,model:selectedModel,instructions:systemPrompt,input:[{type:'text',text:modelPrompt},...attached.input],controller:context?.controller,tools:toolContext.tools});
 
-      const parsedResult = parseAiJsonCandidates([assistantText, resultText]);
+      const allowText = allowsPlainChatReply(text, { scoped: !!scopeId, activePlan: !!(context && activeAiPlan(userId, context.conversationId)) });
+      const parsedResult = parseAiChatCandidates([resultText, assistantText], allowText);
       const parsed = parsedResult.value;
       if (parsedResult.repaired) {
         addLog('warn', 'ai', 'AI 返回 JSON 含未转义双引号，已自动修复');
@@ -728,14 +729,14 @@ priority 识别：
         reply: parsed.intent === 'query' && !includeKnowledgeContext && queryDates.length > 0
           ? buildCompactScheduleQueryReply(sortedSchedules, queryDates, today)
           : (parsed.reply || '好的'),
-        scheduleItems: sortedSchedules,
+        scheduleItems: parsed.intent === 'chat' ? [] : sortedSchedules,
         knowledgeSources,
         changed: false,
         changedDetails: { created: [], updated: [], deleted: [] },
       };
       try {
         const historyMessage = saveAiScheduleResponseHistory(userId, response);
-        run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({formatVersion:1,provider:isChatGPT?'chatgpt':'workbuddy',model:selectedModel,steps,sources:toolContext.sources}),historyMessage.id,userId]);
+        run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({formatVersion:1,provider:isChatGPT?'chatgpt':'workbuddy',model:selectedModel,textFallback:parsedResult.textFallback,steps,sources:toolContext.sources}),historyMessage.id,userId]);
         response.historyMessageId = historyMessage.id;
         if (response.requiresConfirmation) {
           const pendingPlan = aiSchedulePlans.get(response.plan?.id);

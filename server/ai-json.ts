@@ -123,6 +123,17 @@ export function parseAiJsonCandidates(candidates: readonly string[]): { value: a
   throw new Error('AI 返回格式错误：未找到 JSON 对象');
 }
 
+/** Only ordinary chat may accept prose; imports, reminders and action drafts stay strict. */
+export function parseAiChatCandidates(candidates: readonly string[], allowText: boolean): { value: any; repaired: boolean; textFallback: boolean } {
+  try {
+    return { ...parseAiJsonCandidates(candidates), textFallback: false };
+  } catch (error) {
+    const text = candidates.find(candidate => candidate.trim())?.trim();
+    if (!allowText || !text || /^[{\[]/.test(text) || /```json|"(?:intent|reply|operations)"\s*:/i.test(text)) throw error;
+    return { value: { intent: 'chat', reply: text, operations: [], warnings: [], knowledgeSourceIds: [] }, repaired: false, textFallback: true };
+  }
+}
+
 export function parseAiJson(raw: string): { value: any; repaired: boolean } {
   const candidate = firstJsonObject(raw);
   if (!candidate) throw new Error('AI 返回格式错误：未找到 JSON 对象');
