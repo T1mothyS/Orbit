@@ -67,7 +67,7 @@ export function AiAssistantPage() {
             <button
               type="button"
               className="ai-workspace-action"
-              onClick={() => { void chatPanelRef.current?.resetHistory(); }}
+              onClick={() => { void chatPanelRef.current?.resetHistory().catch(e=>setChatError(e instanceof Error?e.message:'创建对话失败')); }}
               disabled={resetDisabled}
               title={resetTitle}
               aria-label={resetTitle}

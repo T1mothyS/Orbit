@@ -24,6 +24,8 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     const [autoKnowledge, setAutoKnowledge] = useState(false);
     const [proactiveEnabled,setProactiveEnabled]=useState(false),[runnerEnabled,setRunnerEnabled]=useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const creatingRef = useRef(false);
     const submittingRef = useRef(false);
     const pendingSubmission = useRef<{
         signature:string;
@@ -43,6 +45,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         return data;
     }, [authHeaders]);
     const select = useCallback((id: string) => {
+        current.current = id;
         setParams(previous => { const next = new URLSearchParams(previous); next.set('conversation', id); return next; });
     }, [setParams]);
     const refresh = useCallback(async () => {
@@ -102,11 +105,20 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         return () => { stopped = true; clearTimeout(timer); };
     }, [authenticated, cid, refresh]);
     const create = useCallback(async (scopeScheduleId?: string, title?: string) => {
-        const data = await api('/api/orbit/conversations', 'POST', {scopeScheduleId,title});
-        await refreshConversations();
-        select(data.conversation.id);
+        if (creatingRef.current) return;
+        creatingRef.current = true;
+        setCreating(true);
+        try {
+            const data = await api('/api/orbit/conversations', 'POST', {scopeScheduleId,title});
+            await refreshConversations();
+            select(data.conversation.id);
+        } finally {
+            creatingRef.current = false;
+            setCreating(false);
+        }
     }, [api, refreshConversations, select]);
     const send = useCallback(async (text: string, body: Record<string, unknown>) => {
+        if (creatingRef.current || current.current !== cid) return false;
         if (!cid)
             throw new Error('请先选择一个对话');
         if (submittingRef.current)
@@ -137,5 +149,5 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     const preference = useCallback(async (value: boolean) => { await api('/api/orbit/preferences', 'PATCH', { autoKnowledge: value }); setAutoKnowledge(value); }, [api]);
     const proactivePreference=useCallback(async(value:boolean)=>{await api('/api/orbit/preferences','PATCH',{proactiveEnabled:value});setProactiveEnabled(value);},[api]);
     const reminderAction=useCallback(async(id:string,action:string)=>{await api(`/api/orbit/reminders/${encodeURIComponent(id)}/${action}`,'POST',{});await refresh();},[api,refresh]);
-    return { cid, conversations, requests, history, error, setError, autoKnowledge,proactiveEnabled,runnerEnabled, submitting, select, create, send, action, rename, remove, clear, preference,proactivePreference,reminderAction, refresh };
+    return { cid, conversations, requests, history, error, setError, autoKnowledge,proactiveEnabled,runnerEnabled, submitting, creating, select, create, send, action, rename, remove, clear, preference,proactivePreference,reminderAction, refresh };
 }
