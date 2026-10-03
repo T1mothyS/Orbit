@@ -13,9 +13,23 @@ export async function completedResponse(res:Response):Promise<any> {
   if(!res.ok){await res.body?.cancel();throw new Error(`ChatGPT 调用失败（${res.status}），请检查套餐额度或重新授权`);}
   const reader=res.body?.getReader();if(!reader)throw new Error('ChatGPT 响应为空');
   const decoder=new TextDecoder();let pending='',completed:any,size=0;
-  const frame=(part:string)=>{const data=part.split('\n').filter(l=>l.startsWith('data:')).map(l=>l.slice(5).trim()).join('\n');if(!data||data==='[DONE]')return;const e=JSON.parse(data);if(e.type==='response.failed'||e.type==='error')throw new Error('ChatGPT 返回失败，请检查额度或授权后重试');if(e.type==='response.incomplete')throw new Error('ChatGPT 回复未完成，请重试');if(e.type==='response.completed'){if(e.response?.status&&e.response.status!=='completed')throw new Error('ChatGPT 回复未完成');completed=e.response;}};
+  const items=new Map<number,any>();
+  const frame=(part:string)=>{
+    const data=part.split('\n').filter(l=>l.startsWith('data:')).map(l=>l.slice(5).trim()).join('\n');if(!data||data==='[DONE]')return;
+    const e=JSON.parse(data);
+    if(e.type==='response.failed'||e.type==='error')throw new Error('ChatGPT 返回失败，请检查额度或授权后重试');
+    if(e.type==='response.incomplete')throw new Error('ChatGPT 回复未完成，请重试');
+    if(e.type==='response.output_item.done'){
+      if(!Number.isInteger(e.output_index)||e.output_index<0||!e.item||typeof e.item.type!=='string')throw new Error('ChatGPT 流式输出格式不正确');
+      items.set(e.output_index,e.item);
+    }
+    if(e.type==='response.completed'){if(e.response?.status&&e.response.status!=='completed')throw new Error('ChatGPT 回复未完成');completed=e.response;}
+  };
   try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>8*1024*1024)throw new Error('ChatGPT 回复超过限制');pending=(pending+decoder.decode(value,{stream:true})).replace(/\r\n/g,'\n');let i;while((i=pending.indexOf('\n\n'))>=0){frame(pending.slice(0,i));pending=pending.slice(i+2);}}pending+=decoder.decode();if(pending.trim())frame(pending);}finally{await reader.cancel();}
-  if(!completed)throw new Error('ChatGPT 连接已中断，未收到完成状态');return completed;
+  if(!completed)throw new Error('ChatGPT 连接已中断，未收到完成状态');
+  // Plan-usage streams may omit output in the terminal envelope; done items carry the full contents.
+  if(!Array.isArray(completed.output)||!completed.output.length)completed.output=[...items].sort(([a],[b])=>a-b).map(([,item])=>item);
+  return completed;
 }
 export async function generateChatGPT(request:ProviderRequest,token:string,fetcher:typeof fetch=fetch):Promise<string>{
   const input:any[]=[{role:'user',content:request.input.map(p=>p.type==='image'?{type:'input_image',image_url:`data:${p.mime};base64,${p.data}`} : p.type==='file'?{type:'input_file',filename:p.filename,file_data:`data:${p.mime};base64,${p.data}`}:{type:'input_text',text:p.text||''})}];let calls=0;

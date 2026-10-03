@@ -46,3 +46,30 @@ test('Responses uses public streaming stateless contract, namespaced tools and s
 test('disconnect retains registration, clears all tokens, and reports unconfirmed remote revocation',async()=>{
   vault.saveSecret('chatgpt','chatgpt-owner',credential());const result=await connection.disconnectChatGPT('chatgpt-owner',async()=>{throw new Error('synthetic network failure');});assert.equal(result.revoked,false);const saved=vault.loadSecret<any>('chatgpt','chatgpt-owner');assert.equal(saved.client_id,'oaiapp_synthetic');assert.equal(saved.access_token,undefined);assert.equal(saved.refresh_token,undefined);assert.equal(saved.id_token,undefined);
 });
+
+test('plan-usage SSE retains done output items when the terminal envelope omits them',async()=>{
+  const reasoning={id:'reasoning-done',type:'reasoning',summary:[],encrypted_content:'opaque-synthetic-only'};
+  const call={type:'function_call',namespace:'orbit',name:'echo',arguments:'{}',call_id:'done-call'};
+  const message={type:'message',content:[{type:'output_text',text:'ORBIT_CHATGPT_TEST_OK'}]};
+  const stream=(items:any[])=>new Response(items.map(item=>'data: '+JSON.stringify(item)+'\r\n\r\n').join(''));
+  const result=await provider.completedResponse(stream([
+    {type:'response.output_item.done',output_index:2,item:message},
+    {type:'response.output_item.done',output_index:0,item:reasoning},
+    {type:'response.output_item.done',output_index:1,item:call},
+    {type:'response.completed',response:{status:'completed',output:[]}},
+  ]));
+  assert.deepEqual(result.output,[reasoning,call,message]);
+  let n=0,calls=0;
+  const fake:typeof fetch=async(_url,options)=>{const body=JSON.parse(String(options?.body));if(++n===2)assert.deepEqual(body.input.find((item:any)=>item.type==='reasoning'),reasoning);return stream([
+    ...(++calls===1?[{type:'response.output_item.done',output_index:0,item:reasoning},{type:'response.output_item.done',output_index:1,item:call}]:[{type:'response.output_item.done',output_index:0,item:message}]),
+    {type:'response.completed',response:{status:'completed',output:[]}},
+  ]);};
+  let executions=0;const text=await provider.generateChatGPT({userId:'x',model:'test',instructions:'test',input:[{type:'text',text:'test'}],tools:[{name:'echo',description:'echo',schema:{type:'object'},execute:async()=>{executions++;return 'synthetic';}}]},'synthetic',fake);
+  assert.equal(text,'ORBIT_CHATGPT_TEST_OK');assert.equal(executions,1);assert.equal(n,2);
+});
+
+test('done output alone cannot turn interrupted, failed or incomplete streams into success',async()=>{
+  const done='data: '+JSON.stringify({type:'response.output_item.done',output_index:0,item:{type:'message',content:[{type:'output_text',text:'partial'}]}})+'\n\n';
+  await assert.rejects(provider.completedResponse(new Response(done)),/未收到完成/);
+  for(const type of ['response.failed','response.incomplete','error'])await assert.rejects(provider.completedResponse(new Response(done+'data: '+JSON.stringify({type})+'\n\n')),/失败|未完成/);
+});

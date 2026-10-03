@@ -50,6 +50,7 @@ UI/交互改动使用实际浏览器：390×844、430×932、768×1024、1440×9
 - Orbit 当前操作回归：server/orbit-plan-state.test.ts 覆盖短句修订、原始日期锚点/时长、账号隔离、挂起/取消、过期、缓存清空后直接确认、revision 冲突、重复确认和备份挂起。实际模型召回质量仍需独立验收。
 
 - ChatGPT 合成合同：chatgpt-provider.test.ts 覆盖 JWT 签名/nonce/audience、登录权限不足、账号隔离、本机 host 保留、loopback/PKCE、并发刷新与令牌替换、临时失败、namespace 工具及加密上下文原样接续、SSE 断线/错误和撤销失败。通过不代表真实 OAuth/额度/模型能力通过。
+- 套餐流式形态：覆盖完成事件 output 为空、output_item.done 乱序收集、工具与加密项目保留，以及项目已完成但整体失败/中断的拒绝；真实本地 Orbit 适配器文本、namespace 工具往返及合成纯色图片理解已验证，服务器通道独立验收。
 - ChatGPT 导入传输：http-security.test.ts 用真实 HTTP 请求模拟同机 HTTPS 代理与公网 Host 的明文请求，并验证远程伪造、IPv4/IPv6 loopback 和歧义协议头；不需要真实凭据或改变全局代理配置。
 - 普通聊天格式：ai-json.test.ts / ai-intent.test.ts 覆盖真实附件追问输入、纯文本/Markdown、结构化优先、空/破损 JSON、日程意图及活跃/专属事项禁止降级；无有效 operations 不产生写权限。真实模型追问需发布后重测。
 ## 隔离 Orbit UI 预览
