@@ -73,3 +73,51 @@ test('done output alone cannot turn interrupted, failed or incomplete streams in
   await assert.rejects(provider.completedResponse(new Response(done)),/未收到完成/);
   for(const type of ['response.failed','response.incomplete','error'])await assert.rejects(provider.completedResponse(new Response(done+'data: '+JSON.stringify({type})+'\n\n')),/失败|未完成/);
 });
+
+test('native web search is explicit, replaces Tavily and persists streamed steps and safe citations',async()=>{
+  const steps:any[]=[],sources:any[]=[],citations:any[]=[];
+  const marker='\uE200cite\uE202turn0search0\uE201',text='😀已核对。'+marker;
+  const web={type:'web_search_call',id:'ws',status:'completed',action:{type:'search',queries:['public example'],sources:[{url:'https://example.com',title:'Example'},{url:'javascript:alert(1)'}]}};
+  const message={type:'message',content:[{type:'output_text',text,annotations:[{type:'url_citation',url:'https://example.com',title:'Example',start_index:Array.from(text).length-Array.from(marker).length,end_index:Array.from(text).length},{type:'url_citation',url:'https://name:secret@example.com',title:'Unsafe'}]}]};
+  const fake:typeof fetch=async(_url,options)=>{
+    const body=JSON.parse(String(options?.body));assert.deepEqual(body.include,['web_search_call.action.sources']);assert.equal(body.tools.find((t:any)=>t.type==='web_search').search_context_size,'low');assert.deepEqual(body.tools[0].tools.map((t:any)=>t.name),['calendar']);
+    return new Response([
+      {type:'response.output_item.added',output_index:0,item:{type:'web_search_call',id:'ws',status:'in_progress'}},
+      {type:'response.output_item.done',output_index:0,item:web},
+      {type:'response.output_item.done',output_index:1,item:message},
+      {type:'response.completed',response:{status:'completed',output:[]}},
+    ].map(event=>'data: '+JSON.stringify(event)+'\n\n').join(''));
+  };
+  let tavily=0;
+  const reply=await provider.generateChatGPT({userId:'x',model:'test',instructions:'test',input:[{type:'text',text:'search'}],webSearch:true,onStep:s=>steps.push(s),onWebSource:s=>sources.push(s),onWebCitation:c=>citations.push(c),tools:[{name:'search',description:'old',schema:{},execute:async()=>{tavily++;}},{name:'calendar',description:'read',schema:{},execute:async()=>{}}]},'synthetic',fake);
+  assert.equal(reply,text);assert.equal(tavily,0);assert.equal(steps[0].state,'running');assert.equal(steps.at(-1).state,'completed');assert.equal(steps.at(-1).query,'public example');assert.equal(new Set(steps.map(s=>s.id)).size,1);
+  assert.ok(sources.every(s=>s.url==='https://example.com/'&&s.publishedAt===null));assert.equal(citations.length,1);assert.equal(citations[0].marker,marker);
+  const {withWebCitations}=await import('./chatgpt-web-search.js');assert.equal(withWebCitations(reply,citations),'😀已核对。[Example](https://example.com/)');
+});
+
+test('native search failure and interruption mark active steps failed without provider fallback',async()=>{
+  for(const ending of ['', 'data: '+JSON.stringify({type:'response.failed',response:{error:{message:'web_search not allowed'}}})+'\n\n']) {
+    const steps:any[]=[];let n=0;
+    await assert.rejects(provider.generateChatGPT({userId:'x',model:'test',instructions:'test',input:[],webSearch:true,onStep:s=>steps.push(s)},'synthetic',async()=>{n++;return new Response('data: '+JSON.stringify({type:'response.output_item.added',output_index:0,item:{type:'web_search_call',status:'in_progress'}})+'\n\n'+ending);}),/未收到完成|不允许联网/);
+    assert.equal(n,1);assert.equal(steps.at(-1).state,'failed');
+  }
+  await assert.rejects(provider.completedResponse(Response.json({error:{message:'Unsupported tool: web_search'}},{status:400})),/不允许联网/);
+});
+
+test('manual capability probes and ordinary requests do not gain hosted search implicitly',async()=>{
+  await provider.generateChatGPT({userId:'x',model:'test',instructions:'test',input:[]},'synthetic',async(_url,options)=>{
+    const body=JSON.parse(String(options?.body));assert.equal(body.tools,undefined);assert.equal(body.include,undefined);return sse([{type:'message',content:[{type:'output_text',text:'plain'}]}]);
+  });
+});
+
+test('citation normalization preserves operation JSON and makes unmatched references clickable',async()=>{
+  const {withWebCitations,webSource}=await import('./chatgpt-web-search.js');
+  const citation={marker:'',url:'https://example.com/a(b)',title:'[Example] `page`'};
+  const raw='{"reply":"事实","operations":[{"type":"create"}]}';
+  const parsed=JSON.parse(raw);parsed.reply=withWebCitations(parsed.reply,[citation,citation]);assert.deepEqual(parsed.operations,[{type:'create'}]);assert.match(parsed.reply,/\[Example page\]\(https:\/\/example.com\/a%28b%29\)/);assert.equal(parsed.reply.split('参考来源：').length,2);
+  for(const url of ['javascript:alert(1)','file:///private','https://name:secret@example.com','invalid'])assert.equal(webSource({url}),undefined);
+});
+
+test('observable hosted tool calls share the existing per-request cap',async()=>{
+  await assert.rejects(provider.generateChatGPT({userId:'x',model:'test',instructions:'test',input:[],webSearch:true},'synthetic',async()=>new Response(Array.from({length:7},(_,i)=>'data: '+JSON.stringify({type:'response.output_item.added',output_index:i,item:{type:'web_search_call',status:'in_progress'}})+'\n\n').join(''))),/调用上限/);
+});

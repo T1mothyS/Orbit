@@ -1,6 +1,7 @@
 import { ORBIT_AI_QUERY_POLICY } from '../orbit-ai-policy.js';
 import { workBuddyProvider } from '../ai-provider-workbuddy.js';
 import { chatGPTProvider } from '../ai-provider-chatgpt.js';
+import {withWebCitations,type WebCitation} from '../chatgpt-web-search.js';
 import { chatGPTStatus } from '../chatgpt-connection.js';
 import { createOrbitTools } from '../orbit-tools.js';
 import { configureSearch,searchStatus } from '../orbit-search.js';
@@ -651,16 +652,19 @@ priority 识别：
     let assistantText = '';
     let resultText = '';
     const steps:any[]=[];
-    const toolContext=createOrbitTools({userId,timezone:queryTimezone,allowKnowledge:includeKnowledgeContext,allowHistory:/历史|上次.*说|之前.*聊/.test(text),onSchedules:items=>{for(const item of items)if(!contextSchedules.some(s=>s.id===item.id))contextSchedules.push(item);},onStep:step=>{const i=steps.findIndex(s=>s.id===step.id);if(i<0)steps.push(step);else steps[i]=step;if(context?.requestId)run('INSERT INTO orbit_request_steps(user_id,request_id,id,label,state,query,at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id,request_id,id) DO UPDATE SET state=excluded.state',[userId,context.requestId,step.id,step.label,step.state,step.query,step.at]);}});
+    const onStep=(step:import('../ai-provider-contract.js').AiStep)=>{const i=steps.findIndex(s=>s.id===step.id);if(i<0)steps.push(step);else steps[i]=step;if(context?.requestId)run('INSERT INTO orbit_request_steps(user_id,request_id,id,label,state,query,at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id,request_id,id) DO UPDATE SET state=excluded.state,label=excluded.label,query=excluded.query',[userId,context.requestId,step.id,step.label,step.state,step.query,step.at]);};
+    const toolContext=createOrbitTools({userId,timezone:queryTimezone,allowKnowledge:includeKnowledgeContext,allowHistory:/历史|上次.*说|之前.*聊/.test(text),onSchedules:items=>{for(const item of items)if(!contextSchedules.some(s=>s.id===item.id))contextSchedules.push(item);},onStep});
+    const webCitations:WebCitation[]=[];
     try {
 
       // 【修复数据隔离】使用该用户的 API Key
       if(attached.images){const models=isChatGPT?await chatGPTModels(userId):await getAvailableModels(userId,userCredential!);const model=isChatGPT?models.find(m=>m.id===selectedModel):models.find(m=>m.modelId===selectedModel)?.orbit;if(model?.capabilities.images.supported!==true)throw new Error('当前模型未声明支持图片输入，请在设置中刷新模型列表并选择支持图片的模型');}
-      resultText=await (isChatGPT?chatGPTProvider:workBuddyProvider).generate({userId,model:selectedModel,instructions:systemPrompt,input:[{type:'text',text:modelPrompt},...attached.input],controller:context?.controller,tools:toolContext.tools});
+      resultText=await (isChatGPT?chatGPTProvider:workBuddyProvider).generate({userId,model:selectedModel,instructions:systemPrompt,input:[{type:'text',text:modelPrompt},...attached.input],controller:context?.controller,tools:toolContext.tools,webSearch:isChatGPT,onStep,onWebSource:source=>{if(toolContext.sources.length<30&&!toolContext.sources.some(s=>s.url===source.url))toolContext.sources.push(source);},onWebCitation:citation=>{if(webCitations.length<40)webCitations.push(citation);}});
 
       const allowText = allowsPlainChatReply(text, { scoped: !!scopeId, activePlan: !!(context && activeAiPlan(userId, context.conversationId)) });
       const parsedResult = parseAiChatCandidates([resultText, assistantText], allowText);
       const parsed = parsedResult.value;
+      if(isChatGPT)parsed.reply=withWebCitations(String(parsed.reply||''),webCitations);
       if (parsedResult.repaired) {
         addLog('warn', 'ai', 'AI 返回 JSON 含未转义双引号，已自动修复');
       }
