@@ -18,6 +18,7 @@ data/attachments/
 data/daily-report-media/
 data/backups/
 data/caldav-bridge/
+data/.orbit-secrets/
 data/migration-backups/
 data/pre-fix-backups/
 *.log

@@ -311,3 +311,6 @@ pm2 restart smart-schedule --update-env
 `GET /api/schedules/unscheduled` 是登录账号隔离的纯只读接口，不套日期窗口、不生成周期。修改复用既有日程和完成记录接口。
 
 新建和涉及时间字段的更新统一校验：单日全天必须使用日期或零点，todo 不保存结束时间；全天与非零时刻冲突明确拒绝。AI 导入只有日期时生成零点全天待办。历史备份仍可恢复，异常记录由桥接报告并由用户明确修正。
+
+### 联网搜索
+管理员在设置 → AI → 联网搜索配置 Tavily Key，也可用 TAVILY_API_KEY。ORBIT_SEARCH_MONTHLY_LIMIT 默认 1000，最多 1000；请求失败也保守占用本地预算。请在 Tavily 账户关闭自动付费，Orbit 不执行购买、付费切换或自动切换搜索商。共享 Key 在其他应用的消耗不计入 Orbit 本地计数。

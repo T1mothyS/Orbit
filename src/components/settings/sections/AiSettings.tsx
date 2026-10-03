@@ -4,6 +4,7 @@ import { SettingSection } from '../SettingSection';
 import { SettingRow, SettingInput } from '../SettingRow';
 import type { SettingsAuthHeaders } from '../types';
 import { ModelSettings } from './ModelSettings';
+import { SearchSettings } from './SearchSettings';
 
 interface LoginStatus {
   isLoggedIn: boolean;
@@ -14,7 +15,7 @@ interface LoginStatus {
   error?: string;
 }
 
-export function AiSettings({ authHeaders }: { authHeaders: SettingsAuthHeaders }) {
+export function AiSettings({ authHeaders,isAdmin=false }: { authHeaders: SettingsAuthHeaders;isAdmin?:boolean }) {
   // ---------- 当前账号的 AI 凭据 ----------
   const [showEnvConfig, setShowEnvConfig] = useState(false);
   const [envConfig, setEnvConfig] = useState({
@@ -168,6 +169,7 @@ export function AiSettings({ authHeaders }: { authHeaders: SettingsAuthHeaders }
         )}
       </SettingRow>
       <ModelSettings authHeaders={authHeaders} />
+      <SearchSettings authHeaders={authHeaders} isAdmin={isAdmin}/>
     </SettingSection>
   );
 }

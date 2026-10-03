@@ -20,7 +20,7 @@ export function SettingsPage({ onOpenAdmin, onOpenTools }: { onOpenAdmin?: () =>
   return (
     <SettingsLayout isAdmin={user.role === 'admin'}>
       <AccountSettings user={user} onLogout={logout} />
-      <AiSettings authHeaders={authHeaders} />
+      <AiSettings authHeaders={authHeaders} isAdmin={user.role==='admin'} />
       <IntegrationGuideSettings authHeaders={authHeaders} />
       <CaldavSettings authHeaders={authHeaders} />
       <NotificationSettings authHeaders={authHeaders} userEmail={user.email} />

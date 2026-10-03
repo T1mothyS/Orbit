@@ -77,6 +77,8 @@ export function applyChatSchema(db: Database, { queryAll, queryOne }: SchemaQuer
   if(!orbitColumns.some(c=>c.name==='conversation_id'))db.run('ALTER TABLE ai_schedule_messages ADD COLUMN conversation_id TEXT');
   if(!orbitColumns.some(c=>c.name==='orbit_meta'))db.run('ALTER TABLE ai_schedule_messages ADD COLUMN orbit_meta TEXT');
   db.run('CREATE INDEX IF NOT EXISTS orbit_history_conversation ON ai_schedule_messages(user_id,conversation_id,created_at)');
+  db.run('CREATE TABLE IF NOT EXISTS orbit_search_usage (month TEXT PRIMARY KEY,calls INTEGER NOT NULL DEFAULT 0,stopped INTEGER NOT NULL DEFAULT 0)');
+  db.run('CREATE TABLE IF NOT EXISTS orbit_request_steps (user_id TEXT NOT NULL,request_id TEXT NOT NULL,id TEXT NOT NULL,label TEXT NOT NULL,state TEXT NOT NULL,query TEXT,at TEXT NOT NULL,PRIMARY KEY(user_id,request_id,id))');
 
 
   db.run(`
