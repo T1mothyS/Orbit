@@ -51,6 +51,8 @@ interface AiSchedulePlan {
   expiresAt: string;
   warnings: string[];
   operations: AiPlanOperation[];
+  revision?: number;
+  state?: string;
 }
 
 interface KnowledgeSource {
@@ -72,7 +74,7 @@ type MessageRole = 'user' | 'assistant';
 type MessageType = 'text' | 'schedules' | 'update' | 'plan' | 'error';
 
 interface ChatMessage {
-  orbitMeta?:{origin:string;eventId:string;enhanced:boolean;state?:string};
+  orbitMeta?:{origin:string;eventId:string;enhanced:boolean;state?:string;handledAction?:string;handledAt?:string;nextReminderAt?:string};
   id: string;
   role: MessageRole;
   type: MessageType;
@@ -452,10 +454,10 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
             {/* 文字回复 */}
             {msg.text && (
               <div className="flex items-start gap-1.5 mb-2">
-                {msg.type !== 'text' && <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />}
+                {msg.type !== 'text' && msg.type !== 'plan' && <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--td-success-color)' }} />}
                 <span
                   className={`text-xs leading-relaxed whitespace-pre-line ${msg.type === 'text' ? 'font-normal' : 'font-medium'}`}
-                  style={{ color: msg.type === 'text' ? 'var(--td-text-color-primary)' : '#10B981' }}
+                  style={{ color: 'var(--td-text-color-primary)' }}
                 >
                   {msg.text.split(/(\[打开日报\]\(\/reports\/\d{4}-\d{2}-\d{2}\?source=(?:local|cloud)\))/g).map((part,index)=>{const match=part.match(/^\[打开日报\]\((.+)\)$/);return match ? <Link key={index} to={match[1]} className="text-blue-600 underline">打开日报</Link> : part;})}
                 </span>
@@ -480,7 +482,7 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
 
             {msg.type === 'plan' && msg.plan && (
               <div className="mt-2 rounded-lg p-2.5" style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE' }}>
-                <div className="text-xs font-medium mb-2" style={{ color: '#1D4ED8' }}>待确认执行计划 · {msg.plan.operations.length} 项</div>
+                <div className="text-xs font-medium mb-2" style={{ color: 'var(--td-brand-color)' }}>{({pending:'待确认',suspended:'已挂起',expired:'已过期',cancelled:'已取消',completed:'已完成',partially_completed:'部分完成',failed:'执行失败'} as Record<string,string>)[msg.plan.state||'pending']}执行计划 · {msg.plan.operations.length} 项 · 版本 {msg.plan.revision||1}</div>
                 {msg.plan.warnings.map((warning, index) => (
                   <div key={`${warning}-${index}`} className="text-xs mb-1" style={{ color: '#B45309' }}>需核对：{warning}</div>
                 ))}
@@ -490,7 +492,7 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
                     operation={operation}
                     editing={editingOperationKey === operation.key}
                     saving={savingPlanOperationKey === `${msg.plan!.id}:${operation.key}`}
-                    onStartEdit={() => setEditingOperationKey(operation.key)}
+                    onStartEdit={() => {if(!msg.plan?.state||msg.plan.state==='pending')setEditingOperationKey(operation.key);}}
                     onCancel={() => setEditingOperationKey(null)}
                     onSave={async patch => {
                       await onUpdatePlanOperation?.(msg.plan!.id, operation.key, patch);
@@ -498,12 +500,13 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
                     }}
                   />)}
                 </div>
-                <div className="flex justify-end gap-2 mt-2.5">
+                {(!msg.plan.state || msg.plan.state==='pending') && <div className="flex justify-end gap-2 mt-2.5">
                   <button type="button" className="secondary-button" onClick={() => onDiscardPlan?.(msg.id)} disabled={confirmingPlanId === msg.plan.id}>取消</button>
                   <button type="button" className="primary-button" onClick={() => onConfirmPlan?.(msg.id, msg.plan!.id)} disabled={confirmingPlanId === msg.plan.id}>
                     {confirmingPlanId === msg.plan.id ? '正在执行…' : '确认并执行'}
                   </button>
-                </div>
+                </div>}
+                {msg.plan.state==='suspended' && <button type="button" className="secondary-button" onClick={()=>void onUpdatePlanOperation?.(msg.plan!.id,'resume',{})}>恢复这份草稿</button>}
               </div>
             )}
 
@@ -520,7 +523,7 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
                 ))}
               </div>
             )}
-            {msg.orbitMeta?.origin==='proactive' && <div className="orbit-reminder-actions"><small>{msg.orbitMeta.enhanced?'Orbit 主动提醒':'Orbit 主动提醒 · 基于事项信息'}</small><div>{[['complete','完成'],['snooze','15 分钟后'],['tomorrow','明天 09:00 再提醒']].map(([action,label])=><button type="button" key={action} disabled={reminderBusy||msg.orbitMeta?.state!=='sent'} onClick={()=>{setReminderBusy(true);setReminderError('');void onReminderAction?.(msg.orbitMeta!.eventId,action).catch(e=>setReminderError(e.message)).finally(()=>setReminderBusy(false));}}>{label}</button>)}</div>{msg.orbitMeta.state==='handled'&&<span>已处理</span>}{reminderError&&<p role="alert">{reminderError}</p>}</div>}
+            {msg.orbitMeta?.origin==='proactive' && <div className={`orbit-reminder-actions ${msg.orbitMeta.state==='handled'?'is-handled':''}`}><small>{msg.orbitMeta.enhanced?'Orbit 主动提醒':'Orbit 主动提醒 · 基于事项信息'}</small>{msg.orbitMeta.state==='sent' && <div>{[['complete','完成'],['snooze','15 分钟后'],['tomorrow','明天 09:00 再提醒']].map(([action,label])=><button type="button" key={action} disabled={reminderBusy} onClick={()=>{setReminderBusy(true);setReminderError('');void onReminderAction?.(msg.orbitMeta!.eventId,action).catch(e=>setReminderError(e.message)).finally(()=>setReminderBusy(false));}}>{label}</button>)}</div>}{msg.orbitMeta.state==='handled'&&<span>{msg.orbitMeta.handledAction==='complete'?'✓ 已完成':msg.orbitMeta.nextReminderAt?`已延后 · ${new Date(msg.orbitMeta.nextReminderAt).toLocaleString()}`:'已处理'}{msg.orbitMeta.handledAt&&<small> · {new Date(msg.orbitMeta.handledAt).toLocaleString()}</small>}</span>}{msg.orbitMeta.state==='discarded'&&<span>提醒已失效，请查看当前事项</span>}{reminderError&&<p role="alert">{reminderError}</p>}</div>}
             {messageTime}
           </div>
         )}
@@ -591,24 +594,22 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     const savingKey = `${planId}:${key}`;
     setSavingPlanOperationKey(savingKey);
     try {
-      const response = await fetch(`/api/ai-chat/plans/${encodeURIComponent(planId)}/operations/${encodeURIComponent(key)}`, {
-        method: 'PATCH',
+      const expectedRevision=messages.find(m=>m.plan?.id===planId)?.plan?.revision||1;
+      const response = await fetch(key==='resume'?`/api/ai-chat/plans/${encodeURIComponent(planId)}/resume`:`/api/ai-chat/plans/${encodeURIComponent(planId)}/operations/${encodeURIComponent(key)}`, {
+        method: key==='resume'?'POST':'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify(patch),
+        body: JSON.stringify({...patch,expectedRevision}),
       });
       const data = await readJsonResponse(response);
-      if (!response.ok || !data.operation) throw new Error(data.error || '保存计划项失败');
+      if (!response.ok || !data.plan) throw new Error(data.error || '保存计划项失败');
       setMessages(previous => previous.map(message => message.plan?.id === planId ? {
         ...message,
-        plan: {
-          ...message.plan!,
-          operations: message.plan!.operations.map(operation => operation.key === key ? { ...operation, ...data.operation } : operation),
-        },
+        plan: data.plan,
       } : message));
     } finally {
       setSavingPlanOperationKey(null);
     }
-  }, [authHeaders]);
+  }, [authHeaders,messages]);
 
   const submitMessage = useCallback(async (rawText: string, options: { clearComposer?: boolean } = {}) => {
     const text = rawText.trim();if(!text) return;
@@ -656,7 +657,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         signal: AbortSignal.timeout(60_000),
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ planId,expectedRevision:messages.find(m=>m.plan?.id===planId)?.plan?.revision||1 }),
       });
       const data = await readJsonResponse(response);
       if (!response.ok) throw new Error(data.error || '确认计划失败');
@@ -667,17 +668,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
         plan: undefined,
         scheduleItems: data.scheduleItems || [],
       } : message));
-      fetch('/api/ai-schedule/history/' + messageId, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({
-          type: 'schedules',
-          content: data.reply || '计划已确认执行。',
-          intent: data.intent || 'create',
-          scheduleItems: data.scheduleItems || [],
-          plan: null,
-        }),
-      }).catch(() => {});
+      await orbit.refresh();
       if (data.changed) onSchedulesCreated?.(data.changedDetails?.created || []);
     } catch (error: any) {
       setMessages(previous => [...previous, {
@@ -690,24 +681,19 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     } finally {
       setConfirmingPlanId(null);
     }
-  }, [authHeaders, confirmingPlanId, onSchedulesCreated]);
+  }, [authHeaders, confirmingPlanId, onSchedulesCreated,messages,orbit.refresh]);
 
   const handleDiscardPlan = useCallback(async (messageId: string) => {
     const discarded = messages.find(message => message.id === messageId);
-    setMessages(previous => previous.map(message => message.id === messageId ? {
-      ...message,
-      type: 'text',
-      text: '已取消这份计划，尚未创建或修改任何日程。',
-      plan: undefined,
-    } : message));
-    if (discarded) {
-      fetch('/api/ai-schedule/history/' + messageId, {
-        method: 'PATCH',
+    if (discarded?.plan) {
+      try { const response=await fetch(`/api/ai-chat/plans/${encodeURIComponent(discarded.plan.id)}/cancel`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ type: 'text', content: '已取消这份计划，尚未创建或修改任何日程。', intent: discarded.intent || null, plan: null }),
-      }).catch(() => {});
+        body: JSON.stringify({ expectedRevision: discarded.plan.revision||1 }),
+      });const data=await readJsonResponse(response);if(!response.ok)throw new Error(data.error||'取消失败');await orbit.refresh();}
+      catch(error){orbit.setError(error instanceof Error?error.message:'取消失败');}
     }
-  }, [authHeaders, messages]);
+  }, [authHeaders, messages,orbit.refresh,orbit.setError]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (noteMode) {

@@ -112,17 +112,19 @@ export async function runOrbitProactiveTick(now=new Date()) {
 }
 export function actOnProactiveEvent(userId:string,id:string,action:string,now=new Date()) {
   const e=queryOne<ProactiveEvent>('SELECT * FROM orbit_proactive_events WHERE user_id=? AND id=?',[userId,id]);if(!e||e.state!=='sent')throw new Error('提醒不存在或已处理');
-  const s=getSchedule(e.schedule_id);if(!s||s.user_id!==userId||s.is_completed)throw new Error('事项已完成或已删除');
-  if(scheduleFingerprint(s)!==e.expected_state)throw new Error('事项已变更，请打开卡片核对最新内容');
+  const s=getSchedule(e.schedule_id);if(!s||s.user_id!==userId||s.is_completed){run("UPDATE orbit_proactive_events SET state='discarded' WHERE user_id=? AND id=?",[userId,id]);throw new Error('事项已完成或已删除');}
+  if(scheduleFingerprint(s)!==e.expected_state){run("UPDATE orbit_proactive_events SET state='discarded' WHERE user_id=? AND id=?",[userId,id]);throw new Error('事项已变更，请打开卡片核对最新内容');}
   withPersistenceTransaction(()=>{
+    let nextReminderAt: string | null = null;
     if(action==='complete') {
       if(e.instance_id){const p=readReminderProjectionSources(userId).find(p=>p.cycle?.id===e.instance_id&&p.current);if(!p)throw new Error('周期已变化');const task=completeReminderCycle(p.task.id,userId,e.instance_id,dateInZone(now,p.task.timezone),'Orbit 主动提醒中完成');if(!task)throw new Error('周期不存在');const completedCycle=readReminderProjectionSources(userId).find(c=>c.cycle?.id===e.instance_id)?.cycle;if(completedCycle)syncReminderCycleToCalendar(task,completedCycle);syncReminderTaskToCalendar(task);if(!listCompletions(userId,{sourceType:'reminder',sourceId:p.task.id}).some(c=>c.instanceId===e.instance_id&&!c.reopenedAt))createCompletion({userId,sourceType:'reminder',sourceId:p.task.id,instanceId:e.instance_id,completedAt:now.toISOString()});}
       else toggleScheduleCompletion(s.id,userId);
     } else if(['snooze','tomorrow'].includes(action)) {
       const timezone=db.getReminder(userId)?.timezone||'Asia/Shanghai';const until=action==='snooze'?new Date(now.getTime()+15*60000):parseScheduleStart(`${addDateDays(dateInZone(now,timezone),1)}T09:00:00`,timezone)!;
+      nextReminderAt=until.toISOString();
       run('INSERT INTO orbit_schedule_reminders (user_id,schedule_id,enabled,minutes,snoozed_until) VALUES (?,?,?,?,?) ON CONFLICT(user_id,schedule_id) DO UPDATE SET enabled=1,snoozed_until=excluded.snoozed_until',[userId,s.id,1,15,until.toISOString()]);
     } else throw new Error('提醒操作无效');
-    run('UPDATE orbit_proactive_events SET state=? WHERE id=?',['handled',id]);
+    run('UPDATE orbit_proactive_events SET state=?,handled_action=?,handled_at=?,next_reminder_at=? WHERE id=? AND user_id=?',['handled',action,now.toISOString(),nextReminderAt,id,userId]);
   });
 }
 export function createProactiveJobs(isReady:()=>boolean) {return createJobRunner([{name:'orbit-proactive',expression:'*/30 * * * * *',run:async()=>{if(isReady())await runOrbitProactiveTick();}}],()=>addLog('warn','ai','Orbit 主动提醒扫描失败'));}

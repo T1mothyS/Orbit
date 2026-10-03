@@ -183,3 +183,7 @@ AI 生成的 update/delete 绑定真实对象 ID 和事实指纹，确认时拒�
 
 ### Orbit AI 基础升级
 Provider 合同位于 server/ai-provider-contract.ts：模型目录声明与真实验证分开；未知能力保持 unknown。工具只有受控读取和草稿权限，正式写入继续经过用户确认和 operation-service。WorkBuddy SDK 内置工具继续关闭。
+
+#### 当前操作状态
+待确认计划的消息快照为持久来源，内存 Map 仅为缓存；会话 active_plan_message_id 指向唯一活跃草稿。revision 用于编辑/确认冲突校验，取消/挂起/过期保留快照。确认接口独立恢复，无需先读取历史。明确时间与日期短句只修订该草稿，文字确认仍需按钮；新话题挂起，恢复需显式操作。恢复备份不会激活草稿。
+主动提醒保存 handled_action、handled_at、next_reminder_at；旧 handled 仅显示已处理。正式日程写入、所有权、指纹与 operation_results 幂等边界不变。

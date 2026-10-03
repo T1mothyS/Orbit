@@ -20,6 +20,7 @@ export interface Conversation {
     is_main?: number;
     scope_schedule_id?: string | null;
     unread?: number;
+    active_plan_message_id?: string | null;
 }
 export interface ChatRequest {
     id: string;
@@ -86,7 +87,7 @@ export function historyContext(userId: string, id: string): string {
     let remaining = 12000;
     const selected: string[] = [];
     for (const row of rows) {
-        const part = `${row.role}: ${row.content}\n对象引用：${row.schedule_items || ''}\n知识引用：${row.knowledge_sources || ''}\n待确认计划：${row.plan || ''}`;
+        const part = `${row.role}: ${row.content}\n对象引用：${row.schedule_items || ''}\n知识引用：${row.knowledge_sources || ''}`;
         if (remaining <= 0)
             break;
         selected.unshift(part.slice(0, remaining));
@@ -160,7 +161,7 @@ export function restoreOrbit(userId: string, data: Pick<ReturnType<typeof export
         if (existing && existing.user_id !== userId)
             throw new Error('消息编号属于其他账号');
         if (!existing)
-            run('INSERT INTO ai_schedule_messages (id,user_id,role,type,content,intent,schedule_items,plan,knowledge_sources,created_at,conversation_id,orbit_meta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [id, userId, m.role, m.type, m.content, m.intent, foreign ? null : m.schedule_items, foreign ? null : m.plan, foreign ? null : m.knowledge_sources, m.created_at, ids.get(m.conversation_id) || fallback,foreign?null:m.orbit_meta||null]);
+            run('INSERT INTO ai_schedule_messages (id,user_id,role,type,content,intent,schedule_items,plan,knowledge_sources,created_at,conversation_id,orbit_meta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [id, userId, m.role, m.type, m.content, m.intent, foreign ? null : m.schedule_items, foreign ? null : restoredPlanSnapshot(m.plan), foreign ? null : m.knowledge_sources, m.created_at, ids.get(m.conversation_id) || fallback,foreign?null:m.orbit_meta||null]);
     }
     setAiPreference(userId, data.autoKnowledge === true);
     // Imported reminders never replay pending jobs or implicitly enable autonomous AI calls.
@@ -168,8 +169,14 @@ export function restoreOrbit(userId: string, data: Pick<ReturnType<typeof export
     if(!foreign) {
       for(const r of data.reminderRules||[])if(getSchedule(r.schedule_id)?.user_id===userId && Number.isInteger(r.minutes)&&r.minutes>=0&&r.minutes<=10080)run('INSERT OR IGNORE INTO orbit_schedule_reminders (user_id,schedule_id,enabled,minutes,snoozed_until) VALUES (?,?,?,?,NULL)',[userId,r.schedule_id,r.enabled?1:0,r.minutes]);
       for(const e of data.knowledgeEvents||[])if(typeof e.id==='string'&&typeof e.entry_id==='string'&&['read','citation'].includes(e.kind)&&!Number.isNaN(Date.parse(e.created_at)))run('INSERT OR IGNORE INTO orbit_knowledge_events (id,user_id,entry_id,kind,created_at) VALUES (?,?,?,?,?)',[e.id,userId,e.entry_id,e.kind,e.created_at]);
-      for(const e of data.proactiveEvents||[])if(getSchedule(e.schedule_id)?.user_id===userId)run('INSERT OR IGNORE INTO orbit_proactive_events (id,user_id,schedule_id,instance_id,expected_state,trigger_at,state,message_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)',[e.id,userId,e.schedule_id,e.instance_id,e.expected_state,e.trigger_at,['sent','handled','discarded'].includes(e.state)?e.state:'discarded',e.message_id,e.created_at]);
+      for(const e of data.proactiveEvents||[])if(getSchedule(e.schedule_id)?.user_id===userId)run('INSERT OR IGNORE INTO orbit_proactive_events (id,user_id,schedule_id,instance_id,expected_state,trigger_at,state,message_id,created_at,handled_action,handled_at,next_reminder_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',[e.id,userId,e.schedule_id,e.instance_id,e.expected_state,e.trigger_at,['sent','handled','discarded'].includes(e.state)?e.state:'discarded',e.message_id,e.created_at,e.handled_action||null,e.handled_at||null,e.next_reminder_at||null]);
     }
+}
+function restoredPlanSnapshot(value: string | null): string | null {
+  if(!value)return null;
+  const p=JSON.parse(value);
+  if(!p.state || p.state==='pending' || p.state==='executing') {p.state='suspended';p.revision=(p.revision||1)+1;}
+  return JSON.stringify(p);
 }
 export function recentObjectReferences(userId: string, id: string): Array<Array<{
     id: string;

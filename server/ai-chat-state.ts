@@ -1,5 +1,5 @@
 import { queryOne as dbQueryOne, run as dbQueryRun } from './database/connection.js';
-import { orbitContext, conversation, getRequest } from './orbit-store.js';
+import { orbitContext, conversation, getRequest, referencedIndex } from './orbit-store.js';
 import { normaliseScheduleApiFields } from './schedule-input.js';
 import { normaliseReminderConfig } from './reminder-input.js';
 import { getLocalDateString } from './local-date.js';
@@ -13,7 +13,9 @@ import * as reminderCalendarSync from './reminder-calendar-sync.js';
 import { getDailyWeather, type WeatherLocation } from './weather-service.js';
 import { addLog } from './log-service.js';
 import { type KnowledgeSearchMatch } from './search-service.js';
-import { rawOperationsFromSnapshot, scheduleFingerprint, type PendingAiOperation } from './ai-plan.js';
+import { buildAiPlanSnapshot, rawOperationsFromSnapshot, scheduleFingerprint, updateAiPlanOperation, type PendingAiOperation } from './ai-plan.js';
+import { resolveQueryDates } from './orbit-time.js';
+import { queryAll } from './database/connection.js';
 import * as db from './db.js';
 import { parseHistoryJson } from './ai-history.js';
 import { recordKnowledgeCitations } from './orbit-statistics.js';
@@ -118,6 +120,10 @@ export interface PendingAiSchedulePlan {
   expiresAt: number;
   historyMessageId?: string;
   confirmedResult?: any;
+  conversationId?: string;
+  revision?: number;
+  state?: string;
+  result?: unknown;
 }
 
 export interface AiChatRequestRecord {
@@ -216,10 +222,10 @@ export function hydratePendingAiSchedulePlans(userId: string, messages: dbModule
   for (const message of messages) {
     if (message.role !== 'assistant' || message.type !== 'plan' || !message.plan) continue;
     const snapshot = parseHistoryJson(message.plan);
-    if (!snapshot?.id || !snapshot?.expiresAt || Date.parse(String(snapshot.expiresAt)) <= Date.now()) continue;
+    if (!snapshot?.id || !snapshot?.expiresAt) continue;
     const operations = rawOperationsFromSnapshot(snapshot);
     if (!operations.length) continue;
-    aiSchedulePlans.set(String(snapshot.id), {
+    const restored: PendingAiSchedulePlan = {
       id: String(snapshot.id),
       userId,
       targetCalendarId: String(snapshot.targetCalendarId || 'personal'),
@@ -231,8 +237,101 @@ export function hydratePendingAiSchedulePlans(userId: string, messages: dbModule
       expiresAt: Date.parse(String(snapshot.expiresAt)),
       historyMessageId: message.id,
       confirmedResult: dbModule.getOperationResult(userId, 'ai-plan', String(snapshot.id)),
-    });
+      conversationId: message.conversation_id || undefined,
+      revision: Number(snapshot.revision) || 1,
+      state: snapshot.state || 'pending',
+      result: snapshot.result,
+    };
+    if (restored.confirmedResult) { restored.state = restored.confirmedResult.partial ? (restored.confirmedResult.changed ? 'partially_completed' : 'failed') : 'completed'; restored.result = restored.confirmedResult; }
+    if (['pending', 'suspended'].includes(restored.state!) && restored.expiresAt <= Date.now()) restored.state = 'expired';
+    aiSchedulePlans.set(restored.id, restored);
+    if (restored.state !== (snapshot.state || 'pending')) persistAiPlan(restored);
   }
+}
+
+/** Always resolve from owned durable history; the Map is only a transport cache. */
+export function resolveAiPlan(userId: string, id: string): PendingAiSchedulePlan | undefined {
+  const messages = queryAll<dbModule.DbAiScheduleMessage>('SELECT * FROM ai_schedule_messages WHERE user_id=? AND plan IS NOT NULL', [userId]);
+  const message = messages.find(m => parseHistoryJson(m.plan)?.id === id);
+  if (!message) return undefined;
+  // Terminal messages retain their immutable plan/result snapshot as well.
+  hydratePendingAiSchedulePlans(userId, [{ ...message, type: 'plan' }]);
+  return aiSchedulePlans.get(id);
+}
+export function persistAiPlan(plan: PendingAiSchedulePlan): void {
+  if (!plan.historyMessageId) throw new Error('计划尚未保存');
+  withPersistenceTransaction(() => {
+    if (!db.updateAiScheduleMessage(plan.historyMessageId!, plan.userId, { plan: JSON.stringify(buildAiPlanSnapshot(plan)) })) throw new Error('计划已移除');
+    if (plan.conversationId && plan.state !== 'pending') dbQueryRun('UPDATE orbit_conversations SET active_plan_message_id=NULL WHERE id=? AND user_id=? AND active_plan_message_id=?', [plan.conversationId, plan.userId, plan.historyMessageId]);
+  });
+}
+export function setAiPlanState(plan: PendingAiSchedulePlan, state: string): void {
+  plan.state = state; plan.revision = (plan.revision || 1) + 1; persistAiPlan(plan);
+}
+export function activateAiPlan(plan: PendingAiSchedulePlan): void {
+  if (!plan.conversationId || !plan.historyMessageId) return;
+  const old = activeAiPlan(plan.userId, plan.conversationId);
+  if (old && old.id !== plan.id) setAiPlanState(old, 'suspended');
+  plan.state = 'pending'; persistAiPlan(plan);
+  dbQueryRun('UPDATE orbit_conversations SET active_plan_message_id=? WHERE id=? AND user_id=?', [plan.historyMessageId, plan.conversationId, plan.userId]);
+}
+export function activeAiPlan(userId: string, cid: string): PendingAiSchedulePlan | undefined {
+  const c = conversation(userId, cid);
+  const rows = queryAll<dbModule.DbAiScheduleMessage>('SELECT * FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND plan IS NOT NULL ORDER BY created_at DESC,rowid DESC', [userId, cid]);
+  const row = c.active_plan_message_id ? rows.find(m => m.id === c.active_plan_message_id) : rows.find(m => !parseHistoryJson(m.plan)?.state);
+  if (!row) return undefined;
+  const plan = resolveAiPlan(userId, String(parseHistoryJson(row.plan)?.id));
+  if (plan?.state !== 'pending') return undefined;
+  if (!c.active_plan_message_id) dbQueryRun('UPDATE orbit_conversations SET active_plan_message_id=? WHERE id=? AND user_id=?', [row.id, cid, userId]);
+  return plan;
+}
+export function assertPlanRevision(plan: PendingAiSchedulePlan, expected: unknown): void {
+  if (expected !== undefined && expected !== (plan.revision || 1)) throw new Error('计划已更新，请刷新后操作');
+  if (expected === undefined && (plan.revision || 1) !== 1) throw new Error('请刷新计划后操作');
+  if (plan.state !== 'pending' || plan.expiresAt <= Date.now()) throw new Error('计划当前不可执行或编辑');
+}
+export function reviseAiPlan(plan: PendingAiSchedulePlan, index: number, patch: Record<string, unknown>, expected: unknown): void {
+  assertPlanRevision(plan, expected);
+  if (!plan.operations[index]) throw new Error('计划操作不存在');
+  plan.operations[index] = updateAiPlanOperation(plan.operations[index], patch);
+  plan.revision = (plan.revision || 1) + 1; persistAiPlan(plan);
+}
+export function pendingInteraction(userId: string, cid: string, text: string): { handled: boolean; reply?: string; plan?: PendingAiSchedulePlan } {
+  const plan = activeAiPlan(userId, cid);
+  const short = text.trim().replace(/[。！？!?.]$/g, '');
+  if (!plan) {
+    if (/^(确认|取消|还是算了|改成|换到|继续刚才)/.test(short) && short.length < 24) return { handled: true, reply: '当前没有活跃的待确认计划，请选择需要恢复的草稿或重新说明事项。' };
+    return { handled: false };
+  }
+  if (/^(取消|还是算了|算了|不要了|取消计划)$/.test(short)) { setAiPlanState(plan, 'cancelled'); return { handled: true, reply: '已取消待确认计划，正式事项没有变更。' }; }
+  if (/^(确认|确定|好的|好|执行|确认执行)$/.test(short)) return { handled: true, reply: '请核对当前计划并点击“确认并执行”。', plan };
+  if (/^(?:把)?(?:第[一二三四五六七八九十\d]+[个项])?(?:改成|改到|换到|移到|推迟到)/.test(short) || /^(?:改|换)(?:成|到)/.test(short)) {
+    const index = referencedIndex(short) ?? (plan.operations.length === 1 ? 0 : -1);
+    if (index < 0) return { handled: true, reply: '这个计划有多个事项，请说明要修改第几项。' };
+    const op = plan.operations[index];
+    const old = op?.data?.start_time;
+    if (!old || op.type === 'delete' || op.type === 'create_recurring') return { handled: true, reply: '请在对应计划卡片中编辑这项操作。' };
+    const hourMatch = short.match(/(上午|下午|晚上|中午)?\s*([零一二三四五六七八九十两\d]+)(?:点|时|:)(半|[零一二三四五六七八九十\d]+分?)?/);
+    const chinese = (v: string): number => /^\d+$/.test(v) ? Number(v) : v === '两' ? 2 : v.includes('十') ? (v.startsWith('十') ? 1 : '零一二三四五六七八九'.indexOf(v[0])) * 10 + (v.endsWith('十') ? 0 : '零一二三四五六七八九'.indexOf(v.at(-1)!)) : '零一二三四五六七八九'.indexOf(v);
+    let date = old.slice(0,10), time = old.slice(11,19);
+    if (/周[一二三四五六日天]|明天|后天|今天|\d{4}-\d{2}-\d{2}|\d+月\d+日/.test(short)) date = resolveQueryDates(short, plan.today)[0];
+    if (hourMatch) {
+      let hour = chinese(hourMatch[2]); if (/下午|晚上/.test(hourMatch[1] || '') && hour < 12) hour += 12;
+      const minute = hourMatch[3] === '半' ? 30 : hourMatch[3] ? chinese(hourMatch[3].replace('分','')) : 0;
+      if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return { handled: true, reply: '时间无效，请重新说明。' };
+      time = `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00`;
+    }
+    if (date === old.slice(0,10) && !hourMatch) return { handled: true, reply: '请补充明确的日期或时间，或者编辑计划卡片。' };
+    const start = `${date}T${time}`;
+    const wallTime = (value: string) => Date.parse(value.slice(0,19) + 'Z');
+    const duration = op.data?.end_time ? wallTime(op.data.end_time) - wallTime(old) : 0;
+    const end = duration > 0 ? new Date(wallTime(start) + duration).toISOString().slice(0,19) : start;
+    reviseAiPlan(plan, index, { startTime: start, endTime: end }, plan.revision);
+    return { handled: true, reply: `已修改同一草稿：${old.slice(0,16).replace('T',' ')} → ${start.slice(0,16).replace('T',' ')}。仍需确认后执行。`, plan };
+  }
+  if (short.length < 8) return { handled: true, reply: '当前计划尚未结束。请说明要修改的内容，或取消、挂起后开始新话题。', plan };
+  setAiPlanState(plan, 'suspended');
+  return { handled: false };
 }
 
 export function isAiChatRequestId(value: unknown): value is string {

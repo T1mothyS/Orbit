@@ -187,9 +187,17 @@ export function buildAiPlanSnapshot(input: {
   reply: string;
   operations: PendingAiOperation[];
   historyMessageId?: string;
+  conversationId?: string;
+  revision?: number;
+  state?: string;
+  result?: unknown;
 }): Record<string, unknown> {
   return {
     id: input.id,
+    conversationId: input.conversationId,
+    revision: input.revision || 1,
+    state: input.state || 'pending',
+    result: input.result,
     expiresAt: new Date(input.expiresAt).toISOString(),
     warnings: input.warnings,
     targetCalendarId: input.targetCalendarId,

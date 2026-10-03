@@ -1,4 +1,5 @@
 import { ORBIT_AI_QUERY_POLICY } from '../orbit-ai-policy.js';
+import { activateAiPlan, activeAiPlan, resolveAiPlan, setAiPlanState, assertPlanRevision, reviseAiPlan, pendingInteraction } from '../ai-chat-state.js';
 import { OptimizeError } from '../prompt-optimize.js';
 import { createPromptOptimizationRunId, runPromptOptimization } from '../note-prompt-optimization.js';
 import { Router } from 'express';
@@ -77,7 +78,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       orbit.conversation(payload.userId,cid);
       const messages = queryAll<dbModule.DbAiScheduleMessage>('SELECT * FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? ORDER BY created_at,rowid',[payload.userId,cid]);
       hydratePendingAiSchedulePlans(payload.userId, messages);
-      res.json({ messages: messages.map(m => {const view=toAiScheduleHistoryMessage(m);if(view.orbitMeta?.eventId)view.orbitMeta.state=queryAll<any>('SELECT state FROM orbit_proactive_events WHERE user_id=? AND id=?',[payload.userId,view.orbitMeta.eventId])[0]?.state||'discarded';if(Array.isArray(view.scheduleItems)) view.scheduleItems=view.scheduleItems.flatMap((item:any)=>{const live=scheduleStore.getSchedule(item.id);return live?.user_id===payload.userId?[live]:[];});return view;}) });
+      res.json({ messages: messages.map(m => {const view=toAiScheduleHistoryMessage(m);if(view.plan?.id)view.plan=buildAiPlanSnapshot(resolveAiPlan(payload.userId,view.plan.id)!);if(view.orbitMeta?.eventId){const e=queryAll<any>('SELECT * FROM orbit_proactive_events WHERE user_id=? AND id=?',[payload.userId,view.orbitMeta.eventId])[0];Object.assign(view.orbitMeta,{state:e?.state||'discarded',handledAction:e?.handled_action,handledAt:e?.handled_at,nextReminderAt:e?.next_reminder_at});}if(Array.isArray(view.scheduleItems)) view.scheduleItems=view.scheduleItems.flatMap((item:any)=>{const live=scheduleStore.getSchedule(item.id);return live?.user_id===payload.userId?[live]:[];});return view;}) });
     } catch (error: any) {
       console.error("[AI History] Error:", error);
       res.status(400).json({ error: '无法读取这个会话' });
@@ -97,8 +98,10 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
         if(body.plan !== null) throw new Error('计划只能通过专用计划编辑入口修改');
         const old = db.getAiScheduleMessages(payload.userId,0).find(m=>m.id===req.params.id);
         const planId=old?.plan ? JSON.parse(old.plan).id : null;
-        if(planId && aiSchedulePlans.get(planId)?.userId===payload.userId) aiSchedulePlans.delete(planId);
-        updates.plan=null;
+        const pending=planId ? resolveAiPlan(payload.userId,planId) : undefined;
+        if(pending && ['pending','suspended'].includes(pending.state!)){setAiPlanState(pending,'cancelled');updates.plan=JSON.stringify(buildAiPlanSnapshot(pending));}
+        else if(pending) throw new Error('终态计划不能覆盖');
+        else updates.plan=null;
       }
       if (body.knowledgeSources !== undefined) updates.knowledge_sources = body.knowledgeSources == null ? null : JSON.stringify(body.knowledgeSources);
       if (!db.updateAiScheduleMessage(req.params.id, payload.userId, updates)) {
@@ -114,24 +117,31 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     try {
       cleanupExpiredAiScheduleState();
       const userId = ((req as any).user as JwtPayload).userId;
-      const plan = aiSchedulePlans.get(req.params.planId);
+      const plan = resolveAiPlan(userId,req.params.planId);
       if (!plan || plan.userId !== userId) return res.status(404).json({ error: '待确认计划不存在或已过期，请重新生成。' });
       if (plan.confirmedResult) return res.status(409).json({ error: '计划已经确认执行，不能再编辑。' });
       if (!/^\d+$/.test(req.params.key)) return res.status(400).json({ error: '计划操作编号不正确' });
       const index = Number(req.params.key);
       const current = plan.operations[index];
       if (!current || current.key !== req.params.key) return res.status(404).json({ error: '计划操作不存在' });
-      const updated = updateAiPlanOperation(current, req.body || {});
-      plan.operations[index] = updated;
-      const snapshot = buildAiPlanSnapshot(plan);
-      if (plan.historyMessageId) {
-        db.updateAiScheduleMessage(plan.historyMessageId, userId, { plan: JSON.stringify(snapshot) });
-      }
-      res.json({ success: true, planId: plan.id, operation: planOperationPreview(updated, index) });
+      const {expectedRevision,...patch}=req.body || {};
+      reviseAiPlan(plan,index,patch,expectedRevision);
+      res.json({ success: true, planId: plan.id, plan:buildAiPlanSnapshot(plan), operation: planOperationPreview(plan.operations[index], index) });
     } catch (error: any) {
-      res.status(400).json({ error: error?.message || '保存计划修改失败' });
+      res.status(/已更新|不可执行/.test(error?.message||'')?409:400).json({ error: error?.message || '保存计划修改失败' });
     }
   });
+  app.post('/api/ai-chat/plans/:planId/:action', authenticate, safe((req,res)=>{
+    const plan=resolveAiPlan(user(req),req.params.planId);
+    if(!plan)throw new Error('计划不存在');
+    if(req.body?.expectedRevision!==(plan.revision||1))throw new Error('计划已更新，请刷新后操作');
+    if(!['pending','suspended'].includes(plan.state!)||plan.expiresAt<=Date.now())throw new Error('计划已结束或过期');
+    if(req.params.action==='resume'){plan.revision=(plan.revision||1)+1;activateAiPlan(plan);}
+    else if(req.params.action==='cancel')setAiPlanState(plan,'cancelled');
+    else if(req.params.action==='suspend')setAiPlanState(plan,'suspended');
+    else throw new Error('操作无效');
+    res.json({plan:buildAiPlanSnapshot(plan)});
+  }));
 
   app.delete("/api/ai-schedule/history", authenticate, (req, res) => {
     try {
@@ -140,6 +150,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       orbit.conversation(payload.userId,cid);
       if (orbitQueue.listOrbitRequests(payload.userId,cid).some(r => ['queued','running'].includes(r.state))) throw new Error('请先取消这个会话中的请求');
       run('DELETE FROM ai_schedule_messages WHERE user_id=? AND conversation_id=?',[payload.userId,cid]);
+      run('UPDATE orbit_conversations SET active_plan_message_id=NULL WHERE user_id=? AND id=?',[payload.userId,cid]);
       const deleted = true;
       res.json({ success: true, deleted });
     } catch (error: any) {
@@ -180,7 +191,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     const previousKnowledge = context ? orbit.previousKnowledgeIds(userId,context.conversationId) : [];
     const knowledgeFollowUp = previousKnowledge.length > 0 && /(第.+[篇条]|这篇|刚才.*知识|上面.*资料)/.test(text);
     const includeKnowledgeContext = requestsKnowledgeContext(text) || orbit.getAiPreference(userId) || body.knowledgeScope === true || knowledgeFollowUp;
-    const previousContext = context ? orbit.historyContext(userId,context.conversationId) + '\n' + orbit.workingContext(userId,context.conversationId,text,targetDate || reminderStore.todayInTimezone(db.getReminder(userId)?.timezone || 'Asia/Shanghai')) : '';
+    let previousContext = '';
     const queryTimezone = db.getReminder(userId)?.timezone || 'Asia/Shanghai';
     const objectRefs = context ? orbit.recentObjectReferences(userId,context.conversationId) : [];
     const referencedIds = new Set(objectRefs.flatMap(row => row.map((s:any)=>s.id)));
@@ -213,6 +224,13 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       } catch (error) {
         console.error('[AI History] 保存用户消息失败:', error);
       }
+    }
+
+    if (context) {
+      const interaction=pendingInteraction(userId,context.conversationId,text);
+      if(interaction.handled){const response={success:true,intent:'chat',reply:interaction.reply,changed:false,activePlanId:interaction.plan?.id};const message=saveAiScheduleResponseHistory(userId,response);return res.json({...response,historyMessageId:message.id});}
+      const activePlan=activeAiPlan(userId,context.conversationId);
+      previousContext=(activePlan?`当前交互状态：等待确认。优先保持同一草稿，不创建替代计划。\n当前计划：${JSON.stringify(buildAiPlanSnapshot(activePlan))}\n`:'当前交互状态：无活跃计划。\n')+orbit.historyContext(userId,context.conversationId)+(activePlan?'':'\n'+orbit.workingContext(userId,context.conversationId,text,targetDate || reminderStore.todayInTimezone(queryTimezone)));
     }
 
     // 只读日程查询直接使用本地数据，不依赖外部 AI 或 API Key。
@@ -666,6 +684,9 @@ priority 识别：
         const plan: PendingAiSchedulePlan = {
           id: uuidv4(),
           userId,
+          conversationId: context?.conversationId,
+          state: 'pending',
+          revision: 1,
           targetCalendarId,
           today,
           intent: parsed.intent || 'chat',
@@ -706,6 +727,7 @@ priority 识别：
             pendingPlan.historyMessageId = historyMessage.id;
             response.plan = buildAiPlanSnapshot(pendingPlan);
             db.updateAiScheduleMessage(historyMessage.id, userId, { plan: JSON.stringify(response.plan) });
+            activateAiPlan(pendingPlan);
           }
         }
       } catch (historyError) {
@@ -753,11 +775,12 @@ priority 识别：
       const userId = ((req as any).user as JwtPayload).userId;
       const replay = dbModule.getOperationResult(userId, 'ai-plan', planId);
       if (replay !== undefined) return res.json(replay);
-      const plan = aiSchedulePlans.get(planId);
+      const plan = resolveAiPlan(userId,planId);
       if (plan?.historyMessageId && !db.getAiScheduleMessages(userId,0).some(m=>m.id===plan.historyMessageId && m.plan)) return res.status(404).json({error:'计划所在对话已删除或计划已取消'});
       if (!plan || plan.userId !== userId) {
         return res.status(404).json({ error: '待确认计划不存在或已过期，请重新生成。' });
       }
+      assertPlanRevision(plan,req.body?.expectedRevision);
 
       if (!plan.confirmedResult) {
         plan.confirmedResult = executeOnce(userId, 'ai-plan', planId, () => {
@@ -795,10 +818,12 @@ priority 识别：
           failed: plan.confirmedResult.changedDetails.failures.length,
         });
       }
-      if (plan.historyMessageId) db.updateAiScheduleMessage(plan.historyMessageId,userId,{type:'schedules',content:plan.confirmedResult.reply,schedule_items:JSON.stringify(plan.confirmedResult.scheduleItems),plan:null});
+      plan.result=plan.confirmedResult;
+      setAiPlanState(plan,plan.confirmedResult.partial ? (plan.confirmedResult.changed?'partially_completed':'failed') : 'completed');
+      if (plan.historyMessageId) db.updateAiScheduleMessage(plan.historyMessageId,userId,{type:'schedules',content:plan.confirmedResult.reply,schedule_items:JSON.stringify(plan.confirmedResult.scheduleItems)});
       res.json(plan.confirmedResult);
     } catch (error: any) {
-      res.status(500).json({ error: error?.message || '确认保存失败，请重试' });
+      res.status(/已更新|不可执行/.test(error?.message||'')?409:500).json({ error: error?.message || '确认保存失败，请重试' });
     }
   });
 
