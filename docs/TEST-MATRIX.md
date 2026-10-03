@@ -50,3 +50,6 @@ UI/交互改动使用实际浏览器：390×844、430×932、768×1024、1440×9
 - Orbit 当前操作回归：server/orbit-plan-state.test.ts 覆盖短句修订、原始日期锚点/时长、账号隔离、挂起/取消、过期、缓存清空后直接确认、revision 冲突、重复确认和备份挂起。实际模型召回质量仍需独立验收。
 
 - ChatGPT 合成合同：chatgpt-provider.test.ts 覆盖 JWT 签名/nonce/audience、登录权限不足、账号隔离、本机 host 保留、loopback/PKCE、并发刷新与令牌替换、临时失败、namespace 工具、SSE 断线/错误和撤销失败。通过不代表真实 OAuth/额度/模型能力通过。
+## 隔离 Orbit UI 预览
+
+构建前端后运行 `npx tsx scripts/orbit-ui-preview.ts 4183`，仅监听 loopback，使用新的临时数据库和合成账号，不载入 .env、不启动邮件/主动提醒/真实模型。关闭进程后临时数据可人工删除；它不代表生产、真实 OAuth、搜索或模型验收。至少检查聊天终态、短句草稿修改、设置搜索键盘定位、阅读旧消息及 reduced-motion，再按本文窗口与主题矩阵检查布局。

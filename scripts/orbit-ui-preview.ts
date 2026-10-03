@@ -1,0 +1,26 @@
+/** Isolated, loopback-only UI preview. Never loads .env or the repository data directory. */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import {randomUUID} from 'node:crypto';
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-ui-preview-'));
+Object.assign(process.env,{DATA_DIR:root,NODE_ENV:'test',APP_ENV:'development',JWT_SECRET:'isolated-preview-only-no-production',BACKGROUND_JOBS_ENABLED:'false',ORBIT_PROACTIVE_ENABLED:'false'});
+const api=await import('../server/index.js');await api.initializeServer();
+const db=await import('../server/db.js'),orbit=await import('../server/orbit-store.js'),state=await import('../server/ai-chat-state.js');
+const {buildAiPlanSnapshot}=await import('../server/ai-plan.js');
+const stamp=new Date().toISOString(),uid='preview-owner';
+db.createUser({id:uid,email:'preview@example.invalid',password_hash:await bcrypt.hash('OrbitPreview123!',10),role:'admin',disabled:0,created_at:stamp,updated_at:stamp});
+const cid=orbit.ensureDefaultConversation(uid);
+for(let i=0;i<12;i++)db.createAiScheduleMessage({id:randomUUID(),user_id:uid,conversation_id:cid,role:i%2?'assistant':'user',type:'text',content:i%2?'### 本周安排\n**重点**：先完成操作状态，再检查页面。\n- 上午 09:00 开会\n- 下午核对资料\n[官方来源](https://www.openai.com/)\n<script>这段内容只显示为文字</script>':'帮我整理一下本周安排。',intent:null,plan:null,schedule_items:null,created_at:new Date(Date.now()-600000+i*10000).toISOString()});
+const event=randomUUID(),message=randomUUID();
+const {run}=await import('../server/database/connection.js');
+run('INSERT INTO orbit_proactive_events (id,user_id,schedule_id,expected_state,trigger_at,state,message_id,created_at,handled_action,handled_at) VALUES (?,?,?,?,?,?,?,?,?,?)',[event,uid,'preview-finished','synthetic',stamp,'handled',message,stamp,'complete',stamp]);
+db.createAiScheduleMessage({id:message,user_id:uid,conversation_id:cid,role:'assistant',type:'text',content:'资料已核对完成。',intent:null,plan:null,schedule_items:null,created_at:stamp,orbit_meta:JSON.stringify({origin:'proactive',eventId:event,enhanced:false})});
+run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=?',[JSON.stringify({origin:'proactive',eventId:event,enhanced:false}),message]);
+const plan:import('../server/ai-chat-state.js').PendingAiSchedulePlan={id:randomUUID(),userId:uid,conversationId:cid,targetCalendarId:'personal',today:new Date().toISOString().slice(0,10),intent:'create',reply:'已准备日程草稿，请确认。',warnings:[],revision:1,state:'pending',expiresAt:Date.now()+900000,historyMessageId:randomUUID(),operations:[{key:'0',type:'create',data:{title:'开会',start_time:'2026-10-04T09:00:00',end_time:'2026-10-04T10:00:00'}}]};
+db.createAiScheduleMessage({id:plan.historyMessageId!,user_id:uid,conversation_id:cid,role:'assistant',type:'plan',content:plan.reply,intent:'create',plan:JSON.stringify(buildAiPlanSnapshot(plan)),schedule_items:null,created_at:new Date(Date.now()+1).toISOString()});state.activateAiPlan(plan);
+const app=express();app.use(api.app);app.use(express.static(path.resolve('dist')));app.get('*',(_req,res)=>res.sendFile(path.resolve('dist/index.html')));
+const port=Number(process.argv[2]||4183),server=app.listen(port,'127.0.0.1',()=>console.log(`Isolated preview: http://127.0.0.1:${port}; synthetic login preview@example.invalid / OrbitPreview123!`));
+process.on('SIGINT',()=>{server.closeAllConnections();server.close(()=>process.exit(0));});

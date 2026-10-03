@@ -1,8 +1,11 @@
 import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle } from 'react';
 import { Bot, BookOpen, Send, Loader2, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin } from 'lucide-react';
+import {safeChatHref} from '../utils/chat-markdown';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { AiProviderSelect } from './AiProviderSelect';
+import {ChatMarkdown} from './ChatMarkdown';
+import {OrbitRequestStatus} from './OrbitRequestStatus';
 import { useOrbitChat } from '../hooks/useOrbitChat';
 import { SCHEDULE_CATEGORY_COLORS, SCHEDULE_CATEGORY_LABELS } from '../utils/scheduleCategories';
 
@@ -85,6 +88,7 @@ interface ChatMessage {
   plan?: AiSchedulePlan;
   knowledgeSources?: KnowledgeSource[];
   timestamp: string | null;
+  isNew?:boolean;
 }
 
 interface AiSchedulePanelProps {
@@ -157,13 +161,14 @@ function operationToForm(operation: AiPlanOperation): PlanOperationForm {
   };
 }
 
-function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, onSave }: {
+function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, onSave, disabled=false }: {
   operation: AiPlanOperation;
   editing: boolean;
   saving: boolean;
   onStartEdit: () => void;
   onCancel: () => void;
   onSave: (patch: Record<string, unknown>) => Promise<void>;
+  disabled?:boolean;
 }) {
   const [form, setForm] = useState<PlanOperationForm>(() => operationToForm(operation));
 
@@ -214,25 +219,15 @@ function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, 
     : operation.recurrence
       ? `每 ${operation.recurrence.interval || 1} ${recurrenceUnit} · 起始 ${operation.recurrence.anchorDate || '待确认'}`
       : operation.startTime ? `${formatDate(operation.startTime)} ${operation.allDay ? '全天' : formatTime(operation.startTime)}` : '时间待确认';
-  const editable = operation.type !== 'delete';
 
   return <div
     className="rounded-md px-2 py-1.5"
-    role={!editing && editable ? 'button' : undefined}
-    tabIndex={!editing && editable ? 0 : undefined}
-    onClick={() => { if (!editing && editable) onStartEdit(); }}
-    onKeyDown={event => {
-      if (!editing && editable && (event.key === 'Enter' || event.key === ' ')) {
-        event.preventDefault();
-        onStartEdit();
-      }
-    }}
-    style={{ backgroundColor: 'var(--td-bg-color-container)', border: '1px solid #DBEAFE', cursor: !editing && editable ? 'pointer' : undefined }}
+    style={{ backgroundColor: 'var(--td-bg-color-container)', border: '1px solid var(--td-component-stroke)' }}
   >
     {!editing ? <>
       <div className="flex items-start justify-between gap-2">
         <div className="text-xs font-medium" style={{ color: 'var(--td-text-color-primary)' }}>{operation.title}</div>
-        {operation.type !== 'delete' && <button type="button" className="ai-plan-edit-button" onClick={event => { event.stopPropagation(); onStartEdit(); }} aria-label={`编辑计划项 ${operation.title}`}><Edit3 size={13} /> 编辑</button>}
+        {operation.type !== 'delete' && !disabled && <button type="button" className="ai-plan-edit-button" onClick={event => { event.stopPropagation(); onStartEdit(); }} aria-label={`编辑计划项 ${operation.title}`}><Edit3 size={13} /> 编辑</button>}
       </div>
       <div className="text-[11px] mt-0.5" style={{ color: 'var(--td-text-color-secondary)' }}>{actionLabel[operation.type] || '处理'} · {timeLabel}</div>
       {operation.before && <div className="text-[11px] mt-1" style={{color:'var(--td-text-color-secondary)'}}>原事项：{operation.before.title} · {operation.before.startTime?.replace('T',' ')} → {operation.startTime?.replace('T',' ') || '保留原时间'}{operation.scheduleId?.startsWith('reminder-cycle:') ? '（仅本周期安排日期）' : ''}</div>}
@@ -333,7 +328,7 @@ function ScheduleMiniCard({ schedule, onOpen, onOpenMenu }: {
       type="button"
       className="ai-schedule-card w-full rounded-xl p-3 mb-2 text-left transition-all"
       style={{
-        background: `linear-gradient(135deg, ${pColor}10, ${color}06)`,
+        background: 'var(--td-bg-color-container)',
         border: `1px solid ${pColor}30`,
         borderLeft: `3px solid ${pColor}`,
       }}
@@ -408,7 +403,7 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
     return (
       <div className="flex justify-end mb-3">
         <div
-          className="text-xs px-3 py-2 rounded-2xl rounded-tr-sm max-w-[88%] leading-relaxed whitespace-pre-line"
+          className="orbit-user-message px-3 py-2 rounded-2xl rounded-tr-sm max-w-[88%] leading-relaxed whitespace-pre-line"
           style={{ backgroundColor: 'var(--td-brand-color)', color: '#fff' }}
         >
           {msg.text}
@@ -424,7 +419,7 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
   };
 
   return (
-    <div className="flex justify-start mb-3">
+    <div className="flex justify-start mb-3 orbit-message" data-new={msg.isNew||undefined}>
       <div className="max-w-[96%] w-full">
         {/* AI 头像行 */}
         <div className="flex items-center gap-1.5 mb-1.5">
@@ -443,7 +438,7 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
         </div>
 
         {msg.type === 'error' ? (
-          <div className="px-3 py-2 rounded-xl text-xs whitespace-pre-line" style={{ backgroundColor: '#FEF2F2', color: '#EF4444', border: '1px solid #FCA5A5' }}>
+          <div className="orbit-message-error px-3 py-2 rounded-lg" role="alert" style={{ backgroundColor: 'var(--td-error-color-light)', color: 'var(--td-error-color)', border: '1px solid var(--td-error-color)' }}>
             {msg.text}
             {messageTime}
           </div>
@@ -455,13 +450,8 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
             {/* 文字回复 */}
             {msg.text && (
               <div className="flex items-start gap-1.5 mb-2">
-                {msg.type !== 'text' && msg.type !== 'plan' && <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--td-success-color)' }} />}
-                <span
-                  className={`text-xs leading-relaxed whitespace-pre-line ${msg.type === 'text' ? 'font-normal' : 'font-medium'}`}
-                  style={{ color: 'var(--td-text-color-primary)' }}
-                >
-                  {msg.text.split(/(\[打开日报\]\(\/reports\/\d{4}-\d{2}-\d{2}\?source=(?:local|cloud)\))/g).map((part,index)=>{const match=part.match(/^\[打开日报\]\((.+)\)$/);return match ? <Link key={index} to={match[1]} className="text-blue-600 underline">打开日报</Link> : part;})}
-                </span>
+                {msg.plan?.state === 'completed' && <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--td-success-color)' }} />}
+                <ChatMarkdown text={msg.text}/>
               </div>
             )}
 
@@ -482,7 +472,7 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
             )}
 
             {msg.type === 'plan' && msg.plan && (
-              <div className="mt-2 rounded-lg p-2.5" style={{ backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE' }}>
+              <div className="mt-2 rounded-lg p-2.5 orbit-plan" style={{ backgroundColor: 'var(--td-brand-color-light)', border: '1px solid var(--td-component-stroke)' }}>
                 <div className="text-xs font-medium mb-2" style={{ color: 'var(--td-brand-color)' }}>{({pending:'待确认',suspended:'已挂起',expired:'已过期',cancelled:'已取消',completed:'已完成',partially_completed:'部分完成',failed:'执行失败'} as Record<string,string>)[msg.plan.state||'pending']}执行计划 · {msg.plan.operations.length} 项 · 版本 {msg.plan.revision||1}</div>
                 {msg.plan.warnings.map((warning, index) => (
                   <div key={`${warning}-${index}`} className="text-xs mb-1" style={{ color: '#B45309' }}>需核对：{warning}</div>
@@ -491,6 +481,7 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
                   {msg.plan.operations.map(operation => <PlanOperationCard
                     key={operation.key}
                     operation={operation}
+                    disabled={!!msg.plan?.state&&msg.plan.state!=='pending'}
                     editing={editingOperationKey === operation.key}
                     saving={savingPlanOperationKey === `${msg.plan!.id}:${operation.key}`}
                     onStartEdit={() => {if(!msg.plan?.state||msg.plan.state==='pending')setEditingOperationKey(operation.key);}}
@@ -525,6 +516,9 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
               </div>
             )}
             {msg.orbitMeta?.origin==='proactive' && <div className={`orbit-reminder-actions ${msg.orbitMeta.state==='handled'?'is-handled':''}`}><small>{msg.orbitMeta.enhanced?'Orbit 主动提醒':'Orbit 主动提醒 · 基于事项信息'}</small>{msg.orbitMeta.state==='sent' && <div>{[['complete','完成'],['snooze','15 分钟后'],['tomorrow','明天 09:00 再提醒']].map(([action,label])=><button type="button" key={action} disabled={reminderBusy} onClick={()=>{setReminderBusy(true);setReminderError('');void onReminderAction?.(msg.orbitMeta!.eventId,action).catch(e=>setReminderError(e.message)).finally(()=>setReminderBusy(false));}}>{label}</button>)}</div>}{msg.orbitMeta.state==='handled'&&<span>{msg.orbitMeta.handledAction==='complete'?'✓ 已完成':msg.orbitMeta.nextReminderAt?`已延后 · ${new Date(msg.orbitMeta.nextReminderAt).toLocaleString()}`:'已处理'}{msg.orbitMeta.handledAt&&<small> · {new Date(msg.orbitMeta.handledAt).toLocaleString()}</small>}</span>}{msg.orbitMeta.state==='discarded'&&<span>提醒已失效，请查看当前事项</span>}{reminderError&&<p role="alert">{reminderError}</p>}</div>}
+            {!!(msg.orbitMeta as any)?.sources?.length&&<details className="orbit-message-sources"><summary>联网来源 · {(msg.orbitMeta as any).sources.length}</summary>{(msg.orbitMeta as any).sources.map((source:any)=><a key={source.url} href={safeChatHref(source.url)} target="_blank" rel="noopener noreferrer"><strong>{source.title}</strong><small>{source.source} · {source.publishedAt?new Date(source.publishedAt).toLocaleString():'发布时间未知'} · 获取 {new Date(source.retrievedAt).toLocaleString()}</small></a>)}</details>}
+            {!!(msg.orbitMeta as any)?.steps?.length&&<details className="orbit-message-steps"><summary>处理步骤</summary>{(msg.orbitMeta as any).steps.map((s:any)=><p key={s.id}>{s.state==='completed'?'✓':s.state==='failed'?'!':'…'} {s.label} · {s.query}</p>)}</details>}
+            {msg.plan?.state&&['completed','partially_completed','failed'].includes(msg.plan.state)&&<p className="orbit-outcome" role="status">{msg.plan.state==='completed'?'✓ 已完成':msg.plan.state==='partially_completed'?'部分事项已完成，请核对未执行项目':'执行失败，正式结果请核对失败原因'}</p>}
             {messageTime}
           </div>
         )}
@@ -555,6 +549,8 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const { isAuthenticated, authHeaders } = useAuth();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const followBottom=useRef(true),seenMessages=useRef(new Set<string>());
+  const [hasNewReply,setHasNewReply]=useState(false);
   const orbit = useOrbitChat(authHeaders,isAuthenticated);
   const isLoading = orbit.requests.some(r => r.state === 'running' || r.state === 'queued');
   const [conversationDrawer, setConversationDrawer] = useState(false);
@@ -563,7 +559,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const [targetConversation, setTargetConversation] = useState('');
   const inputRevisionRef = useRef(0);
   const drafts = useRef(new Map<string,string>());
-  useEffect(()=>{inputRevisionRef.current++;setInputText(drafts.current.get(orbit.cid)||'');setRenameTitle(null);setDeleteDialog(false);},[orbit.cid]);
+  useEffect(()=>{inputRevisionRef.current++;setInputText(drafts.current.get(orbit.cid)||'');setRenameTitle(null);setDeleteDialog(false);followBottom.current=true;seenMessages.current.clear();setHasNewReply(false);},[orbit.cid]);
 
   useEffect(() => {
     onChatStateChange?.({ hasMessages: messages.length > 0, busy: isLoading });
@@ -574,13 +570,16 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
       id: m.id, role: m.role, type: m.type || 'text', text: m.text || m.content || '',
       intent: m.intent, scheduleItems: m.scheduleItems, plan: m.plan, knowledgeSources: m.knowledgeSources,orbitMeta:m.orbitMeta,
       timestamp: m.timestamp || m.created_at || null,
+      isNew:seenMessages.current.size>0&&!seenMessages.current.has(m.id),
     })));
+    if(seenMessages.current.size>0&&!followBottom.current&&orbit.history.some(m=>m.role==='assistant'&&!seenMessages.current.has(m.id)))setHasNewReply(true);
+    seenMessages.current=new Set(orbit.history.map(m=>m.id));
   }, [orbit.history]);
 
   // 自动滚到底部
   useEffect(() => {
     const container = messagesContainerRef.current;
-    container?.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    if(followBottom.current)container?.scrollTo({ top: container.scrollHeight, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth' });
   }, [messages, isLoading]);
 
   useEffect(() => {
@@ -741,7 +740,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
       {!collapsed && (
         <>
           {/* 对话区域 */}
-          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-3 py-3">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-3 py-3" onScroll={e=>{const el=e.currentTarget;followBottom.current=el.scrollHeight-el.scrollTop-el.clientHeight<80;if(followBottom.current)setHasNewReply(false);}}>
           <div className="schedule-ai-reading-column">
         {/* 空状态：快捷示例 */}
         {messages.length === 0 && !isLoading && (
@@ -802,19 +801,11 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
         ))}
 
         {/* 加载中 */}
-        {isLoading && (
-          <div className="flex justify-start mb-3">
-            <div className="flex items-center gap-1.5 px-3 py-2 rounded-2xl rounded-tl-sm"
-              style={{ backgroundColor: 'var(--td-bg-color-page)', border: '1px solid var(--td-component-stroke)' }}>
-              <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--td-brand-color)' }} />
-              <span className="text-xs" style={{ color: 'var(--td-text-color-secondary)' }}>思考中...</span>
-            </div>
-          </div>
-        )}
+        {hasNewReply&&<button type="button" className="orbit-new-reply" onClick={()=>{followBottom.current=true;setHasNewReply(false);const el=messagesContainerRef.current;el?.scrollTo({top:el.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}}>有新回复 · 滚动到底部</button>}
 
           </div>
 
-            <div className="orbit-request-list" aria-live="polite">{orbit.requests.filter(r=>r.state!=='completed').map(r=><div key={r.id} className="orbit-request"><span><b>{({queued:'等待中',running:'生成中',cancelled:'已取消',failed:'失败',interrupted:'已中断'} as Record<string,string>)[r.state]}</b> · {r.text}<small>{r.error}</small></span>{['queued','running'].includes(r.state)?<button type="button" onClick={()=>{void orbit.action(r.id,'cancel').catch(e=>orbit.setError(e.message));}}>取消</button>:<button type="button" onClick={()=>{void orbit.action(r.id,'retry').catch(e=>orbit.setError(e.message));}}>重试</button>}</div>)}</div>
+            <div className="orbit-request-list" aria-live="polite">{orbit.requests.filter(r=>r.state!=='completed').map(r=><OrbitRequestStatus key={r.id} request={r} onAction={verb=>{void orbit.action(r.id,verb).catch(e=>orbit.setError(e.message));}}/>)}</div>
           </div>
 
           {/* 输入框 */}

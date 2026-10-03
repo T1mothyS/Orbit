@@ -17,6 +17,7 @@ export function SettingsDialog({ onClose, onOpenAdmin, onOpenTools, onOpenProjec
     if (appRoot) appRoot.inert = true;
     const trapFocus = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !event.defaultPrevented) {
+        if(frameRef.current?.querySelector('[data-settings-search-open="true"]')){event.preventDefault();event.stopPropagation();window.dispatchEvent(new Event('orbit:settings-search-close'));return;}
         const hasOpenSelect = [...document.querySelectorAll<HTMLElement>('.t-select__dropdown')]
           .some(popup => popup.getClientRects().length > 0 && getComputedStyle(popup).visibility !== 'hidden' && !popup.className.includes('leave'));
         if (hasOpenSelect) return;

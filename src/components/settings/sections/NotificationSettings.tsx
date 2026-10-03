@@ -189,14 +189,14 @@ export function NotificationSettings({ authHeaders, userEmail }: { authHeaders: 
         <SettingRow label="开启每日提醒" description="每天发送日程摘要；切换后立即保存。">
           <Switch aria-label="开启每日提醒" aria-checked={reminderEnabled} value={reminderEnabled} disabled={disabled} onChange={v => void saveToggle('enabled', Boolean(v))} />
         </SettingRow>
-        {reminderEnabled && <SettingRow label="提醒时间" description="北京时间（UTC+8）">
+        <SettingRow label="提醒时间" description={reminderEnabled?'北京时间（UTC+8）':'北京时间（UTC+8）；先开启每日提醒。'}>
           <div className="settings-time-pair">
-            <Select aria-label="提醒小时" value={reminderHour} disabled={disabled} onChange={v => setReminderHour(Number(v))} options={Array.from({ length: 24 }, (_, i) => ({ label: `${String(i).padStart(2, '0')} 时`, value: i }))} />
+            <Select aria-label="提醒小时" value={reminderHour} disabled={disabled||!reminderEnabled} onChange={v => setReminderHour(Number(v))} options={Array.from({ length: 24 }, (_, i) => ({ label: `${String(i).padStart(2, '0')} 时`, value: i }))} />
             <span>:</span>
-            <Select aria-label="提醒分钟" value={reminderMinute} disabled={disabled} onChange={v => setReminderMinute(Number(v))} options={Array.from({ length: 12 }, (_, i) => ({ label: `${String(i * 5).padStart(2, '0')} 分`, value: i * 5 }))} />
+            <Select aria-label="提醒分钟" value={reminderMinute} disabled={disabled||!reminderEnabled} onChange={v => setReminderMinute(Number(v))} options={Array.from({ length: 12 }, (_, i) => ({ label: `${String(i * 5).padStart(2, '0')} 分`, value: i * 5 }))} />
           </div>
-          <div className="settings-actions"><Button tag="button" loading={loadingReminder} disabled={disabled} onClick={saveReminderEmail}>保存提醒时间</Button></div>
-        </SettingRow>}
+          <div className="settings-actions"><Button tag="button" loading={loadingReminder} disabled={disabled||!reminderEnabled} onClick={saveReminderEmail}>保存提醒时间</Button></div>
+        </SettingRow>
         <SettingRow label="日报邮件" description="与每日摘要、提醒渠道和免打扰独立。开启后，新发布或更新的内容版本会入队，同一版本不会重复发送。切换后立即保存。">
           <Switch aria-label="日报邮件" aria-checked={reportEmailEnabled} value={reportEmailEnabled} disabled={disabled} onChange={v => void saveToggle('reportEmailEnabled', Boolean(v))} />
         </SettingRow>

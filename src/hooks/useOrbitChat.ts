@@ -12,6 +12,8 @@ export interface OrbitRequest {
     text: string;
     state: string;
     error?: string;
+    createdAt?:string;
+    steps?:Array<{id:string;label:string;state:string;query?:string;at:string}>;
 }
 export function useOrbitChat(authHeaders: () => Record<string, string>, authenticated: boolean) {
     const [params, setParams] = useSearchParams();
@@ -59,6 +61,13 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         setConversations(data.conversations);
         return data.conversations as OrbitConversation[];
     }, [api]);
+    const streamId=requests.find(r=>r.state==='running')?.id||requests.find(r=>r.state==='queued')?.id;
+    useEffect(()=>{
+        if(!authenticated||!cid||!streamId)return;
+        const controller=new AbortController();
+        void (async()=>{try{const res=await fetch(`/api/orbit/requests/${encodeURIComponent(streamId)}/events`,{headers:authHeaders(),signal:controller.signal});if(!res.ok||!res.body)return;const reader=res.body.getReader(),decoder=new TextDecoder();let pending='';try{for(;;){const {done,value}=await reader.read();if(done)break;pending=(pending+decoder.decode(value,{stream:true})).replace(/\r\n/g,'\n');let i;while((i=pending.indexOf('\n\n'))>=0){const frame=pending.slice(0,i);pending=pending.slice(i+2);const line=frame.split('\n').find(l=>l.startsWith('data: '));if(line&&current.current===cid){const row=JSON.parse(line.slice(6));setRequests(old=>old.map(r=>r.id===row.id?row:r));}}}}finally{await reader.cancel();}if(!controller.signal.aborted)await refresh();}catch{/* Existing authenticated polling recovers dropped streams. */}})();
+        return()=>controller.abort();
+    },[authenticated,cid,streamId,authHeaders,refresh]);
     useEffect(() => {
         if (!authenticated)
             return;

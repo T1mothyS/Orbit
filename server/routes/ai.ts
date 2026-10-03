@@ -8,6 +8,7 @@ import { activateAiPlan, activeAiPlan, resolveAiPlan, setAiPlanState, assertPlan
 import { OptimizeError } from '../prompt-optimize.js';
 import { createPromptOptimizationRunId, runPromptOptimization } from '../note-prompt-optimization.js';
 import { Router } from 'express';
+import {createHash} from 'node:crypto';
 import type { createAuth } from '../auth.js';
 import { defaultModel, resolveCodeBuddyCredential, getMissingCodeBuddyCredentialMessage } from '../ai-credentials.js';
 import { getLocalDateString } from '../local-date.js';
@@ -59,6 +60,16 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
   app.get('/api/orbit/requests', authenticate, safe((req,res) => res.json({ requests: orbitQueue.listOrbitRequests(user(req),String(req.query.conversationId || '')).map(requestView) })));
   app.post('/api/orbit/requests/:id/cancel', authenticate, safe((req,res) => res.json({ request: requestView(orbitQueue.cancelOrbitRequest(user(req),req.params.id)) })));
   app.post('/api/orbit/requests/:id/retry', authenticate, safe((req,res) => res.json({ request: requestView(orbitQueue.retryOrbitRequest(user(req),req.params.id)) })));
+  app.get('/api/orbit/requests/:id/events',authenticate,(req,res)=>{
+    const userId=user(req),id=req.params.id;
+    if(!orbit.getRequest(userId,id))return res.status(404).json({error:'请求不存在'});
+    res.setHeader('Content-Type','text/event-stream');res.setHeader('Cache-Control','no-store');res.setHeader('X-Accel-Buffering','no');res.flushHeaders();
+    let previous='',closed=false;
+    const expiresAt=Number((req as any).user.exp||0)*1000;
+    let lastHeartbeat=Date.now();
+    const tick=()=>{if(closed)return;const row=orbit.getRequest(userId,id);if(!row||!db.getUserById(userId)||db.getUserById(userId)?.disabled||(expiresAt&&Date.now()>=expiresAt)){res.end();return;}const value=JSON.stringify(requestView(row));if(value!==previous){previous=value;const revision=createHash('sha256').update(value).digest('hex').slice(0,20);res.write(`id: ${revision}\nevent: status\ndata: ${value}\n\n`);}else if(Date.now()-lastHeartbeat>=15000){res.write(': heartbeat\n\n');lastHeartbeat=Date.now();}if(!['queued','running'].includes(row.state))res.end();};
+    const timer=setInterval(()=>{try{tick();}catch{res.end();}},750);res.on('close',()=>{closed=true;clearInterval(timer);});tick();
+  });
 
   app.post('/api/ai/prompt-optimize', authenticate, async (req, res) => {
     const controller = new AbortController();
