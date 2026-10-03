@@ -32,6 +32,8 @@ Luna 上次为何慢，需要对应执行记录才能确认。当前可确认的
 
 ## 状态与幂等
 
+依赖变化且本机为 Windows 时，main 的 CI 使用 Ubuntu 24.04/Node 22.23.2，完整校验通过后生成 `orbit-linux-release` 短期 artifact：冻结源码、前端构建和同一轮安装的 Linux `node_modules`（包含 PM2 使用的 tsx）。构建机验证 sharp/PDF/Office 加载；manifest 记录 commit/version/源文件哈希，完整包另有 SHA-256。下载后核对 workflow head、成功状态、包 hash 与 manifest，再按路径 B 在生产暂存并做运行时探针。该 CI 不保存生产凭据，也不自动部署；生产旧依赖保留用于回滚。
+
 - main/tag 已同步且服务器目标 commit/包/配置相同且验收有效时，只做复核，不再切换重启。
 - 没有对应 Release 时创建；已有同 tag 时核对/更新说明，不新建重复 Release。
 - GitHub Actions 是可移植的独立检查；其状态单列，不能替代本次本地/服务器证据。

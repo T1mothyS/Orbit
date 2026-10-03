@@ -13,6 +13,8 @@
 
 只有在排除根版本号差异后，`package.json` 与 `package-lock.json` 的依赖内容仍完全一致，且线上运行时与构建产物兼容时，A 才能复用线上 `node_modules`；描述或任务脚本的变化单独评估，不当作依赖变化。Windows 生成的依赖目录不能直接搬到 Linux。
 
+路径 B 可使用 main 的 CI `orbit-linux-release` artifact 作为兼容 Linux 构建环境产物，流程和校验入口见 [发布流程](RELEASE.md#状态与幂等)。服务器只解包、校验、备份和切换；新依赖随产物进入暂存，旧依赖留在回滚代码目录。
+
 ## 路径 A：普通预构建升级
 
 项目成长另需服务端资源 `project-evolution/generated.json`；发布清单和暂存检查必须包含它，不得放入匿名静态目录。校验见 [项目成长说明](../project-evolution/README.md)。
