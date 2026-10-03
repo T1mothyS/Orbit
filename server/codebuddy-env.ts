@@ -33,6 +33,9 @@ export function buildCodeBuddyEnv(credential: CodeBuddyCredential): Record<strin
   const env: Record<string, string> = {
     CODEBUDDY_API_KEY: credential.api_key,
     CODEBUDDY_INTERNET_ENVIRONMENT: 'internal',
+    // The SDK CLI owns its HTTP transport; inheriting Node's native proxy mode breaks it.
+    // Keep the parent process proxy active for ChatGPT without changing global environment.
+    NODE_USE_ENV_PROXY: '0',
   };
   const baseUrl = normaliseCodeBuddyBaseUrl(credential.base_url);
   if (baseUrl) env.CODEBUDDY_BASE_URL = baseUrl;

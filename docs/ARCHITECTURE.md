@@ -191,6 +191,8 @@ Provider 合同位于 server/ai-provider-contract.ts：模型目录声明与真�
 #### Provider 适配边界
 WorkBuddy 主聊天经 ai-provider-workbuddy.ts 调用；旧 Key/验证/模型接口保持兼容。目录可用时补充 SDK 原始能力字段，不可用时返回 unknown 而不使旧模型列表失败。请求入队冻结 Provider 和模型。进程内 MCP 工具采用 Orbit 白名单，拒绝命令、文件、外部 MCP 和继承设置；SDK 内置工具仍为 tools: []。图片导入同步权限策略。zod 沿 SDK 已有 v4 版本显式声明。
 
+`buildCodeBuddyEnv` 为所有 SDK 入口显式设置 `NODE_USE_ENV_PROXY=0`。SDK CLI 自行管理 HTTP 传输，不能继承父进程的 Node 原生代理模式；此项只作用于子进程，个人 Key/Base URL 与父进程 ChatGPT 代理保持不变。服务器代理安装、私有订阅与回退细节只记录在本机 runbook。
+
 #### 联网工具
 Orbit 工具复用日历、词法知识库和已发布日报服务；知识沿明确请求/自动检索偏好/明确资料追问开放，跨对话历史工具只在明确请求时开放。Tavily 固定 basic，每轮两次、每次五条；月度请求保守计数，额度错误锁定本月，不自动切换。公开网页读取复用 HTTPS/DNS 地址固定防护，逐跳校验、超时和大小限制。结果记录真实 URL、发布时间（未知为空）和抓取时间。
 搜索 Key 使用独立 AES-GCM 凭据目录，默认主机密钥不进入普通用户或全站数据库/附件备份；Windows 应使用运行账号专属目录 ACL。模型和工具均无正式写权限。
