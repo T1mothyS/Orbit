@@ -82,6 +82,7 @@ export function applyChatSchema(db: Database, { queryAll, queryOne }: SchemaQuer
   db.run('CREATE TABLE IF NOT EXISTS orbit_attachments (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,conversation_id TEXT NOT NULL,state TEXT NOT NULL,error TEXT,extraction TEXT,created_at TEXT NOT NULL)');
   db.run('CREATE TABLE IF NOT EXISTS orbit_message_attachments (user_id TEXT NOT NULL,message_id TEXT NOT NULL,attachment_id TEXT NOT NULL,PRIMARY KEY(user_id,message_id,attachment_id))');
   db.run('CREATE INDEX IF NOT EXISTS orbit_attachment_conversation ON orbit_attachments(user_id,conversation_id,created_at)');
+  db.run('CREATE TABLE IF NOT EXISTS orbit_model_capabilities (user_id TEXT NOT NULL,provider TEXT NOT NULL,model TEXT NOT NULL,credential_version TEXT NOT NULL,capability TEXT NOT NULL,verified_at TEXT NOT NULL,PRIMARY KEY(user_id,provider,model,capability))');
 
 
   db.run(`

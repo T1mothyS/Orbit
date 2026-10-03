@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified local version: `0.38.0-261001.0922`（2026-10-01，主对话/统计/主动提醒本地验证；真实 AI、生产、自然定时与收件箱未验；日报历史证据按各节日期使用）。
+- Last local verification: 2026-10-03，Orbit P0–P7 基础升级候选；版本源为 package.json，验证入口/结果见 TEST-MATRIX。真实 AI、生产、自然定时与收件箱未验；日报历史证据按各节日期使用。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -137,7 +137,7 @@ Tools 的正式来源是 `protected-tools/manifest.json` 及各 slug 的 `index.
 
 ## Orbit 对话与操作合同
 
-2026-09-30 的本地实现使用现有 chat.db 和同步持久化事务，未增加数据库服务或框架。`orbit_conversations` 保存账号归属和会话标题；`ai_schedule_messages.conversation_id` 关联历史；旧记录首次访问时迁入默认会话。会话历史长期保留，模型仅使用最近 20 条、最多 12000 字符的历史，以及有界对象引用和当前账号事实。历史和知识资料不是系统指令，不能把历史计划视为已执行。模型查询明确关闭内置工具、继承配置、MCP 和 SDK 会话持久化；只有本站认证服务可以在确认后写入事务。
+Orbit 使用现有 chat.db 和同步持久化事务，未增加数据库服务或框架。`orbit_conversations` 保存账号归属和会话标题；`ai_schedule_messages.conversation_id` 关联历史；旧记录首次访问时迁入默认会话。会话历史长期保留，模型仅使用最近 20 条、最多 12000 字符的历史，以及有界对象引用、附件节选和当前账号事实。活跃草稿优先于普通历史；历史和知识资料不是系统指令，不能把历史计划视为已执行。模型查询关闭内置工具、继承配置、外部 MCP 和 SDK 会话持久化，仅注册 Orbit 进程内受控工具；只有本站认证服务可以在确认后写入事务。
 
 `orbit_requests` 保存请求 ID、归属、输入、状态和结果。每账号一次执行一个 AI 请求；不同账号及短同步写操作可以并行。请求号在账号内唯一，重复提交返回原请求，号相同而内容不同拒绝。状态为 queued/running/completed/failed/cancelled/interrupted；页面关闭不取消后台任务，显式取消会中止 SDK 并禁止迟到历史/计划落库。启动时 running 转 interrupted，queued 继续执行；失败或中断需要手动重试。该队列不保证外部模型的计费撤销，也不重放备份中的外部请求。
 
@@ -192,7 +192,7 @@ Provider 合同位于 server/ai-provider-contract.ts：模型目录声明与真�
 WorkBuddy 主聊天经 ai-provider-workbuddy.ts 调用；旧 Key/验证/模型接口保持兼容。目录可用时补充 SDK 原始能力字段，不可用时返回 unknown 而不使旧模型列表失败。请求入队冻结 Provider 和模型。进程内 MCP 工具采用 Orbit 白名单，拒绝命令、文件、外部 MCP 和继承设置；SDK 内置工具仍为 tools: []。图片导入同步权限策略。zod 沿 SDK 已有 v4 版本显式声明。
 
 #### 联网工具
-Orbit 工具复用日历、词法知识库和已发布日报服务；知识/跨对话历史只有显式请求时开放。Tavily 固定 basic，每轮两次、每次五条；月度请求保守计数，额度错误锁定本月，不自动切换。公开网页读取复用 HTTPS/DNS 地址固定防护，逐跳校验、超时和大小限制。结果记录真实 URL、发布时间（未知为空）和抓取时间。
+Orbit 工具复用日历、词法知识库和已发布日报服务；知识沿明确请求/自动检索偏好/明确资料追问开放，跨对话历史工具只在明确请求时开放。Tavily 固定 basic，每轮两次、每次五条；月度请求保守计数，额度错误锁定本月，不自动切换。公开网页读取复用 HTTPS/DNS 地址固定防护，逐跳校验、超时和大小限制。结果记录真实 URL、发布时间（未知为空）和抓取时间。
 搜索 Key 使用独立 AES-GCM 凭据目录，默认主机密钥不进入普通用户或全站数据库/附件备份；Windows 应使用运行账号专属目录 ACL。模型和工具均无正式写权限。
 
 #### ChatGPT 适配
@@ -202,6 +202,12 @@ Orbit 工具复用日历、词法知识库和已发布日报服务；知识/跨�
 
 聊天附件复用 activity.db 的 attachments、账号配额与 data/attachments 哈希文件；chat.db 增量保存 orbit_attachments（会话、解析状态/块）和 orbit_message_attachments（消息引用）。原附件/完成记录接口保持类型边界，文档扩展只在聊天与备份恢复明确启用。上传需认证、会话归属，10MB/文件、3 个/轮、20MB/轮、默认 500MB/账号；图片经 sharp 校验、2048px 压缩并去除 EXIF。
 
-共享 file-parser 服务在最多两个 192MB heap worker 中解析，15s 超时与取消，最多 100 页 PDF/一百万字符正文。PDF.js 使用本地字体资源，不执行 PDF JavaScript、不抓取外链；PDF.js optional canvas 是服务端依赖，Node 最低 22.13，部署需保留 npm 的平台 optional dependencies。扫描/加密 PDF 明确失败。解析能力供后续知识库复用，上传不写知识库。
+共享 file-parser 服务在最多两个 192MB heap worker 中解析，15s 超时与取消，最多 100 页 PDF/一百万字符正文/2,000 个解析块，与备份恢复上限一致。PDF.js 使用本地字体资源，不执行 PDF JavaScript、不抓取外链；PDF.js optional canvas 是服务端依赖，Node 最低 22.13，部署需保留 npm 的平台 optional dependencies。扫描/加密 PDF 明确失败。解析能力供后续知识库复用，上传不写知识库。
 
 模型输入按账号模型目录的真实 image capability 检查，未知能力不假装读取图片；文档降级为带页码/定位的文本。每轮文本预算用 12,000 UTF-8 字节保守限制 token 上界，截断明确提示节选；后续“这份文件”只引用当前会话最近附件，多个文件需指定名称。未发送附件 24 小时后在账号附件访问/上传时清理；已关联文件随会话保留，删除引用并检查共享哈希后清理文件。加密用户备份保存附件、解析块及消息关系，跨账号恢复重映射 ID；OAuth 凭据不进入普通备份。
+
+Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓存值/行定位，CSV 有界状态解析；不计算公式、不加载外部资源。Office 先验证 ZIP 中央目录，再在 worker 校验真实解压大小：1,000 entries、每项 10MB、总计 40MB、压缩比 100；拒绝路径穿越、加密/ZIP64、宏/ActiveX/嵌入对象及类型不符。XLSX 最多 30 表、每表 1,000 行/总 100,000 非空单元格；CSV 最多 200 列/1,000 行。截断必须反馈。worker 源文件随源码部署，不进入前端 bundle。
+
+`orbit_model_capabilities` 保存按账号/Provider/模型/凭据版本的真实图片或工具验证，优先于目录声明。`POST /api/orbit/providers/probe` 仅在用户手动点击时用合成输入验证，60 秒上限，不发送个人上下文；失败不写“支持”。清空/删除账号删除新表与本地 ChatGPT 凭据；远程应用授权需用户另在 ChatGPT 账户确认撤销。恢复缺失文件不创建幽灵附件引用。
+
+认证事件流 `GET /api/orbit/requests/:id/events` 在每次更新检查 token 到期、账号禁用及 auth_version，流断开回查持久请求并保留轮询降级。失败项重试创建新的有期限草稿，只复制失败操作并保留原指纹；旧草稿保存 retryPlanId，重复请求不复制成功项。

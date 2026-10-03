@@ -1,7 +1,7 @@
 # Orbit 测试与验收矩阵
 
 - Status: LIVING；职责：测试入口、风险覆盖及各层证据边界。
-- 本轮代码基线：33e3972 的 Orbit 第二阶段；文档与旧部署入口调整见更新日志。
+- 当前验收对象：Orbit P0–P7 基础升级候选；版本源为 package.json，具体结果见下方日期记录。
 - 历史逐次数量、回放、截图和生产记录已集中到 [归档矩阵](archive/engineering/TEST-MATRIX-20261001.md)。历史通过不代表当前 HEAD 通过。
 
 ## 本地验证
@@ -49,7 +49,15 @@ UI/交互改动使用实际浏览器：390×844、430×932、768×1024、1440×9
 
 - Orbit 当前操作回归：server/orbit-plan-state.test.ts 覆盖短句修订、原始日期锚点/时长、账号隔离、挂起/取消、过期、缓存清空后直接确认、revision 冲突、重复确认和备份挂起。实际模型召回质量仍需独立验收。
 
-- ChatGPT 合成合同：chatgpt-provider.test.ts 覆盖 JWT 签名/nonce/audience、登录权限不足、账号隔离、本机 host 保留、loopback/PKCE、并发刷新与令牌替换、临时失败、namespace 工具、SSE 断线/错误和撤销失败。通过不代表真实 OAuth/额度/模型能力通过。
+- ChatGPT 合成合同：chatgpt-provider.test.ts 覆盖 JWT 签名/nonce/audience、登录权限不足、账号隔离、本机 host 保留、loopback/PKCE、并发刷新与令牌替换、临时失败、namespace 工具及加密上下文原样接续、SSE 断线/错误和撤销失败。通过不代表真实 OAuth/额度/模型能力通过。
 ## 隔离 Orbit UI 预览
 
 构建前端后运行 `npx tsx scripts/orbit-ui-preview.ts 4183`，仅监听 loopback，使用新的临时数据库和合成账号，不载入 .env、不启动邮件/主动提醒/真实模型。关闭进程后临时数据可人工删除；它不代表生产、真实 OAuth、搜索或模型验收。至少检查聊天终态、短句草稿修改、设置搜索键盘定位、阅读旧消息及 reduced-motion，再按本文窗口与主题矩阵检查布局。
+
+## 2026-10-03 基础升级本地验收
+
+398/398 服务测试、3/3 跨项目隔离测试、typecheck、Web/Electron 构建通过。包含持久草稿/冲突/幂等、账号能力证据、OAuth/Responses 合成协议、搜索预算/公共 URL 防护、Markdown/设置索引、真实字节图片和 PDF/Office worker、超旧 JSON 限额的 HTTP 上传、跨账号拒绝、SSE 终态、加密备份关联与缺失文件/账号清理。ExcelJS 的 uuid 定向 override 后重跑全套，Office 解析通过；依赖剩余告警见 SEC01。
+
+真实浏览器使用临时合成数据库：9→10 同一草稿、刷新持久、挂起/恢复、文字确认仍需按钮、点击确认后 1 项日程/终态、完成提醒无动作、CSV 上传就绪/消息关联、无 Key 明确失败及重试入口、vision 别名定位/聚焦已验证。阅读旧消息时 top=1782 保持不变并出现“有新回复”。覆盖 390×844、430×932、768×1024、1440×900，并补充 1366×768 和 1920×1080；明暗、加载/空态、日历/弹窗、今日/周期/日报/知识库入口已检查。窗口变化瞬间的过渡帧不当成稳定布局结论。
+
+未验证真实 WorkBuddy/ChatGPT/Tavily 账号、套餐资格/额度/官方工具行为、模型理解质量、系统 reduced-motion、低性能设备、Electron 安装包运行、生产迁移/恢复、自然提醒和真实 SMTP/IMAP/手机。reduced-motion 已做源码检查，没有修改系统设置冒充实测。合成 SMTP 只属于跨项目测试。

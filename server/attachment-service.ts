@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as activityStore from './activity-store.js';
+import {validateOfficeArchive} from './archive-validation.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +32,7 @@ export function validateAttachmentBytes(mime:string,buffer:Buffer,allowDocuments
   if(allowDocuments&&['text/plain','text/markdown','text/csv'].includes(mime)) {
     const text=new TextDecoder('utf-8',{fatal:true}).decode(buffer);if(text.includes('\0'))throw new Error('不支持二进制文本');return;
   }
-  if(allowDocuments&&['application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(mime)&&buffer.subarray(0,4).equals(Buffer.from([80,75,3,4])))return;
+  if(allowDocuments&&['application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(mime)&&buffer.subarray(0,4).equals(Buffer.from([80,75,3,4]))){validateOfficeArchive(buffer,mime);return;}
   throw new Error('不支持这个附件类型');
 }
 

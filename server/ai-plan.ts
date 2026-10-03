@@ -191,6 +191,7 @@ export function buildAiPlanSnapshot(input: {
   revision?: number;
   state?: string;
   result?: unknown;
+  retryPlanId?:string;
 }): Record<string, unknown> {
   return {
     id: input.id,
@@ -198,6 +199,7 @@ export function buildAiPlanSnapshot(input: {
     revision: input.revision || 1,
     state: input.state || 'pending',
     result: input.result,
+    retryPlanId:input.retryPlanId,
     expiresAt: new Date(input.expiresAt).toISOString(),
     warnings: input.warnings,
     targetCalendarId: input.targetCalendarId,

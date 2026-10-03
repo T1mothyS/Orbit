@@ -4,7 +4,7 @@ import { chatGPTProvider } from '../ai-provider-chatgpt.js';
 import { chatGPTStatus } from '../chatgpt-connection.js';
 import { createOrbitTools } from '../orbit-tools.js';
 import { configureSearch,searchStatus } from '../orbit-search.js';
-import { activateAiPlan, activeAiPlan, resolveAiPlan, setAiPlanState, assertPlanRevision, reviseAiPlan, pendingInteraction } from '../ai-chat-state.js';
+import { activateAiPlan, activeAiPlan, resolveAiPlan, setAiPlanState, assertPlanRevision, reviseAiPlan, pendingInteraction,retryFailedPlan } from '../ai-chat-state.js';
 import { OptimizeError } from '../prompt-optimize.js';
 import { createPromptOptimizationRunId, runPromptOptimization } from '../note-prompt-optimization.js';
 import { Router } from 'express';
@@ -41,7 +41,7 @@ import { syncReminderTasksToCalendar } from '../reminder-calendar-sync.js';
 import { listDailyReportViews, getDailyReportView } from '../daily-report-service.js';
 import { selectKnowledgeReferences } from '../orbit-knowledge.js';
 import { schedulesForQuery } from '../orbit-schedule-context.js';
-import { getProactivePreference, setProactivePreference } from '../orbit-proactive.js';
+import { getProactivePreference, setProactivePreference,proactiveEventView } from '../orbit-proactive.js';
 
 export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAuth>, 'authenticate'>) {
   const app = Router();
@@ -67,9 +67,9 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     if(!orbit.getRequest(userId,id))return res.status(404).json({error:'请求不存在'});
     res.setHeader('Content-Type','text/event-stream');res.setHeader('Cache-Control','no-store');res.setHeader('X-Accel-Buffering','no');res.flushHeaders();
     let previous='',closed=false;
-    const expiresAt=Number((req as any).user.exp||0)*1000;
+    const expiresAt=Number((req as any).user.exp||0)*1000,authVersion=(req as any).user.authVersion;
     let lastHeartbeat=Date.now();
-    const tick=()=>{if(closed)return;const row=orbit.getRequest(userId,id);if(!row||!db.getUserById(userId)||db.getUserById(userId)?.disabled||(expiresAt&&Date.now()>=expiresAt)){res.end();return;}const value=JSON.stringify(requestView(row));if(value!==previous){previous=value;const revision=createHash('sha256').update(value).digest('hex').slice(0,20);res.write(`id: ${revision}\nevent: status\ndata: ${value}\n\n`);}else if(Date.now()-lastHeartbeat>=15000){res.write(': heartbeat\n\n');lastHeartbeat=Date.now();}if(!['queued','running'].includes(row.state))res.end();};
+    const tick=()=>{if(closed)return;const row=orbit.getRequest(userId,id);if(!row||!db.getUserById(userId)||db.getUserById(userId)?.disabled||(db.getUserById(userId)?.auth_version??0)!==authVersion||(expiresAt&&Date.now()>=expiresAt)){res.end();return;}const value=JSON.stringify(requestView(row));if(value!==previous){previous=value;const revision=createHash('sha256').update(value).digest('hex').slice(0,20);res.write(`id: ${revision}\nevent: status\ndata: ${value}\n\n`);}else if(Date.now()-lastHeartbeat>=15000){res.write(': heartbeat\n\n');lastHeartbeat=Date.now();}if(!['queued','running'].includes(row.state))res.end();};
     const timer=setInterval(()=>{try{tick();}catch{res.end();}},750);res.on('close',()=>{closed=true;clearInterval(timer);});tick();
   });
 
@@ -99,7 +99,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       orbit.conversation(payload.userId,cid);
       const messages = queryAll<dbModule.DbAiScheduleMessage>('SELECT * FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? ORDER BY created_at,rowid',[payload.userId,cid]);
       hydratePendingAiSchedulePlans(payload.userId, messages);
-      res.json({ messages: messages.map(m => {const view=toAiScheduleHistoryMessage(m);if(view.plan?.id)view.plan=buildAiPlanSnapshot(resolveAiPlan(payload.userId,view.plan.id)!);if(view.orbitMeta?.eventId){const e=queryAll<any>('SELECT * FROM orbit_proactive_events WHERE user_id=? AND id=?',[payload.userId,view.orbitMeta.eventId])[0];Object.assign(view.orbitMeta,{state:e?.state||'discarded',handledAction:e?.handled_action,handledAt:e?.handled_at,nextReminderAt:e?.next_reminder_at});}if(Array.isArray(view.scheduleItems)) view.scheduleItems=view.scheduleItems.flatMap((item:any)=>{const live=scheduleStore.getSchedule(item.id);return live?.user_id===payload.userId?[live]:[];});return view;}) });
+      res.json({ messages: messages.map(m => {const view=toAiScheduleHistoryMessage(m);if(view.plan?.id)view.plan=buildAiPlanSnapshot(resolveAiPlan(payload.userId,view.plan.id)!);if(view.orbitMeta?.eventId){Object.assign(view.orbitMeta,proactiveEventView(payload.userId,view.orbitMeta.eventId));}if(Array.isArray(view.scheduleItems)) view.scheduleItems=view.scheduleItems.flatMap((item:any)=>{const live=scheduleStore.getSchedule(item.id);return live?.user_id===payload.userId?[live]:[];});return view;}) });
     } catch (error: any) {
       console.error("[AI History] Error:", error);
       res.status(400).json({ error: '无法读取这个会话' });
@@ -156,6 +156,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     const plan=resolveAiPlan(user(req),req.params.planId);
     if(!plan)throw new Error('计划不存在');
     if(req.body?.expectedRevision!==(plan.revision||1))throw new Error('计划已更新，请刷新后操作');
+    if(req.params.action==='retry'){const next=retryFailedPlan(plan);return res.json({plan:buildAiPlanSnapshot(next)});}
     if(!['pending','suspended'].includes(plan.state!)||plan.expiresAt<=Date.now())throw new Error('计划已结束或过期');
     if(req.params.action==='resume'){plan.revision=(plan.revision||1)+1;activateAiPlan(plan);}
     else if(req.params.action==='cancel')setAiPlanState(plan,'cancelled');
@@ -253,6 +254,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     }
 
     if (context) {
+      if(attachmentIds.length && /^(请阅读附件|总结|概述|新话题|看看)/.test(text)){const current=activeAiPlan(userId,context.conversationId);if(current)setAiPlanState(current,'suspended');}
       const interaction=attachmentIds.length?{handled:false}:pendingInteraction(userId,context.conversationId,text);
       if(interaction.handled){const response={success:true,intent:'chat',reply:interaction.reply,changed:false,activePlanId:interaction.plan?.id};const message=saveAiScheduleResponseHistory(userId,response);return res.json({...response,historyMessageId:message.id});}
       const activePlan=activeAiPlan(userId,context.conversationId);

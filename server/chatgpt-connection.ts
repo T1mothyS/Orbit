@@ -35,6 +35,7 @@ export async function chatGPTAccessToken(userId:string,fetcher:typeof fetch=fetc
     const res=await fetcher(CHATGPT_ISSUER+'/api/accounts/oauth/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'refresh_token',client_id:current.client_id,refresh_token:current.refresh_token,resource:CHATGPT_RESOURCE}),signal:AbortSignal.timeout(15000)});
     const raw=await res.json();
     if(!res.ok){const code=String(raw.error?.code||raw.error||'');if(/^(invalid_grant|invalid_refresh_token|token_expired|refresh_token_expired|refresh_token_invalidated|refresh_token_reused)$/.test(code)){saveSecret('chatgpt',userId,{client_id:current.client_id,issuer:current.issuer,subject:current.subject,email:current.email,ext_agent_host_id:current.ext_agent_host_id,scopes:[],expires_at:0,status:'reauthorization_required'});}throw new Error(`ChatGPT 刷新失败（${res.status}），${res.status>=500?'凭据已保留，请稍后重试':'请检查授权状态'}`);}
+    if(!chatGPTOwner(userId)||loadSecret<ChatGPTCredential>('chatgpt',userId)?.refresh_token!==current.refresh_token)throw new Error('连接已被清除，刷新结果已丢弃');
     const next=tokenRecord({...raw,scope:raw.scope||current.scopes.join(' ')},current);next.id_token=raw.id_token||current.id_token;
     saveSecret('chatgpt',userId,next);return next.access_token!;
   });refreshing.set(userId,task);try{return await task;}finally{refreshing.delete(userId);}

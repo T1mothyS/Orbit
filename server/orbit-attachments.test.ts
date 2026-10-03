@@ -13,3 +13,24 @@ function pdf(text:string){const objects=['<< /Type /Catalog /Pages 2 0 R >>','<<
 test('PDF extraction keeps page location, broken input and cancellation fail explicitly',async()=>{const parsed=await parseDocument(pdf('OrbitDocument'),'application/pdf');assert.equal(parsed.blocks[0].location,'第 1 页');assert.match(parsed.blocks[0].text,/OrbitDocument/);await assert.rejects(parseDocument(Buffer.from('%PDF-broken'),'application/pdf'));const controller=new AbortController();const pending=parseDocument(Buffer.alloc(10000000,65),'text/plain',controller.signal);controller.abort();await assert.rejects(pending,/取消/);});
 test('document context has a bounded conservative token budget and reports excerpts',async()=>{const file=await upload('信息'.repeat(10000));const result=files.attachmentContext('files-owner',[file.id],'信息');assert.match(result.notice,/节选/);assert.ok(Buffer.byteLength(result.input[0].text!)<12500);});
 test('encrypted user backup restores shared files and conversation/message references in another account',async()=>{const backup=await import('./backup-service.js');const bytes=backup.createUserBackup('files-owner','synthetic-password-123');const result=backup.restoreUserBackup('files-other',bytes,'synthetic-password-123','replace');assert.equal(result.status,'COMPLETED');const restored=store.exportOrbit('files-other');assert.ok(restored.attachments.length>0);assert.ok(restored.attachmentLinks.length>0);for(const link of restored.attachmentLinks){assert.equal(files.messageAttachments('files-other',link.message_id)[0].conversationId,restored.conversations.find(c=>c.id===files.attachment('files-other',link.attachment_id).conversation_id)?.id);assert.throws(()=>files.attachment('files-owner',link.attachment_id),/不存在/);}});
+
+test('HTTP uploads exceed the old JSON body limit, remain owned and authenticated SSE ends at terminal state',async()=>{
+  const server=api.app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));const base=`http://127.0.0.1:${(server.address() as {port:number}).port}`;
+  const request=(uid:string,url:string,init:RequestInit={})=>fetch(base+url,{...init,headers:{Authorization:'Bearer '+api.signUserToken(db.getUserById(uid)!),'Content-Type':'application/json',...init.headers}});
+  try{
+    const response=await request('files-owner',`/api/orbit/conversations/${cid}/attachments`,{method:'POST',body:JSON.stringify({name:'large.txt',mime:'text/plain',base64:Buffer.alloc(1100000,65).toString('base64')})});assert.equal(response.status,200);const file=(await response.json()).attachment;assert.equal(file.state,'ready');
+    assert.equal((await fetch(base+`/api/orbit/attachments/${file.id}`)).status,401);
+    assert.equal((await request('files-other',`/api/orbit/attachments/${file.id}`)).status,400);
+    const download=await request('files-owner',`/api/orbit/attachments/${file.id}`);assert.equal((await download.arrayBuffer()).byteLength,1100000);assert.match(download.headers.get('content-disposition')!,/attachment/);
+    const id=randomUUID();run('INSERT INTO orbit_requests(id,user_id,conversation_id,state,body,created_at) VALUES (?,?,?,?,?,?)',[id,'files-owner',cid,'completed',JSON.stringify({text:'合成状态'}),stamp]);
+    assert.equal((await request('files-other',`/api/orbit/requests/${id}/events`)).status,404);
+    const events=await request('files-owner',`/api/orbit/requests/${id}/events`);assert.match(events.headers.get('content-type')!,/text\/event-stream/);assert.match(await events.text(),/completed/);
+  }finally{server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
+});
+
+test('missing backup files do not restore ghost message links and account cleanup removes provider data',async()=>{
+  const backup=store.exportOrbit('files-owner');backup.attachments.push({id:'missing-file',conversation_id:cid,state:'ready',created_at:stamp} as any);backup.attachmentLinks.push({message_id:backup.messages[0].id,attachment_id:'missing-file'} as any);store.restoreOrbit('files-owner',backup,'merge');assert.ok(!store.exportOrbit('files-owner').attachments.some(a=>a.id==='missing-file'));
+  const vault=await import('./orbit-credential-vault.js');vault.saveSecret('chatgpt','files-other',{synthetic:true});run('INSERT INTO orbit_model_capabilities(user_id,provider,model,credential_version,capability,verified_at) VALUES (?,?,?,?,?,?)',['files-other','workbuddy','synthetic','v1','images',stamp]);db.clearUserData('files-other');
+  assert.equal(store.exportOrbit('files-other').attachments.length,0);assert.equal(vault.loadSecret('chatgpt','files-other'),undefined);
+  const {queryAll}=await import('./database/connection.js');assert.equal(queryAll('SELECT * FROM orbit_model_capabilities WHERE user_id=?',['files-other']).length,0);
+});

@@ -2,9 +2,16 @@ import { queryAll, run } from '../connection.js';
 import { deleteDailyReportCloudData } from './report-cloud.js';
 import { deleteOAuthUserData } from './oauth.js';
 import { deleteUserOperationResults } from './operations.js';
+import { removeSecret } from '../../orbit-credential-vault.js';
+
+function clearOrbitProviderData(userId:string):void {
+  removeSecret('chatgpt',userId);
+  for(const table of ['orbit_attachments','orbit_message_attachments','orbit_request_steps','orbit_model_capabilities'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
+}
 
 export function deleteUser(userId: string): boolean {
   try {
+    clearOrbitProviderData(userId);
     for(const table of ['orbit_schedule_reminders','orbit_knowledge_events','orbit_proactive_events'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
     deleteUserOperationResults(userId);
     run('DELETE FROM daily_report_tokens WHERE user_id = ?', [userId]);
@@ -38,6 +45,7 @@ export function deleteUser(userId: string): boolean {
 
 export function clearUserData(userId: string): { schedules: number; sessions: number } {
   try {
+    clearOrbitProviderData(userId);
     for(const table of ['orbit_schedule_reminders','orbit_knowledge_events','orbit_proactive_events'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
     deleteUserOperationResults(userId);
     run('DELETE FROM user_api_keys WHERE user_id = ?', [userId]);

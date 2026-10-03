@@ -5,6 +5,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .primary-button { background:var(--td-brand-color); box-shadow:none; }
 .primary-button:hover,.secondary-button:hover { transform:none; box-shadow:none; }
 .product-nav-item.icon-only { box-shadow:none; }
+.product-nav-label{display:none}
+.product-nav-item.icon-only.active{background:var(--td-brand-color-light);color:var(--td-brand-color)}
+.product-nav-item.icon-only:hover .product-nav-image,.product-nav-item.icon-only.active .product-nav-image{transform:none;filter:none}
 .product-nav-item.icon-only:hover,.product-nav-item.icon-only.active { box-shadow:none; }
 .product-nav-item.icon-only:hover .product-nav-lucide,.product-nav-item.icon-only.active .product-nav-lucide { transform:none; filter:none; }
 .reminder-page { background:var(--td-bg-color-page); }
@@ -21,7 +24,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .orbit-message-body code { font-family:ui-monospace,monospace; font-size:.9em; padding:1px 4px; border-radius:4px; background:var(--td-bg-color-component); }
 .orbit-message-body pre { max-width:100%; overflow:auto; margin:8px 0; padding:12px; border:1px solid var(--td-component-stroke); border-radius:6px; background:var(--td-bg-color-container); }
 .orbit-message-body pre code { padding:0; background:none; }
-.orbit-message-body a,.orbit-message-sources a { color:var(--td-brand-color); text-decoration:underline; text-underline-offset:3px; }
+.orbit-message-body a,.orbit-message-sources a,.settings-stack > a { color:var(--td-brand-color); text-decoration:underline; text-underline-offset:3px; }
+.dark .orbit-message-body a,.dark .orbit-message-sources a,.dark .settings-stack > a { color:var(--td-brand-color-9,var(--td-brand-color-active)); }
 .orbit-message[data-new=true] { animation:orbit-message-arrive var(--orbit-motion-feedback) var(--orbit-ease); }
 @keyframes orbit-message-arrive { from {opacity:0;} to {opacity:1;} }
 .orbit-message-sources,.orbit-message-steps { font-size:12px; margin-top:12px; padding-top:8px; border-top:1px solid var(--td-component-stroke); color:var(--td-text-color-secondary); }
@@ -59,6 +63,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .settings-search-results button[aria-selected=true],.settings-search-results button:hover { background:var(--td-bg-color-component); }
 .settings-search-results small { display:block; color:var(--td-text-color-secondary); margin-top:4px; font-size:12px; max-height:3em; overflow:hidden; }
 .settings-search-results p { padding:12px; }
+.settings-actions > select { min-width:120px; max-width:100%; min-height:32px; padding:4px 8px; border:1px solid var(--td-component-stroke); border-radius:var(--orbit-radius-control); background:var(--td-bg-color-container); color:var(--td-text-color-primary); font-size:13px; }
+.settings-actions > select:disabled { color:var(--td-text-color-disabled); }
 .settings-nav { grid-row:2; }
 .settings-scroll { grid-row:2; }
 .settings-nav button[aria-current=true] { color:var(--td-brand-color); background:var(--td-brand-color-light); }

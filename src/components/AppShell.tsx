@@ -60,6 +60,7 @@ export function AppShell({
               aria-label={item.label}
             >
               {item.icon ? <img className="product-nav-image" src={item.icon} alt="" aria-hidden="true" /> : item.Icon ? <item.Icon className="product-nav-lucide" size={26} strokeWidth={1.8} aria-hidden="true" /> : null}
+              <span className="product-nav-label">{item.label}</span>
             </button>
           ))}
         </nav>

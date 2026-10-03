@@ -127,4 +127,10 @@ export function actOnProactiveEvent(userId:string,id:string,action:string,now=ne
     run('UPDATE orbit_proactive_events SET state=?,handled_action=?,handled_at=?,next_reminder_at=? WHERE id=? AND user_id=?',['handled',action,now.toISOString(),nextReminderAt,id,userId]);
   });
 }
+
+export function proactiveEventView(userId:string,id:string){
+  const e=queryOne<any>('SELECT * FROM orbit_proactive_events WHERE user_id=? AND id=?',[userId,id]);
+  if(e?.state==='sent'){const s=getSchedule(e.schedule_id);if(!s||s.user_id!==userId||s.is_completed||scheduleFingerprint(s)!==e.expected_state){run("UPDATE orbit_proactive_events SET state='discarded' WHERE user_id=? AND id=?",[userId,id]);e.state='discarded';}}
+  return {state:e?.state||'discarded',handledAction:e?.handled_action,handledAt:e?.handled_at,nextReminderAt:e?.next_reminder_at};
+}
 export function createProactiveJobs(isReady:()=>boolean) {return createJobRunner([{name:'orbit-proactive',expression:'*/30 * * * * *',run:async()=>{if(isReady())await runOrbitProactiveTick();}}],()=>addLog('warn','ai','Orbit 主动提醒扫描失败'));}

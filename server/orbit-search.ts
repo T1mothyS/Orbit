@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 export interface WebSource {title:string;url:string;source:string;snippet:string;publishedAt:string|null;retrievedAt:string}
 const cache=new Map<string,{until:number;sources:WebSource[]}>();
 const month=()=>new Date().toISOString().slice(0,7);
-export function searchStatus(){const row=queryOne<{calls:number;stopped:number}>('SELECT * FROM orbit_search_usage WHERE month=?',[month()]);return {configured:!!(process.env.TAVILY_API_KEY||loadSecret<{key:string}>('search','server')?.key),provider:'tavily',used:row?.calls||0,limit:Math.min(1000,Math.max(0,Number(process.env.ORBIT_SEARCH_MONTHLY_LIMIT||1000))),stopped:!!row?.stopped};}
+export function searchStatus(){const row=queryOne<{calls:number;stopped:number}>('SELECT * FROM orbit_search_usage WHERE month=?',[month()]);return {configured:!!(process.env.TAVILY_API_KEY||loadSecret<{key:string}>('search','server')?.key),provider:'tavily',used:row?.calls||0,limit:!!process.env.ORBIT_SEARCH_MONTHLY_LIMIT?.trim() && Number.isFinite(Number(process.env.ORBIT_SEARCH_MONTHLY_LIMIT))?Math.min(1000,Math.max(0,Number(process.env.ORBIT_SEARCH_MONTHLY_LIMIT))):1000,stopped:!!row?.stopped};}
 export function configureSearch(key:string){if(key && (key.length>300 || /\s/.test(key)))throw new Error('搜索 Key 格式不正确');if(key)saveSecret('search','server',{key});else removeSecret('search','server');cache.clear();}
 export async function searchWeb(query:string,signal?:AbortSignal,fetcher:typeof fetch=fetch):Promise<WebSource[]> {
   if(!query.trim()||query.length>300)throw new Error('搜索词必须为 1–300 字');

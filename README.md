@@ -28,7 +28,7 @@
 
 ## Windows 本地启动
 
-要求 Node.js >=22.12.0、npm 和仓库锁文件。首次安装：
+要求 Node.js >=22.13.0、npm 和仓库锁文件。首次安装：
 
 ```powershell
 npm ci

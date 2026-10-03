@@ -1,6 +1,6 @@
 # Orbit 文档索引
 
-- Status: LIVING；2026-10-01 整理。此索引只负责导航，不复制任务、版本或生产状态。
+- Status: LIVING；2026-10-03 核对基础升级入口。此索引只负责导航，不复制任务、版本或生产状态。
 - 权威次序：源码/实际验证 → 领域合同 → 当前任务状态；历史报告按原日期解释。版本只读 package.json。
 
 ## 路线、更新与任务
@@ -31,7 +31,7 @@
 
 | 文档 | 范围 |
 | --- | --- |
-| [架构](ARCHITECTURE.md) | 运行时、持久化、账号所有权、Orbit 队列/主对话/统计/主动提醒 |
+| [架构](ARCHITECTURE.md) | 运行时、持久化、账号所有权、队列/草稿、Provider/工具、OAuth 和共享附件 |
 | [日历数据](CALENDAR-DATA-GUIDE.md) | 事项/周期/日期语义及历史兼容包袱 |
 | [Cloud 日报](CHATGPT-WORK-CLOUD.md) | OAuth/MCP、Local/Cloud、V2.5 输入/内容/媒体与正式发布合同 |
 | [Cloud 排障](CLOUD-DIGEST-RECOVERY.md) | Prompt/模板/完整性/媒体分支核对 |

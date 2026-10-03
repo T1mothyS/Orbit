@@ -4,6 +4,7 @@ import { buildCodeBuddyEnv } from './codebuddy-env.js';
 import { createModelService } from './model-service.js';
 import * as db from './db.js';
 import { workBuddyModel } from './ai-provider-contract.js';
+import {withVerifiedCapabilities,capabilityCredentialVersion} from './ai-model-capabilities.js';
 
 export const defaultModel = "glm-5.1";
 export const modelService = createModelService<any>({
@@ -27,7 +28,7 @@ export function getAvailableModels(
         const models=await session.getAvailableModels();
         // Experimental capability lookup must never break the existing model list.
         let raw:Record<string,any>[]=[];let timer:ReturnType<typeof setTimeout>|undefined;try{raw=await Promise.race([session.getAvailableModelsRaw(),new Promise<Record<string,any>[]>(resolve=>{timer=setTimeout(()=>resolve([]),3000);})]);}catch{}finally{clearTimeout(timer);}
-        return models.map(model=>({...model,orbit:workBuddyModel({...model,...raw.find(r=>r.id===model.modelId)})}));
+        return models.map(model=>({...model,orbit:withVerifiedCapabilities(userId,workBuddyModel({...model,...raw.find(r=>r.id===model.modelId)}),capabilityCredentialVersion(credential.api_key+'\0'+credential.updated_at))}));
       }};
     },
   });

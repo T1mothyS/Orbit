@@ -172,6 +172,8 @@ export function AiSettings({ authHeaders,isAdmin=false }: { authHeaders: Setting
       <ModelSettings authHeaders={authHeaders} />
       <ChatGPTSettings authHeaders={authHeaders}/>
       <SearchSettings authHeaders={authHeaders} isAdmin={isAdmin}/>
+      <CapabilitySettings authHeaders={authHeaders}/>
     </SettingSection>
   );
 }
+import {CapabilitySettings} from './CapabilitySettings';

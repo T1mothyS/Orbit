@@ -124,6 +124,7 @@ export interface PendingAiSchedulePlan {
   revision?: number;
   state?: string;
   result?: unknown;
+  retryPlanId?:string;
 }
 
 export interface AiChatRequestRecord {
@@ -241,6 +242,7 @@ export function hydratePendingAiSchedulePlans(userId: string, messages: dbModule
       revision: Number(snapshot.revision) || 1,
       state: snapshot.state || 'pending',
       result: snapshot.result,
+      retryPlanId:snapshot.retryPlanId,
     };
     if (restored.confirmedResult) { restored.state = restored.confirmedResult.partial ? (restored.confirmedResult.changed ? 'partially_completed' : 'failed') : 'completed'; restored.result = restored.confirmedResult; }
     if (['pending', 'suspended'].includes(restored.state!) && restored.expiresAt <= Date.now()) restored.state = 'expired';
@@ -329,13 +331,23 @@ export function pendingInteraction(userId: string, cid: string, text: string): {
     reviseAiPlan(plan, index, { startTime: start, endTime: end }, plan.revision);
     return { handled: true, reply: `已修改同一草稿：${old.slice(0,16).replace('T',' ')} → ${start.slice(0,16).replace('T',' ')}。仍需确认后执行。`, plan };
   }
-  if (short.length < 8) return { handled: true, reply: '当前计划尚未结束。请说明要修改的内容，或取消、挂起后开始新话题。', plan };
+  if (short.length < 8 && !/天气|几点|怎么|是什么|查询|查一下|新话题|知识库/.test(short)) return { handled: true, reply: '当前计划尚未结束。请说明要修改的内容，或取消、挂起后开始新话题。', plan };
   setAiPlanState(plan, 'suspended');
   return { handled: false };
 }
 
 export function isAiChatRequestId(value: unknown): value is string {
   return typeof value === 'string' && /^[a-zA-Z0-9_-]{12,120}$/.test(value);
+}
+
+export function retryFailedPlan(plan:PendingAiSchedulePlan):PendingAiSchedulePlan {
+  if(plan.retryPlanId){const existing=resolveAiPlan(plan.userId,plan.retryPlanId);if(existing)return existing;}
+  const result=(plan.confirmedResult||plan.result) as any;
+  if(!['failed','partially_completed'].includes(plan.state||'')||!Array.isArray(result?.changedDetails?.failures)||!plan.conversationId)throw new Error('这份计划没有可重试的失败项');
+  const operations=result.changedDetails.failures.map((f:any)=>plan.operations[f.index]).filter(Boolean);
+  if(!operations.length)throw new Error('没有可重试的操作');
+  const next:PendingAiSchedulePlan={...plan,id:uuidv4(),operations:structuredClone(operations),historyMessageId:uuidv4(),state:'pending',revision:1,result:undefined,confirmedResult:undefined,retryPlanId:undefined,expiresAt:Date.now()+AI_SCHEDULE_PLAN_TTL_MS,reply:'已为失败项创建新草稿，成功项不会重复执行。请核对后确认。'};
+  withPersistenceTransaction(()=>{db.createAiScheduleMessage({id:next.historyMessageId!,user_id:next.userId,conversation_id:next.conversationId,role:'assistant',type:'plan',content:next.reply,intent:next.intent,plan:JSON.stringify(buildAiPlanSnapshot(next)),schedule_items:null,created_at:new Date().toISOString()});activateAiPlan(next);plan.retryPlanId=next.id;persistAiPlan(plan);});return next;
 }
 
 export function buildAiPlanWarnings(text: string, operations: any[], modelWarnings: unknown): string[] {

@@ -47,3 +47,5 @@ test('HTTP confirm restores without reading history, rejects stale revision and 
     assert.equal(state.resolveAiPlan('plan-owner',p.id)?.state,'completed');
   }finally{server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
 });
+test('partial retry contains only failed operations and replays the same new draft',()=>{const p=draft();p.operations.push({key:'1',type:'create',data:{title:'失败项',start_time:'invalid'}});p.state='partially_completed';p.result={changed:true,changedDetails:{failures:[{index:1}]}};state.persistAiPlan(p);const next=state.retryFailedPlan(p);assert.equal(next.operations.length,1);assert.equal(next.operations[0].data.title,'失败项');assert.notEqual(next.id,p.id);assert.equal(state.retryFailedPlan(state.resolveAiPlan('plan-owner',p.id)!).id,next.id);assert.equal(state.activeAiPlan('plan-owner',cidFor(next))?.id,next.id);});
+function cidFor(p:import('./ai-chat-state.js').PendingAiSchedulePlan){return p.conversationId!;}

@@ -523,7 +523,8 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
             {msg.orbitMeta?.origin==='proactive' && <div className={`orbit-reminder-actions ${msg.orbitMeta.state==='handled'?'is-handled':''}`}><small>{msg.orbitMeta.enhanced?'Orbit 主动提醒':'Orbit 主动提醒 · 基于事项信息'}</small>{msg.orbitMeta.state==='sent' && <div>{[['complete','完成'],['snooze','15 分钟后'],['tomorrow','明天 09:00 再提醒']].map(([action,label])=><button type="button" key={action} disabled={reminderBusy} onClick={()=>{setReminderBusy(true);setReminderError('');void onReminderAction?.(msg.orbitMeta!.eventId,action).catch(e=>setReminderError(e.message)).finally(()=>setReminderBusy(false));}}>{label}</button>)}</div>}{msg.orbitMeta.state==='handled'&&<span>{msg.orbitMeta.handledAction==='complete'?'✓ 已完成':msg.orbitMeta.nextReminderAt?`已延后 · ${new Date(msg.orbitMeta.nextReminderAt).toLocaleString()}`:'已处理'}{msg.orbitMeta.handledAt&&<small> · {new Date(msg.orbitMeta.handledAt).toLocaleString()}</small>}</span>}{msg.orbitMeta.state==='discarded'&&<span>提醒已失效，请查看当前事项</span>}{reminderError&&<p role="alert">{reminderError}</p>}</div>}
             {!!(msg.orbitMeta as any)?.sources?.length&&<details className="orbit-message-sources"><summary>联网来源 · {(msg.orbitMeta as any).sources.length}</summary>{(msg.orbitMeta as any).sources.map((source:any)=><a key={source.url} href={safeChatHref(source.url)} target="_blank" rel="noopener noreferrer"><strong>{source.title}</strong><small>{source.source} · {source.publishedAt?new Date(source.publishedAt).toLocaleString():'发布时间未知'} · 获取 {new Date(source.retrievedAt).toLocaleString()}</small></a>)}</details>}
             {!!(msg.orbitMeta as any)?.steps?.length&&<details className="orbit-message-steps"><summary>处理步骤</summary>{(msg.orbitMeta as any).steps.map((s:any)=><p key={s.id}>{s.state==='completed'?'✓':s.state==='failed'?'!':'…'} {s.label} · {s.query}</p>)}</details>}
-            {msg.plan?.state&&['completed','partially_completed','failed'].includes(msg.plan.state)&&<p className="orbit-outcome" role="status">{msg.plan.state==='completed'?'✓ 已完成':msg.plan.state==='partially_completed'?'部分事项已完成，请核对未执行项目':'执行失败，正式结果请核对失败原因'}</p>}
+            {msg.plan?.state&&['completed','partially_completed','failed'].includes(msg.plan.state)&&<div className="orbit-outcome"><p role="status">{msg.plan.state==='completed'?'✓ 已完成':msg.plan.state==='partially_completed'?'部分事项已完成，请核对未执行项目':'执行失败，正式结果请核对失败原因'}</p>{msg.plan.state!=='completed'&&<button type="button" className="secondary-button" disabled={!!savingPlanOperationKey} onClick={()=>void onUpdatePlanOperation?.(msg.plan!.id,'retry',{}).catch(e=>setReminderError(e.message))}>为失败项创建新草稿</button>}</div>}
+            {msg.plan&&reminderError&&<p role="alert">{reminderError}</p>}
             {messageTime}
           </div>
         )}
@@ -603,13 +604,15 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     setSavingPlanOperationKey(savingKey);
     try {
       const expectedRevision=messages.find(m=>m.plan?.id===planId)?.plan?.revision||1;
-      const response = await fetch(key==='resume'?`/api/ai-chat/plans/${encodeURIComponent(planId)}/resume`:`/api/ai-chat/plans/${encodeURIComponent(planId)}/operations/${encodeURIComponent(key)}`, {
-        method: key==='resume'?'POST':'PATCH',
+      const lifecycle=['resume','retry'].includes(key);
+      const response = await fetch(lifecycle?`/api/ai-chat/plans/${encodeURIComponent(planId)}/${key}`:`/api/ai-chat/plans/${encodeURIComponent(planId)}/operations/${encodeURIComponent(key)}`, {
+        method: lifecycle?'POST':'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({...patch,expectedRevision}),
       });
       const data = await readJsonResponse(response);
       if (!response.ok || !data.plan) throw new Error(data.error || '保存计划项失败');
+      if(key==='retry'){await orbit.refresh();return;}
       setMessages(previous => previous.map(message => message.plan?.id === planId ? {
         ...message,
         plan: data.plan,
@@ -617,7 +620,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     } finally {
       setSavingPlanOperationKey(null);
     }
-  }, [authHeaders,messages]);
+  }, [authHeaders,messages,orbit.refresh]);
 
   const submitMessage = useCallback(async (rawText: string, options: { clearComposer?: boolean } = {}) => {
     const text = rawText.trim()||(attachments.files.length?'请阅读附件并说明主要内容':'');if(!text||!attachments.ready) return;

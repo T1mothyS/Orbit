@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { queryAll, queryOne, run } from './database/connection.js';
 import { withPersistenceTransaction } from './persistence.js';
 import { getSchedule, getAllSchedules } from './schedule-store.js';
+import {getAttachment} from './activity-store.js';
 import { addDateDays } from './orbit-time.js';
 export interface OrbitContext {
     userId: string;
@@ -78,16 +79,17 @@ export function deleteConversation(userId: string, id: string) {
 export function historyContext(userId: string, id: string): string {
     conversation(userId, id);
     const rows = queryAll<{
+        id:string;
         role: string;
         content: string;
         schedule_items: string | null;
         knowledge_sources: string | null;
         plan: string | null;
-    }>('SELECT role,content,schedule_items,knowledge_sources,plan FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? ORDER BY created_at DESC,rowid DESC LIMIT 20', [userId, id]);
+    }>('SELECT id,role,content,schedule_items,knowledge_sources,plan FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? ORDER BY created_at DESC,rowid DESC LIMIT 20', [userId, id]);
     let remaining = 12000;
     const selected: string[] = [];
     for (const row of rows) {
-        const part = `${row.role}: ${row.content}\n对象引用：${row.schedule_items || ''}\n知识引用：${row.knowledge_sources || ''}`;
+        const part = `${row.role}: ${row.content}\n对象引用：${row.schedule_items || ''}\n知识引用：${row.knowledge_sources || ''}\n附件引用：${messageAttachments(userId,row.id).map(f=>f.name).join('、')}`;
         if (remaining <= 0)
             break;
         selected.unshift(part.slice(0, remaining));
@@ -167,14 +169,17 @@ export function restoreOrbit(userId: string, data: Pick<ReturnType<typeof export
             run('INSERT INTO ai_schedule_messages (id,user_id,role,type,content,intent,schedule_items,plan,knowledge_sources,created_at,conversation_id,orbit_meta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [id, userId, m.role, m.type, m.content, m.intent, foreign ? null : m.schedule_items, foreign ? null : restoredPlanSnapshot(m.plan), foreign ? null : m.knowledge_sources, m.created_at, ids.get(m.conversation_id) || fallback,foreign?null:m.orbit_meta||null]);
     }
     setAiPreference(userId, data.autoKnowledge === true);
+    const missingAttachments=new Set<string>();
     for(const file of data.attachments||[]) {
       const id=attachmentIds.get(file.id)||file.id,cid=ids.get(file.conversation_id);
       if(!cid||typeof id!=='string')throw new Error('附件备份引用无效');
+      if(!getAttachment(id,userId)){missingAttachments.add(file.id);continue;}
       const existing=queryOne<any>('SELECT user_id FROM orbit_attachments WHERE id=?',[id]);if(existing&&existing.user_id!==userId)throw new Error('附件编号属于其他账号');
       if(file.extraction){if(typeof file.extraction!=='string'||file.extraction.length>1100000)throw new Error('附件解析备份超限');const parsed=JSON.parse(file.extraction);if(!Array.isArray(parsed.blocks)||parsed.blocks.length>2000||parsed.blocks.some((b:any)=>typeof b.text!=='string'||typeof b.location!=='string'))throw new Error('附件解析备份无效');}
       run('INSERT OR IGNORE INTO orbit_attachments(id,user_id,conversation_id,state,error,extraction,created_at) VALUES (?,?,?,?,?,?,?)',[id,userId,cid,file.state==='ready'?'ready':'failed',file.state==='ready'?null:'恢复后的附件需要重试解析',file.extraction||null,file.created_at]);
     }
     for(const link of data.attachmentLinks||[]) {
+      if(missingAttachments.has(link.attachment_id))continue;
       const id=attachmentIds.get(link.attachment_id)||link.attachment_id,message=messageIds.get(link.message_id);
       if(!message||!queryOne('SELECT id FROM orbit_attachments WHERE user_id=? AND id=?',[userId,id]))throw new Error('附件消息备份引用不完整');
       run('INSERT OR IGNORE INTO orbit_message_attachments(user_id,message_id,attachment_id) VALUES (?,?,?)',[userId,message,id]);
@@ -231,3 +236,4 @@ export function previousKnowledgeIds(userId: string, id: string): string[] {
     }
     return [];
 }
+import {messageAttachments} from './orbit-attachments.js';

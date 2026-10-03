@@ -8,6 +8,7 @@ const PAGE_SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 
 // JWT payload 类型
 export interface JwtPayload {
+  exp?:number;
   userId: string;
   email: string;
   role: 'admin' | 'user';
@@ -94,6 +95,7 @@ export function createAuth({ secret: JWT_SECRET, getUserById, isProduction = fal
         email: current.email,
         role: current.role,
         authVersion: current.auth_version ?? 0,
+        exp:decoded.exp,
       } satisfies JwtPayload };
     } catch (err) {
       return { error: 'Token 无效或已过期，请重新登录' };

@@ -1,0 +1,6 @@
+import {createHash} from 'node:crypto';
+import {queryAll,run} from './database/connection.js';
+import type {AiProviderId,OrbitModel} from './ai-provider-contract.js';
+export const capabilityCredentialVersion=(value:string)=>createHash('sha256').update(value).digest('hex');
+export function withVerifiedCapabilities(userId:string,model:OrbitModel,version:string):OrbitModel {const result=structuredClone(model);for(const row of queryAll<{capability:'images'|'tools'}>('SELECT capability FROM orbit_model_capabilities WHERE user_id=? AND provider=? AND model=? AND credential_version=?',[userId,model.provider,model.id,version]))if(['images','tools'].includes(row.capability))result.capabilities[row.capability]={supported:true,evidence:'verified'};return result;}
+export function recordVerifiedCapability(userId:string,provider:AiProviderId,model:string,version:string,capability:'images'|'tools'){run('INSERT INTO orbit_model_capabilities(user_id,provider,model,credential_version,capability,verified_at) VALUES (?,?,?,?,?,?) ON CONFLICT(user_id,provider,model,capability) DO UPDATE SET credential_version=excluded.credential_version,verified_at=excluded.verified_at',[userId,provider,model,version,capability,new Date().toISOString()]);}

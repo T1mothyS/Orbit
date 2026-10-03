@@ -2,9 +2,7 @@
 .reminder-page {
   min-height: 100vh;
   overflow: auto;
-  background:
-    radial-gradient(circle at 85% 0%, rgba(96, 165, 250, 0.13), transparent 32rem),
-    rgb(var(--color-background));
+  background: var(--td-bg-color-page);
   color: rgb(var(--color-foreground));
 }
 
@@ -204,8 +202,8 @@
 .complete-modal h2 { font-size: 21px; letter-spacing: -0.04em; }
 .complete-modal p { margin-top: 8px; color: rgb(var(--color-muted-foreground)); font-size: 13px; line-height: 1.7; }
 
-.dark .reminder-page { background: radial-gradient(circle at 85% 0%, rgba(37, 99, 235, .18), transparent 32rem), rgb(var(--color-background)); }
-.dark .reminder-topbar { background: rgba(18, 18, 18, .78); }
+.dark .reminder-page { background: var(--td-bg-color-page); }
+.dark .reminder-topbar { background: var(--td-bg-color-container); }
 .dark .stat-icon.blue, .dark .task-type-icon.card, .dark .empty-icon { background: rgba(37, 99, 235, .16); }
 .dark .stat-icon.green { background: rgba(16, 185, 129, .14); }
 .dark .stat-icon.amber { background: rgba(245, 158, 11, .14); }
