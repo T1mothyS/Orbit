@@ -7,6 +7,8 @@ import { AiProviderSelect } from './AiProviderSelect';
 import {ChatMarkdown} from './ChatMarkdown';
 import {OrbitRequestStatus} from './OrbitRequestStatus';
 import { useOrbitChat } from '../hooks/useOrbitChat';
+import {useChatAttachments,type ChatFile} from '../hooks/useChatAttachments';
+import {ChatAttachmentCard,ChatAttachmentComposer} from './ChatAttachments';
 import { SCHEDULE_CATEGORY_COLORS, SCHEDULE_CATEGORY_LABELS } from '../utils/scheduleCategories';
 
 // ==================== 类型 ====================
@@ -78,6 +80,7 @@ type MessageRole = 'user' | 'assistant';
 type MessageType = 'text' | 'schedules' | 'update' | 'plan' | 'error';
 
 interface ChatMessage {
+  attachments?:ChatFile[];
   orbitMeta?:{origin:string;eventId:string;enhanced:boolean;state?:string;handledAction?:string;handledAt?:string;nextReminderAt?:string};
   id: string;
   role: MessageRole;
@@ -394,6 +397,7 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
   savingPlanOperationKey?: string | null;
 }) {
   const isUser = msg.role === 'user';
+  const {authHeaders}=useAuth();
   const [editingOperationKey, setEditingOperationKey] = useState<string | null>(null);
   const [reminderBusy,setReminderBusy]=useState(false),[reminderError,setReminderError]=useState('');
   const timestamp = parseMessageTimestamp(msg.timestamp);
@@ -407,6 +411,7 @@ function MessageBubble({ msg, onReminderAction, onOpenSchedule, onOpenScheduleMe
           style={{ backgroundColor: 'var(--td-brand-color)', color: '#fff' }}
         >
           {msg.text}
+          {msg.attachments?.map(file=><ChatAttachmentCard key={file.id} file={file} authHeaders={authHeaders}/>)}
           {messageTime}
         </div>
       </div>
@@ -552,6 +557,8 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const followBottom=useRef(true),seenMessages=useRef(new Set<string>());
   const [hasNewReply,setHasNewReply]=useState(false);
   const orbit = useOrbitChat(authHeaders,isAuthenticated);
+  const attachments=useChatAttachments(orbit.cid,authHeaders);
+  const cannotSend=orbit.submitting||savingNotes||(noteMode?!inputText.trim():(!inputText.trim()&&!attachments.files.length)||!attachments.ready);
   const isLoading = orbit.requests.some(r => r.state === 'running' || r.state === 'queued');
   const [conversationDrawer, setConversationDrawer] = useState(false);
   const [renameTitle, setRenameTitle] = useState<string | null>(null);
@@ -568,7 +575,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   useEffect(() => {
     setMessages(orbit.history.map(m => ({
       id: m.id, role: m.role, type: m.type || 'text', text: m.text || m.content || '',
-      intent: m.intent, scheduleItems: m.scheduleItems, plan: m.plan, knowledgeSources: m.knowledgeSources,orbitMeta:m.orbitMeta,
+      intent: m.intent, scheduleItems: m.scheduleItems, plan: m.plan, knowledgeSources: m.knowledgeSources,orbitMeta:m.orbitMeta,attachments:m.attachments,
       timestamp: m.timestamp || m.created_at || null,
       isNew:seenMessages.current.size>0&&!seenMessages.current.has(m.id),
     })));
@@ -613,13 +620,14 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   }, [authHeaders,messages]);
 
   const submitMessage = useCallback(async (rawText: string, options: { clearComposer?: boolean } = {}) => {
-    const text = rawText.trim();if(!text) return;
+    const text = rawText.trim()||(attachments.files.length?'请阅读附件并说明主要内容':'');if(!text||!attachments.ready) return;
     const revision = inputRevisionRef.current;
     try {
-      const accepted = await orbit.send(text,{calendarId:'personal',...aiConnection});
+      const accepted = await orbit.send(text,{calendarId:'personal',...aiConnection,attachmentIds:attachments.files.map(f=>f.id)});
+      if(accepted)attachments.clear();
       if(accepted && options.clearComposer !== false && revision === inputRevisionRef.current) {inputRevisionRef.current++;setInputText('');drafts.current.delete(orbit.cid);}
     } catch(error) {orbit.setError(error instanceof Error?error.message:'发送失败，请重试');}
-  }, [orbit.send,orbit.setError,aiConnection]);
+  }, [orbit.send,orbit.setError,aiConnection,attachments]);
 
   const handleSubmit = useCallback(() => {
     void submitMessage(inputText, { clearComposer: true });
@@ -814,6 +822,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
             style={{ borderTop: '1px solid var(--td-component-stroke)' }}
           >
             {!noteMode&&<AiProviderSelect authHeaders={authHeaders} onChange={(provider,model)=>setAiConnection({provider,model})}/>}
+            {!noteMode&&<ChatAttachmentComposer {...attachments} disabled={orbit.submitting}/>}
             <div
               className={`rounded-xl transition-all schedule-ai-composer${noteMode ? ' is-note-mode' : ''}`}
             >
@@ -844,16 +853,16 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
               <button
                 type="button"
                 onClick={noteMode ? () => { void handleSaveNotes(); } : handleSubmit}
-                disabled={!inputText.trim() || orbit.submitting || savingNotes}
+                disabled={cannotSend}
                 className="schedule-ai-send-button flex items-center justify-center rounded-lg text-xs font-medium transition-all"
                 style={{
-                  backgroundColor: (!inputText.trim() || orbit.submitting || savingNotes)
+                  backgroundColor: cannotSend
                     ? 'var(--td-bg-color-component)'
                     : 'var(--td-brand-color)',
-                  color: (!inputText.trim() || orbit.submitting || savingNotes)
+                  color: cannotSend
                     ? 'var(--td-text-color-disabled)'
                     : '#fff',
-                  cursor: (!inputText.trim() || orbit.submitting || savingNotes) ? 'not-allowed' : 'pointer',
+                  cursor: cannotSend ? 'not-allowed' : 'pointer',
                 }}
                 aria-label={noteMode ? '保存记事' : isLoading ? '加入队列' : '发送'}
                 title={noteMode ? 'Ctrl+Enter 保存记事' : 'Ctrl+Enter 发送'}

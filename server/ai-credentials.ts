@@ -26,7 +26,7 @@ export function getAvailableModels(
       return {close:()=>session.close(),getAvailableModels:async()=>{
         const models=await session.getAvailableModels();
         // Experimental capability lookup must never break the existing model list.
-        let raw:Record<string,any>[]=[];try{raw=await session.getAvailableModelsRaw();}catch{}
+        let raw:Record<string,any>[]=[];let timer:ReturnType<typeof setTimeout>|undefined;try{raw=await Promise.race([session.getAvailableModelsRaw(),new Promise<Record<string,any>[]>(resolve=>{timer=setTimeout(()=>resolve([]),3000);})]);}catch{}finally{clearTimeout(timer);}
         return models.map(model=>({...model,orbit:workBuddyModel({...model,...raw.find(r=>r.id===model.modelId)})}));
       }};
     },

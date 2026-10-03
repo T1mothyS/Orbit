@@ -10,7 +10,9 @@ import { createPromptOptimizationRunId, runPromptOptimization } from '../note-pr
 import { Router } from 'express';
 import {createHash} from 'node:crypto';
 import type { createAuth } from '../auth.js';
-import { defaultModel, resolveCodeBuddyCredential, getMissingCodeBuddyCredentialMessage } from '../ai-credentials.js';
+import { defaultModel, resolveCodeBuddyCredential, getMissingCodeBuddyCredentialMessage,getAvailableModels } from '../ai-credentials.js';
+import {chatGPTModels} from '../ai-provider-chatgpt.js';
+import {messageAttachments,linkMessageAttachments,selectAttachmentIds,attachmentContext,clearConversationAttachments} from '../orbit-attachments.js';
 import { getLocalDateString } from '../local-date.js';
 import { isValidDateKey } from '../date-key.js';
 import { type JwtPayload } from '../auth.js';
@@ -53,7 +55,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
   app.post('/api/orbit/conversations', authenticate, safe((req,res) => res.json({ conversation: orbit.createConversation(user(req), String(req.body?.title || '新对话'),req.body?.scopeScheduleId) })));
   app.post('/api/orbit/conversations/:id/read', authenticate, safe((req,res) => {orbit.markConversationRead(user(req),req.params.id,req.body?.observedAt);res.json({success:true});}));
   app.patch('/api/orbit/conversations/:id', authenticate, safe((req,res) => { orbit.renameConversation(user(req),req.params.id,String(req.body?.title || ''));res.json({success:true}); }));
-  app.delete('/api/orbit/conversations/:id', authenticate, safe((req,res) => { orbit.deleteConversation(user(req),req.params.id);res.json({success:true}); }));
+  app.delete('/api/orbit/conversations/:id', authenticate, safe((req,res) => {const uid=user(req),cid=req.params.id;if(orbit.conversation(uid,cid).is_main)throw new Error('主对话不能删除');if(queryAll("SELECT id FROM orbit_requests WHERE user_id=? AND conversation_id=? AND state IN ('queued','running')",[uid,cid]).length)throw new Error('请先取消请求');clearConversationAttachments(uid,cid);orbit.deleteConversation(uid,cid);res.json({success:true}); }));
   app.get('/api/orbit/preferences', authenticate, safe((req,res) => res.json({ autoKnowledge: orbit.getAiPreference(user(req)),proactiveEnabled:getProactivePreference(user(req)),runnerEnabled:process.env.ORBIT_PROACTIVE_ENABLED==='true' })));
   app.patch('/api/orbit/preferences', authenticate, safe((req,res) => { const body=req.body||{};if(typeof body.autoKnowledge!=='boolean'&&typeof body.proactiveEnabled!=='boolean')throw new Error('提醒或检索设置格式不正确');if(body.autoKnowledge!==undefined){if(typeof body.autoKnowledge!=='boolean')throw new Error('检索设置格式不正确');orbit.setAiPreference(user(req),body.autoKnowledge);}if(body.proactiveEnabled!==undefined){if(typeof body.proactiveEnabled!=='boolean')throw new Error('提醒设置格式不正确');setProactivePreference(user(req),body.proactiveEnabled);}res.json({success:true}); }));
   app.post('/api/orbit/requests', authenticate, safe((req,res) => res.status(202).json({ request: requestView(orbitQueue.submitOrbitRequest(user(req),req.body || {})) })));
@@ -168,6 +170,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       const cid = String(req.query.conversationId || orbit.ensureDefaultConversation(payload.userId));
       orbit.conversation(payload.userId,cid);
       if (orbitQueue.listOrbitRequests(payload.userId,cid).some(r => ['queued','running'].includes(r.state))) throw new Error('请先取消这个会话中的请求');
+      clearConversationAttachments(payload.userId,cid);
       run('DELETE FROM ai_schedule_messages WHERE user_id=? AND conversation_id=?',[payload.userId,cid]);
       run('UPDATE orbit_conversations SET active_plan_message_id=NULL WHERE user_id=? AND id=?',[payload.userId,cid]);
       const deleted = true;
@@ -207,6 +210,8 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     if (!text) return res.status(400).json({ error: "请输入内容" });
     if (text.length > 20_000) return res.status(400).json({ error: '输入内容不能超过 20000 个字符' });
     const context = orbit.orbitContext.getStore();
+    let attachmentIds:string[]=[],attached={input:[] as import('../ai-provider-contract.js').AiInputPart[],notice:'',images:false};
+    try{if(context){attachmentIds=selectAttachmentIds(userId,context.conversationId,text,body.attachmentIds||[]);attached=attachmentContext(userId,attachmentIds,text);}}catch(error){return res.status(400).json({error:error instanceof Error?error.message:'附件读取失败'});}
     const previousKnowledge = context ? orbit.previousKnowledgeIds(userId,context.conversationId) : [];
     const knowledgeFollowUp = previousKnowledge.length > 0 && /(第.+[篇条]|这篇|刚才.*知识|上面.*资料)/.test(text);
     const includeKnowledgeContext = requestsKnowledgeContext(text) || orbit.getAiPreference(userId) || body.knowledgeScope === true || knowledgeFollowUp;
@@ -235,26 +240,27 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     if (authenticatedUser) {
       try {
         cleanupAiScheduleHistory(userId);
-        saveAiScheduleHistoryMessage({
+        const userMessage=saveAiScheduleHistoryMessage({
           userId,
           role: 'user',
           type: 'text',
           content: String(text),
         });
+        if(attachmentIds.length)linkMessageAttachments(userId,userMessage.id,attachmentIds);
       } catch (error) {
         console.error('[AI History] 保存用户消息失败:', error);
       }
     }
 
     if (context) {
-      const interaction=pendingInteraction(userId,context.conversationId,text);
+      const interaction=attachmentIds.length?{handled:false}:pendingInteraction(userId,context.conversationId,text);
       if(interaction.handled){const response={success:true,intent:'chat',reply:interaction.reply,changed:false,activePlanId:interaction.plan?.id};const message=saveAiScheduleResponseHistory(userId,response);return res.json({...response,historyMessageId:message.id});}
       const activePlan=activeAiPlan(userId,context.conversationId);
       previousContext=(activePlan?`当前交互状态：等待确认。优先保持同一草稿，不创建替代计划。\n当前计划：${JSON.stringify(buildAiPlanSnapshot(activePlan))}\n`:'当前交互状态：无活跃计划。\n')+orbit.historyContext(userId,context.conversationId)+(activePlan?'':'\n'+orbit.workingContext(userId,context.conversationId,text,targetDate || reminderStore.todayInTimezone(queryTimezone)));
     }
 
     // 只读日程查询直接使用本地数据，不依赖外部 AI 或 API Key。
-    if (authenticatedUser && isReadOnlyScheduleQuery(text) && !includeKnowledgeContext) {
+    if (authenticatedUser && !attachmentIds.length && isReadOnlyScheduleQuery(text) && !includeKnowledgeContext) {
       const today = targetDate || reminderStore.todayInTimezone(queryTimezone);
       const queryDates = parseQueryDatesForCards(text, today);
       const scheduleItems: any[] = [];
@@ -289,7 +295,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     }
 
     // 天气问题由受控数据源直接回答，不把实时事实交给语言模型猜测。
-    if (isWeatherQuestion(String(text))) {
+    if (!attachmentIds.length && isWeatherQuestion(String(text))) {
       const preference = db.getReminder(userId);
       const explicitLocation = extractWeatherLocationQuery(String(text));
       try {
@@ -647,7 +653,8 @@ priority 识别：
     try {
 
       // 【修复数据隔离】使用该用户的 API Key
-      resultText=await (isChatGPT?chatGPTProvider:workBuddyProvider).generate({userId,model:selectedModel,instructions:systemPrompt,input:[{type:'text',text:modelPrompt}],controller:context?.controller,tools:toolContext.tools});
+      if(attached.images){const models=isChatGPT?await chatGPTModels(userId):await getAvailableModels(userId,userCredential!);const model=isChatGPT?models.find(m=>m.id===selectedModel):models.find(m=>m.modelId===selectedModel)?.orbit;if(model?.capabilities.images.supported!==true)throw new Error('当前模型未声明支持图片输入，请在设置中刷新模型列表并选择支持图片的模型');}
+      resultText=await (isChatGPT?chatGPTProvider:workBuddyProvider).generate({userId,model:selectedModel,instructions:systemPrompt,input:[{type:'text',text:modelPrompt},...attached.input],controller:context?.controller,tools:toolContext.tools});
 
       const parsedResult = parseAiJsonCandidates([assistantText, resultText]);
       const parsed = parsedResult.value;
@@ -657,6 +664,7 @@ priority 识别：
       assertActive();
       const references = selectKnowledgeReferences(String(parsed.reply || ''), parsed.knowledgeSourceIds, candidateKnowledgeSources);
       parsed.reply = references.reply;
+      if(attached.notice)parsed.reply+='\n\n'+attached.notice;
       const knowledgeSources = references.sources;
       const operations = normaliseAiPlanOperations(parsed.operations);
       for (const op of operations) {
@@ -749,7 +757,8 @@ priority 识别：
       });
       console.error('[AI Chat] Error:', error);
       try {
-        saveAiScheduleHistoryMessage({ userId, role: 'assistant', type: 'error', content: error?.message || 'AI 处理失败，请重试' });
+        const failed=saveAiScheduleHistoryMessage({ userId, role: 'assistant', type: 'error', content: error?.message || 'AI 处理失败，请重试' });
+        run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({formatVersion:1,provider:isChatGPT?'chatgpt':'workbuddy',model:selectedModel,steps,sources:toolContext.sources}),failed.id,userId]);
       } catch {}
       res.status(500).json({ error: error?.message || 'AI 处理失败，请重试' });
     }

@@ -23,7 +23,9 @@ export function createApp(deps: AppDependencies): express.Express {
   app.use(securityHeaders(deps.isProduction));
   app.use(createApiRateLimiter());
   const largeJsonParser = express.json({ limit: '75mb' });
+  const chatAttachmentParser=express.json({limit:'15mb'});
   app.use((req, res, next) => {
+    if(req.method==='POST'&&/^\/api\/orbit\/conversations\/[^/]+\/attachments$/.test(req.path))return chatAttachmentParser(req,res,next);
     const acceptsLargeJson = req.method === 'POST' && (
       /^\/api\/completions\/[^/]+\/attachments$/.test(req.path)
       || req.path === '/api/ai/imports/parse'

@@ -1,5 +1,6 @@
 import * as dbModule from './db.js';
 import * as db from './db.js';
+import {messageAttachments} from './orbit-attachments.js';
 
 export const AI_SCHEDULE_HISTORY_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -26,5 +27,6 @@ export function toAiScheduleHistoryMessage(message: dbModule.DbAiScheduleMessage
     knowledgeSources: parseHistoryJson(message.knowledge_sources || null),
     timestamp: message.created_at,
     orbitMeta: parseHistoryJson(message.orbit_meta || null),
+    attachments:messageAttachments(message.user_id,message.id),
   };
 }

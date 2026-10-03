@@ -198,3 +198,10 @@ Orbit 工具复用日历、词法知识库和已发布日报服务；知识/跨�
 #### ChatGPT 适配
 本地授权助手使用 127.0.0.1 /auth/callback、state/nonce/PKCE，保存 issued client ID 并验证 JWKS/issuer/audience/sub。服务器导入再次验证身份与访问令牌的 resource/scope，保留本机 host。刷新使用进程合并和独占文件锁，原子保存旋转 token；临时失败保留凭据，失效令牌要求重授权。
 直接公共 Responses HTTP/SSE 强制 store:false、stream:true，不使用 previous_response_id 或后台参数。仅完成事件视为成功，工具按官方 namespace 发送；工具结果纳入后续本地 input。OAuth 连接从普通备份排除，后台 AI 不迁移到此连接。
+### 会话附件与共享解析
+
+聊天附件复用 activity.db 的 attachments、账号配额与 data/attachments 哈希文件；chat.db 增量保存 orbit_attachments（会话、解析状态/块）和 orbit_message_attachments（消息引用）。原附件/完成记录接口保持类型边界，文档扩展只在聊天与备份恢复明确启用。上传需认证、会话归属，10MB/文件、3 个/轮、20MB/轮、默认 500MB/账号；图片经 sharp 校验、2048px 压缩并去除 EXIF。
+
+共享 file-parser 服务在最多两个 192MB heap worker 中解析，15s 超时与取消，最多 100 页 PDF/一百万字符正文。PDF.js 使用本地字体资源，不执行 PDF JavaScript、不抓取外链；PDF.js optional canvas 是服务端依赖，Node 最低 22.13，部署需保留 npm 的平台 optional dependencies。扫描/加密 PDF 明确失败。解析能力供后续知识库复用，上传不写知识库。
+
+模型输入按账号模型目录的真实 image capability 检查，未知能力不假装读取图片；文档降级为带页码/定位的文本。每轮文本预算用 12,000 UTF-8 字节保守限制 token 上界，截断明确提示节选；后续“这份文件”只引用当前会话最近附件，多个文件需指定名称。未发送附件 24 小时后在账号附件访问/上传时清理；已关联文件随会话保留，删除引用并检查共享哈希后清理文件。加密用户备份保存附件、解析块及消息关系，跨账号恢复重映射 ID；OAuth 凭据不进入普通备份。

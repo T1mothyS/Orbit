@@ -1,11 +1,11 @@
 {
   "name": "smart-schedule-agent",
-  "version": "0.42.0-261003.0931",
+  "version": "0.43.0-261003.0946",
   "description": "Orbit — chat-first personal workspace",
   "author": "Smart Schedule Team",
   "license": "MIT",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.13.0"
   },
   "type": "module",
   "main": "dist-electron/main.js",
@@ -53,6 +53,7 @@
     "mermaid": "^12.0.0",
     "node-cron": "^4.2.1",
     "nodemailer": "^9.1.1",
+    "pdfjs-dist": "^6.3.289",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.13.0",

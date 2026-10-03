@@ -40,6 +40,7 @@ interface UserBackupPayload {
   dailyReportCloudContext?: ReturnType<typeof dailyReportCloudStore.getDailyReportCloudContext>;
   activity: ReturnType<typeof activityStore.exportUserActivity>;
   files: Array<{
+    attachmentId?:string;
     completionId: string | null;
     importId: string | null;
     originalName: string;
@@ -250,7 +251,7 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
   payload.files = payload.files.map(file => ({
     ...file,
     completionId: file.completionId ? completionIds.get(String(file.completionId)) || null : null,
-    importId: file.importId ? importIds.get(String(file.importId)) || null : null,
+    importId: file.importId?.startsWith('orbit:')?'orbit:'+crypto.randomUUID():file.importId ? importIds.get(String(file.importId)) || null : null,
   }));
   if (payload.account.reminder && typeof payload.account.reminder === 'object') {
     (payload.account.reminder as Record<string, unknown>).id = crypto.randomUUID();
@@ -306,6 +307,7 @@ export function createUserBackup(userId: string, password: string, allowMissingD
     return [{ filename, sha256, base64: bytes.toString('base64') }];
   });
   const files = activityStore.listAttachments(userId).map(record => ({
+    attachmentId:record.id,
     completionId: record.completionId,
     importId: record.importId,
     originalName: record.originalName,
@@ -416,7 +418,6 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
   const attachmentFailures: Array<{ originalName: string; error: string }> = [];
   const missingMedia = [...new Set((payload.activity.dailyReports || []).flatMap((row: any) => [...String(row.markdown || '').matchAll(/\/daily-report-media\/([a-f0-9]{64}\.(?:jpg|png|webp|ico|svg))/g)].map(match => match[1])))].filter(name => !fs.existsSync(path.join(dailyReportMediaRoot(), name)));
   const result = withPersistenceTransaction(() => {
-    if (payload.orbit) restoreOrbit(userId,payload.orbit,mode,isForeignAccount);
     if (mode === 'replace') db.deleteUserOperationResults(userId);
     const schedule = scheduleStore.restoreUserScheduleData(userId, payload.schedule, mode);
     const reminder = reminderStore.restoreUserReminderData(userId, payload.reminder, mode);
@@ -441,21 +442,25 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
       });
     }
     let attachments = 0;
+    const attachmentIds=new Map<string,string>();
     for (const file of payload.files) {
       try {
-        withPersistenceTransaction(() => attachmentService.saveBase64Attachment({
+        const restored=withPersistenceTransaction(() => attachmentService.saveBase64Attachment({
           userId,
           completionId: file.completionId,
           importId: file.importId,
           originalName: file.originalName,
           mimeType: file.mimeType,
           base64: file.base64,
+          allowDocuments:true,
         }));
+        if(file.attachmentId)attachmentIds.set(file.attachmentId,restored.id);
         attachments++;
       } catch (error) {
         attachmentFailures.push({ originalName: file.originalName, error: error instanceof Error ? error.message : String(error) });
       }
     }
+    if(payload.orbit)restoreOrbit(userId,payload.orbit,mode,isForeignAccount,attachmentIds);
     return {
       schedule,
       reminder,

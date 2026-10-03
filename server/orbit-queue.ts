@@ -6,6 +6,7 @@ import { queryAll, run } from './database/connection.js';
 import { conversation, getRequest, orbitContext, type ChatRequest } from './orbit-store.js';
 import { aiChatRequestRecords, isAiChatRequestId } from './ai-chat-state.js';
 import { withPersistenceTransaction } from './persistence.js';
+import {validateChatAttachments} from './orbit-attachments.js';
 type Worker = (req: any, res: any) => Promise<any>;
 let worker: Worker;
 const active = new Map<string, {
@@ -29,14 +30,16 @@ export function submitOrbitRequest(userId: string, body: any) {
     const text = String(body.text || '').trim();
     if (!text || text.length > 20000)
         throw new Error('请输入 1–20000 字的内容');
-    const allowed = new Set(['text', 'requestId', 'conversationId', 'targetDate', 'model', 'calendarId', 'knowledgeScope', 'provider']);
+    const allowed = new Set(['text', 'requestId', 'conversationId', 'targetDate', 'model', 'calendarId', 'knowledgeScope', 'provider','attachmentIds']);
+    const attachmentIds=validateChatAttachments(userId,cid,body.attachmentIds||[]);
     if(body.provider!==undefined && !['workbuddy','chatgpt'].includes(body.provider))throw new Error('Provider 当前不可用');
     if(body.provider==='chatgpt' && (!chatGPTStatus(userId).connected || !body.model))throw new Error('请连接 ChatGPT 并选择该账号可用模型');
     if (Object.keys(body).some(key => !allowed.has(key)))
         throw new Error('请求包含不支持的字段');
     const old = getRequest(userId, id);
     if (old) {
-        if (old.conversation_id !== cid || JSON.parse(old.body).text !== text)
+        const frozen=JSON.parse(old.body);
+        if (old.conversation_id !== cid || frozen.text !== text || (body.provider!==undefined&&frozen.provider!==body.provider) || (body.model!==undefined&&frozen.model!==body.model) || JSON.stringify(frozen.attachmentIds||[])!==JSON.stringify(attachmentIds))
             throw new Error('请求编号已用于其他内容');
         return old;
     }
@@ -44,7 +47,7 @@ export function submitOrbitRequest(userId: string, body: any) {
         throw new Error('等待队列已满，请先处理已有请求');
     const submittedAt = new Date();
     const targetDate = body.targetDate || dateInZone(submittedAt, getReminder(userId)?.timezone || 'Asia/Shanghai');
-    run('INSERT INTO orbit_requests (id,user_id,conversation_id,state,body,created_at) VALUES (?,?,?,?,?,?)', [id, userId, cid, 'queued', JSON.stringify({ ...body, text, targetDate, provider:body.provider||'workbuddy',model:body.model||getUserPreferredModel(userId,defaultModel) }), submittedAt.toISOString()]);
+    run('INSERT INTO orbit_requests (id,user_id,conversation_id,state,body,created_at) VALUES (?,?,?,?,?,?)', [id, userId, cid, 'queued', JSON.stringify({ ...body, text, targetDate,attachmentIds, provider:body.provider||'workbuddy',model:body.model||getUserPreferredModel(userId,defaultModel) }), submittedAt.toISOString()]);
     void pump(userId);
     return getRequest(userId, id)!;
 }

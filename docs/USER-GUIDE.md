@@ -319,3 +319,8 @@ pm2 restart smart-schedule --update-env
 当前只开放 ORBIT_CHATGPT_OWNER_ID 指定账号；未指定时为最早创建的有效管理员。Orbit 登录和 ChatGPT 连接是两个独立身份。运行 npm run chatgpt:connect，在系统浏览器完成 loopback/PKCE 授权，在设置 → AI 导入授权文件。个人服务器导入须使用 HTTPS，服务端保留自己的 host ID，独占刷新。导入后删除传输副本；重新授权使用设置中下载的非敏感注册信息并传 --registration 参数。
 访问令牌和旋转刷新令牌保存在独立加密目录，不进入普通数据导出或备份。应保护服务账号专属目录权限，单实例运行；进程崩溃留下凭据锁时，停服后核对并清理该锁。断开连接会尝试官方撤销；失败会明确显示远程撤销未确认。
 模型取授权账号实际列表，不静默切换 WorkBuddy 或付费 API。仅手动聊天使用 ChatGPT；原日报与主动提醒链路保持独立。套餐资格、真实额度、OAuth 和模型工具行为仍须个人账号实测。官方流程：[注册](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)、[个人 VM](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms)、[调用限制](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations)。
+## 对话附件
+
+输入区“附件”支持 JPEG/PNG/WebP、UTF-8 TXT/Markdown 和文字版 PDF。单个最多 10MB，每轮最多 3 个/20MB。上传条显示进度、解析和失败；解析完成再发送，失败可重试或移除。图片需要选择目录明确支持图片的模型；未知/不支持时会提示切换。没有文字的扫描 PDF 当前不能识别。
+
+消息中的附件可下载；继续询问“这份文件”会使用同一对话最近的附件，多文件时请写文件名。长文按问题取节选，并保留页码；收到“只读取了节选”时可指定章节/页码追问。附件不会自动加入知识库。清理历史/删除会话同时清理相关附件；未发送文件保留 24 小时。加密备份包含附件文件和关联，普通 JSON 导出不是完整附件备份。

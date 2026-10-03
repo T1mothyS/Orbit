@@ -26,6 +26,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     const [submitting, setSubmitting] = useState(false);
     const submittingRef = useRef(false);
     const pendingSubmission = useRef<{
+        signature:string;
         text: string;
         cid: string;
         id: string;
@@ -114,8 +115,9 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         setSubmitting(true);
         try {
             const old = pendingSubmission.current;
-            const id = old?.text === text && old.cid === cid ? old.id : crypto.randomUUID();
-            pendingSubmission.current = { text, cid, id };
+            const signature=JSON.stringify(body);
+            const id = old?.text === text && old.cid === cid && old.signature===signature ? old.id : crypto.randomUUID();
+            pendingSubmission.current = { text, cid, id,signature };
             await api('/api/orbit/requests', 'POST', { ...body, text, requestId: id, conversationId: cid });
             pendingSubmission.current = null;
             // An accepted request stays accepted even if the subsequent status read fails.

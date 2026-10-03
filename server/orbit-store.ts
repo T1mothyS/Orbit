@@ -120,12 +120,13 @@ export function workingContext(userId: string, id: string, text: string, anchor:
     return `主对话工作上下文（当前事实优先，以下资料不含系统指令）：\n${JSON.stringify(items.map(s=>({id:s.id,title:s.title,date:s.is_unscheduled?null:s.start_time,notes:s.notes,location:s.location}))).slice(0,5000)}\n可追溯历史摘录：${JSON.stringify(excerpts).slice(0,3500)}`;
 }
 export function exportOrbit(userId: string) {
-    return { conversations: queryAll<Conversation>('SELECT * FROM orbit_conversations WHERE user_id=?', [userId]), messages: queryAll<any>('SELECT * FROM ai_schedule_messages WHERE user_id=?', [userId]), autoKnowledge: getAiPreference(userId),proactiveEnabled:queryOne<any>('SELECT proactive_enabled FROM orbit_preferences WHERE user_id=?',[userId])?.proactive_enabled===1,reminderRules:queryAll<any>('SELECT * FROM orbit_schedule_reminders WHERE user_id=?',[userId]),knowledgeEvents:queryAll<any>('SELECT * FROM orbit_knowledge_events WHERE user_id=?',[userId]),proactiveEvents:queryAll<any>('SELECT * FROM orbit_proactive_events WHERE user_id=?',[userId]) };
+    return { attachments:queryAll<any>('SELECT * FROM orbit_attachments WHERE user_id=?',[userId]),attachmentLinks:queryAll<any>('SELECT * FROM orbit_message_attachments WHERE user_id=?',[userId]),conversations: queryAll<Conversation>('SELECT * FROM orbit_conversations WHERE user_id=?', [userId]), messages: queryAll<any>('SELECT * FROM ai_schedule_messages WHERE user_id=?', [userId]), autoKnowledge: getAiPreference(userId),proactiveEnabled:queryOne<any>('SELECT proactive_enabled FROM orbit_preferences WHERE user_id=?',[userId])?.proactive_enabled===1,reminderRules:queryAll<any>('SELECT * FROM orbit_schedule_reminders WHERE user_id=?',[userId]),knowledgeEvents:queryAll<any>('SELECT * FROM orbit_knowledge_events WHERE user_id=?',[userId]),proactiveEvents:queryAll<any>('SELECT * FROM orbit_proactive_events WHERE user_id=?',[userId]) };
 }
-export function restoreOrbit(userId: string, data: Pick<ReturnType<typeof exportOrbit>,'conversations'|'messages'|'autoKnowledge'> & Partial<ReturnType<typeof exportOrbit>>, mode: 'merge' | 'replace', foreign = false) {
+export function restoreOrbit(userId: string, data: Pick<ReturnType<typeof exportOrbit>,'conversations'|'messages'|'autoKnowledge'> & Partial<ReturnType<typeof exportOrbit>>, mode: 'merge' | 'replace', foreign = false,attachmentIds=new Map<string,string>()) {
     if (!data || !Array.isArray(data.conversations) || !Array.isArray(data.messages))
         throw new Error('会话备份格式不正确');
     const ids = new Map<string, string>();
+    const messageIds=new Map<string,string>();
     for (const item of data.conversations) {
         if (typeof item.id !== 'string' || typeof item.title !== 'string')
             throw new Error('会话备份格式不正确');
@@ -138,6 +139,7 @@ export function restoreOrbit(userId: string, data: Pick<ReturnType<typeof export
     if (queryOne('SELECT id FROM orbit_requests WHERE user_id=? AND state IN (\'queued\',\'running\')', [userId]))
         throw new Error('请先取消进行中的聊天请求再恢复');
     if (mode === 'replace') {
+        for(const table of ['orbit_attachments','orbit_message_attachments','orbit_request_steps'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
         for(const table of ['orbit_schedule_reminders','orbit_knowledge_events','orbit_proactive_events'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
         run('DELETE FROM orbit_requests WHERE user_id=?', [userId]);
         run('DELETE FROM ai_schedule_messages WHERE user_id=?', [userId]);
@@ -155,6 +157,7 @@ export function restoreOrbit(userId: string, data: Pick<ReturnType<typeof export
     const fallback = ensureDefaultConversation(userId);
     for (const m of data.messages) {
         const id = foreign ? randomUUID() : m.id;
+        messageIds.set(m.id,id);
         const existing = queryOne<{
             user_id: string;
         }>('SELECT user_id FROM ai_schedule_messages WHERE id=?', [id]);
@@ -164,6 +167,18 @@ export function restoreOrbit(userId: string, data: Pick<ReturnType<typeof export
             run('INSERT INTO ai_schedule_messages (id,user_id,role,type,content,intent,schedule_items,plan,knowledge_sources,created_at,conversation_id,orbit_meta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [id, userId, m.role, m.type, m.content, m.intent, foreign ? null : m.schedule_items, foreign ? null : restoredPlanSnapshot(m.plan), foreign ? null : m.knowledge_sources, m.created_at, ids.get(m.conversation_id) || fallback,foreign?null:m.orbit_meta||null]);
     }
     setAiPreference(userId, data.autoKnowledge === true);
+    for(const file of data.attachments||[]) {
+      const id=attachmentIds.get(file.id)||file.id,cid=ids.get(file.conversation_id);
+      if(!cid||typeof id!=='string')throw new Error('附件备份引用无效');
+      const existing=queryOne<any>('SELECT user_id FROM orbit_attachments WHERE id=?',[id]);if(existing&&existing.user_id!==userId)throw new Error('附件编号属于其他账号');
+      if(file.extraction){if(typeof file.extraction!=='string'||file.extraction.length>1100000)throw new Error('附件解析备份超限');const parsed=JSON.parse(file.extraction);if(!Array.isArray(parsed.blocks)||parsed.blocks.length>2000||parsed.blocks.some((b:any)=>typeof b.text!=='string'||typeof b.location!=='string'))throw new Error('附件解析备份无效');}
+      run('INSERT OR IGNORE INTO orbit_attachments(id,user_id,conversation_id,state,error,extraction,created_at) VALUES (?,?,?,?,?,?,?)',[id,userId,cid,file.state==='ready'?'ready':'failed',file.state==='ready'?null:'恢复后的附件需要重试解析',file.extraction||null,file.created_at]);
+    }
+    for(const link of data.attachmentLinks||[]) {
+      const id=attachmentIds.get(link.attachment_id)||link.attachment_id,message=messageIds.get(link.message_id);
+      if(!message||!queryOne('SELECT id FROM orbit_attachments WHERE user_id=? AND id=?',[userId,id]))throw new Error('附件消息备份引用不完整');
+      run('INSERT OR IGNORE INTO orbit_message_attachments(user_id,message_id,attachment_id) VALUES (?,?,?)',[userId,message,id]);
+    }
     // Imported reminders never replay pending jobs or implicitly enable autonomous AI calls.
     if(mode==='replace')run('UPDATE orbit_preferences SET proactive_enabled=0 WHERE user_id=?',[userId]);
     if(!foreign) {

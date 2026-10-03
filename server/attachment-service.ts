@@ -25,6 +25,16 @@ function detectMime(buffer: Buffer): string | null {
   return null;
 }
 
+export function validateAttachmentBytes(mime:string,buffer:Buffer,allowDocuments=false) {
+  if(!buffer.length||buffer.length>MAX_FILE_SIZE)throw new Error('附件大小必须在 1 字节到 10MB 之间');
+  if(ALLOWED_MIME.has(mime)){if(detectMime(buffer)!==mime)throw new Error('附件内容与文件类型不一致');return;}
+  if(allowDocuments&&['text/plain','text/markdown','text/csv'].includes(mime)) {
+    const text=new TextDecoder('utf-8',{fatal:true}).decode(buffer);if(text.includes('\0'))throw new Error('不支持二进制文本');return;
+  }
+  if(allowDocuments&&['application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(mime)&&buffer.subarray(0,4).equals(Buffer.from([80,75,3,4])))return;
+  throw new Error('不支持这个附件类型');
+}
+
 export function saveBase64Attachment(input: {
   userId: string;
   completionId?: string | null;
@@ -32,13 +42,12 @@ export function saveBase64Attachment(input: {
   originalName: string;
   mimeType: string;
   base64: string;
+  allowDocuments?: boolean;
 }): activityStore.AttachmentRecord {
-  if (!ALLOWED_MIME.has(input.mimeType)) throw new Error('只支持 JPEG、PNG、WebP 和 PDF 文件');
   const cleanBase64 = input.base64.replace(/^data:[^;]+;base64,/, '');
   const buffer = Buffer.from(cleanBase64, 'base64');
-  if (!buffer.length || buffer.length > MAX_FILE_SIZE) throw new Error('附件大小必须在 1 字节到 10MB 之间');
-  const detected = detectMime(buffer);
-  if (!detected || detected !== input.mimeType) throw new Error('附件内容与文件类型不一致');
+  validateAttachmentBytes(input.mimeType,buffer,input.allowDocuments);
+  const detected=input.mimeType;
   if (activityStore.getUserAttachmentBytes(input.userId) + buffer.length > MAX_USER_BYTES) throw new Error('附件空间已达到用户配额');
   if (input.completionId && activityStore.listAttachments(input.userId, input.completionId).length >= MAX_PER_COMPLETION) {
     throw new Error('每次完成最多上传 5 个附件');
@@ -47,7 +56,7 @@ export function saveBase64Attachment(input: {
   const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
   const userDir = path.join(ROOT, input.userId.replace(/[^a-zA-Z0-9_-]/g, '_'));
   fs.mkdirSync(userDir, { recursive: true });
-  const extension = detected === 'application/pdf' ? '.pdf' : detected === 'image/png' ? '.png' : detected === 'image/webp' ? '.webp' : '.jpg';
+  const extension: string = ({'application/pdf':'.pdf','image/png':'.png','image/webp':'.webp','image/jpeg':'.jpg','text/plain':'.txt','text/markdown':'.md','text/csv':'.csv','application/vnd.openxmlformats-officedocument.wordprocessingml.document':'.docx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'.xlsx'} as Record<string,string>)[detected];
   const absolutePath = path.join(userDir, sha256 + extension);
   if (!absolutePath.startsWith(path.resolve(userDir) + path.sep)) throw new Error('附件路径不安全');
   if (!fs.existsSync(absolutePath)) fs.writeFileSync(absolutePath, buffer, { flag: 'wx' });
