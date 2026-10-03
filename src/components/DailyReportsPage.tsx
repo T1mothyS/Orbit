@@ -3,6 +3,7 @@ import { ArrowLeft, Check, FileText, Mail, MoreHorizontal, RefreshCw } from 'luc
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
+import { useReadingReturn } from '../hooks/useReadingReturn';
 
 type EmailStatus = 'DISABLED' | 'QUEUED' | 'SENT' | 'FAILED';
 type DailyReportSource = 'local' | 'cloud';
@@ -94,7 +95,7 @@ async function readError(response: Response, fallback: string): Promise<Error> {
 }
 
 export function DailyReportsPage() {
-  const { authHeaders } = useAuth();
+  const { authHeaders, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [reports, setReports] = useState<DailyReportSummary[]>([]);
@@ -104,37 +105,46 @@ export function DailyReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const viewMode = searchParams.get('view') === 'shadow' ? 'shadow' : searchParams.get('view') === 'candidates' ? 'candidates' : 'received';
+  const listRef = useRef<HTMLDivElement>(null);
+  const loadGeneration = useRef(0);
+  const [returnLimit, setReturnLimit] = useState(INITIAL_REPORT_LIMIT);
+  useReadingReturn(user?.id, `reports-list:${viewMode}`, listRef, !loading,
+    { limit: Math.max(INITIAL_REPORT_LIMIT, reports.length) }, saved => setReturnLimit(Math.min(100, saved.limit)));
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/daily-reports?limit=${INITIAL_REPORT_LIMIT}&offset=0&view=${viewMode}`, { headers: authHeaders() });
+      const response = await fetch(`/api/daily-reports?limit=${returnLimit}&offset=0&view=${viewMode}`, { headers: authHeaders() });
       if (!response.ok) throw await readError(response, '日报加载失败');
       const result = await response.json();
+      if (generation !== loadGeneration.current) return;
       setReports((result.reports || []).map(normalizeReportSummary));
       setHasMore(Boolean(result.hasMore));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : '日报加载失败');
+      if (generation === loadGeneration.current) setError(loadError instanceof Error ? loadError.message : '日报加载失败');
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
-  }, [authHeaders, viewMode]);
+  }, [authHeaders, viewMode, returnLimit]);
 
   const loadMore = async () => {
     if (loadingMore || loading || !hasMore) return;
+    const generation = loadGeneration.current;
     setLoadingMore(true);
     setError(null);
     try {
       const response = await fetch(`/api/daily-reports?limit=${HISTORY_PAGE_SIZE}&offset=${reports.length}&view=${viewMode}`, { headers: authHeaders() });
       if (!response.ok) throw await readError(response, '更多日报加载失败');
       const result = await response.json();
+      if (generation !== loadGeneration.current) return;
       setReports(current => [...current, ...(result.reports || []).map(normalizeReportSummary)]);
       setHasMore(Boolean(result.hasMore));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : '更多日报加载失败');
+      if (generation === loadGeneration.current) setError(loadError instanceof Error ? loadError.message : '更多日报加载失败');
     } finally {
-      setLoadingMore(false);
+      if (generation === loadGeneration.current) setLoadingMore(false);
     }
   };
 
@@ -155,6 +165,10 @@ export function DailyReportsPage() {
 
   const switchView = (next: 'received' | 'candidates' | 'shadow') => {
     if (next === viewMode) return;
+    ++loadGeneration.current;
+    setLoadingMore(false);
+    setLoading(true);
+    setReturnLimit(INITIAL_REPORT_LIMIT);
     setReports([]);
     setHasMore(false);
     setSearchParams(next !== 'received' ? { view: next } : {});
@@ -185,7 +199,7 @@ export function DailyReportsPage() {
   };
 
   return (
-    <div className="daily-reports-page">
+    <div className="daily-reports-page" ref={listRef} aria-busy={loading}>
       <header className="daily-reports-header">
         <div>
           <div className="daily-reports-eyebrow">PRIVATE INTELLIGENCE</div>
@@ -213,7 +227,7 @@ export function DailyReportsPage() {
         </div>
       )}
 
-      {loading ? (
+      {loading && !reports.length ? (
         <div className="daily-report-state"><RefreshCw size={22} className="spin" /><span>正在加载日报…</span></div>
       ) : error && reports.length === 0 ? (
         <div className="daily-report-state">
@@ -254,6 +268,7 @@ export function DailyReportsPage() {
                   <button
                     type="button"
                     className={`daily-report-featured-open${latest.heroImageUrl ? ' with-image' : ''}${isWidePlaceholder(latest) ? ' illustrated' : ''}`}
+                    data-reader-key={latest.id}
                     onClick={() => openReport(latest)}
                     aria-label={`打开最新的 ${formatReportDate(latest.date)} 日报`}
                   >
@@ -294,6 +309,7 @@ export function DailyReportsPage() {
                           <button
                             type="button"
                             className={`daily-report-card-open${item.heroImageUrl ? ' with-image' : ''}${isWidePlaceholder(item) ? ' illustrated' : ''}`}
+                            data-reader-key={item.id}
                             onClick={() => openReport(item)}
                             aria-label={`打开 ${formatReportDate(item.date)} 日报`}
                           >
@@ -345,7 +361,7 @@ export function DailyReportsPage() {
 export function DailyReportReaderPage() {
   // This route bypasses AppContent; restore the saved theme on direct opens too.
   useTheme();
-  const { authHeaders } = useAuth();
+  const { authHeaders, user } = useAuth();
   const navigate = useNavigate();
   const { date } = useParams<{ date: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -354,7 +370,10 @@ export function DailyReportReaderPage() {
     : undefined;
   const requestedView = searchParams.get('view') === 'candidates' ? 'candidates' : 'received';
   const shadowId = searchParams.get('shadow');
-  const [report, setReport] = useState<DailyReport | null>(null);
+  const [reportData, setReport] = useState<DailyReport | null>(null);
+  const identity = `report:${date}:${requestedSource || ''}:${requestedView}:${shadowId || ''}`;
+  const [loadedIdentity, setLoadedIdentity] = useState('');
+  const report = loadedIdentity === identity ? reportData : null;
   const [dateReports, setDateReports] = useState<DailyReportSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -362,12 +381,14 @@ export function DailyReportReaderPage() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  const readerRef = useRef<HTMLElement>(null);
+  const loadGeneration = useRef(0);
+  useReadingReturn(user?.id, identity, readerRef, !loading && !!report);
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setLoading(true);
     setError(null);
-    setReport(null);
-    setDateReports([]);
     try {
       if (!date) throw new Error('日报日期无效');
       const query = new URLSearchParams();
@@ -378,14 +399,16 @@ export function DailyReportReaderPage() {
       const response = await fetch(`/api/daily-reports/${encodeURIComponent(date)}${sourceQuery}`, { headers: authHeaders() });
       if (!response.ok) throw await readError(response, '日报加载失败');
       const result = await response.json();
+      if (generation !== loadGeneration.current) return;
+      setLoadedIdentity(identity);
       setReport(result.report ? normalizeReportSummary(result.report) as DailyReport : null);
       setDateReports((result.reports || []).map(normalizeReportSummary));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : '日报加载失败');
+      if (generation === loadGeneration.current) setError(loadError instanceof Error ? loadError.message : '日报加载失败');
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
-  }, [authHeaders, date, requestedSource, requestedView, shadowId]);
+  }, [authHeaders, date, requestedSource, requestedView, shadowId, identity]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -467,7 +490,7 @@ export function DailyReportReaderPage() {
   const sourceOptions = availableSourceReports.length ? availableSourceReports : report ? [report] : [];
 
   return (
-    <main className="daily-report-reader-page">
+    <main className="daily-report-reader-page" ref={readerRef} aria-busy={loading}>
       <div className="daily-report-reader-toolbar">
         <div className="daily-report-reader-toolbar-row">
           <button type="button" className="daily-report-back" onClick={returnToList} aria-label="返回日报列表">
@@ -490,6 +513,8 @@ export function DailyReportReaderPage() {
             </button>
             {moreMenuOpen && report && (
               <div ref={moreMenuRef} id="daily-report-more-menu" className="daily-report-more-menu" role="menu" aria-label="日报更多操作">
+                <button type="button" role="menuitem" className="daily-report-send-button daily-report-menu-send" disabled={loading}
+                  onClick={() => { setMoreMenuOpen(false); void load(); }}><RefreshCw size={14} />刷新正文</button>
                 <div className="daily-report-menu-field">
                   <span className="daily-report-menu-label">来源</span>
                   <div className="daily-report-source-menu-list" aria-label="来源与接收状态">
@@ -536,9 +561,13 @@ export function DailyReportReaderPage() {
         </div>
       </div>
 
-      {loading ? (
+      {error && report && <div className="daily-report-notice" role="alert">
+        <span>{error}。已保留当前内容。</span>
+        <button type="button" className="daily-report-retry-button" onClick={() => void load()} disabled={loading}>重试刷新</button>
+      </div>}
+      {loading && !report ? (
         <div className="daily-report-reader-state"><RefreshCw size={22} className="spin" /><span>正在加载日报…</span></div>
-      ) : error ? (
+      ) : error && !report ? (
         <div className="daily-report-reader-state" role="alert">
           <FileText size={30} />
           <strong>日报暂时无法加载</strong>

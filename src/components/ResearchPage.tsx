@@ -123,7 +123,7 @@ export function ResearchPage() {
         </button>
       </header>
       {error && <div className="research-error" role="alert">{error}<button type="button" onClick={() => void load()}>重试</button></div>}
-      {loading ? <div className="research-state" role="status">正在加载研究记录…</div> : (
+      {loading && !runs.length && !proposals.length ? <div className="research-state" role="status">正在加载研究记录…</div> : (
         <div className="research-grid">
           <section aria-labelledby="research-history-title">
             <h2 id="research-history-title">研究历史</h2>

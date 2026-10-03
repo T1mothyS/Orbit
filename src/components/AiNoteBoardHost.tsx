@@ -51,8 +51,15 @@ export function useAiNoteBoard({ initialNoteId }: UseAiNoteBoardOptions): AiNote
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(() => (
-    typeof window !== 'undefined' && window.matchMedia('(min-width: 861px)').matches
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1101px)').matches
   ));
+
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 1101px)');
+    const collapse = () => { if (!desktop.matches) setDrawerOpen(false); };
+    desktop.addEventListener('change', collapse);
+    return () => desktop.removeEventListener('change', collapse);
+  }, []);
 
   useEffect(() => {
     if (initialNoteId) setDrawerOpen(true);
@@ -242,9 +249,6 @@ export function AiNoteBoardHost({ controller, aiBusy = false }: {
         onOptimize={controller.optimize}
         onRevertOptimization={controller.revertOptimization}
       />
-      {controller.drawerOpen && (
-        <button type="button" className="note-board-scrim" onClick={controller.closeDrawer} aria-label="关闭记事板" />
-      )}
     </>
   );
 }

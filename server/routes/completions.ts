@@ -98,12 +98,12 @@ export function createCompletionsRouter({ authenticate }: Pick<ReturnType<typeof
     try {
       const completion = activityStore.updateCompletion(req.params.id, (req as any).user.userId, {
         completedAt: req.body.completedAt ? String(req.body.completedAt) : undefined,
-        note: req.body.note === undefined ? undefined : String(req.body.note),
+        note: req.body.note === undefined ? undefined : req.body.note === null ? null : String(req.body.note),
         amountCents: req.body.amountCents === undefined
           ? undefined
           : req.body.amountCents == null ? null : Number(req.body.amountCents),
         currency: req.body.currency === undefined ? undefined : String(req.body.currency),
-        billDate: req.body.billDate === undefined ? undefined : String(req.body.billDate),
+        billDate: req.body.billDate === undefined ? undefined : req.body.billDate === null ? null : String(req.body.billDate),
       });
       if (!completion) return res.status(404).json({ error: '完成记录不存在' });
       res.json({ completion });

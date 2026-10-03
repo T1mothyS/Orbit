@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useDialogLifecycle } from '../hooks/useDialogLifecycle';
 import { ScheduleFormModal } from './calendar/ScheduleFormModal';
 import type { Schedule } from './calendar/schedule-types';
 import '../styles/unscheduled.css';
@@ -16,6 +17,8 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [closing, setClosing] = useState(false);
+  useDialogLifecycle(dialog);
   const [editing, setEditing] = useState<Schedule | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [history, setHistory] = useState<Completion[]>([]);
@@ -28,7 +31,8 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
   const dismiss = () => {
     if (busy) return;
     if (editing) { dismissEditor(); return; }
-    onClose();
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) onClose();
+    else setClosing(true);
   };
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -40,7 +44,6 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
     } catch (e) { setError(e instanceof Error ? e.message : '加载待办失败'); }
     finally { setLoading(false); }
   }, [authHeaders]);
-  useEffect(() => { const previous = document.activeElement as HTMLElement | null; dialog.current?.showModal(); return () => { previous?.focus(); }; }, []);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     if (!selected) return;
@@ -70,7 +73,8 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
   const visible = rows.filter(row => (filter === 'all' || row.is_completed === (filter === 'completed'))
     && [row.title, row.description, row.notes].some(text => (text || '').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())))
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id));
-  return createPortal(<dialog ref={dialog} className="unscheduled-drawer" aria-labelledby="unscheduled-title"
+  return createPortal(<dialog ref={dialog} className={`unscheduled-drawer${closing ? ' is-closing' : ''}`} aria-labelledby="unscheduled-title"
+    onAnimationEnd={event => { if (closing && event.target === event.currentTarget) onClose(); }}
     onCancel={event => { event.preventDefault(); dismiss(); }}
     onClick={event => {
       if (event.target !== event.currentTarget) return;
@@ -87,7 +91,7 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
     </div>
     {error && <div role="alert">{error}<button className="secondary-button" disabled={busy || loading} onClick={() => void load()}>重新加载</button></div>}
     <div className="unscheduled-list" aria-busy={loading || busy}>
-      {loading ? <p role="status">正在加载待办…</p> : visible.length === 0 ? <p>没有符合条件的待办</p> : visible.map(row => <article key={row.id}>
+      {loading && !rows.length ? <p role="status">正在加载待办…</p> : visible.length === 0 ? <p>没有符合条件的待办</p> : visible.map(row => <article key={row.id}>
         <h3>{row.title}</h3><p>{row.is_completed ? '已完成' : '未完成'} · {{ high: '高', medium: '中', low: '低' }[row.priority]}优先级</p>
         <div className="unscheduled-actions">
           <button className="secondary-button" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>详情</button>

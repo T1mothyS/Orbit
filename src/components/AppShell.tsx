@@ -1,15 +1,15 @@
 import { ReactNode } from 'react';
-import { BellRing, BookOpen, Moon, Newspaper, Settings, Shield, Sun, type LucideIcon } from 'lucide-react';
+import { Bot, CalendarDays, CircleArrowRight, Repeat2, BookOpen, Moon, Newspaper, Settings, Shield, Sun, type LucideIcon } from 'lucide-react';
 import { GlobalSearch } from './GlobalSearch';
 
 type Section = 'today' | 'schedule' | 'assistant' | 'reminders' | 'reports' | 'library';
 
 const productNavItems: Array<{ section: Section; label: string; icon?: string; Icon?: LucideIcon }> = [
-  { section: 'assistant', label: 'AI 对话', icon: '/navigation-icons/assistant.png' },
+  { section: 'assistant', label: 'AI 对话', Icon: Bot },
 
-  { section: 'today', label: '今日', icon: '/navigation-icons/today.png' },
-  { section: 'schedule', label: '日程', icon: '/navigation-icons/schedule.png' },
-  { section: 'reminders', label: '周期提醒', icon: '/navigation-icons/reminders.png' },
+  { section: 'today', label: '今日', Icon: CircleArrowRight },
+  { section: 'schedule', label: '日程', Icon: CalendarDays },
+  { section: 'reminders', label: '周期提醒', Icon: Repeat2 },
   { section: 'reports', label: '日报', Icon: Newspaper },
   { section: 'library', label: '知识库', Icon: BookOpen },
 ];
@@ -58,6 +58,7 @@ export function AppShell({
               onClick={() => onSectionChange(item.section)}
               title={item.label}
               aria-label={item.label}
+              aria-current={activeSection === item.section ? 'page' : undefined}
             >
               {item.icon ? <img className="product-nav-image" src={item.icon} alt="" aria-hidden="true" /> : item.Icon ? <item.Icon className="product-nav-lucide" size={26} strokeWidth={1.8} aria-hidden="true" /> : null}
               <span className="product-nav-label">{item.label}</span>

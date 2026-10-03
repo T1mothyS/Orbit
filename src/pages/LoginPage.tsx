@@ -6,6 +6,7 @@ import { useLocation } from 'react-router-dom';
 
 import { Button, Input, MessagePlugin } from 'tdesign-react';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../hooks/useTheme';
 
 type Mode = 'login' | 'register';
 
@@ -23,6 +24,7 @@ function getSafeNextPath(pathname: string, search: string): string | null {
 }
 
 export function LoginPage() {
+  useTheme();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,6 +35,7 @@ export function LoginPage() {
   const [codeCountdown, setCodeCountdown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
 
   const { login, register, sendRegisterCode, isAuthenticated } = useAuth();
   const location = useLocation();
@@ -81,6 +84,8 @@ export function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    setError('');
     if (mode === 'login') {
       if (!email || !password) {
         MessagePlugin.warning('请填写邮箱和密码');
@@ -93,7 +98,7 @@ export function LoginPage() {
         // 强制刷新确保所有全局状态重置
         window.location.href = nextPath || '/assistant';
       } catch (e: any) {
-        MessagePlugin.error(e.message);
+        setError(e.message || '登录失败，请重试');
       } finally {
         setLoading(false);
       }
@@ -115,7 +120,7 @@ export function LoginPage() {
         await register(email, password, code, inviteCode);
         MessagePlugin.success('注册成功！');
       } catch (e: any) {
-        MessagePlugin.error(e.message);
+        setError(e.message || '注册失败，请重试');
       } finally {
         setLoading(false);
       }
@@ -123,90 +128,95 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+    <div className="orbit-login-page min-h-screen flex flex-col">
       <main className="flex flex-1 items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src="/orbit-logo.png" alt="Orbit" className="orbit-login-logo" /><h1 className="text-3xl font-bold text-white mb-1">Orbit</h1>
-          <p className="text-white/70 text-sm">以对话为入口，管理你的个人事务</p>
+          <img src="/orbit-logo.png" alt="" className="orbit-login-logo" /><h1 className="text-3xl font-bold mb-1">Orbit</h1>
+          <p className="text-sm">以对话为入口，管理你的个人事务</p>
         </div>
 
         {/* 表单卡片 */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+        <div className="orbit-login-card p-8">
           {/* Tab 切换 */}
           <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
             <button
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${mode === 'login' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => setMode('login')}
+              onClick={() => { setMode('login'); setError(''); }} disabled={loading || sending} aria-pressed={mode === 'login'}
             >
               登录
             </button>
             <button
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${mode === 'register' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => setMode('register')}
+              onClick={() => { setMode('register'); setError(''); }} disabled={loading || sending} aria-pressed={mode === 'register'}
             >
               注册
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>邮箱</label>
+            {error && <p className="orbit-inline-error" role="alert">{error}</p>}
+            <label className="block">
+              <span className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>邮箱</span>
               <Input
+                autocomplete="email"
                 value={email}
                 onChange={(v) => setEmail(v as string)}
                 placeholder="请输入邮箱地址"
                 size="large"
               />
-            </div>
+            </label>
 
-            <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>密码</label>
+            <label className="block">
+              <span className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>密码</span>
               <Input
                 value={password}
                 onChange={(v) => setPassword(v as string)}
-                placeholder={mode === 'register' ? '至少6位' : '请输入密码'}
+                placeholder={mode === 'register' ? '至少8位' : '请输入密码'}
+                autocomplete={mode === 'register' ? 'new-password' : 'current-password'}
                 size="large"
                 type="password"
               />
-            </div>
+            </label>
 
             {mode === 'register' && (
               <>
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>确认密码</label>
+                <label className="block">
+                  <span className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>确认密码</span>
                   <Input
                     value={confirmPassword}
                     onChange={(v) => setConfirmPassword(v as string)}
                     placeholder="再次输入密码"
                     size="large"
                     type="password"
+                    autocomplete="new-password"
                   />
-                </div>
+                </label>
 
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>邀请码</label>
+                <label className="block">
+                  <span className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>邀请码</span>
                   <Input
                     value={inviteCode}
                     onChange={(v) => setInviteCode(v as string)}
                     placeholder="请输入邀请码"
                     size="large"
                   />
-                </div>
+                </label>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>邮箱验证码</label>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
+                  <div className="flex gap-2 items-end">
+                    <label className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>邮箱验证码</span>
                       <Input
                         value={code}
                         onChange={(v) => setCode(v as string)}
                         placeholder="输入6位验证码"
                         size="large"
                         maxlength={6}
+                        autocomplete="one-time-code"
                       />
-                    </div>
+                    </label>
                     <Button
                       onClick={handleSendCode}
                       loading={sending}
@@ -232,7 +242,7 @@ export function LoginPage() {
               block
               size="large"
               loading={loading}
-              style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)', color: '#fff', border: 'none', marginTop: '8px' }}
+              style={{ background: 'var(--td-brand-color)', color: '#fff', border: 'none', marginTop: '8px' }}
             >
               {mode === 'login' ? '登 录' : '完 成 注 册'}
             </Button>
@@ -247,13 +257,13 @@ export function LoginPage() {
           )}
         </div>
 
-          <p className="text-center text-white/50 text-xs mt-6">
+          <p className="text-center text-xs mt-6">
             Orbit © 2026
           </p>
         </div>
       </main>
 
-      <footer className="flex-none px-4 pb-5 text-center text-xs text-white/60">
+      <footer className="flex-none px-4 pb-5 text-center text-xs">
         <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
           冀ICP备2026028167号
         </a>

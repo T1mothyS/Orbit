@@ -11,14 +11,19 @@ export function OrbitComposerMenu({ ai, onClose, onAttach, onNew, children, busy
   const dialog = useRef<HTMLDialogElement>(null);
   useDialogLifecycle(dialog);
   const [view, setView] = useState<'tools' | 'models' | 'history'>('tools');
+  const [closing, setClosing] = useState(false);
+  const close = () => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) onClose();
+    else setClosing(true);
+  };
   useLayoutEffect(() => { dialog.current?.querySelector<HTMLElement>('#orbit-composer-menu-title')?.focus(); }, [view]);
   const selected = ai.models.find(model => model.id === ai.model);
-  return createPortal(<dialog ref={dialog} className="orbit-dialog-viewport orbit-composer-overlay" aria-labelledby="orbit-composer-menu-title"
-    onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="orbit-composer-menu">
+  return createPortal(<dialog ref={dialog} className={`orbit-dialog-viewport orbit-composer-overlay${closing ? ' is-closing' : ''}`} aria-labelledby="orbit-composer-menu-title"
+    onCancel={event => { event.preventDefault(); event.stopPropagation(); close(); }} onClick={event => { if (event.target === event.currentTarget) close(); }}>
+    <section className="orbit-composer-menu" onAnimationEnd={event => { if (closing && event.target === event.currentTarget) onClose(); }}>
       <header>{view !== 'tools' && <button type="button" aria-label="返回更多功能" onClick={() => setView('tools')}><ArrowLeft size={18} /></button>}
         <h2 id="orbit-composer-menu-title" tabIndex={-1}>{view === 'tools' ? '更多功能' : view === 'models' ? '模型设置' : '历史对话'}</h2>
-        <button type="button" aria-label="关闭更多功能" onClick={onClose}><X size={18} /></button></header>
+        <button type="button" aria-label="关闭更多功能" onClick={close}><X size={18} /></button></header>
       <div className="orbit-composer-menu-body">
         {view === 'tools' ? <div className="orbit-composer-tools">
           <button type="button" onClick={() => setView('models')}><SlidersHorizontal size={20} /><span><strong>模型设置</strong><small>{ai.loading ? '正在读取模型…' : selected?.name || ai.model || '选择或连接模型'}</small></span><ChevronRight size={16} /></button>

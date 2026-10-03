@@ -28,6 +28,8 @@
 
 本机 AGENTS.local.md、DEPLOY.md、CONTINUOUS-REQUIREMENTS.md 保持忽略。DEPLOY.md 的执行地址/细节和本机记录不复制到仓库或发布包；连续记录按末尾追加，不归并重写历史。
 
+[2026-10-04 UI / Motion 实施验收](archive/engineering/ORBIT-UI-MOTION-VERIFICATION-20261004.md)：后续 1–7 项实现、逐态证据、发布和设备边界。
+
 ## 当前领域合同与操作
 
 | 文档 | 范围 |

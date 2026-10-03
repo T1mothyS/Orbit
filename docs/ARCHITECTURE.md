@@ -229,3 +229,5 @@ Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓�
 `orbit_model_capabilities` 保存按账号/Provider/模型/凭据版本的真实图片或工具验证，优先于目录声明。`POST /api/orbit/providers/probe` 仅在用户手动点击时用合成输入验证，60 秒上限，不发送个人上下文；失败不写“支持”。清空/删除账号删除新表与本地 ChatGPT 凭据；远程应用授权需用户另在 ChatGPT 账户确认撤销。恢复缺失文件不创建幽灵附件引用。
 
 认证事件流 `GET /api/orbit/requests/:id/events` 在每次更新检查 token 到期、账号禁用及 auth_version，流断开回查持久请求并保留轮询降级。失败项重试创建新的有期限草稿，只复制失败操作并保留原指纹；旧草稿保存 retryPlanId，重复请求不复制成功项。
+
+完成记录 `PUT /api/completions/:id` 继续校验账号归属。可选 note/billDate 的 null 或空字符串表示清空，省略表示保留；日期非法拒绝更新，不能把 null 转成字面文本。前端分别呈现登记完成、证明上传和失败恢复，附件失败不重新创建已成功的完成记录；网络超时结果仍未知。

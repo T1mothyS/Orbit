@@ -1,7 +1,8 @@
 import { BookOpen, Download, RefreshCw, Search, SlidersHorizontal } from 'lucide-react';
-import { lazy, useCallback, useEffect, useState } from 'react';
+import { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useReadingReturn } from '../hooks/useReadingReturn';
 import { FeatureBoundary } from './FeatureBoundary';
 import { DEFAULT_LIBRARY_SORT, downloadResponse, formatTime, isLibrarySort, kindLabels, LibraryEntry, LibraryKind, LibrarySort, LibraryType, readError, sortLabels, statusLabels, typeLabels } from './library/library-shared';
 import './library/library.css';
@@ -9,7 +10,7 @@ import './library/library.css';
 const LibraryDetailPage = lazy(() => import('./library/LibraryDetailPage').then(module => ({ default: module.LibraryDetailPage })));
 
 function LibraryHomePage() {
-  const { authHeaders } = useAuth();
+  const { authHeaders, user } = useAuth();
   const navigate = useNavigate();
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
   const [total, setTotal] = useState(0);
@@ -24,6 +25,12 @@ function LibraryHomePage() {
   const [preferenceError, setPreferenceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const loadGeneration = useRef(0);
+  useReadingReturn(user?.id, 'library-list', listRef, !loading && sortPreferenceReady,
+    { searchText, query, kind, type, status }, saved => {
+      setSearchText(saved.searchText); setQuery(saved.query); setKind(saved.kind); setType(saved.type); setStatus(saved.status);
+    });
 
   const loadPreference = useCallback(async () => {
     setSortPreferenceReady(false);
@@ -45,6 +52,7 @@ function LibraryHomePage() {
   }, [authHeaders]);
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setLoading(true);
     setError(null);
     try {
@@ -53,12 +61,13 @@ function LibraryHomePage() {
       const response = await fetch(`/api/library?${params.toString()}`, { headers: authHeaders() });
       if (!response.ok) throw await readError(response, '知识库加载失败');
       const data = await response.json();
+      if (generation !== loadGeneration.current) return;
       setEntries(data.items || []);
       setTotal(Number(data.total || 0));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : '知识库加载失败');
+      if (generation === loadGeneration.current) setError(loadError instanceof Error ? loadError.message : '知识库加载失败');
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
   }, [authHeaders, kind, query, sort, status, type]);
 
@@ -99,16 +108,15 @@ function LibraryHomePage() {
   };
 
   return (
-    <div className="library-page">
+    <div className="library-page" ref={listRef} aria-busy={loading}>
       <header className="library-header">
         <div>
-          <span className="library-eyebrow">READ-ONLY LIBRARY</span>
           <h1>知识库</h1>
-          <p>内容在本地知识库 V2 加工后发布；这里负责阅读、评论、关联查看和导出。</p>
+          <p>阅读、回顾，连接你的知识。</p>
         </div>
         <div className="library-header-actions">
           <button type="button" className="library-secondary-button" onClick={() => void load()} disabled={loading}><RefreshCw size={14} className={loading ? 'spin' : undefined} />刷新</button>
-          <button type="button" className="library-primary-button" onClick={() => void downloadFullExport()}><Download size={14} />导出全库</button>
+          <button type="button" className="library-secondary-button" onClick={() => void downloadFullExport()}><Download size={14} />导出全库</button>
         </div>
       </header>
 
@@ -143,7 +151,7 @@ function LibraryHomePage() {
       </section>
 
       <div className="library-list-meta"><span>{loading ? '正在加载…' : `显示 ${entries.length} 条，共 ${total} 条`}</span><span>当前按{sortLabels[sort]}</span></div>
-      {loading ? (
+      {loading && !entries.length ? (
         <div className="library-state"><RefreshCw size={24} className="spin" /><span>正在加载知识库…</span></div>
       ) : entries.length ? (
         <div className="library-grid">
@@ -160,7 +168,7 @@ function LibraryCard({ entry, onOpen }: { entry: LibraryEntry; onOpen: () => voi
   const displayTitle = entry.title || entry.summary || '未命名知识碎片';
   return (
     <article className={`library-card ${entry.kind}`}>
-      <button type="button" className="library-card-open" onClick={onOpen} aria-label={`打开 ${displayTitle}`}>
+      <button type="button" className="library-card-open" data-reader-key={entry.id} onClick={onOpen} aria-label={`打开 ${displayTitle}`}>
         <div className="library-card-topline"><span className={`library-kind-badge ${entry.kind}`}>{kindLabels[entry.kind]}</span><span className="library-type-label">{typeLabels[entry.type]}</span></div>
         <h2>{displayTitle}</h2>
         <p>{entry.summary || '暂无摘要，打开正文查看。'}</p>

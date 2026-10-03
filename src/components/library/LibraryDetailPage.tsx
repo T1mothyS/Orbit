@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useReadingReturn } from '../../hooks/useReadingReturn';
 import { buildLibraryToc, copyText, downloadResponse, formatTime, kindLabels, LibraryDetail, LibraryTocItem, readError, relationItems, relationStatusLabels, richContentSource, showRichContentError, statusLabels, typeLabels } from './library-shared';
 
 let libraryMermaidRenderId = 0;
@@ -18,7 +19,7 @@ function getLibraryTocOffset(scrollRoot: HTMLElement | null, toc: HTMLElement | 
 }
 
 export function LibraryDetailPage({ id }: { id: string }) {
-  const { authHeaders } = useAuth();
+  const { authHeaders, user } = useAuth();
   const navigate = useNavigate();
   const [detail, setDetail] = useState<LibraryDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,8 +27,10 @@ export function LibraryDetailPage({ id }: { id: string }) {
   const [comment, setComment] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
   const [tocItems, setTocItems] = useState<LibraryTocItem[]>([]);
+  const [tocReady, setTocReady] = useState(false);
   const [activeTocId, setActiveTocId] = useState<string | null>(null);
   const detailPageRef = useRef<HTMLDivElement | null>(null);
+  useReadingReturn(user?.id, `library:${id}`, detailPageRef, !loading && !!detail && tocReady);
   const markdownRef = useRef<HTMLDivElement | null>(null);
   const tocRef = useRef<HTMLElement | null>(null);
   const loadGenerationRef = useRef(0);
@@ -54,6 +57,7 @@ export function LibraryDetailPage({ id }: { id: string }) {
   useEffect(() => {
     setDetail(null);
     setTocItems([]);
+    setTocReady(false);
     setActiveTocId(null);
     setComment('');
     setError(null);
@@ -169,6 +173,7 @@ export function LibraryDetailPage({ id }: { id: string }) {
     if (!root || !detail) return;
     const nextItems = buildLibraryToc(root, entryTitle);
     setTocItems(nextItems);
+    setTocReady(true);
     setActiveTocId(nextItems[0]?.id || null);
   }, [detail, entryTitle]);
 
@@ -249,7 +254,7 @@ export function LibraryDetailPage({ id }: { id: string }) {
     const nextTop = needsVerticalScroll
       ? Math.min(toc.scrollHeight - toc.clientHeight, Math.max(0, toc.scrollTop + targetRect.top - tocRect.top - (toc.clientHeight - targetRect.height) / 2))
       : toc.scrollTop;
-    toc.scrollTo({ left: nextLeft, top: nextTop, behavior: 'smooth' });
+    toc.scrollTo({ left: nextLeft, top: nextTop, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }, [activeTocId]);
 
   const exportMarkdown = async () => {
@@ -296,7 +301,7 @@ export function LibraryDetailPage({ id }: { id: string }) {
     const maxScrollTop = Math.max(0, scrollRoot.scrollHeight - scrollRoot.clientHeight);
     const targetTop = scrollRoot.scrollTop + heading.getBoundingClientRect().top - rootRect.top - tocOffset - 4;
     const top = Math.min(maxScrollTop, Math.max(0, targetTop));
-    scrollRoot.scrollTo({ top, behavior: 'smooth' });
+    scrollRoot.scrollTo({ top, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     setActiveTocId(item.id);
   };
 
@@ -322,7 +327,7 @@ export function LibraryDetailPage({ id }: { id: string }) {
 
   const readerBack = <button type="button" className="library-back-button library-reader-back" onClick={() => navigate('/library')}><ArrowLeft size={20} aria-hidden="true" />返回</button>;
   const readerStateNav = <nav className="library-reader-state-nav" aria-label="阅读导航">{readerBack}</nav>;
-  if (loading) return <div className="library-page library-detail-page">{readerStateNav}<div className="library-state"><RefreshCw size={24} className="spin" /><span>正在加载知识详情…</span></div></div>;
+  if (loading && !detail) return <div className="library-page library-detail-page">{readerStateNav}<div className="library-state"><RefreshCw size={24} className="spin" /><span>正在加载知识详情…</span></div></div>;
   if (error && !detail) return <div className="library-page library-detail-page">{readerStateNav}<div className="library-state" role="alert"><BookOpen size={30} /><strong>知识详情暂时无法加载</strong><span>{error}</span><button type="button" className="library-secondary-button" onClick={() => void load()}>重试</button></div></div>;
   if (!detail) return null;
   const entry = detail.entry;
@@ -343,7 +348,7 @@ export function LibraryDetailPage({ id }: { id: string }) {
         <div className="library-card-topline"><span className={`library-kind-badge ${entry.kind}`}>{kindLabels[entry.kind]}</span><span className="library-type-label">{typeLabels[entry.type]}</span><span className="library-status-label">{statusLabels[entry.status]}</span></div>
         <h1>{title}</h1>
         <p>{entry.summary}</p>
-        <div className="library-detail-meta"><span>更新于 {formatTime(entry.updatedAt)}</span><span>来源：{entry.sourceType}</span>{entry.tags.map(tag => <span className="library-tag" key={tag}>#{tag}</span>)}</div>
+        <div className="library-detail-meta"><span>更新于 {formatTime(entry.updatedAt)}</span><span>{entry.sourceType === 'manual' ? '手动整理' : '知识条目'}</span>{entry.tags.map(tag => <span className="library-tag" key={tag}>#{tag}</span>)}</div>
       </header>
       <div className="library-detail-layout">
           <nav ref={tocRef} className={`library-toc${tocItems.length ? '' : ' library-toc-empty'}`} aria-label="文章章节导航">
@@ -369,16 +374,18 @@ export function LibraryDetailPage({ id }: { id: string }) {
           <div ref={markdownRef} className="chat-markdown library-markdown" onClick={handleMarkdownClick} dangerouslySetInnerHTML={{ __html: entry.html || '' }} />
         </article>
         <aside className="library-detail-aside">
-          <section className="library-aside-card"><strong>内容信息</strong><dl><dt>内容 ID</dt><dd>{entry.id}</dd><dt>sourceId</dt><dd>{entry.sourceId || '—'}</dd><dt>哈希</dt><dd>{entry.contentHash.slice(0, 16)}…</dd><dt>创建</dt><dd>{formatTime(entry.createdAt)}</dd><dt>版本</dt><dd>{detail.versions.length || '—'}</dd></dl></section>
-          <section className="library-aside-card"><strong><Link2 size={14} />关联</strong><p className="library-relation-help">关联由知识库 V2 的 <code>relations.json</code> 维护。已确认可直接查看目标，待确认仅供复核，未解析不会伪装成链接。</p>{relations.length ? <div className="library-relation-list">{relations.map((relation, index) => <div className="library-relation" key={`${relation.targetSourceId}-${index}`}><span className={`library-relation-status ${relation.status}`}>{relationStatusLabels[relation.status]}</span><span>{relation.label}</span>{relation.targetEntryId ? <Link className="library-relation-target" to={`/library/${encodeURIComponent(relation.targetEntryId)}`}>{relation.targetTitle || relation.targetSourceId}</Link> : <span className="library-relation-unresolved">{relation.targetStatus === 'archived' ? '目标已归档' : '目标尚未解析'}</span>}<code>{relation.targetSourceId}</code></div>)}</div> : <p>当前没有本地关联。</p>}</section>
-          <section className="library-aside-card"><strong>来源</strong><p>{entry.sourceRef || '本地知识库 V2 发布'}</p>{entry.sourceUrl && <a href={entry.sourceUrl} target="_blank" rel="noreferrer">打开来源</a>}</section>
+
+          <section className="library-aside-card"><strong><Link2 size={14} />关联</strong><p className="library-relation-help">关联由知识库 V2 的 <code>relations.json</code> 维护。已确认可直接查看目标，待确认仅供复核，未解析不会伪装成链接。</p>{relations.length ? <div className="library-relation-list">{relations.map((relation, index) => <div className="library-relation" key={`${relation.targetSourceId}-${index}`}><span className={`library-relation-status ${relation.status}`}>{relationStatusLabels[relation.status]}</span><span>{relation.label}</span>{relation.targetEntryId ? <Link className="library-relation-target" to={`/library/${encodeURIComponent(relation.targetEntryId)}`}>{relation.targetTitle || '关联内容'}</Link> : <span className="library-relation-unresolved">{relation.targetStatus === 'archived' ? '目标已归档' : '目标尚未解析'}</span>}<details className="library-relation-id"><summary>关联标识</summary><code>{relation.targetSourceId}</code></details></div>)}</div> : <p>当前没有本地关联。</p>}</section>
+          <section className="library-aside-card"><strong>来源</strong><p>{entry.sourceRef && entry.sourceRef !== entry.sourceId ? entry.sourceRef : '已保存来源'}</p>{entry.sourceUrl && <a href={entry.sourceUrl} target="_blank" rel="noreferrer">打开来源</a>}</section>
+
+          <details className="library-aside-card library-technical"><summary>技术信息</summary><dl><dt>内容 ID</dt><dd>{entry.id}</dd><dt>sourceId</dt><dd>{entry.sourceId || '—'}</dd><dt>哈希</dt><dd>{entry.contentHash.slice(0, 16)}…</dd><dt>创建</dt><dd>{formatTime(entry.createdAt)}</dd><dt>版本</dt><dd>{detail.versions.length || '—'}</dd></dl></details>
         </aside>
       </div>
 
-      <section className="library-versions">
+      <details className="library-versions"><summary>版本记录 · {detail.versions.length} 个版本</summary>
         <div className="library-section-heading"><div><span className="library-eyebrow">VERSIONS</span><h2>版本记录</h2></div><span>{detail.versions.length} 个版本</span></div>
         {detail.versions.length ? <div className="library-version-list">{detail.versions.map(version => <details key={version.id} className="library-version"><summary><span>{formatTime(version.createdAt)}</span><code>{version.contentHash.slice(0, 16)}…</code></summary><pre>{version.content}</pre></details>)}</div> : <div className="library-comment-empty">暂无历史版本。</div>}
-      </section>
+      </details>
 
       <section className="library-comments">
         <div className="library-section-heading"><div><span className="library-eyebrow">REFLECTIONS</span><h2>评论与补充</h2></div><span>{detail.comments.length} 条</span></div>

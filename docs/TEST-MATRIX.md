@@ -1,10 +1,12 @@
 # Orbit 测试与验收矩阵
 
 - Status: LIVING；职责：测试入口、风险覆盖及各层证据边界。
-- 当前验收对象：Orbit P0–P7 基础升级候选；版本源为 package.json，具体结果见下方日期记录。
+- 当前验收对象：Orbit 基础升级与 UI/Motion 专项；版本源为 package.json，具体结果见日期记录。
 - 历史逐次数量、回放、截图和生产记录已集中到 [归档矩阵](archive/engineering/TEST-MATRIX-20261001.md)。历史通过不代表当前 HEAD 通过。
 
 ## 本地验证
+
+2026-10-04 UI / Motion 后续 1–7 项的冻结自动/逐态/生产与设备边界见 [本轮快照](archive/engineering/ORBIT-UI-MOTION-VERIFICATION-20261004.md)。四尺寸模拟、合成账号、真实 AI 和物理手机是不同证据层。
 
 | 入口 | 必须覆盖/证明 |
 | --- | --- |

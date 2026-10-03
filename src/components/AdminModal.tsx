@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
 CopyIcon,
 DeleteIcon,
@@ -46,8 +47,8 @@ interface LogEntry {
   data?: any;
 }
 
-const PRODUCTION_INVITE_COMMAND = `$sshKey = 'C:\\Users\\Elysia\\.ssh\\gotimothy_online_ed25519'
-& ssh -i $sshKey root@47.95.114.137 "grep -E '^(ADMIN_INVITE_CODE|USER_INVITE_CODE)=' /root/smart-schedule-agent/.env"`;
+const PRODUCTION_INVITE_COMMAND = `# 在服务器的项目目录中执行；邀请码仅在本机控制台查看
+grep -E '^(ADMIN_INVITE_CODE|USER_INVITE_CODE)=' .env`;
 
 async function copyText(value: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
@@ -86,7 +87,6 @@ function UserManagementTab({ onClose }: { onClose?: () => void }) {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [showInviteHelp, setShowInviteHelp] = useState(false);
   const [inviteCommandCopied, setInviteCommandCopied] = useState(false);
   const [inviteStatuses, setInviteStatuses] = useState<InviteCodeStatus[]>([]);
   const [inviteLoading, setInviteLoading] = useState(true);
@@ -555,28 +555,9 @@ function UserManagementTab({ onClose }: { onClose?: () => void }) {
           </div>
         )}
 
-        <div className="admin-invite-legacy">
-          <div className="admin-invite-legacy-heading">
-            <h4>迁移期 SSH 查询（只读）</h4>
-            <div className="relative">
-              <button
-                type="button"
-                aria-label="查看生产环境邀请码查询说明"
-                aria-expanded={showInviteHelp}
-                title="查看查询说明"
-                onClick={() => setShowInviteHelp(value => !value)}
-                className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold"
-                style={{ borderColor: 'var(--td-component-stroke)', color: 'var(--td-text-color-secondary)' }}
-              >
-                ?
-              </button>
-              {showInviteHelp && (
-                <div role="tooltip" className="absolute left-0 top-7 z-10 w-80 max-w-[calc(100vw-3rem)] rounded-lg border p-2 text-xs leading-5 shadow-lg" style={{ borderColor: 'var(--td-component-stroke)', color: 'var(--td-text-color-secondary)', backgroundColor: 'var(--td-bg-color-container)' }}>
-                  这条命令只查看迁移期 .env 引导配置；数据库初始化或轮换后，当前生效值以数据库记录为准，网页不会读取或回显邀请码明文。
-                </div>
-              )}
-            </div>
-          </div>
+        <details className="admin-invite-legacy">
+          <summary>迁移期查询说明</summary>
+          <p>这条命令只查看迁移期 .env 引导配置；数据库初始化或轮换后，当前生效值以数据库记录为准，网页不会读取或回显邀请码明文。</p>
           <p>仅在首次迁移或服务器排障时使用，需要当前电脑已配置 SSH Key 并拥有服务器访问权限。</p>
           <pre className="admin-invite-command"><code>{PRODUCTION_INVITE_COMMAND}</code></pre>
           <div className="admin-invite-command-actions">
@@ -584,7 +565,7 @@ function UserManagementTab({ onClose }: { onClose?: () => void }) {
               {inviteCommandCopied ? '已复制' : '复制命令'}
             </Button>
           </div>
-        </div>
+        </details>
       </section>
       {/* 搜索栏 */}
       <div className="admin-toolbar mb-4">
@@ -903,21 +884,43 @@ interface AdminModalProps {
 
 export function AdminModal({ visible, onClose }: AdminModalProps) {
   const [tab, setTab] = useState('users');
+  const frame = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose); close.current = onClose;
 
   useEffect(() => {
     if (!visible) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const root = document.getElementById('root');
+    const wasInert = root?.inert ?? false;
+    if (root) root.inert = true;
+    frame.current?.querySelector<HTMLElement>('.admin-modal-close')?.focus();
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      const popups = [...document.querySelectorAll<HTMLElement>('.t-popup')].filter(popup => popup.getClientRects().length && getComputedStyle(popup).visibility !== 'hidden');
+      if (event.key === 'Escape' && !event.defaultPrevented && !popups.length) {
+        event.preventDefault(); event.stopPropagation(); close.current();
+      }
+      if (event.key !== 'Tab') return;
+      const controls = [frame.current, ...popups].flatMap(container => container ? [...container.querySelectorAll<HTMLElement>('button,input,select,textarea,a[href],[tabindex]')] : [])
+        .filter(element => element.tabIndex >= 0 && !element.matches(':disabled') && element.getClientRects().length > 0);
+      const first = controls[0], last = controls[controls.length - 1];
+      if (!controls.includes(document.activeElement as HTMLElement) || (event.shiftKey ? document.activeElement === first : document.activeElement === last)) {
+        event.preventDefault(); (event.shiftKey ? last : first)?.focus();
+      }
     };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose, visible]);
+    document.addEventListener('keydown', handleEscape, true);
+    return () => {
+      document.removeEventListener('keydown', handleEscape, true);
+      if (root) root.inert = wasInert;
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+      else document.querySelector<HTMLElement>('[aria-label="打开管理面板"]')?.focus({ preventScroll: true });
+    };
+  }, [visible]);
 
   if (!visible) return null;
 
-  return (
+  return createPortal(
     <div className="admin-modal-backdrop" onMouseDown={onClose}>
-      <div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title" onMouseDown={event => event.stopPropagation()}>
+      <div ref={frame} className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title" onMouseDown={event => event.stopPropagation()}>
         {/* 标题 */}
         <button
           type="button"
@@ -969,5 +972,5 @@ export function AdminModal({ visible, onClose }: AdminModalProps) {
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }

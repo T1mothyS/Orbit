@@ -1,5 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, CircleX, Copy, Forward, GitMerge, Sparkles, Pencil, RotateCcw, StickyNote, X } from 'lucide-react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { createPortal } from 'react-dom';
+import { useDialogLifecycle } from '../hooks/useDialogLifecycle';
+import { usePanelPresence } from '../hooks/usePanelPresence';
+import { Check, ChevronDown, ChevronRight, ChevronUp, CircleX, Copy, Forward, GitMerge, Sparkles, Pencil, RotateCcw, StickyNote, X } from 'lucide-react';
 import { formatNotesAsCsv, formatNotesAsText, noteExportFilename } from '../utils/note-export';
 import { NOTE_COLORS, NOTE_COLOR_LABELS, NOTE_COLOR_STYLES, normaliseNoteColor, type NoteColor } from '../utils/note-colors';
 
@@ -272,18 +275,38 @@ export function NoteBoard({
   const [copyFeedback, setCopyFeedback] = useState<{ id: string; kind: CopyFeedback }>({ id: '', kind: null });
   const [optimizationBusyId, setOptimizationBusyId] = useState<string | null>(null);
   const drawerRef = useRef<HTMLElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 1100px)').matches);
+  const presence = usePanelPresence(drawerOpen);
+  useDialogLifecycle(dialogRef, mobile && presence.present, '.note-board-close');
+  const [dragOffset, setDragOffset] = useState(0);
+  const drag = useRef<{ id: number; x: number; y: number } | null>(null);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1100px)');
+    const update = () => setMobile(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  const endDrag = (event: PointerEvent<HTMLDivElement>, cancel = false) => {
+    const start = drag.current;
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setDragOffset(0);
+    if (!cancel && start && event.clientX - start.x > 80 && Math.abs(event.clientY - start.y) < (event.clientX - start.x) / 2) onCloseDrawer();
+  };
   const copyTimerRef = useRef<number | null>(null);
   const optimizationAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!drawerOpen) return;
+    if (!drawerOpen || mobile) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     drawerRef.current?.querySelector<HTMLElement>('button, input, textarea')?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !document.querySelector('[aria-modal="true"]')) onCloseDrawer();
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [drawerOpen, onCloseDrawer]);
+    return () => { window.removeEventListener('keydown', onKeyDown); previous?.isConnected && previous.focus({ preventScroll: true }); };
+  }, [drawerOpen, mobile, onCloseDrawer]);
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -303,6 +326,7 @@ export function NoteBoard({
   const currentEditing = useRef(editingId);currentEditing.current=editingId;
   const startEdit = (note: NoteItem) => {
     if (optimizationBusyId === note.id) return;
+    if (editingId !== note.id && hasUnsavedEdit && !window.confirm('当前记事有未保存的修改，确定切换吗？')) return;
     setEditingId(note.id);
     setEditValue(note.content);
     setColorPickerId(null);
@@ -451,6 +475,7 @@ export function NoteBoard({
   const mergeNote = async (note: NoteItem) => {
     if (mergeBusy) return;
     if (!mergeSourceId) {
+      if (hasUnsavedEdit && !window.confirm('当前记事有未保存的修改，确定放弃并选择合并来源吗？')) return;
       setMergeSourceId(note.id);
       setEditingId(null);
       setColorPickerId(null);
@@ -526,8 +551,13 @@ export function NoteBoard({
     );
   };
 
-  return (
-    <aside id={id} ref={drawerRef} className={`note-board note-board-drawer${drawerOpen ? ' is-open' : ''}`} aria-label="AI 记事板">
+  const panel = (
+    <aside id={id} ref={drawerRef} className={`note-board note-board-drawer${presence.present ? ' is-open' : ''}`}
+      data-phase={presence.phase} data-dragging={!!dragOffset} style={dragOffset ? { transform: `translateX(${dragOffset}px)` } : undefined} aria-label="AI 记事板">
+      {mobile && <div className="note-board-drag-handle" aria-hidden="true"
+        onPointerDown={event => { if (event.button !== 0) return; drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); }}
+        onPointerMove={event => { const start = drag.current; if (!start || start.id !== event.pointerId) return; const x = event.clientX - start.x, y = Math.abs(event.clientY - start.y); if (y > 12 && y > Math.abs(x)) { endDrag(event, true); return; } if (x > 8 && x > y * 1.5) setDragOffset(Math.min(x, 220)); }}
+        onPointerUp={event => endDrag(event)} onPointerCancel={event => endDrag(event, true)} onLostPointerCapture={() => { drag.current = null; setDragOffset(0); }}><ChevronRight size={12} /><span>向右滑动关闭</span></div>}
       <div className="note-board-header">
         <div className="note-board-heading">
           <span className="note-board-heading-icon"><StickyNote size={17} /></span>
@@ -565,4 +595,7 @@ export function NoteBoard({
       <span className="sr-only">AI 优化会在当前编辑框中锁定正文并直接保存结果；优化完成后可撤回一次，手动保存新正文会建立新的撤回基线。</span>
     </aside>
   );
+  return mobile ? createPortal(<dialog ref={dialogRef} className="orbit-note-dialog" aria-label="AI 记事板" data-phase={presence.phase}
+    onCancel={event => { event.preventDefault(); event.stopPropagation(); if (colorPickerId) setColorPickerId(null); else onCloseDrawer(); }}
+    onClick={event => { if (event.target === event.currentTarget) onCloseDrawer(); }}>{panel}</dialog>, document.body) : panel;
 }
