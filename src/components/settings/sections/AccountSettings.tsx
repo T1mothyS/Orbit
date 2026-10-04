@@ -2,10 +2,12 @@ import { Button } from 'tdesign-react';
 import { SettingSection } from '../SettingSection';
 import { SettingRow } from '../SettingRow';
 import type { SettingsUser } from '../types';
+import { AvatarSettings } from './AvatarSettings';
 
 export function AccountSettings({ user, onLogout }: { user: SettingsUser; onLogout: () => void }) {
   return (
     <SettingSection id="account" title="当前账号" description="此处的设置仅用于当前登录账号。">
+      <AvatarSettings email={user.email}/>
       <SettingRow label="登录邮箱">
         <div className="settings-account">
           <strong>{user.email}</strong>

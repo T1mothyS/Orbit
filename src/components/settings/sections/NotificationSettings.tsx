@@ -208,7 +208,7 @@ export function NotificationSettings({ authHeaders, userEmail }: { authHeaders: 
             {locationResults.length > 0 && <div className="settings-location-results" aria-label="地点搜索结果">{locationResults.map(location => <button type="button" key={`${location.latitude}:${location.longitude}`} disabled={disabled} onClick={() => void saveHomeLocation(location)}><strong>{location.name}</strong><span>{[location.admin1, location.country].filter(Boolean).join(' · ')}</span></button>)}</div>}
           </div>
         </SettingRow>
-        <SettingRow label="通知渠道" description="修改渠道和免打扰后，点击“保存通知设置”。">
+        <SettingRow label="通知渠道" description="站内通知包含主动聊天提醒，统一发到 Orbit 主对话。修改渠道和免打扰后，点击“保存通知设置”。">
           <div className="settings-switches">
             <label><Switch aria-label="邮件通知" aria-checked={emailEnabled} value={emailEnabled} disabled={disabled} onChange={v => setEmailEnabled(Boolean(v))} /><span>邮件</span></label>
             <label><Switch aria-label="站内通知" aria-checked={inAppEnabled} value={inAppEnabled} disabled={disabled} onChange={v => setInAppEnabled(Boolean(v))} /><span>站内通知</span></label>
@@ -221,7 +221,9 @@ export function NotificationSettings({ authHeaders, userEmail }: { authHeaders: 
           <div className="settings-actions"><Button tag="button" loading={loadingReminder} disabled={disabled} onClick={saveReminderEmail}>保存通知设置</Button></div>
         </SettingRow>
       </fieldset>
+      <WeeklySettings/>
       <p className="settings-note">高优先级日程邮件是固定规则，不受邮件开关、免打扰和“开启每日提醒”影响。官方发件邮箱：aicalendarofficial@163.com</p>
     </SettingSection>
   );
 }
+import { WeeklySettings } from './WeeklySettings';

@@ -19,7 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import type { CreditCardConfig, GenericReminderConfig, ReminderStats, ReminderTask, ReminderTaskType, SimConfig } from '../reminder-types';
+import type { CreditCardConfig, GenericReminderConfig, ReminderStats, ReminderTask, ReminderTaskType, SimConfig,ReminderCycle } from '../reminder-types';
 import { useLocation } from 'react-router-dom';
 
 interface ReminderPageProps {
@@ -211,6 +211,8 @@ export function ReminderPage() {
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
+  const [linkedCycle,setLinkedCycle]=useState<ReminderCycle|null>(null);
+  useEffect(()=>{const q=new URLSearchParams(location.search),task=q.get('task'),cycle=q.get('cycle');setLinkedCycle(null);if(!task||!cycle)return;const c=new AbortController();void fetch('/api/cycle-reminders/'+encodeURIComponent(task)+'/history',{headers:authHeaders(),signal:c.signal}).then(async r=>{const d=await r.json();const found=d.history?.find((v:ReminderCycle)=>v.id===cycle);if(!r.ok||!found)throw new Error('周期实例不存在或无权访问');setLinkedCycle(found);}).catch(e=>{if(!c.signal.aborted)setNotice({type:'error',message:e.message});});return()=>c.abort();},[location.search,authHeaders]);
   const visibleTasks = tasks;
 
   const updateForm = (key: keyof FormState, value: string) => setForm(current => ({ ...current, [key]: value }));
@@ -218,7 +220,8 @@ export function ReminderPage() {
   const openEdit = (task: ReminderTask) => { const next = configToForm(task); formBaseline.current = JSON.stringify(next); setNotice(null); setEditing(task); setForm(next); setFormOpen(true); };
 
   useEffect(() => {
-    const taskId = new URLSearchParams(location.search).get('edit');
+    const query=new URLSearchParams(location.search);const selected=query.get('task');if(selected&&!loading&&!tasks.some(t=>t.id===selected))setNotice({type:'error',message:'周期事项不存在或无权访问'});if(selected){const element=document.getElementById('reminder-task-'+selected);element?.scrollIntoView({block:'center'});element?.classList.add('setting-search-target');}
+    const taskId = query.get('edit');
     if (!taskId || !tasks.length) return;
     const task = tasks.find(item => item.id === taskId);
     if (!task) return;
@@ -392,8 +395,8 @@ export function ReminderPage() {
             const cardConfig = task.config as CreditCardConfig;
             const simConfig = task.config as SimConfig;
             const genericConfig = task.config as GenericReminderConfig;
-            return <article className={!task.enabled ? 'task-card disabled' : 'task-card'} key={task.id}>
-              <div className="task-card-head"><div className={'task-type-icon ' + (task.type === 'credit_card' ? 'card' : task.type === 'sim' ? 'sim' : 'generic')}>{task.type === 'credit_card' ? <CreditCard size={20} /> : task.type === 'sim' ? <Smartphone size={20} /> : <Repeat2 size={20} />}</div><div className="task-title-wrap"><h3>{task.name}</h3></div><span className={'status-badge ' + status.tone}>{status.label}</span></div>
+            return <article id={'reminder-task-'+task.id} className={!task.enabled ? 'task-card disabled' : 'task-card'} key={task.id}>
+              {linkedCycle?.taskId===task.id&&<div className="settings-status" role="status">已定位周期：{linkedCycle.periodStart} — {linkedCycle.dueDate} · {statusLabel(linkedCycle.status).label}{linkedCycle.completedAt&&' · 完成 '+linkedCycle.completedAt.slice(0,10)}</div>}<div className="task-card-head"><div className={'task-type-icon ' + (task.type === 'credit_card' ? 'card' : task.type === 'sim' ? 'sim' : 'generic')}>{task.type === 'credit_card' ? <CreditCard size={20} /> : task.type === 'sim' ? <Smartphone size={20} /> : <Repeat2 size={20} />}</div><div className="task-title-wrap"><h3>{task.name}</h3></div><span className={'status-badge ' + status.tone}>{status.label}</span></div>
               <div className="task-due-block"><span>{task.type === 'credit_card' ? '本期还款日' : task.type === 'sim' ? '本次保号截止' : '本周期到期日'}</span><strong>{formatDue(cycle?.dueDate || null)}</strong><em>{remaining === null ? '—' : remaining < 0 ? '已逾期 ' + Math.abs(remaining) + ' 天' : remaining === 0 ? '今天到期' : '还有 ' + remaining + ' 天'}</em></div>
               <div className="task-details">{task.type === 'credit_card' ? <><span>账单日每月 {cardConfig.statementDay} 日</span><span>{cardConfig.paymentMonthOffset === 1 ? '次月' : '当月'} {cardConfig.paymentDay} 日还款</span><span>提前提醒：{(cardConfig.reminderOffsets || [15, 7, 1, 0]).map(value => value + ' 天').join(' · ')}</span></> : task.type === 'sim' ? <><span>{simConfig.provider || '未填写运营商'} · {simConfig.numberMasked || '未填写号码'}</span><span>每 {simConfig.intervalDays} 天检查一次</span><span>提前提醒：{(simConfig.reminderOffsets || [30, 15, 7, 1, 0]).map(value => value + ' 天').join(' · ')}</span></> : <><span>{genericConfig.actionGuide}</span><span>{genericConfig.reminderOffsets.map(value => '提前 ' + value + ' 天').join(' · ')}</span></>}</div>
               <div className="task-card-foot"><div className="task-reminder-meta"><span className="next-reminder">{task.enabled && task.nextReminderDate ? '下一提醒 ' + formatDue(task.nextReminderDate) : task.enabled ? '暂无待发送提醒' : '已暂停提醒'}</span><small className="last-reminder">{task.lastReminderDate ? '上次提醒 ' + formatDue(task.lastReminderDate) : '上次提醒：尚未发送'}</small></div><div className="card-actions">{task.enabled && cycle && cycle.status !== 'completed' && <button type="button" className="complete-button" onClick={() => { setNotice(null); setRegisteredCompletion(''); setCompleteTarget(task); setCompleteDate(today()); setCompleteNote(''); setCompleteAmount(''); setCompleteBillDate(''); setCompleteFiles([]); }}><CheckCircle2 size={15} /> 标记完成</button>}<button type="button" className="icon-button small" onClick={() => openEdit(task)} title="编辑" aria-label="编辑周期提醒"><Edit3 size={15} /></button><button type="button" className="icon-button small" onClick={() => toggleTask(task)} disabled={pendingTask === task.id} title={task.enabled ? '暂停' : '启用'} aria-label={task.enabled ? '暂停周期提醒' : '启用周期提醒'}>{task.enabled ? <PauseCircle size={15} /> : <PlayCircle size={15} />}</button><button type="button" className="icon-button small danger-button" onClick={() => deleteTask(task)} disabled={pendingTask === task.id} title="删除" aria-label="删除周期提醒"><Trash2 size={15} /></button></div></div>

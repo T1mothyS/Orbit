@@ -1,0 +1,56 @@
+import { queryAll, queryOne } from './database/connection.js';
+import { getAllSchedules } from './schedule-store.js';
+import { readReminderProjectionSources } from './reminder-store.js';
+import { listCompletions } from './activity-store.js';
+import { dateInZone,addDateDays } from './orbit-time.js';
+import { parseScheduleStart } from './notification-scheduler.js';
+import { orbitObjectPath } from '../src/utils/orbit-links.js';
+
+export function activityStatistics(userId:string,range:{startAt:string;endAt:string;timezone:string},now:Date,taskType='all') {
+  const start=Date.parse(range.startAt),end=Date.parse(range.endAt);
+  const instant=(value:string)=>parseScheduleStart(value,range.timezone)?.getTime()??NaN;
+  const inside=(value:string)=>{const at=instant(value);return at>=start&&at<end;};
+  const schedules=getAllSchedules(userId).filter(s=>!s.id.startsWith('reminder-cycle:')&&(taskType==='all'||taskType===s.type));
+  const projections=readReminderProjectionSources(userId).filter(p=>taskType==='all'||taskType==='reminder');
+  const endClock=new Intl.DateTimeFormat('en-GB',{timeZone:range.timezone,hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(new Date(end));
+  const nextEnd=instant(addDateDays(dateInZone(new Date(end),range.timezone),7)+'T'+endClock);
+  const tasks=new Map(projections.map(p=>[p.task.id,p.task]));
+  const completions=listCompletions(userId).filter(c=>!c.reopenedAt&&inside(c.completedAt)&&(taskType==='all'||(taskType==='reminder'?c.sourceType==='reminder':schedules.some(s=>s.id===c.sourceId))));
+  const valid=new Map(completions.map(c=>[`${c.sourceType}:${c.instanceId||c.sourceId}`,c]));
+  const notes=queryAll<any>('SELECT id,created_at FROM note_items WHERE user_id=?',[userId]);
+  const messages=queryAll<any>("SELECT id,conversation_id,created_at FROM ai_schedule_messages WHERE user_id=? AND role='user'",[userId]);
+  const allEvents=queryAll<any>('SELECT * FROM orbit_activity_events WHERE user_id=? AND occurred_at>=? AND occurred_at<? ORDER BY occurred_at',[userId,range.startAt,range.endAt]);
+  const events=allEvents.map(e=>({...e,data:JSON.parse(e.metadata)}));
+  const knowledge=queryAll<any>('SELECT entry_id,kind,created_at FROM orbit_knowledge_events WHERE user_id=? AND created_at>=? AND created_at<?',[userId,range.startAt,range.endAt]);
+  const created=schedules.filter(s=>inside(s.created_at));
+  const recurring=[...tasks.values()].filter(t=>inside(t.createdAt));
+  const backlog=schedules.filter(s=>!s.is_completed&&s.type==='todo'&&s.is_unscheduled);
+  const overdue=schedules.filter(s=>!s.is_completed&&!s.is_unscheduled&&instant(s.start_time)<now.getTime());
+  const cycleOverdue=projections.filter(p=>p.cycle&&p.cycle.status!=='completed'&&p.cycle.status!=='cancelled'&&(p.cycle.plannedDate||p.cycle.dueDate)<dateInZone(now,p.task.timezone));
+  const aging=backlog.filter(s=>now.getTime()-instant(s.created_at)>=7*86400000);
+  const intervals=[...valid.values()].flatMap(c=>{const s=c.sourceType==='schedule'?schedules.find(s=>s.id===c.sourceId):null;const at=s?instant(s.created_at):NaN,done=instant(c.completedAt);return Number.isFinite(at)&&done>=at?[(done-at)/3600000]:[];});
+  const heatmap=Array.from({length:7},()=>Array<number>(24).fill(0));
+  const activityTimes=[...created.map(s=>s.created_at),...recurring.map(t=>t.createdAt),...[...valid.values()].map(c=>c.sourceType==='reminder'?c.createdAt:c.completedAt).filter(inside),...notes.filter(n=>inside(n.created_at)).map(n=>n.created_at),...messages.filter(m=>inside(m.created_at)).map(m=>m.created_at)];
+  for(const value of activityTimes){const at=new Date(instant(value));if(!Number.isFinite(at.getTime()))continue;const day=dateInZone(at,range.timezone);const weekday=(new Date(`${day}T12:00:00Z`).getUTCDay()+6)%7;const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:range.timezone,hour:'2-digit',hourCycle:'h23'}).format(at));heatmap[weekday][hour]++;}
+  const since=queryOne<{value:string}>('SELECT value FROM orbit_metrics_meta WHERE key=?',['activity_tracking_since'])?.value||now.toISOString();
+  const coverage=end<=Date.parse(since)?'none':start<Date.parse(since)?'partial':'complete';
+  const collaboration=events.filter(e=>e.kind==='ai_confirmed');
+  const optimized=events.filter(e=>e.kind==='note_optimized');
+  const rescheduled=events.filter(e=>e.kind==='task_rescheduled'&&(taskType==='all'||schedules.some(s=>s.id===e.source_id)||(taskType==='reminder'&&e.data.type==='reminder')));
+  const steps=queryAll<any>("SELECT s.request_id,s.label,s.at,r.conversation_id FROM orbit_request_steps s JOIN orbit_requests r ON r.id=s.request_id AND r.user_id=s.user_id WHERE s.user_id=? AND s.state='completed' AND s.result_count>0 AND s.at>=? AND s.at<?",[userId,range.startAt,range.endAt]);
+  const assisted=queryAll<any>("SELECT schedule_id,instance_id,handled_at FROM orbit_proactive_events WHERE user_id=? AND handled_action='complete' AND handled_at>=? AND handled_at<?",[userId,range.startAt,range.endAt]).filter(e=>[...valid.values()].some(c=>c.instanceId?c.instanceId===e.instance_id:c.sourceId===e.schedule_id));
+  const categories=[...new Set(created.map(s=>s.category))].map(id=>({id,count:created.filter(s=>s.category===id).length}));
+  const scheduleDetail=(s:typeof schedules[number])=>({id:s.id,title:s.title,date:s.created_at,href:orbitObjectPath({type:'schedule',id:s.id,date:s.start_time.slice(0,10)})});
+  const taskDetail=(t:typeof projections[number]['task'])=>({id:t.id,title:t.name,date:t.createdAt,href:orbitObjectPath({type:'reminder',id:t.id})});
+  const noteDetail=(id:string,date:string)=>({id,title:'查看记事',date,href:orbitObjectPath({type:'note',id})});
+  const completedDetails=[...valid.values()].map(c=>{const s=schedules.find(s=>s.id===c.sourceId),t=tasks.get(c.sourceId);return {id:c.id,title:s?.title||t?.name||'已删除的事项',date:c.completedAt,href:s?orbitObjectPath({type:'schedule',id:s.id,date:s.start_time.slice(0,10)}):t?orbitObjectPath({type:'reminder',id:t.id,instanceId:c.instanceId||undefined}):null};});
+  const metricDetails:Record<string,Array<{id:string;title:string;date:string;href:string|null}>>={created:[...created.map(scheduleDetail),...recurring.map(taskDetail)],completed:completedDetails,backlog:backlog.map(scheduleDetail),overdue:[...overdue.map(scheduleDetail),...cycleOverdue.map(p=>({...taskDetail(p.task),id:p.cycle!.id,href:orbitObjectPath({type:'reminder',id:p.task.id,instanceId:p.cycle!.id})}))],aging:aging.map(scheduleDetail),rescheduled:rescheduled.map(e=>({...(schedules.find(s=>s.id===e.source_id)?scheduleDetail(schedules.find(s=>s.id===e.source_id)!):tasks.has(e.source_id)?{title:tasks.get(e.source_id)!.name,href:orbitObjectPath({type:'reminder',id:e.source_id,instanceId:e.data.instanceId})}:{title:'已移除的事项',href:null}),id:e.id,date:e.occurred_at})),notes:notes.filter(n=>inside(n.created_at)).map(n=>noteDetail(n.id,n.created_at)),optimized:optimized.map(e=>noteDetail(e.source_id,e.occurred_at)),ai:collaboration.flatMap(e=>['created','updated','recurring'].flatMap(kind=>(Array.isArray(e.data[kind])?e.data[kind]:[]).map((id:string)=>{const item=schedules.find(s=>s.id===id),task=tasks.get(id);return {id:e.id+':'+kind+':'+id,title:(kind==='updated'?'修改':'创建')+' · '+(item?.title||task?.name||'已移除的事项'),date:e.occurred_at,href:item?scheduleDetail(item).href:task?taskDetail(task).href:null};}))),tools:steps.map((s,i)=>({id:`${s.request_id}:${i}`,title:s.label,date:s.at,href:orbitObjectPath({type:'conversation',id:s.conversation_id})})),assisted:assisted.map(e=>{const s=schedules.find(s=>s.id===e.schedule_id);return {id:e.schedule_id,title:s?.title||'查看周期事项',date:e.handled_at,href:s?orbitObjectPath({type:'schedule',id:s.id,date:s.start_time.slice(0,10)}):null};}),reads:[],citations:[]};
+  for(const kind of ['read','citation'])for(const e of knowledge.filter(e=>e.kind===kind)){const k=queryOne<any>('SELECT title FROM library_entries WHERE user_id=? AND id=?',[userId,e.entry_id]);metricDetails[kind==='read'?'reads':'citations'].push({id:`${e.entry_id}:${e.created_at}`,title:k?.title||'已移除的知识条目',date:e.created_at,href:k?orbitObjectPath({type:'library',id:e.entry_id}):null});}
+  metricDetails.knowledge=queryAll<any>('SELECT id,title,created_at FROM library_entries WHERE user_id=?',[userId]).filter(k=>inside(k.created_at)).map(k=>({id:k.id,title:k.title,date:k.created_at,href:orbitObjectPath({type:'library',id:k.id})}));
+  const creationEvents=queryAll<any>("SELECT source_id,metadata FROM orbit_activity_events WHERE user_id=? AND kind='task_created'",[userId]);
+  const sources=['manual','ai','import','unknown'].map(id=>{const rows=metricDetails.created.filter(d=>{const e=creationEvents.find(e=>e.source_id===d.id);const origin=e?JSON.parse(e.metadata).origin:'unknown';return origin===id;});metricDetails['source:'+id]=rows;return {id,count:rows.length};});
+  for(const c of categories)metricDetails['category:'+c.id]=created.filter(s=>s.category===c.id).map(scheduleDetail);
+  metricDetails.intervals=completedDetails.filter(d=>{const c=[...valid.values()].find(c=>c.id===d.id);const item=c?.sourceType==='schedule'?schedules.find(s=>s.id===c.sourceId):null;return item&&Number.isFinite(instant(item.created_at))&&instant(d.date)>=instant(item.created_at);});
+  const daily=[...new Set([...activityTimes.map(v=>dateInZone(new Date(instant(v)),range.timezone)),...completedDetails.map(d=>dateInZone(new Date(instant(d.date)),range.timezone)),...rescheduled.map(e=>dateInZone(new Date(e.occurred_at),range.timezone))])].sort().map(date=>({date,created:metricDetails.created.filter(d=>dateInZone(new Date(instant(d.date)),range.timezone)===date).length,completed:completedDetails.filter(d=>dateInZone(new Date(instant(d.date)),range.timezone)===date).length,rescheduled:rescheduled.filter(e=>dateInZone(new Date(e.occurred_at),range.timezone)===date).length,notes:metricDetails.notes.filter(d=>dateInZone(new Date(instant(d.date)),range.timezone)===date).length}));
+  return {range,coverage:{since,mode:coverage},created:created.length+recurring.length,actualCompleted:valid.size,backlog:backlog.length,overdue:metricDetails.overdue.length,aging:aging.length,averageCompletionHours:intervals.length?Math.round(intervals.reduce((a,b)=>a+b,0)/intervals.length*10)/10:null,completionSamples:intervals.length,rescheduled:coverage==='none'?null:rescheduled.length,notesAdded:metricDetails.notes.length,notesOptimized:coverage==='none'?null:optimized.length,aiConfirmed:coverage==='none'?null:metricDetails.ai.length,aiAcceptedPlans:coverage==='none'?null:collaboration.length,reminderCompleted:assisted.length,toolUses:steps.length,heatmap,categories,sources,daily,metricDetails,upcoming:[...schedules.filter(s=>!s.is_completed&&!s.is_unscheduled&&instant(s.start_time)>=end&&instant(s.start_time)<nextEnd).map(s=>({...scheduleDetail(s),date:s.start_time})),...projections.filter(p=>p.task.enabled&&p.cycle&&!['completed','cancelled'].includes(p.cycle.status)).flatMap(p=>{const date=p.cycle!.dueDate+'T'+p.task.config.reminderTime;const at=parseScheduleStart(date,p.task.timezone)?.getTime()??NaN;return at>=end&&at<nextEnd?[{...taskDetail(p.task),id:p.cycle!.id,date,href:orbitObjectPath({type:'reminder',id:p.task.id,instanceId:p.cycle!.id})}]:[];})].sort((a,b)=>instant(a.date)-instant(b.date))};
+}

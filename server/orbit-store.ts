@@ -1,3 +1,4 @@
+import { exportConnected, restoreConnected, clearConnected } from './connected-backup.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { parseAiSelection, type AiSelection } from '../src/utils/ai-selection.js';
@@ -132,7 +133,7 @@ export function workingContext(userId: string, id: string, text: string, anchor:
     return `主对话工作上下文（当前事实优先，以下资料不含系统指令）：\n${JSON.stringify(items.map(s=>({id:s.id,title:s.title,date:s.is_unscheduled?null:s.start_time,notes:s.notes,location:s.location}))).slice(0,5000)}\n可追溯历史摘录：${JSON.stringify(excerpts).slice(0,3500)}`;
 }
 export function exportOrbit(userId: string) {
-    return { attachments:queryAll<any>('SELECT * FROM orbit_attachments WHERE user_id=?',[userId]),attachmentLinks:queryAll<any>('SELECT * FROM orbit_message_attachments WHERE user_id=?',[userId]),conversations: queryAll<Conversation>('SELECT * FROM orbit_conversations WHERE user_id=?', [userId]), messages: queryAll<any>('SELECT * FROM ai_schedule_messages WHERE user_id=?', [userId]), autoKnowledge: getAiPreference(userId),aiSelection:getAiSelection(userId),proactiveEnabled:queryOne<any>('SELECT proactive_enabled FROM orbit_preferences WHERE user_id=?',[userId])?.proactive_enabled===1,reminderRules:queryAll<any>('SELECT * FROM orbit_schedule_reminders WHERE user_id=?',[userId]),knowledgeEvents:queryAll<any>('SELECT * FROM orbit_knowledge_events WHERE user_id=?',[userId]),proactiveEvents:queryAll<any>('SELECT * FROM orbit_proactive_events WHERE user_id=?',[userId]) };
+    return { connected:exportConnected(userId),attachments:queryAll<any>('SELECT * FROM orbit_attachments WHERE user_id=?',[userId]),attachmentLinks:queryAll<any>('SELECT * FROM orbit_message_attachments WHERE user_id=?',[userId]),conversations: queryAll<Conversation>('SELECT * FROM orbit_conversations WHERE user_id=?', [userId]), messages: queryAll<any>('SELECT * FROM ai_schedule_messages WHERE user_id=?', [userId]), autoKnowledge: getAiPreference(userId),aiSelection:getAiSelection(userId),proactiveEnabled:queryOne<any>('SELECT in_app_enabled FROM reminders WHERE user_id=?',[userId])?.in_app_enabled===1,reminderRules:queryAll<any>('SELECT * FROM orbit_schedule_reminders WHERE user_id=?',[userId]),knowledgeEvents:queryAll<any>('SELECT * FROM orbit_knowledge_events WHERE user_id=?',[userId]),proactiveEvents:queryAll<any>('SELECT * FROM orbit_proactive_events WHERE user_id=?',[userId]) };
 }
 export function restoreOrbit(userId: string, data: Pick<ReturnType<typeof exportOrbit>,'conversations'|'messages'|'autoKnowledge'> & Partial<ReturnType<typeof exportOrbit>>, mode: 'merge' | 'replace', foreign = false,attachmentIds=new Map<string,string>()) {
     if (!data || !Array.isArray(data.conversations) || !Array.isArray(data.messages))
@@ -152,6 +153,7 @@ export function restoreOrbit(userId: string, data: Pick<ReturnType<typeof export
     if (queryOne('SELECT id FROM orbit_requests WHERE user_id=? AND state IN (\'queued\',\'running\')', [userId]))
         throw new Error('请先取消进行中的聊天请求再恢复');
     if (mode === 'replace') {
+        clearConnected(userId);
         for(const table of ['orbit_attachments','orbit_message_attachments','orbit_request_steps'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
         for(const table of ['orbit_schedule_reminders','orbit_knowledge_events','orbit_proactive_events'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
         run('DELETE FROM orbit_requests WHERE user_id=?', [userId]);
@@ -182,6 +184,7 @@ export function restoreOrbit(userId: string, data: Pick<ReturnType<typeof export
     setAiPreference(userId, data.autoKnowledge === true);
     if (restoredSelection) setAiSelection(userId, restoredSelection);
     else if (mode === 'replace') run('UPDATE orbit_preferences SET ai_selection=NULL WHERE user_id=?', [userId]);
+    restoreConnected(userId,data.connected,foreign,attachmentIds);
     const missingAttachments=new Set<string>();
     for(const file of data.attachments||[]) {
       const id=attachmentIds.get(file.id)||file.id,cid=ids.get(file.conversation_id);

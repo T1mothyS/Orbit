@@ -1,3 +1,5 @@
+import { recordActivityEvent,activityOrigin } from './activity-events.js';
+import { withPersistenceTransaction } from './persistence.js';
 import { isValidDateKey } from './date-key.js';
 import { registerPersistence, persistDatabase, recoverPersistence, assertPersistenceReady } from './persistence.js';
 import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
@@ -644,7 +646,8 @@ export function getReminderTask(id: string, userId: string): ReminderTaskSummary
   return listReminderTasks(userId).find(item => item.id === id) || null;
 }
 
-export function createReminderTask(input: {
+export function createReminderTask(input: Parameters<typeof createReminderTaskRecord>[0]):ReminderTaskSummary {return withPersistenceTransaction(()=>createReminderTaskRecord(input));}
+function createReminderTaskRecord(input: {
   userId: string;
   type: ReminderTaskType;
   name: string;
@@ -676,6 +679,7 @@ export function createReminderTask(input: {
      VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)`,
     [task.id, task.userId, task.type, task.name, task.timezone, JSON.stringify(task.config), now, now],
   );
+  recordActivityEvent(task.userId,'task_created',task.id,{origin:activityOrigin.getStore()||'manual',type:'reminder'},task.id);
   return getReminderTask(task.id, task.userId)!;
 }
 
@@ -928,11 +932,15 @@ export function restoreUserReminderData(
 
 /** Changes this cycle's working date without moving its deadline or future rule. */
 export function setCyclePlannedDate(cycleId: string, userId: string, date: string | null): ReminderTaskSummary {
+  return withPersistenceTransaction(()=>setCyclePlannedDateRecord(cycleId,userId,date));
+}
+function setCyclePlannedDateRecord(cycleId:string,userId:string,date:string|null):ReminderTaskSummary {
   if (date !== null && !isValidDateKey(date)) throw new Error('安排日期格式不正确');
   const cycle = getCycleInternal(cycleId);
   const task = cycle && getTaskInternal(cycle.taskId);
   if (!cycle || !task || task.userId !== userId) throw new Error('周期事项不存在或无权访问');
   if (!['pending', 'expired'].includes(cycle.status)) throw new Error('只能调整尚未完成周期的安排日期');
   run('UPDATE reminder_cycles SET planned_date = ?, updated_at = ? WHERE id = ?', [date, nowIso(), cycleId]);
+  if((cycle.plannedDate||null)!==date)recordActivityEvent(userId,'task_rescheduled',task.id,{from:cycle.plannedDate||cycle.dueDate,to:date||cycle.dueDate,instanceId:cycle.id,type:'reminder',origin:activityOrigin.getStore()||'manual'});
   return getReminderTask(task.id, userId)!;
 }

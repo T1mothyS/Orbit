@@ -69,7 +69,7 @@ test('proactive default is off; explicit reminder preserved, durable dedupe and 
     assert.ok(proactive.proactiveCandidates('v2-owner').some(c=>c.schedule.id===s.id&&c.trigger==='2026-10-01T09:45:00.000Z'));
     assert.equal((await proactive.runOrbitProactiveTick(localNow)).sent,1);assert.equal((await proactive.runOrbitProactiveTick(localNow)).sent,0);
     schedules.updateSchedule(s.id,{notes:'Updated notes after notification'});assert.equal((await proactive.runOrbitProactiveTick(localNow)).sent,0);
-    const main=store.listConversations('v2-owner')[0];assert.equal(main.unread,1);store.markConversationRead('v2-owner',main.id,localNow.toISOString());assert.equal(store.listConversations('v2-owner')[0].unread,0);
+    const main=store.listConversations('v2-owner')[0];assert.equal(main.unread,1);store.markConversationRead('v2-owner',main.id,new Date().toISOString());assert.equal(store.listConversations('v2-owner')[0].unread,0);
     assert.equal(queryAll<any>('SELECT * FROM orbit_proactive_events WHERE schedule_id=?',[s.id])[0].state,'sent');
   }finally{proactive.setProactiveEnhancer(old);proactive.setProactivePreference('v2-owner',false);}
 });
@@ -116,7 +116,7 @@ test('quiet hours suppress proactive chat; explicit zero minute reminders, compl
     assert.equal((await proactive.runOrbitProactiveTick(now)).sent,0);db.upsertReminder({...db.getReminder('v2-owner')!,quiet_hours_enabled:0});
     assert.equal((await proactive.runOrbitProactiveTick(now)).sent,1);const e=queryAll<any>('SELECT * FROM orbit_proactive_events WHERE schedule_id=?',[s.id])[0];
     proactive.actOnProactiveEvent('v2-owner',e.id,'complete',now);assert.equal(schedules.getSchedule(s.id)?.is_completed,true);assert.equal((await proactive.runOrbitProactiveTick(now)).sent,0);
-    const snapshot=store.exportOrbit('v2-owner');store.restoreOrbit('v2-owner',snapshot,'replace');assert.equal(proactive.getProactivePreference('v2-owner'),false);assert.equal(store.listConversations('v2-owner').filter(c=>c.is_main===1).length,1);
+    const snapshot=store.exportOrbit('v2-owner');store.restoreOrbit('v2-owner',snapshot,'replace');assert.equal(proactive.getProactivePreference('v2-owner'),db.getReminder('v2-owner')?.in_app_enabled===1);assert.equal(store.listConversations('v2-owner').filter(c=>c.is_main===1).length,1);
   }finally{proactive.setProactiveEnhancer(old);proactive.setProactivePreference('v2-owner',false);}
 });
 test('cycle proactive completion records one real cycle and its next projection; no deadline or recurrence change',async()=>{

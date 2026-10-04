@@ -1,3 +1,4 @@
+import { activityOrigin,recordActivityEvent } from '../activity-events.js';
 import { Router } from 'express';
 import type { createAuth } from '../auth.js';
 import { normaliseReminderConfig } from '../reminder-input.js';
@@ -64,7 +65,7 @@ export function createAiImportsRouter({ authenticate }: Pick<ReturnType<typeof c
       if (!current || current.status !== 'draft') return res.status(404).json({ error: '导入草稿不存在或已经处理' });
       const draft = { ...current.draft, ...req.body.draft } as unknown as AiImportDraft;
       if (!draft.title || !/^\d{4}-\d{2}-\d{2}$/.test(draft.dueDate)) return res.status(400).json({ error: '标题和到期日期不能为空' });
-      const response = executeOnce(userId, 'ai-import', req.params.id, () => {
+      const response = executeOnce(userId, 'ai-import', req.params.id, () => activityOrigin.run('import',() => {
         let created: unknown;
         if (draft.kind === 'recurring') {
           const date = draft.dueDate;
@@ -115,8 +116,9 @@ export function createAiImportsRouter({ authenticate }: Pick<ReturnType<typeof c
           });
         }
         const confirmed = activityStore.confirmAiImport(req.params.id, userId, draft as unknown as Record<string, unknown>);
+        const object=created as {id:string};recordActivityEvent(userId,'ai_confirmed',current.id,{created:draft.kind==='recurring'?[]:[object.id],updated:[],recurring:draft.kind==='recurring'?[object.id]:[],origin:'import'},'import:'+current.id);
         return { import: confirmed, created };
-      });
+      }));
       res.json(response);
     } catch (error: any) {
       res.status(400).json({ error: error?.message || '确认导入失败' });

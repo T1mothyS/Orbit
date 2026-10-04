@@ -1,3 +1,5 @@
+import { getNotification } from '../activity-store.js';
+import { notificationObject } from '../notification-chat.js';
 import { ORBIT_AI_QUERY_POLICY } from '../orbit-ai-policy.js';
 import { workBuddyProvider } from '../ai-provider-workbuddy.js';
 import { chatGPTProvider } from '../ai-provider-chatgpt.js';
@@ -113,7 +115,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       orbit.conversation(payload.userId,cid);
       const messages = queryAll<dbModule.DbAiScheduleMessage>('SELECT * FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? ORDER BY created_at,rowid',[payload.userId,cid]);
       hydratePendingAiSchedulePlans(payload.userId, messages);
-      res.json({ messages: messages.map(m => {const view=toAiScheduleHistoryMessage(m);if(view.plan?.id)view.plan=buildAiPlanSnapshot(resolveAiPlan(payload.userId,view.plan.id)!);if(view.orbitMeta?.eventId){Object.assign(view.orbitMeta,proactiveEventView(payload.userId,view.orbitMeta.eventId));}if(Array.isArray(view.scheduleItems)) view.scheduleItems=view.scheduleItems.flatMap((item:any)=>{const live=scheduleStore.getSchedule(item.id);return live?.user_id===payload.userId?[live]:[];});return view;}) });
+      res.json({ messages: messages.map(m => {const view=toAiScheduleHistoryMessage(m);if(view.plan?.id)view.plan=buildAiPlanSnapshot(resolveAiPlan(payload.userId,view.plan.id)!);if(view.orbitMeta?.notificationId)Object.assign(view.orbitMeta,notificationView(payload.userId,view.orbitMeta.notificationId));if(view.orbitMeta?.eventId){const event=proactiveEventView(payload.userId,view.orbitMeta.eventId);if(!view.orbitMeta.notificationId||event.state==='handled')Object.assign(view.orbitMeta,event);}if(Array.isArray(view.scheduleItems)) view.scheduleItems=view.scheduleItems.flatMap((item:any)=>{const live=scheduleStore.getSchedule(item.id);return live?.user_id===payload.userId?[live]:[];});return view;}) });
     } catch (error: any) {
       console.error("[AI History] Error:", error);
       res.status(400).json({ error: '无法读取这个会话' });
@@ -234,6 +236,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     const queryTimezone = db.getReminder(userId)?.timezone || 'Asia/Shanghai';
     const objectRefs = context ? orbit.recentObjectReferences(userId,context.conversationId) : [];
     const referencedIds = new Set(objectRefs.flatMap(row => row.map((s:any)=>s.id)));
+    if(body.notificationId){const notification=getNotification(String(body.notificationId),userId);if(!notification)return res.status(400).json({error:'通知不存在或无权访问'});const ref=notificationObject(notification);if(ref?.type==='schedule')referencedIds.add(ref.id);if(ref?.type==='reminder'&&ref.instanceId)referencedIds.add('reminder-cycle:'+ref.instanceId);}
     const scopeId=context ? orbit.conversation(userId,context.conversationId).scope_schedule_id : null;
     if(scopeId)referencedIds.add(scopeId);
     const noteContext = /记事|记事板|便签/.test(text) ? db.listNoteItems(userId).filter(n=>!n.completed).slice(0,8).map(n=>({id:n.id,content:n.content})):[];
@@ -665,7 +668,8 @@ priority 识别：
     let assistantText = '';
     let resultText = '';
     const steps:any[]=[];
-    const onStep=(step:import('../ai-provider-contract.js').AiStep)=>{const i=steps.findIndex(s=>s.id===step.id);if(i<0)steps.push(step);else steps[i]=step;if(context?.requestId)run('INSERT INTO orbit_request_steps(user_id,request_id,id,label,state,query,at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id,request_id,id) DO UPDATE SET state=excluded.state,label=excluded.label,query=excluded.query',[userId,context.requestId,step.id,step.label,step.state,step.query,step.at]);};
+    const settingRefs=/设置|怎么.*关|怎么.*开|开启|关闭|在哪|头像|每日总结|周报/.test(text)?findSettings(text,db.getUserById(userId)?.role==='admin').slice(0,3):[];
+    const onStep=(step:import('../ai-provider-contract.js').AiStep)=>{const i=steps.findIndex(s=>s.id===step.id);if(i<0)steps.push(step);else steps[i]=step;if(context?.requestId)run('INSERT INTO orbit_request_steps(user_id,request_id,id,label,state,query,at,result_count) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(user_id,request_id,id) DO UPDATE SET state=excluded.state,label=excluded.label,query=excluded.query,at=excluded.at,result_count=excluded.result_count',[userId,context.requestId,step.id,step.label,step.state,step.query,step.at,step.resultCount??null]);};
     const toolContext=createOrbitTools({userId,timezone:queryTimezone,allowKnowledge:includeKnowledgeContext,allowHistory:/历史|上次.*说|之前.*聊/.test(text),onSchedules:items=>{for(const item of items)if(!contextSchedules.some(s=>s.id===item.id))contextSchedules.push(item);},onStep});
     const webCitations:WebCitation[]=[];
     try {
@@ -753,7 +757,7 @@ priority 识别：
       };
       try {
         const historyMessage = saveAiScheduleResponseHistory(userId, response);
-        run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({formatVersion:1,provider:isChatGPT?'chatgpt':'workbuddy',model:selectedModel,textFallback:parsedResult.textFallback,steps,sources:toolContext.sources}),historyMessage.id,userId]);
+        run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({formatVersion:1,provider:isChatGPT?'chatgpt':'workbuddy',model:selectedModel,textFallback:parsedResult.textFallback,steps,settingRefs:[...settingRefs,...toolContext.settingRefs].filter((r,i,rows)=>rows.findIndex(s=>s.id===r.id)===i),sources:toolContext.sources}),historyMessage.id,userId]);
         response.historyMessageId = historyMessage.id;
         if (response.requiresConfirmation) {
           const pendingPlan = aiSchedulePlans.get(response.plan?.id);
@@ -778,7 +782,7 @@ priority 识别：
       console.error('[AI Chat] Error:', error);
       try {
         const failed=saveAiScheduleHistoryMessage({ userId, role: 'assistant', type: 'error', content: error?.message || 'AI 处理失败，请重试' });
-        run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({formatVersion:1,provider:isChatGPT?'chatgpt':'workbuddy',model:selectedModel,steps,sources:toolContext.sources}),failed.id,userId]);
+        run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({formatVersion:1,provider:isChatGPT?'chatgpt':'workbuddy',model:selectedModel,steps,settingRefs:[...settingRefs,...toolContext.settingRefs].filter((r,i,rows)=>rows.findIndex(s=>s.id===r.id)===i),sources:toolContext.sources}),failed.id,userId]);
       } catch {}
       res.status(500).json({ error: error?.message || 'AI 处理失败，请重试' });
     }
@@ -819,7 +823,8 @@ priority 识别：
 
       if (!plan.confirmedResult) {
         plan.confirmedResult = executeOnce(userId, 'ai-plan', planId, () => {
-          const result = executeAiScheduleOperations(plan);
+          const result = activityOrigin.run('ai',()=>executeAiScheduleOperations(plan));
+          if(result.changed)recordActivityEvent(userId,'ai_confirmed',planId,{created:result.createdSchedules.map(s=>s.id),updated:result.updatedSchedules.map(s=>s.id),recurring:result.createdReminderTasks.map(t=>t.id)},planId);
           const scheduleItems = [...result.createdSchedules, ...result.updatedSchedules];
           const failureSummary = result.failures.length
             ? `另有 ${result.failures.length} 项未执行。\n失败原因：\n${result.failures.map(failure => {
@@ -865,3 +870,6 @@ priority 识别：
   // 获取某日日程（供 AI 对话上下文）
   return app;
 }
+import { activityOrigin, recordActivityEvent } from '../activity-events.js';
+import { notificationView } from '../notification-chat.js';
+import { findSettings } from '../../src/utils/settings-registry.js';

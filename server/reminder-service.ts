@@ -5,6 +5,7 @@ import {
   markDeliverySent,
 } from './reminder-store.js';
 import { enqueueUserNotificationDetailed, type NotificationLogger } from './notification-service.js';
+import { parseScheduleStart } from './notification-scheduler.js';
 
 export async function processCycleReminders(log?: NotificationLogger, now = new Date()): Promise<void> {
   const dueReminders = getDueReminders(now);
@@ -19,6 +20,7 @@ export async function processCycleReminders(log?: NotificationLogger, now = new 
         sourceId: reminder.task.id,
         instanceId: reminder.cycle.id,
         kind: reminder.reminderType,
+        scheduledAt: parseScheduleStart(`${reminder.scheduledDate}T${String(config.reminderTime||'12:00').slice(0,5)}:00`,reminder.task.timezone)?.toISOString(),
         title: `【事务提醒】${reminder.task.name}`,
         body: `截止日期：${reminder.cycle.dueDate}${reminder.delayed ? '\n本提醒已延迟补发，请尽快处理。' : ''}\n${config.actionGuide || '请完成本周期事务并登记。'}`,
         dedupePrefix: `cycle:${reminder.cycle.id}:${reminder.reminderType}:${reminder.scheduledDate}`,

@@ -1,4 +1,5 @@
-import { registerPersistence, persistDatabase, recoverPersistence, assertPersistenceReady } from './persistence.js';
+import { registerPersistence, persistDatabase, recoverPersistence, assertPersistenceReady, withPersistenceTransaction } from './persistence.js';
+import { recordActivityEvent, activityOrigin } from './activity-events.js';
 import { validateScheduleTime } from './schedule-time.js';
 /**
  * 日程数据存储模块
@@ -347,6 +348,13 @@ function safeNull(val: any): any {
 
 // 创建日程
 export function createSchedule(schedule: Omit<Schedule, 'created_at' | 'updated_at'>): Schedule {
+  return withPersistenceTransaction(()=>{
+    const result=createScheduleRecord(schedule);
+    if(result.user_id&&!result.id.startsWith('reminder-cycle:'))recordActivityEvent(result.user_id,'task_created',result.id,{origin:activityOrigin.getStore()||'manual',type:result.type},result.id);
+    return result;
+  });
+}
+function createScheduleRecord(schedule: Omit<Schedule, 'created_at' | 'updated_at'>): Schedule {
   validateScheduleTime(schedule);
   const now = new Date().toISOString();
   const isUnscheduled = schedule.is_unscheduled === true;
@@ -406,6 +414,13 @@ export function createSchedulesBatch(schedules: Omit<Schedule, 'created_at' | 'u
 
 // 更新日程
 export function updateSchedule(id: string, updates: Partial<Schedule>): Schedule | null {
+  return withPersistenceTransaction(()=>{
+    const before=getSchedule(id),result=updateScheduleRecord(id,updates);
+    if(before&&result&&!id.startsWith('reminder-cycle:')&&(before.start_time!==result.start_time||!!before.is_unscheduled!==!!result.is_unscheduled))recordActivityEvent(result.user_id,'task_rescheduled',id,{from:before.is_unscheduled?null:before.start_time,to:result.is_unscheduled?null:result.start_time,origin:activityOrigin.getStore()||'manual'});
+    return result;
+  });
+}
+function updateScheduleRecord(id: string, updates: Partial<Schedule>): Schedule | null {
   const existing = getSchedule(id);
   if (!existing) return null;
 

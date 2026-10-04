@@ -53,5 +53,7 @@ export function webSearchStep(item:any,id:string,at:string,state:AiStep['state']
   const action=item?.action||{};
   const label=action.type==='open_page'?'ChatGPT 读取网页':action.type==='find_in_page'?'ChatGPT 查找网页内容':'ChatGPT 联网搜索';
   const query=Array.isArray(action.queries)?action.queries.join('；'):action.query||action.url||'';
-  return {id,label,state,query:String(query).slice(0,300),at};
+  const sources=new Set((Array.isArray(action.sources)?action.sources:[]).map((raw:any)=>webSource(raw)?.url).filter(Boolean));
+  const resultCount=state==='completed'?sources.size||(['open_page','find_in_page'].includes(action.type)&&webSource({url:action.url})?1:0):undefined;
+  return {id,label,state,query:String(query).slice(0,300),at:state==='completed'?new Date().toISOString():at,resultCount};
 }

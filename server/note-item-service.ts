@@ -160,9 +160,12 @@ export function commitOptimizedNote(userId: string, id: string, expectedContent:
   assertExpectedNoteVersion(existing, expectedContent, expectedRevision);
   if (existing.is_optimized === 1) throw new NoteOptimizationConflict('ALREADY_OPTIMIZED', '这条记事已经优化，请先撤回后再优化。');
   const content = validateContent(optimizedContent);
+  return withPersistenceTransaction(()=>{
   const updated = db.commitNoteOptimization(id, userId, expectedContent, expectedRevision, content);
   if (!updated) throw new NoteContentConflict();
+  recordActivityEvent(userId,'note_optimized',id,{},`${id}:${updated.content_revision}`);
   return toNoteItem(updated);
+  });
 }
 
 export function revertOptimizedNote(userId: string, id: string, expectedContent: string, expectedRevision: number): NoteItem | undefined {
@@ -218,3 +221,5 @@ export class NoteOptimizationConflict extends Error {
 function assertExpectedNoteVersion(row: db.DbNoteItem, expectedContent: string, expectedRevision: number): void {
   if (row.content !== expectedContent || row.content_revision !== expectedRevision) throw new NoteContentConflict();
 }
+import { withPersistenceTransaction } from './persistence.js';
+import { recordActivityEvent } from './activity-events.js';

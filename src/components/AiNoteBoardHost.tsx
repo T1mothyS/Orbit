@@ -86,6 +86,8 @@ export function useAiNoteBoard({ initialNoteId }: UseAiNoteBoardOptions): AiNote
     else setNotes([]);
   }, [isAuthenticated, loadNotes]);
 
+  useEffect(()=>{if(!initialNoteId||loading||!drawerOpen)return;const timer=setTimeout(()=>{const target=document.getElementById('orbit-note-'+initialNoteId);if(target){target.scrollIntoView({block:'center'});target.classList.add('setting-search-target');}else if(notes.length||!loading)setError('记事不存在或无权访问');},200);return()=>clearTimeout(timer);},[initialNoteId,loading,drawerOpen,notes]);
+
   const updateNote = useCallback(async (id: string, body: Record<string, unknown>, signal?: AbortSignal): Promise<NoteItem> => {
     const response = await fetch(`/api/note-items/${encodeURIComponent(id)}`, {
       method: 'PATCH',

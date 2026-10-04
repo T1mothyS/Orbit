@@ -1,6 +1,6 @@
 # Orbit 文档索引
 
-- Status: LIVING；2026-10-03 核对基础升级入口。此索引只负责导航，不复制任务、版本或生产状态。
+- Status: LIVING；2026-10-04 核对交互连接与个人报告入口。此索引只负责导航，不复制任务、版本或生产状态。
 - 权威次序：源码/实际验证 → 领域合同 → 当前任务状态；历史报告按原日期解释。版本只读 package.json。
 
 ## 路线、更新与任务
@@ -45,7 +45,7 @@
 | [CalDAV 桥接](CALDAV-BRIDGE.md) | 单向投影、周期/完成/归并、锁/自动化/恢复 |
 | [CalDAV POC](CALDAV-HONOR-POC.md) | 可行性和隔离操作；真机结果为日期证据 |
 | [Bundle 测量](BUNDLE-BASELINE.md) | 资源测量方法；旧数据只作历史基线 |
-| [项目成长](../project-evolution/README.md) | 工程历史/生成数据与个人统计的分离 |
+| [项目成长](../project-evolution/README.md) | 工程历史/生成数据与个人活动报告的分离 |
 | [Decision 0001](decisions/0001-phase-three-foundations.md) | 已接受的历史架构决策 |
 
 ## 维护规则

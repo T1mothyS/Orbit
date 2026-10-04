@@ -1,5 +1,6 @@
 import * as activityStore from './activity-store.js';
 import * as db from './db.js';
+import { deliverInApp } from './notification-chat.js';
 import {
   sendDailyReminderEmail,
   sendDailyReportEmail,
@@ -30,7 +31,7 @@ function inQuietHours(value: string, start: string, end: string): boolean {
   return start < end ? value >= start && value < end : value >= start || value < end;
 }
 
-function quietAdjustedDate(userId: string, scheduledAt: string): string {
+export function quietAdjustedDate(userId: string, scheduledAt: string): string {
   const preference = db.getReminder(userId);
   if (!preference?.quiet_hours_enabled) return scheduledAt;
   const timezone = preference.timezone || 'Asia/Shanghai';
@@ -220,6 +221,10 @@ export async function processNotificationQueue(log?: NotificationLogger): Promis
   }
 
   for (const item of dueItems) {
+    if(item.channel==='browser'&&(db.getReminder(item.userId)?.browser_enabled===0||!db.getUserById(item.userId)||db.getUserById(item.userId)?.disabled)){activityStore.suppressNotification(item.id);continue;}
+    const processingAt=new Date().toISOString();
+    const quietUntil=quietAdjustedDate(item.userId,processingAt);
+    if(quietUntil>processingAt){activityStore.deferNotification(item.id,quietUntil);continue;}
     if (!activityStore.claimNotification(item.id)) {
       result.claimSkipped += 1;
       log?.('通知未能领取，可能已被其他任务处理', undefined, notificationLogData(item, {
@@ -253,6 +258,8 @@ export async function processNotificationQueue(log?: NotificationLogger): Promis
           durationMs: Date.now() - emailStartedAt,
           ...summarizeEmailSendResult(sendResult),
         }));
+      } else if(item.channel==='in_app') {
+        if(!deliverInApp(item)){activityStore.suppressNotification(item.id);continue;}
       } else {
         log?.('非邮件通知直接进入已发送状态', undefined, notificationLogData(claimedItem, {
           event: 'non_email_notification_marked_sent',

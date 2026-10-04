@@ -15,7 +15,7 @@ const DB_PATH = path.join(DATA_DIR, 'activity.db');
 
 export type ActionSource = 'schedule' | 'reminder';
 export type NotificationChannel = 'email' | 'in_app' | 'browser';
-export type NotificationStatus = 'pending' | 'sending' | 'sent' | 'failed';
+export type NotificationStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'suppressed';
 export type DailyReportSource = 'local' | 'cloud';
 export type DailyReportDeliveryStatus = 'received' | 'candidate';
 
@@ -788,24 +788,26 @@ export function attachDailyReportNotification(id: string, userId: string, notifi
   return getDailyReportById(id, userId);
 }
 
-export function listNotifications(userId: string, filters: { status?: string; channel?: string; unreadOnly?: boolean; limit?: number } = {}): NotificationDelivery[] {
+export function listNotifications(userId: string, filters: { status?: string; channel?: string; sourceType?:string; sourceId?:string; unreadOnly?: boolean; limit?: number } = {}): NotificationDelivery[] {
   const clauses = ['user_id = ?'];
   const params: unknown[] = [userId];
   if (filters.status) { clauses.push('status = ?'); params.push(filters.status); }
   if (filters.channel) { clauses.push('channel = ?'); params.push(filters.channel); }
+  if(filters.sourceType){clauses.push('source_type = ?');params.push(filters.sourceType);}
+  if(filters.sourceId){clauses.push('source_id = ?');params.push(filters.sourceId);}
   if (filters.unreadOnly) clauses.push('read_at IS NULL AND status = \'sent\'');
   const limit = Math.min(Math.max(Number(filters.limit || 100), 1), 500);
   params.push(limit);
   return queryAll<any>(`SELECT * FROM notification_deliveries WHERE ${clauses.join(' AND ')} ORDER BY created_at DESC LIMIT ?`, params).map(rowToNotification);
 }
 
-export function listDueNotifications(now = nowIso()): NotificationDelivery[] {
+export function listDueNotifications(now = nowIso(), channel?:NotificationChannel): NotificationDelivery[] {
   return queryAll<any>(
     `SELECT * FROM notification_deliveries
      WHERE status IN ('pending', 'failed') AND attempts < max_attempts
        AND scheduled_at <= ? AND (next_retry_at IS NULL OR next_retry_at <= ?)
-     ORDER BY scheduled_at ASC LIMIT 100`,
-    [now, now],
+       ${channel?'AND channel = ?':''} ORDER BY scheduled_at ASC LIMIT 100`,
+    channel?[now,now,channel]:[now, now],
   ).map(rowToNotification);
 }
 
@@ -820,6 +822,12 @@ export function claimNotification(id: string): boolean {
 export function markNotificationSent(id: string): void {
   const now = nowIso();
   run(`UPDATE notification_deliveries SET status = 'sent', sent_at = ?, next_retry_at = NULL, last_error = NULL, updated_at = ? WHERE id = ?`, [now, now, id]);
+}
+
+export function deferNotification(id:string,until:string) {run('UPDATE notification_deliveries SET next_retry_at=? WHERE id=?',[until,id]);}
+
+export function suppressNotification(id:string):void {
+  run("UPDATE notification_deliveries SET status='suppressed',last_error='渠道已关闭、对象已失效或事件无需展示',updated_at=? WHERE id=?",[nowIso(),id]);
 }
 
 export function markNotificationFailed(id: string, error: string): void {
@@ -1076,7 +1084,7 @@ function restoreUserActivityInternal(
        scheduled_at, status, attempts, max_attempts, next_retry_at, last_error, sent_at, read_at, dedupe_key, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [row.id, userId, row.source_type, row.source_id, row.instance_id || null, row.channel, row.kind, row.title, row.body,
-        row.scheduled_at, row.status, row.attempts || 0, row.max_attempts || 4, row.next_retry_at || null, row.last_error || null,
+        row.scheduled_at, ['sent','suppressed'].includes(row.status)?row.status:'suppressed', row.attempts || 0, row.max_attempts || 4, null, ['sent','suppressed'].includes(row.status)?row.last_error||null:'从备份恢复，不重新投递',
         row.sent_at || null, row.read_at || null, row.dedupe_key, row.created_at || nowIso(), row.updated_at || nowIso()],
     );
     notifications++;

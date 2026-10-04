@@ -1,3 +1,4 @@
+import { clearConnected } from '../../connected-backup.js';
 import { queryAll, run } from '../connection.js';
 import { deleteDailyReportCloudData } from './report-cloud.js';
 import { deleteOAuthUserData } from './oauth.js';
@@ -5,6 +6,7 @@ import { deleteUserOperationResults } from './operations.js';
 import { removeSecret } from '../../orbit-credential-vault.js';
 
 function clearOrbitProviderData(userId:string):void {
+  clearConnected(userId);
   removeSecret('chatgpt',userId);
   for(const table of ['orbit_attachments','orbit_message_attachments','orbit_request_steps','orbit_model_capabilities'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
 }

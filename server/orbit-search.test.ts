@@ -29,6 +29,6 @@ test('web reading rejects local/private endpoints and limits body, redirects and
   await assert.rejects(search.limitedBody(new Response('oversize'),2),/超过/);
 });
 test('tool registry has no write tools and no implicit knowledge or history access',async()=>{
-  const c=tools.createOrbitTools({userId:'synthetic',timezone:'Asia/Hong_Kong',allowKnowledge:false,allowHistory:false});assert.deepEqual(c.tools.map(t=>t.name),['search','read_url','calendar','reports']);
+  const c=tools.createOrbitTools({userId:'synthetic',timezone:'Asia/Hong_Kong',allowKnowledge:false,allowHistory:false});assert.deepEqual(c.tools.map(t=>t.name),['settings','search','read_url','calendar','reports']);
   await assert.rejects(c.tools[0].execute({query:'x',shell:'danger'}),/参数/);
 });

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useDialogLifecycle } from '../hooks/useDialogLifecycle';
 
-type SearchResultType = 'schedule' | 'note' | 'report' | 'library';
+type SearchResultType = 'schedule' | 'note' | 'report' | 'library'|'conversation'|'reminder'|'setting'|'tool'|'activity-report';
 
 interface SearchResult {
   type: SearchResultType;
@@ -23,6 +23,7 @@ interface SearchResponse {
 }
 
 const TYPE_LABELS: Record<SearchResultType, string> = {
+  conversation:'对话',reminder:'周期提醒',setting:'设置',tool:'Tools','activity-report':'周期报告',
   schedule: '日程',
   note: '记事',
   report: '日报',
@@ -30,13 +31,14 @@ const TYPE_LABELS: Record<SearchResultType, string> = {
 };
 
 const TYPE_ICONS: Record<SearchResultType, typeof CalendarDays> = {
+  conversation:FileText,reminder:CalendarDays,setting:Search,tool:FileText,'activity-report':FileText,
   schedule: CalendarDays,
   note: StickyNote,
   report: FileText,
   library: BookOpen,
 };
 
-const TYPE_ORDER: SearchResultType[] = ['schedule', 'note', 'report', 'library'];
+const TYPE_ORDER: SearchResultType[] = ['setting','schedule','reminder','conversation','note','report','library','tool','activity-report'];
 
 export function GlobalSearch() {
   const navigate = useNavigate();
@@ -116,7 +118,7 @@ export function GlobalSearch() {
 
   const openResult = (result: SearchResult) => {
     close();
-    navigate(result.target.path);
+    if(/^\/tools\/[^/?]+/.test(result.target.path))window.location.assign(result.target.path);else navigate(result.target.path);
   };
 
   const closeFromOverlay = (event: React.MouseEvent<HTMLDialogElement>) => {
@@ -147,8 +149,8 @@ export function GlobalSearch() {
                   ref={inputRef}
                   value={query}
                   onChange={event => setQuery(event.target.value)}
-                  placeholder="搜索日程、记事、日报或知识库"
-                  aria-label="搜索日程、记事、日报或知识库"
+                  placeholder="搜索事项、对话、记事、设置和报告"
+                  aria-label="搜索事项、对话、记事、设置和报告"
                 />
                 {loading && <Loader2 size={16} className="spin" aria-label="搜索中" />}
               </div>

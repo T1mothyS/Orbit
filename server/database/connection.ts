@@ -4,6 +4,7 @@ import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { setActivityEventSink } from '../activity-events.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,7 +48,16 @@ export async function initDb(): Promise<void> {
     db = new SQL.Database(bytes);
   });
 
+  // Freeze the existing stores before the additive connected-report migration.
+  if(fs.existsSync(dbPath)&&!queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='orbit_activity_reports'")){
+    const snapshot=path.join(dataDir,'migration-backups',`connected-report-${new Date().toISOString().replace(/[:.]/g,'-')}`);
+    fs.mkdirSync(snapshot,{recursive:true});
+    for(const name of fs.readdirSync(dataDir).filter(name=>name.endsWith('.db')))
+      fs.copyFileSync(path.join(dataDir,name),path.join(snapshot,name),fs.constants.COPYFILE_EXCL);
+  }
+
   applyChatSchema(db, { queryAll, queryOne });
+  setActivityEventSink(event => run('INSERT OR IGNORE INTO orbit_activity_events (id,user_id,kind,source_id,occurred_at,metadata) VALUES (?,?,?,?,?,?)',[event.id,event.userId,event.kind,event.sourceId,event.occurredAt,JSON.stringify(event.metadata)]));
 
   // 保存到文件
   saveDb();

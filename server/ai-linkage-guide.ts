@@ -1,4 +1,4 @@
-export const AI_LINKAGE_GUIDE_VERSION = 'ai-linkage-2026-09-09.1';
+export const AI_LINKAGE_GUIDE_VERSION = 'ai-linkage-2026-10-04.1';
 
 export interface AiLinkageGuideItem {
   id: string;
@@ -107,6 +107,10 @@ export const AI_LINKAGE_GUIDE_ITEMS: AiLinkageGuideItem[] = [
 ];
 
 export const AI_LINKAGE_RULES: AiLinkageRule[] = [
+  {id:'memory-boundary',title:'长期记忆的实际边界',rule:'对话保存历史并读取有界上下文；没有自动永久记住全部信息的保证。知识库检索在 + 菜单默认关闭，明确提到知识库时可检索；开启自动检索后显示可关闭标签。'},
+  {id:'daily-reminder-boundary',title:'每日行动提醒',rule:'通知设置中的每日提醒总结当天未完成安排；站内渠道与主动聊天共用站内通知开关，逐事项规则保留。卡片入库不保证网页外或手机弹出。'},
+  {id:'intelligence-report-boundary',title:'情报日报',rule:'情报日报由独立 Local 或 Cloud 链路发布，内容、媒体与令牌合同保持独立；不是个人活动周报。'},
+  {id:'personal-weekly-boundary',title:'个人活动报告与 Orbit Weekly',rule:'从头像菜单打开个人活动报告，周/月/年或自定义范围读取真实完成、积压、知识与 AI 执行明细。洞察手动生成；通知设置中自动周报默认关闭，默认账号时区周日20:00。预览后确认发送，按已开启的站内/邮件渠道投递；模型失败保留事实版，SMTP accepted 不表示收件箱已收到。'},
   { id: 'real-schedule-data', title: '日程事实优先', rule: '查询、修改和删除日程必须依赖系统提供的真实数据；模型不能凭记忆补造标题、时间、地点或 ID。' },
   { id: 'write-confirmation', title: '写入先确认', rule: '创建、修改、删除日程和创建周期事务都先生成可编辑计划，只有用户明确确认后才写入正式数据。' },
   { id: 'controlled-weather', title: '天气走受控服务', rule: '天气问题只能使用 Open-Meteo 服务或带来源标记的缓存；请求失败时明确不可用，不允许模型凭记忆猜测。' },

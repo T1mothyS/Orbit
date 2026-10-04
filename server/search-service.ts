@@ -1,8 +1,14 @@
 import * as activityStore from './activity-store.js';
 import * as db from './db.js';
 import * as scheduleStore from './schedule-store.js';
+import { queryAll } from './database/connection.js';
+import { readReminderProjectionSources } from './reminder-store.js';
+import { findSettings } from '../src/utils/settings-registry.js';
+import { orbitObjectPath } from '../src/utils/orbit-links.js';
+import { getPublicTools } from './protected-tools.js';
+import { fileURLToPath } from 'node:url';
 
-export const SEARCH_SCOPES = ['all', 'schedule', 'note', 'report', 'library'] as const;
+export const SEARCH_SCOPES = ['all', 'schedule', 'note', 'report', 'library', 'conversation', 'reminder', 'setting', 'tool', 'activity-report'] as const;
 export type SearchScope = (typeof SEARCH_SCOPES)[number];
 
 export interface SearchTarget {
@@ -279,14 +285,16 @@ export function searchAll(userId: string, input: { query?: unknown; scope?: unkn
   const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
     ? Math.min(Math.floor(requestedLimit), MAX_LIMIT)
     : MAX_LIMIT;
-  const emptyCounts = { schedule: 0, note: 0, report: 0, library: 0 };
+  const emptyCounts = { schedule: 0, note: 0, report: 0, library: 0, conversation:0,reminder:0,setting:0,tool:0,'activity-report':0 };
   if (!query) return { query, results: [], counts: emptyCounts };
 
   const scopedResults = {
+    setting:scope==='all'||scope==='setting'?findSettings(query,db.getUserById(userId)?.role==='admin').map(i=>({type:'setting' as const,id:i.id,title:i.label,snippet:i.description,target:{path:orbitObjectPath({type:'setting',id:i.id})}})):[],
     schedule: scope === 'all' || scope === 'schedule' ? scheduleResults(userId, query) : [],
     note: scope === 'all' || scope === 'note' ? noteResults(userId, query) : [],
     report: scope === 'all' || scope === 'report' ? reportResults(userId, query) : [],
     library: scope === 'all' || scope === 'library' ? libraryResults(userId, query) : [],
+    ...connectedResults(userId,query,scope),
   };
   const results = (Object.values(scopedResults).flat() as SearchResult[]).slice(0, limit);
   return {
@@ -297,6 +305,18 @@ export function searchAll(userId: string, input: { query?: unknown; scope?: unkn
       note: scopedResults.note.length,
       report: scopedResults.report.length,
       library: scopedResults.library.length,
+      conversation:scopedResults.conversation.length,reminder:scopedResults.reminder.length,setting:scopedResults.setting.length,tool:scopedResults.tool.length,'activity-report':scopedResults['activity-report'].length,
     },
   };
+}
+
+function connectedResults(userId:string,query:string,scope:SearchScope) {
+  const enabled=(type:SearchScope)=>scope==='all'||scope===type;
+  const conversations:SearchResult[]=enabled('conversation')?queryAll<any>('SELECT m.id,m.content,m.created_at,m.conversation_id,c.title FROM ai_schedule_messages m JOIN orbit_conversations c ON c.id=m.conversation_id AND c.user_id=m.user_id WHERE m.user_id=? AND (instr(lower(m.content),lower(?))>0 OR instr(lower(c.title),lower(?))>0) ORDER BY m.created_at DESC LIMIT 10',[userId,query,query]).map(m=>({type:'conversation',id:m.id,title:m.title,snippet:plainText(m.content).slice(0,150),date:m.created_at,target:{path:orbitObjectPath({type:'conversation',id:m.id,conversationId:m.conversation_id})}})):[];
+  const tasks=new Map((enabled('reminder')?readReminderProjectionSources(userId):[]).map(p=>[p.task.id,p.task]));
+  const reminders:SearchResult[]=enabled('reminder')?[...tasks.values()].filter(t=>matchRank(query,[t.name])>0).slice(0,10).map(t=>({type:'reminder',id:t.id,title:t.name,snippet:'周期提醒',target:{path:orbitObjectPath({type:'reminder',id:t.id})}})):[];
+  let tools:SearchResult[]=[];
+  if(enabled('tool'))try{tools=getPublicTools(fileURLToPath(new URL('../protected-tools',import.meta.url))).filter(t=>matchRank(query,[t.title,t.summary])>0).slice(0,10).map(t=>({type:'tool',id:t.slug,title:t.title,snippet:t.summary,target:{path:t.path}}));}catch{/* Unavailable mounted tools do not hide account search results. */}
+  const reports:SearchResult[]=enabled('activity-report')?queryAll<any>('SELECT id,range_start,range_end,created_at FROM orbit_activity_reports WHERE user_id=? ORDER BY created_at DESC LIMIT 50',[userId]).filter(r=>matchRank(query,['Orbit Weekly','个人活动报告',r.range_start,r.range_end])>0).slice(0,10).map(r=>({type:'activity-report',id:r.id,title:'Orbit Weekly · 个人活动报告',snippet:`${r.range_start} 至 ${r.range_end}`,date:r.created_at,target:{path:orbitObjectPath({type:'activity-report',id:r.id})}})):[];
+  return {conversation:conversations,reminder:reminders,tool:tools,'activity-report':reports};
 }

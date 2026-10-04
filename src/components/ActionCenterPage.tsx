@@ -403,27 +403,7 @@ export function ActionCenterPage() {
     }
   }, [authHeaders, days]);
 
-  const loadNotifications = useCallback(async () => {
-    try {
-      const response = await fetch('/api/notifications?limit=30', { headers: authHeaders() });
-      if (!response.ok) return;
-      const result = await response.json();
-      const list: NotificationItem[] = result.notifications || [];
-      if ('Notification' in window && Notification.permission === 'granted') {
-        for (const item of list.filter(entry => entry.channel === 'browser' && entry.status === 'sent' && !entry.readAt).slice(0, 3)) {
-          new Notification(item.title, { body: item.body, tag: item.id });
-          fetch('/api/notifications/' + item.id + '/read', { method: 'POST', headers: authHeaders() }).catch(() => undefined);
-        }
-      }
-    } catch { /* 浏览器通知失败不影响行动中心 */ }
-  }, [authHeaders]);
-
   useEffect(() => { loadActions(); }, [loadActions]);
-  useEffect(() => {
-    loadNotifications();
-    const timer = window.setInterval(loadNotifications, 60_000);
-    return () => window.clearInterval(timer);
-  }, [loadNotifications]);
 
   const sendTodayEmail = async () => {
     if (sendingEmail) return;

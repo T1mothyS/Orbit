@@ -18,12 +18,14 @@ import { extractAiMessageText, parseAiJsonCandidates } from './ai-json.js';
 import { addLog } from './log-service.js';
 import { syncReminderCycleToCalendar, syncReminderTaskToCalendar } from './reminder-calendar-sync.js';
 import { listCompletions, createCompletion } from './activity-store.js';
+import { enqueueNotificationDetailed } from './activity-store.js';
+import { inAppEnabled, setInAppEnabled, deliverInApp, processInAppNotifications } from './notification-chat.js';
 
 interface ReminderRule {enabled:number;minutes:number;snoozed_until:string|null}
 interface Candidate {schedule:Schedule;expected:string;trigger:string;start:Date;instanceId:string|null;taskId?:string}
 interface ProactiveEvent {id:string;user_id:string;schedule_id:string;instance_id:string|null;expected_state:string;trigger_at:string;state:string;created_at:string}
-export function getProactivePreference(userId:string) {return queryOne<{proactive_enabled:number}>('SELECT proactive_enabled FROM orbit_preferences WHERE user_id=?',[userId])?.proactive_enabled===1;}
-export function setProactivePreference(userId:string,enabled:boolean) {run('INSERT INTO orbit_preferences (user_id,proactive_enabled) VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET proactive_enabled=excluded.proactive_enabled',[userId,enabled?1:0]);}
+export function getProactivePreference(userId:string) {return inAppEnabled(userId);}
+export function setProactivePreference(userId:string,enabled:boolean) {setInAppEnabled(userId,enabled);}
 export function getScheduleReminder(userId:string,id:string) {
   const s=getSchedule(id);if(!s||s.user_id!==userId)throw new Error('事项不存在');
   const rule=queryOne<ReminderRule>('SELECT * FROM orbit_schedule_reminders WHERE user_id=? AND schedule_id=?',[userId,id]);
@@ -78,7 +80,7 @@ let ticking=false;
 export async function runOrbitProactiveTick(now=new Date()) {
   if(ticking)return {sent:0};ticking=true;let sent=0;
   try {
-    const users=queryAll<{id:string}>('SELECT u.id FROM users u JOIN orbit_preferences p ON p.user_id=u.id WHERE u.disabled=0 AND p.proactive_enabled=1');
+    const users=queryAll<{id:string}>('SELECT u.id FROM users u JOIN reminders p ON p.user_id=u.id WHERE u.disabled=0 AND p.in_app_enabled=1');
     for(const {id:userId} of users) {
       if(quietNow(userId,now))continue;
       for(const p of readReminderProjectionSources(userId).filter(p=>p.current&&p.cycle))syncReminderTaskToCalendar({...p.task,currentCycle:p.cycle,nextReminderDate:null,lastReminderDate:null,sentReminderTypes:[]});
@@ -99,9 +101,10 @@ export async function runOrbitProactiveTick(now=new Date()) {
         const current=proactiveCandidates(userId).find(c=>c.schedule.id===s.id&&c.expected===candidate.expected&&c.trigger===candidate.trigger);
         const elapsed=Date.now()-generationStarted;
         if(!current||!getProactivePreference(userId)||db.getUserById(userId)?.disabled||quietNow(userId,new Date(now.getTime()+Math.max(0,elapsed)))||(!candidate.taskId&&!ruleFor(userId,s.id)?.snoozed_until&&Date.parse(candidate.trigger)<candidate.start.getTime()&&candidate.start.getTime()<now.getTime()+elapsed)||elapsed+now.getTime()-Date.parse(candidate.trigger)>300000) {run('UPDATE orbit_proactive_events SET state=? WHERE id=?',['discarded',event.id]);continue;}
-        const messageId=randomUUID();
         withPersistenceTransaction(()=>{
-          run('INSERT INTO ai_schedule_messages (id,user_id,role,type,content,schedule_items,created_at,conversation_id,orbit_meta) VALUES (?,?,?,?,?,?,?,?,?)',[messageId,userId,'assistant','text',fact+`\n\n温馨提示：${tip||'可以先准备好这件事所需的物品或资料，按自己的节奏完成。'}`,JSON.stringify([current.schedule]),now.toISOString(),cid,JSON.stringify({origin:'proactive',eventId:event!.id,scheduleId:s.id,triggerAt:candidate.trigger,startAt:candidate.start.toISOString(),enhanced:!!tip})]);
+          const notification=enqueueNotificationDetailed({userId,sourceType:candidate.taskId?'reminder':'schedule',sourceId:candidate.taskId||s.id,instanceId:candidate.instanceId,channel:'in_app',kind:ruleFor(userId,s.id)?.snoozed_until?'proactive_snooze':'proactive',title:s.title,body:fact+`\n\n温馨提示：${tip||'可以先准备好这件事所需的物品或资料，按自己的节奏完成。'}`,scheduledAt:candidate.trigger,dedupeKey:`proactive:${userId}:${s.id}:${candidate.trigger}`}).notification;
+          const messageId=deliverInApp(notification,event!.id,!!tip);
+          if(!messageId)throw new Error('站内通知未能持久化');
           run('UPDATE orbit_proactive_events SET state=?,message_id=? WHERE id=?',['sent',messageId,event!.id]);
           run('UPDATE orbit_conversations SET updated_at=? WHERE id=? AND user_id=?',[now.toISOString(),cid,userId]);
         });sent++;
@@ -133,4 +136,4 @@ export function proactiveEventView(userId:string,id:string){
   if(e?.state==='sent'){const s=getSchedule(e.schedule_id);if(!s||s.user_id!==userId||s.is_completed||scheduleFingerprint(s)!==e.expected_state){run("UPDATE orbit_proactive_events SET state='discarded' WHERE user_id=? AND id=?",[userId,id]);e.state='discarded';}}
   return {state:e?.state||'discarded',handledAction:e?.handled_action,handledAt:e?.handled_at,nextReminderAt:e?.next_reminder_at};
 }
-export function createProactiveJobs(isReady:()=>boolean) {return createJobRunner([{name:'orbit-proactive',expression:'*/30 * * * * *',run:async()=>{if(isReady())await runOrbitProactiveTick();}}],()=>addLog('warn','ai','Orbit 主动提醒扫描失败'));}
+export function createProactiveJobs(isReady:()=>boolean) {return createJobRunner([{name:'orbit-proactive',expression:'*/30 * * * * *',run:async()=>{if(isReady()){await runOrbitProactiveTick();processInAppNotifications();await (await import('./activity-reports.js')).runWeeklyReports();}}}],()=>addLog('warn','ai','Orbit 通知与周期报告扫描失败'));}

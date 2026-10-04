@@ -1,3 +1,4 @@
+import { getNotification } from './activity-store.js';
 import { getUserById, getReminder, getUserPreferredModel } from './db.js';
 import { defaultModel } from './ai-credentials.js';
 import { chatGPTStatus } from './chatgpt-connection.js';
@@ -30,7 +31,8 @@ export function submitOrbitRequest(userId: string, body: any) {
     const text = String(body.text || '').trim();
     if (!text || text.length > 20000)
         throw new Error('请输入 1–20000 字的内容');
-    const allowed = new Set(['text', 'requestId', 'conversationId', 'targetDate', 'model', 'calendarId', 'knowledgeScope', 'provider','attachmentIds']);
+    const allowed = new Set(['text', 'requestId', 'conversationId', 'targetDate', 'model', 'calendarId', 'knowledgeScope', 'provider','attachmentIds','notificationId']);
+    if(body.notificationId!==undefined&&(typeof body.notificationId!=='string'||!getNotification(body.notificationId,userId)))throw new Error('通知不存在或无权访问');
     const attachmentIds=validateChatAttachments(userId,cid,body.attachmentIds||[]);
     if(body.provider!==undefined && !['workbuddy','chatgpt'].includes(body.provider))throw new Error('Provider 当前不可用');
     if(body.provider==='chatgpt' && (!chatGPTStatus(userId).connected || !body.model))throw new Error('请连接 ChatGPT 并选择该账号可用模型');

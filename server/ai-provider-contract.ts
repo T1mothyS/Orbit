@@ -10,7 +10,7 @@ export interface OrbitModel {
 export interface AiInputPart {
   type: 'text' | 'image' | 'file'; text?: string; data?: string; mime?: string; filename?: string;
 }
-export interface AiStep { id: string; label: string; state: 'running' | 'completed' | 'failed'; query?: string; at: string }
+export interface AiStep { id: string; label: string; state: 'running' | 'completed' | 'failed'; query?: string; at: string;resultCount?:number }
 export interface OrbitTool {
   name: string; description: string; schema: Record<string, unknown>;
   execute(args: unknown, signal?: AbortSignal): Promise<unknown>;

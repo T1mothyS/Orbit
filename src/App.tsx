@@ -40,7 +40,7 @@ function App() {
         document.title = 'Orbit - 设置 / Settings';
       } else {
         document.title = /^\/project\/?$/.test(location.pathname)
-          ? (new URLSearchParams(location.search).get('view')==='statistics'?'Orbit - 使用统计':'Orbit - 项目成长')
+          ? (new URLSearchParams(location.search).get('view')==='statistics'?'Orbit - 个人活动报告':'Orbit - 项目成长')
           : /^\/tools\/?$/.test(location.pathname) ? 'Orbit - Tools' : /^\/assistant\/?$/.test(location.pathname)?'Orbit - 对话':'Orbit - 首页 / Home';
       }
     }
@@ -100,6 +100,10 @@ function AppContent() {
   const activeSection: 'today' | 'schedule' | 'assistant' | 'reminders' | 'reports' | 'library' | null = isToolsPage || isProjectPage ? null : isResearchPage || location.pathname.startsWith('/reports') ? 'reports' : location.pathname.startsWith('/library') ? 'library' : location.pathname === '/schedule' ? 'schedule' : location.pathname === '/assistant' ? 'assistant' : location.pathname === '/reminders' ? 'reminders' : 'today';
   const changeSection = (section: 'today' | 'schedule' | 'assistant' | 'reminders' | 'reports' | 'library') => navigate(section === 'schedule' ? '/schedule' : section === 'assistant' ? '/assistant' : section === 'reminders' ? '/reminders' : section === 'reports' ? '/reports' : section === 'library' ? '/library' : '/today');
 
+  const settingsId=new URLSearchParams(location.search).get('settings');
+  useEffect(()=>{if(settingsId)setShowSettings(true);},[settingsId]);
+  useEffect(()=>{const open=(event:Event)=>{settingsTriggerRef.current=document.activeElement as HTMLElement;setShowSettings(true);const section=(event as CustomEvent<string>).detail;if(section)setTimeout(()=>document.dispatchEvent(new CustomEvent('orbit:settings-open-section',{detail:section})),200);};window.addEventListener('orbit:open-settings',open);return()=>window.removeEventListener('orbit:open-settings',open);},[]);
+  const closeSettings=()=>{setShowSettings(false);if(settingsId){const params=new URLSearchParams(location.search);params.delete('settings');navigate({pathname:location.pathname,search:params.toString()},{replace:true});}};
   // 设置弹窗打开/关闭时更新 Tab 标题
   useEffect(() => {
     document.title = showSettings
@@ -107,9 +111,9 @@ function AppContent() {
       : showAdmin
       ? 'Orbit - 管理面板 / Admin'
       : activeSection === null
-      ? isProjectPage ? 'Orbit - 项目成长' : 'Orbit - Tools'
+      ? isProjectPage ? (new URLSearchParams(location.search).get('view')==='statistics'?'Orbit - 个人活动报告':'Orbit - 项目成长') : 'Orbit - Tools'
       : activeSection === 'assistant' ? 'Orbit - 对话' : 'Orbit - 个人事务中心';
-  }, [activeSection, showSettings, showAdmin, isProjectPage]);
+  }, [activeSection, showSettings, showAdmin, isProjectPage,location.search]);
 
   return (
     <>
@@ -133,9 +137,9 @@ function AppContent() {
         </FeatureBoundary>
       </AppShell>
 
-      {showSettings && <FeatureBoundary onClose={() => { setShowSettings(false); settingsTriggerRef.current?.focus(); }}><SettingsDialog
+      {showSettings && <FeatureBoundary onClose={() => { closeSettings(); settingsTriggerRef.current?.focus(); }}><SettingsDialog
         restoreFocusTo={settingsTriggerRef.current}
-        onClose={() => setShowSettings(false)}
+        onClose={closeSettings}
         onOpenAdmin={() => { setShowSettings(false); setShowAdmin(true); }}
         onOpenTools={() => { setShowSettings(false); navigate('/tools'); }}
         onOpenProject={() => { setShowSettings(false); navigate('/project'); }}

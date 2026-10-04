@@ -14,6 +14,7 @@ const notifications = await import('./notification-service.js');
 
 await db.initDb();
 await activity.initActivityDb();
+const scheduleStore=await import('./schedule-store.js');await scheduleStore.initScheduleDb();
 
 test('通知队列会记录领取、非邮件处理和最终状态', async () => {
   const userId = 'notification-service-user';
@@ -44,6 +45,7 @@ test('通知队列会记录领取、非邮件处理和最终状态', async () =>
     created_at: now,
     updated_at: now,
   });
+  scheduleStore.createSchedule({id:'notification-service-schedule',user_id:userId,calendar_id:'personal',type:'event',title:'测试事项',start_time:now,end_time:now,all_day:false,category:'life',priority:'medium',is_completed:false,is_repeated:false,reminders:[],is_high_risk:false});
   notifications.enqueueUserNotification({
     userId,
     sourceType: 'schedule',
@@ -65,10 +67,10 @@ test('通知队列会记录领取、非邮件处理和最终状态', async () =>
   assert.equal(stored?.status, 'sent');
   assert.deepEqual(
     events.map(event => event.data?.event),
-    ['notification_queue_scan_started', 'notification_claimed', 'non_email_notification_marked_sent', 'notification_sent', 'notification_queue_completed'],
+    ['notification_queue_scan_started', 'notification_claimed', 'notification_sent', 'notification_queue_completed'],
   );
   assert.equal(events[1]?.data?.notificationId, stored?.id);
-  assert.equal(events[3]?.data?.sentAt != null, true);
+  assert.equal(events[2]?.data?.sentAt != null, true);
 });
 
 test('邮件配置错误会记录错误码、失败状态和下一次重试时间', async () => {

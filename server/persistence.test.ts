@@ -35,7 +35,8 @@ test('all four stores restore memory after a failed replacement; failed mutation
     const before = item.bytes();
     const disk = fs.readFileSync(path.join(root, item.name));
     const rename = fs.renameSync;
-    const mock = t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => { if (String(to) === path.join(root, item.name)) throw new Error('injected disk failure'); return rename(from, to); });
+    let failed=false;
+    const mock = t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => { if (!failed && String(to) === path.join(root, item.name)) {failed=true;throw new Error('injected disk failure');} return rename(from, to); });
     assert.throws(item.mutate, /injected/);
     mock.mock.restore();
     assert.deepEqual(item.bytes(), before, item.name + ' memory');

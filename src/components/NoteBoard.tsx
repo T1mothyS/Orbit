@@ -1,3 +1,4 @@
+import { NoteLinks } from './NoteLinks';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useDialogLifecycle } from '../hooks/useDialogLifecycle';
@@ -153,6 +154,7 @@ function NoteRow({
       : '选择为合并来源';
   return (
     <article
+      id={'orbit-note-'+note.id}
       className={`note-board-row${note.completed ? ' is-completed' : ''}${colorPickerOpen ? ' is-color-picker-open' : ''}${mergeSourceSelected ? ' is-merge-source' : ''}`}
       style={{ backgroundColor: colorStyle.surface, borderColor: colorStyle.border }}
     >
@@ -239,9 +241,9 @@ function NoteRow({
               aria-label="编辑记事正文"
             />
           ) : (
-            <button type="button" className="note-board-content-button" onClick={onStartEdit} disabled={disabled}>
-              {note.content}
-            </button>
+            <div className="note-board-content-button" onClick={()=>{if(!disabled)onStartEdit();}}>
+              <NoteLinks text={note.content}/>
+            </div>
           )}
         </div>
       </div>

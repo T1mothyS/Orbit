@@ -471,6 +471,7 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
       dailyReportCloudContext: payload.dailyReportCloudContext !== undefined,
       mode,
       idsRemapped: isForeignAccount,
+      historicalReferencesUnavailable:isForeignAccount&&!!payload.orbit?.connected,
       partial: attachmentFailures.length > 0 || missingMedia.length > 0,
       status: attachmentFailures.length || missingMedia.length ? 'PARTIAL' : 'COMPLETED',
       attachmentFailures,

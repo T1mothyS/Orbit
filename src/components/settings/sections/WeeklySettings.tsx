@@ -1,0 +1,12 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../../hooks/useAuth';
+import { SettingRow } from '../SettingRow';
+interface WeeklyPreferences {enabled:boolean;weekday:number;hour:number;minute:number;timezone:string;runnerEnabled:boolean;emailRunnerEnabled:boolean}
+export function WeeklySettings() {
+  const {authHeaders}=useAuth();const [data,setData]=useState<WeeklyPreferences|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const load=()=>{setError('');void fetch('/api/orbit/weekly/preferences',{headers:authHeaders()}).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||'周报设置加载失败');setData(d);}).catch(e=>setError(e.message));};
+  useEffect(load,[authHeaders]);
+  const save=async()=>{if(!data)return;setBusy(true);setError('');try{const r=await fetch('/api/orbit/weekly/preferences',{method:'PATCH',headers:{...authHeaders(),'Content-Type':'application/json'},body:JSON.stringify({enabled:data.enabled,weekday:data.weekday,hour:data.hour,minute:data.minute})});const d=await r.json();if(!r.ok)throw new Error(d.error||'周报设置保存失败');setData(d);}catch(e){setError(e instanceof Error?e.message:'周报设置保存失败');}finally{setBusy(false);}};
+  return <SettingRow label="Orbit Weekly" description="总结最近七天的执行、知识积累与 AI 协作；自动投递默认关闭。使用已开启的邮件及站内通知渠道。">{data?<><label><input type="checkbox" checked={data.enabled} disabled={busy} onChange={e=>setData({...data,enabled:e.target.checked})}/> 开启自动周报</label><div className="settings-time-pair"><select aria-label="周报星期" disabled={busy} value={data.weekday} onChange={e=>setData({...data,weekday:Number(e.target.value)})}>{['周日','周一','周二','周三','周四','周五','周六'].map((d,i)=><option key={i} value={i}>{d}</option>)}</select><input type="time" aria-label="周报时间" disabled={busy} value={`${String(data.hour).padStart(2,'0')}:${String(data.minute).padStart(2,'0')}`} onChange={e=>{const [hour,minute]=e.target.value.split(':').map(Number);if(Number.isFinite(hour)&&Number.isFinite(minute))setData({...data,hour,minute});}}/><span>{data.timezone}</span></div><button type="button" disabled={busy} onClick={()=>void save()}>{busy?'保存中…':'保存周报设置'}</button>{!data.runnerEnabled&&<p role="status">自动报告服务未启用；设置会保留，可在统计页手动生成。</p>}{data.enabled&&!data.emailRunnerEnabled&&<p className="settings-help">邮件发送服务未启用时，邮件会等待队列处理；站内投递独立运行。</p>}<p><Link to="/project?view=statistics">查看个人活动报告 →</Link></p></>:<p role="status">正在读取周报设置…</p>}{error&&<p role="alert">{error}<button type="button" onClick={load}>重新读取</button></p>}</SettingRow>;
+}

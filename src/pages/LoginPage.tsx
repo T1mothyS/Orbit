@@ -12,7 +12,7 @@ type Mode = 'login' | 'register';
 
 function getSafeNextPath(pathname: string, search: string): string | null {
   const queryNext = new URLSearchParams(search).get('next');
-  const candidate = queryNext || (/^\/(tools|project|reports)(\/|$)/.test(pathname) ? `${pathname}${search}` : null);
+  const candidate = queryNext || (/^\/(tools|project|reports|assistant|schedule|reminders|library|today)(\/|$)/.test(pathname) ? `${pathname}${search}` : null);
   if (!candidate || !candidate.startsWith('/') || candidate.startsWith('//')) return null;
   try {
     const url = new URL(candidate, window.location.origin);

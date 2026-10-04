@@ -16,6 +16,7 @@ const { searchAll, searchLibraryForAi } = await import('./search-service.js');
 await db.initDb();
 await activity.initActivityDb();
 await scheduleStore.initScheduleDb();
+await (await import('./reminder-store.js')).initReminderDb();
 
 const userId = 'search-user';
 const otherUserId = 'search-other-user';
@@ -113,7 +114,7 @@ scheduleStore.createSchedule({
 
 test('统一搜索覆盖日程、记事、日报和知识库，并返回日程直达地址', () => {
   const result = searchAll(userId, { query: '搜索', scope: 'all' });
-  assert.deepEqual(Object.keys(result.counts).sort(), ['library', 'note', 'report', 'schedule']);
+  assert.deepEqual(Object.keys(result.counts).sort(), ['activity-report','conversation','library','note','reminder','report','schedule','setting','tool']);
   assert.ok(result.results.some(item => item.type === 'schedule'));
   assert.ok(result.results.some(item => item.type === 'note'));
   assert.ok(result.results.some(item => item.type === 'report'));

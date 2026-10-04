@@ -88,6 +88,7 @@ export function DataSettings({ authHeaders }: { authHeaders: SettingsAuthHeaders
       } else {
         MessagePlugin.success('数据恢复完成，刷新页面后生效');
       }
+      if(data.result?.historicalReferencesUnavailable)setRestoreIssues(previous=>[...previous,'跨账号恢复已保留活动事件和报告快照；原账号对象链接已停用，请从恢复后的事项重新生成报告。']);
       setBackupFile(null); setBackupPreview(null);
     } catch (error: any) { MessagePlugin.error(error?.message || '恢复失败'); }
     finally { setBackupBusy(false); }
@@ -121,7 +122,7 @@ export function DataSettings({ authHeaders }: { authHeaders: SettingsAuthHeaders
 
 
   return (
-    <SettingSection id="data" title="数据备份与恢复" description="仅处理当前账号的数据。加密备份包含个人日历、周期事务、记事、日报、完成历史和附件，不包含密码、角色或 API Key。">
+    <SettingSection id="data" title="数据备份与恢复" description="仅处理当前账号的数据。加密备份包含个人日历、周期事务、记事、日报、完成历史、头像、活动事件、个人周报和附件，不包含密码、角色或 API Key。">
       {restoreIssues.length > 0 && <div className="settings-status" role="alert" style={{ overflowWrap: 'anywhere' }}>
         <div><strong>恢复未全部完成</strong><ul>{restoreIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul></div>
       </div>}

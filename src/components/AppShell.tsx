@@ -1,4 +1,8 @@
-import { ReactNode } from 'react';
+import { ReactNode, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { AccountAvatar } from './AccountAvatar';
+import { BrowserNotifications } from './BrowserNotifications';
+import '../styles/account-menu.css';
 import { Bot, CalendarDays, CircleArrowRight, Repeat2, BookOpen, Moon, Newspaper, Settings, Shield, Sun, type LucideIcon } from 'lucide-react';
 import { GlobalSearch } from './GlobalSearch';
 
@@ -39,6 +43,8 @@ export function AppShell({
   onLogout,
   children,
 }: AppShellProps) {
+  const menu=useRef<HTMLDetailsElement>(null);
+  const close=()=>{if(menu.current)menu.current.open=false;};
   return (
     <div className={`app-shell${mobileReader ? ' app-shell-mobile-reader' : ''}`}>
       <header className="reminder-topbar app-topbar">
@@ -67,23 +73,22 @@ export function AppShell({
         </nav>
 
         <div className="topbar-actions">
-          <span className="user-chip" title={user?.email}>{user?.email}</span>
           <GlobalSearch />
-          <button className="icon-button" onClick={onOpenSettings} title="设置" aria-label="打开设置">
-            <Settings size={16} />
-          </button>
-          {user?.role === 'admin' && (
-            <button className="icon-button" onClick={onOpenAdmin} title="管理面板" aria-label="打开管理面板">
-              <Shield size={16} />
-            </button>
-          )}
-          <button className="icon-button" onClick={onToggleTheme} title="切换主题" aria-label="切换主题">
-            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-          </button>
-          <button className="text-button" onClick={() => { onLogout?.(); window.location.href = '/login'; }}>退出</button>
+          <details className="account-menu" ref={menu} onKeyDown={e=>{if(e.key==='Escape'){close();menu.current?.querySelector('summary')?.focus();}}} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))close();}}>
+            <summary aria-label="个人菜单" title={user?.email}><AccountAvatar email={user?.email||'O'}/></summary>
+            <div className="account-menu-panel"><strong>{user?.email}</strong>
+              <button type="button" onClick={()=>{close();window.dispatchEvent(new CustomEvent('orbit:open-settings',{detail:'account'}));}}>账户与头像</button>
+              <button type="button" onClick={()=>{close();onOpenSettings();}}><Settings size={16}/> 设置</button>
+              <Link to="/project?view=statistics" onClick={close}>个人活动报告</Link>
+              <Link to="/tools" onClick={close}>Tools 工具中心</Link><Link to="/project?view=growth" onClick={close}>项目成长</Link>
+              {user?.role==='admin'&&<button type="button" onClick={()=>{close();onOpenAdmin?.();}}><Shield size={16}/> 管理面板</button>}
+              <button type="button" onClick={onToggleTheme}>{theme==='light'?<Moon size={16}/>:<Sun size={16}/>} 切换主题</button>
+              <button type="button" onClick={()=>{onLogout?.();window.location.href='/login';}}>退出登录</button>
+            </div>
+          </details>
         </div>
       </header>
-      <main className="app-shell-body">{children}</main>
+      <BrowserNotifications/><main className="app-shell-body">{children}</main>
     </div>
   );
 }

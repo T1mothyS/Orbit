@@ -68,6 +68,16 @@ export function applyChatSchema(db: Database, { queryAll, queryOne }: SchemaQuer
   db.run(`CREATE TABLE IF NOT EXISTS orbit_knowledge_events (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,entry_id TEXT NOT NULL,kind TEXT NOT NULL,created_at TEXT NOT NULL,UNIQUE(user_id,id))`);
   db.run('CREATE INDEX IF NOT EXISTS orbit_knowledge_events_period ON orbit_knowledge_events(user_id,kind,created_at)');
   db.run('CREATE TABLE IF NOT EXISTS orbit_metrics_meta (key TEXT PRIMARY KEY,value TEXT NOT NULL)');
+  db.run('CREATE TABLE IF NOT EXISTS orbit_activity_events (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,kind TEXT NOT NULL,source_id TEXT NOT NULL,occurred_at TEXT NOT NULL,metadata TEXT NOT NULL)');
+  db.run('CREATE INDEX IF NOT EXISTS orbit_activity_period ON orbit_activity_events(user_id,occurred_at,kind)');
+  db.run('CREATE TABLE IF NOT EXISTS orbit_activity_reports (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,range_start TEXT NOT NULL,range_end TEXT NOT NULL,snapshot TEXT NOT NULL,snapshot_hash TEXT NOT NULL,insights TEXT,insight_error TEXT,created_at TEXT NOT NULL,UNIQUE(user_id,snapshot_hash))');
+  db.run('CREATE TABLE IF NOT EXISTS orbit_weekly_preferences (user_id TEXT PRIMARY KEY,enabled INTEGER NOT NULL DEFAULT 0,weekday INTEGER NOT NULL DEFAULT 0,hour INTEGER NOT NULL DEFAULT 20,minute INTEGER NOT NULL DEFAULT 0,last_cutoff TEXT)');
+  db.run('CREATE TABLE IF NOT EXISTS orbit_profiles (user_id TEXT PRIMARY KEY,avatar_id TEXT)');
+  const reportColumns=queryAll<{name:string}>('PRAGMA table_info(orbit_activity_reports)');
+  if(!reportColumns.some(c=>c.name==='auto_cutoff'))db.run('ALTER TABLE orbit_activity_reports ADD COLUMN auto_cutoff TEXT');
+  db.run('CREATE UNIQUE INDEX IF NOT EXISTS orbit_report_cutoff ON orbit_activity_reports(user_id,auto_cutoff)');
+  db.run('CREATE TABLE IF NOT EXISTS orbit_notification_messages (notification_id TEXT PRIMARY KEY,user_id TEXT NOT NULL,message_id TEXT NOT NULL,delivery_key TEXT NOT NULL,UNIQUE(user_id,delivery_key))');
+  db.run('INSERT OR IGNORE INTO orbit_metrics_meta (key,value) VALUES (?,?)',[ 'activity_tracking_since',new Date().toISOString()]);
   db.run('INSERT OR IGNORE INTO orbit_metrics_meta (key,value) VALUES (?,?)',['knowledge_tracking_since',new Date().toISOString()]);
   db.run(`CREATE TABLE IF NOT EXISTS orbit_schedule_reminders (user_id TEXT NOT NULL,schedule_id TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 1,minutes INTEGER NOT NULL DEFAULT 15,snoozed_until TEXT,PRIMARY KEY(user_id,schedule_id))`);
   db.run(`CREATE TABLE IF NOT EXISTS orbit_proactive_events (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,schedule_id TEXT NOT NULL,instance_id TEXT,expected_state TEXT NOT NULL,trigger_at TEXT NOT NULL,state TEXT NOT NULL,message_id TEXT,error TEXT,created_at TEXT NOT NULL,UNIQUE(user_id,schedule_id,expected_state,trigger_at))`);
@@ -80,6 +90,8 @@ export function applyChatSchema(db: Database, { queryAll, queryOne }: SchemaQuer
   db.run('CREATE INDEX IF NOT EXISTS orbit_history_conversation ON ai_schedule_messages(user_id,conversation_id,created_at)');
   db.run('CREATE TABLE IF NOT EXISTS orbit_search_usage (month TEXT PRIMARY KEY,calls INTEGER NOT NULL DEFAULT 0,stopped INTEGER NOT NULL DEFAULT 0)');
   db.run('CREATE TABLE IF NOT EXISTS orbit_request_steps (user_id TEXT NOT NULL,request_id TEXT NOT NULL,id TEXT NOT NULL,label TEXT NOT NULL,state TEXT NOT NULL,query TEXT,at TEXT NOT NULL,PRIMARY KEY(user_id,request_id,id))');
+  const stepColumns=queryAll<{name:string}>('PRAGMA table_info(orbit_request_steps)');
+  if(!stepColumns.some(c=>c.name==='result_count'))db.run('ALTER TABLE orbit_request_steps ADD COLUMN result_count INTEGER');
   db.run('CREATE TABLE IF NOT EXISTS orbit_attachments (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,conversation_id TEXT NOT NULL,state TEXT NOT NULL,error TEXT,extraction TEXT,created_at TEXT NOT NULL)');
   db.run('CREATE TABLE IF NOT EXISTS orbit_message_attachments (user_id TEXT NOT NULL,message_id TEXT NOT NULL,attachment_id TEXT NOT NULL,PRIMARY KEY(user_id,message_id,attachment_id))');
   db.run('CREATE INDEX IF NOT EXISTS orbit_attachment_conversation ON orbit_attachments(user_id,conversation_id,created_at)');

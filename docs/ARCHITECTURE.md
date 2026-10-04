@@ -183,13 +183,13 @@ Orbit 账号备份的 aiSelection 随偏好导出并在恢复前校验，不包�
 
 知识更新比较相邻版本内容哈希，初始/补建基线和连续相同版本不计。`POST /api/orbit/knowledge/:id/read` 在实际可见详情打开时记录，滚动半小时同条目去重；AI 回答保存后只为校验过的 `referenced=true` 来源记录一次消息/条目引用。事件只存账号/条目/种类/时间，系统元数据保留采集起点；之前阅读/引用显示未记录，不回算模糊历史。
 
-服务级 `ORBIT_PROACTIVE_ENABLED=true` 独立启动每 30 秒扫描，账号侧栏还需开启主动聊天；不依赖 BACKGROUND_JOBS_ENABLED，不启动 SMTP/IMAP、日报或备份。普通明确时间事项缺省提前 15 分钟一次，有明确分钟数则沿用；周期沿用原 offset/date/time/timezone。无日期及无明确时间全天事项不自动触发。`GET/PATCH /api/orbit/schedules/:id/reminder` 调整普通事项聊天提醒，不更改原邮件或周期规则。
+服务级 `ORBIT_PROACTIVE_ENABLED=true` 独立启动每 30 秒扫描，账号通知设置中的站内通知开关还需开启；不依赖 BACKGROUND_JOBS_ENABLED，不启动 SMTP/IMAP、日报或备份。普通明确时间事项缺省提前 15 分钟一次，有明确分钟数则沿用；周期沿用原 offset/date/time/timezone。无日期及无明确时间全天事项不自动触发。`GET/PATCH /api/orbit/schedules/:id/reminder` 调整普通事项聊天提醒，不更改原邮件或周期规则。
 
 只处理触发点后 5 分钟内候选；免打扰期间抑制，结束时仅窗口内有效候选可发，过期不批量补发。账号正在生成普通请求时直接用事实模板，其余可用该账号已授权模型补充最多 600 字建议，20 秒超时/失败降级；资料不作为指令，AI 无写入工具。发送前复查账号开关、静默、事项事实指纹、提醒时点及完成状态。网络等待不持有数据库事务，消息与事件状态在同步事务中落盘；同账号/事项实例/提醒点去重，事实指纹用于发送前校验，重启只恢复窗口内未送候选。
 
 提醒默认写主对话并保存来源。`POST /api/orbit/reminders/:eventId/complete|snooze|tomorrow` 验账号、事件及事项基线：完成沿用真实完成记录/周期同步；稍后为 15 分钟，次日为账号时区明天 09:00，仅调整聊天提醒。重复动作拒绝，自然语言修改仍走确认计划。关页面后消息仍保存，不代表网页外或手机弹出。真实模型建议质量和自然定时另行验收。
 
-账号备份保存主对话标记、消息来源、普通提醒规则及使用事件；同账号合并幂等，替换恢复关闭主动提醒、丢弃未送事件和 snooze 时间，恢复不自动发起 AI。外账号恢复清除原业务引用及提醒/统计事件，旧备份缺新字段继续可读。删除/清空账号清理新账号表，全库快照覆盖系统采集起点。数据迁移前留数据库快照；生产迁移另行授权。
+账号备份保存主对话标记、消息来源、普通提醒规则及使用事件；同账号合并幂等，替换恢复不重放未送通知和 snooze 时间，个人自动周报关闭，恢复不自动发起 AI。外账号恢复清除原业务引用及可执行提醒，并保留停用原链接的历史活动事件/报告快照，旧备份缺新字段继续可读。删除/清空账号清理新账号表，全库快照覆盖系统采集起点。数据迁移前留数据库快照；生产迁移另行授权。
 
 ### Orbit AI 基础升级
 Provider 合同位于 server/ai-provider-contract.ts：模型目录声明与真实验证分开；未知能力保持 unknown。工具只有受控读取和草稿权限，正式写入继续经过用户确认和 operation-service。WorkBuddy SDK 内置工具继续关闭。
@@ -231,3 +231,19 @@ Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓�
 认证事件流 `GET /api/orbit/requests/:id/events` 在每次更新检查 token 到期、账号禁用及 auth_version，流断开回查持久请求并保留轮询降级。失败项重试创建新的有期限草稿，只复制失败操作并保留原指纹；旧草稿保存 retryPlanId，重复请求不复制成功项。
 
 完成记录 `PUT /api/completions/:id` 继续校验账号归属。可选 note/billDate 的 null 或空字符串表示清空，省略表示保留；日期非法拒绝更新，不能把 null 转成字面文本。前端分别呈现登记完成、证明上传和失败恢复，附件失败不重新创建已成功的完成记录；网络超时结果仍未知。
+
+
+### 交互连接与个人活动报告合同
+
+- Status: CONTRACT；2026-10-04 增量实现。权威来源：`notification-chat.ts`、`activity-statistics.ts`、`activity-reports.ts`、`connected-backup.ts`、`orbit-profile.ts` 与相关路由/测试。行为、表结构、过滤或投递规则变更时同步本节。
+- `reminders.in_app_enabled` 是站内及主动聊天的唯一账号开关。旧 `proactiveEnabled` GET/PATCH 仅为兼容别名，旧字段不再存第二份启用状态。逐事项提前/停用规则保持独立。
+- `orbit_notification_messages` 以账号、对象、周期实例、精确提醒时点去重。站内消息、映射、会话时间和通知 sent 在跨库同步事务落盘。系统重启复用映射，不扫描历史 sent 做消息回填；删除消息也不重放历史通知。已读使用通知 read_at，完成使用真实业务记录，投递 sent 与两者独立。
+- 新卡片元数据包含通知 ID、对象引用、来源标签、设置引用及事项基线指纹。GET 历史会按当前归属/完成/指纹计算状态；完成与延后接口再次检查，不接受失效卡片。旧主动卡片动作继续支持。站内扫描独立于 SMTP/IMAP；公共应用层消费浏览器前台通知，浏览器队列 sent 表示前台可消费，read 表示前台已显示/确认，不保证系统弹窗最终呈现。
+- `src/utils/orbit-links.ts` 维护旧 URL 对象定位与安全协议过滤。Settings registry 只含稳定 ID、名称、用途、关键词和定位，不含配置值；账号权限过滤管理员设置。Settings 搜索、全局搜索、AI 只读工具及聊天卡片共用索引，不建立 AI 内嵌设置表单。
+- `orbit_activity_events` 只记录成功创建来源、日期改期、确认执行和成功记事优化。复用现有同步事务与 executeOnce，不记录页面停留或复制聊天正文。采集起点在 `orbit_metrics_meta`；未知历史不回填。
+- `GET /api/orbit/statistics` 保留旧字段和筛选；自定义 `period=custom&from=<带偏移时间>&to=<带偏移时间>`，最大 367 个自然日对应时长，开始包含/结束不包含。新增 activity、filters、coverage、每日趋势/热图与 metricDetails；`metric/offset/limit` 支持 1–100 条分页。安排分母按安排时间，完成按有效记录；周期与投影去重。无日期待办纳入新增、完成、积压。快照积压不反推历史；成功工具步骤要求 result_count > 0，旧未采集结果不补算。
+- `orbit_activity_reports` 保存范围、统计、摘要 hash、洞察、失败信息及自动截止点；模型无写工具，最多三条洞察、有界统计/必要摘要与证据对象，账号选择的 Provider/model，60 秒上限。快照 hash 忽略展示时刻/锚点；事实变化后可重新生成。接口：`GET/POST /api/orbit/activity-reports`、`GET /:id`、`GET /:id/current`、`POST /:id/insights`、`POST /:id/deliver`（confirm=true）。全部检查账号归属。发送预览先绑定保存的事实快照；确认时发送原报告 ID，数据变化不会悄悄替换已预览的内容。
+- `orbit_weekly_preferences` 默认 enabled=0，账号时区周日 20:00。`GET/PATCH /api/orbit/weekly/preferences` 只接受 enabled/weekday/hour/minute。稳定计划使用相邻本地周截止点，跨 DST 可能不是 168 小时；修改时点的首期接续最近实际截止点，长停服只取最近一周。账号、截止点唯一；邮件/站内按报告 ID/渠道唯一，报告与投递共用事实快照。模型失败仍为事实版；邮件 sent 仅表示 SMTP accepted。恢复不开启自动周报、不重投旧通知。
+- `orbit_profiles` 只存账号头像附件 ID。JPEG/PNG/WebP ≤5 MB，复用图片签名/配额/文件存储，sharp 转 256px WebP 并清除 EXIF。`GET /api/orbit/profile` 和头像 GET/POST/DELETE 必须认证；响应 private/no-store。
+- 账号备份 orbit.connected 保存事件/报告/偏好/头像映射/通知消息映射，文件沿现有 attachments 备份。旧备份缺字段兼容；跨账号恢复保留历史证据并停用原账号链接，自动周报保持关闭；未发送通知转 suppressed。删除/清空账号清理所有新表。
+- 首次新增报告表前在运行数据目录 migration-backups 保存既有 SQLite 文件；正常跨库事务保留 undo 恢复。回滚需停服务、保留当前新增数据，再恢复对应四库快照并切回原代码；不能以恢复旧数据库保留升级后新数据。生产迁移、部署、真实 AI/SMTP 与收件箱验收分别授权。
