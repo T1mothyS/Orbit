@@ -261,16 +261,23 @@
 
 @media (max-width: 760px) {
   .daily-reports-page { padding: 22px 14px 46px; }
-  .daily-reports-header { align-items: stretch; flex-direction: column; gap: 14px; }
+  .daily-reports-header { align-items:center; flex-direction:row; gap:8px; margin-bottom:12px; }
+  .daily-reports-eyebrow { display:none; }
   .daily-report-toolbar-actions { justify-content: flex-start; }
   .daily-report-toolbar-button { align-self: flex-start; }
   .daily-report-featured-open { display: flex; flex-direction: column; }
   .daily-report-featured-hero { height: auto; min-height: 0; aspect-ratio: 16 / 9; }
-  .daily-report-featured-body { padding: 22px 19px 24px; }
+  .app-shell .daily-report-featured-body { padding:12px; }
   .daily-report-featured-headline { font-size: 30px; }
-  .daily-report-card-open { display: flex; flex-direction: column; }
-  .daily-report-card-hero { width: 100%; height: 180px; }
-  .daily-report-card-open.illustrated .daily-report-card-hero { width: 100%; height: auto; }
+  .daily-report-card-open { display:grid; grid-template-columns:minmax(0,1fr); }
+  .daily-report-card-open.with-image { grid-template-columns:100px minmax(0,1fr); }
+  .daily-report-card-hero { width:88px; height:88px; margin:12px 0 0 12px; object-fit:cover; border-radius:6px; }
+  .daily-report-card-open.illustrated .daily-report-card-hero { width:88px; height:66px; }
+  .daily-report-card-body { padding:12px; }
+  .daily-report-card-headline { margin-top:8px; font-size:18px; }
+  .daily-report-card p { margin:8px 0; -webkit-line-clamp:2; }
+  .daily-report-card-footer { padding:8px 12px; gap:8px; }
+  .daily-report-image-credit,.daily-report-featured .daily-report-image-credit { padding:6px 12px; }
   .daily-report-history-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
   .daily-report-card-footer { align-items: flex-start; flex-direction: column; }
   .daily-report-card-footer .daily-report-retry-button { align-self: flex-start; }

@@ -56,6 +56,11 @@ export async function initDb(): Promise<void> {
       fs.copyFileSync(path.join(dataDir,name),path.join(snapshot,name),fs.constants.COPYFILE_EXCL);
   }
 
+  if (fs.existsSync(dbPath) && !queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='note_images'")) {
+    const snapshot = path.join(dataDir, 'migration-backups', `note-images-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+    fs.mkdirSync(snapshot, { recursive: true });
+    for (const name of fs.readdirSync(dataDir).filter(name => name.endsWith('.db'))) fs.copyFileSync(path.join(dataDir, name), path.join(snapshot, name), fs.constants.COPYFILE_EXCL);
+  }
   applyChatSchema(db, { queryAll, queryOne });
   setActivityEventSink(event => run('INSERT OR IGNORE INTO orbit_activity_events (id,user_id,kind,source_id,occurred_at,metadata) VALUES (?,?,?,?,?,?)',[event.id,event.userId,event.kind,event.sourceId,event.occurredAt,JSON.stringify(event.metadata)]));
 

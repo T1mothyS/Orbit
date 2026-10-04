@@ -25,7 +25,7 @@ export function createApp(deps: AppDependencies): express.Express {
   const largeJsonParser = express.json({ limit: '75mb' });
   const chatAttachmentParser=express.json({limit:'15mb'});
   app.use((req, res, next) => {
-    if(req.method==='POST'&&(/^\/api\/orbit\/conversations\/[^/]+\/attachments$/.test(req.path)||req.path==='/api/orbit/profile/avatar'))return chatAttachmentParser(req,res,next);
+    if(req.method==='POST'&&(/^\/api\/orbit\/conversations\/[^/]+\/attachments$/.test(req.path)||req.path==='/api/orbit/profile/avatar'||req.path==='/api/note-items/images'))return chatAttachmentParser(req,res,next);
     const acceptsLargeJson = req.method === 'POST' && (
       /^\/api\/completions\/[^/]+\/attachments$/.test(req.path)
       || req.path === '/api/ai/imports/parse'

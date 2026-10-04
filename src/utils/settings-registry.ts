@@ -1,6 +1,7 @@
 import { settingKeywords, searchSettings, type SearchableSetting } from './settings-search.js';
 // Stable IDs are shared by the settings UI, search and read-only AI recall. No values or secrets.
 const definitions = [
+  { id: 'library-full-export', section: 'library', label: '导出全库', description: '下载当前账号的完整知识库 JSON。', admin: false },
   {
     "id": "setting-account-m2enu0",
     "section": "account",

@@ -81,6 +81,7 @@ export function DataSettings({ authHeaders }: { authHeaders: SettingsAuthHeaders
         const issues = [
           ...(data.result.attachmentFailures || []).map((item: { originalName: string; error: string }) => `${item.originalName}：${item.error}`),
           ...(data.result.missingMedia || []).map((name: string) => `日报图片缺失：${name}`),
+          ...(data.result.missingNoteImages || []).map((id: string) => `记事图片缺失：${id}`),
           ...(data.result.cleanupFailures || []).map(() => '旧附件清理失败，已保留文件。'),
         ];
         setRestoreIssues(issues.length ? issues : ['部分内容未恢复，请核对备份。']);

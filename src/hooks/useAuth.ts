@@ -3,6 +3,7 @@
  * 管理 JWT token、用户信息、登录状态
  */
 import { useState, useEffect, useCallback } from 'react';
+import { clearAccountComposerDrafts } from '../utils/composer-draft';
 
 interface User {
   id: string;
@@ -105,6 +106,7 @@ export function useAuth() {
 
   // 登出
   const logout = () => {
+    if (state.user?.id) clearAccountComposerDrafts(state.user.id);
     void fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', keepalive: true }).catch(() => undefined);
     localStorage.removeItem(TOKEN_KEY);
     setState({ user: null, token: null, isLoading: false, isAuthenticated: false });

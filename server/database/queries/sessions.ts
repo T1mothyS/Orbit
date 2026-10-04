@@ -185,6 +185,8 @@ export function deleteExpiredAiScheduleMessages(beforeIso: string, userId?: stri
 }
 
 export function clearAllData(): void {
+  run('DELETE FROM note_item_images');
+  run('DELETE FROM note_images');
   run('DELETE FROM messages');
   run('DELETE FROM sessions');
   run('DELETE FROM ai_schedule_messages');

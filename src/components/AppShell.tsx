@@ -1,9 +1,10 @@
-import { ReactNode, useRef } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AccountAvatar } from './AccountAvatar';
 import { BrowserNotifications } from './BrowserNotifications';
 import '../styles/account-menu.css';
-import { Bot, CalendarDays, CircleArrowRight, Repeat2, BookOpen, Moon, Newspaper, Settings, Shield, Sun, type LucideIcon } from 'lucide-react';
+import { Bot, CalendarDays, CircleArrowRight, Repeat2, BookOpen, Moon, Newspaper, Settings, Sun, UserRound, ChartNoAxesCombined, type LucideIcon } from 'lucide-react';
+import { APP_CONFIG } from '../config';
 import { GlobalSearch } from './GlobalSearch';
 
 type Section = 'today' | 'schedule' | 'assistant' | 'reminders' | 'reports' | 'library';
@@ -45,6 +46,7 @@ export function AppShell({
 }: AppShellProps) {
   const menu=useRef<HTMLDetailsElement>(null);
   const close=()=>{if(menu.current)menu.current.open=false;};
+  useEffect(() => { const outside = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node)) close(); }; window.addEventListener('pointerdown', outside); return () => window.removeEventListener('pointerdown', outside); }, []);
   return (
     <div className={`app-shell${mobileReader ? ' app-shell-mobile-reader' : ''}`}>
       <header className="reminder-topbar app-topbar">
@@ -77,13 +79,17 @@ export function AppShell({
           <details className="account-menu" ref={menu} onKeyDown={e=>{if(e.key==='Escape'){close();menu.current?.querySelector('summary')?.focus();}}} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))close();}}>
             <summary aria-label="个人菜单" title={user?.email}><AccountAvatar email={user?.email||'O'}/></summary>
             <div className="account-menu-panel"><strong>{user?.email}</strong>
-              <button type="button" onClick={()=>{close();window.dispatchEvent(new CustomEvent('orbit:open-settings',{detail:'account'}));}}>账户与头像</button>
               <button type="button" onClick={()=>{close();onOpenSettings();}}><Settings size={16}/> 设置</button>
-              <Link to="/project?view=statistics" onClick={close}>个人活动报告</Link>
+              <button type="button" onClick={()=>{close();window.dispatchEvent(new CustomEvent('orbit:open-settings',{detail:'account'}));}}><UserRound size={16} />账户与头像</button>
+              <Link to="/project?view=statistics" onClick={close}><ChartNoAxesCombined size={16} />个人活动报告</Link>
+              <button type="button" onClick={()=>{close();onToggleTheme();}}>{theme==='light'?<Moon size={16}/>:<Sun size={16}/>} 切换主题</button>
+              <hr />
+              <Link to="/assistant?tool=email-import" onClick={close}>邮箱导入</Link><Link to="/research" onClick={close}>研究与观点</Link>
               <Link to="/tools" onClick={close}>Tools 工具中心</Link><Link to="/project?view=growth" onClick={close}>项目成长</Link>
-              {user?.role==='admin'&&<button type="button" onClick={()=>{close();onOpenAdmin?.();}}><Shield size={16}/> 管理面板</button>}
-              <button type="button" onClick={onToggleTheme}>{theme==='light'?<Moon size={16}/>:<Sun size={16}/>} 切换主题</button>
+              {user?.role==='admin'&&<button type="button" onClick={()=>{close();onOpenAdmin?.();}}>管理面板</button>}
+              <hr />
               <button type="button" onClick={()=>{onLogout?.();window.location.href='/login';}}>退出登录</button>
+              <div className="account-menu-version">Orbit {APP_CONFIG.version}</div>
             </div>
           </details>
         </div>

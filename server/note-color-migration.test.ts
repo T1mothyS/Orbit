@@ -43,4 +43,5 @@ test('旧 note_items 数据库迁移后使用中性灰并保留历史关联字�
   assert.equal(item.isOptimized, false);
   assert.equal(item.optimizationCount, 0);
   assert.equal(item.contentRevision, 0);
+  assert.deepEqual(item.images, []);
 });

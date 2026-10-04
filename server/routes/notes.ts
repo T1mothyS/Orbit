@@ -3,6 +3,7 @@ import * as noteItemService from '../note-item-service.js';
 import { OptimizeError } from '../prompt-optimize.js';
 import { createPromptOptimizationRunId, runPromptOptimization, type PromptOptimizationRun } from '../note-prompt-optimization.js';
 import { addLog } from '../log-service.js';
+import * as noteImages from '../note-image-service.js';
 
 export function createNotesRouter({
   authenticate,
@@ -12,6 +13,33 @@ export function createNotesRouter({
   optimizePrompt?: (userId: string, text: unknown, controller: AbortController, runId?: string) => Promise<PromptOptimizationRun>;
 }) {
   const app = Router();
+  app.post('/api/note-items/images', authenticate, async (req, res) => {
+    const controller = new AbortController();
+    const abort = () => { if (!res.writableEnded) controller.abort(); };
+    res.on('close', abort);
+    try {
+      const image = await noteImages.uploadNoteImage((req as any).user.userId, req.body, controller.signal);
+      if (!res.destroyed) res.status(201).json({ image });
+    } catch (error) {
+      if (!res.destroyed) res.status(400).json({ error: error instanceof Error ? error.message : '上传图片失败' });
+    } finally { res.off('close', abort); }
+  });
+  app.get('/api/note-items/images/:id', authenticate, (req, res) => {
+    try {
+      const image = noteImages.readNoteImage((req as any).user.userId, req.params.id);
+      res.setHeader('Content-Type', image.mime);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.send(image.bytes);
+    } catch { res.status(404).json({ error: '图片不存在、已过期或无权访问' }); }
+  });
+  app.delete('/api/note-items/images/:id', authenticate, (req, res) => {
+    const userId = (req as any).user.userId;
+    try { noteImages.noteImageView(userId, req.params.id); }
+    catch { return res.status(404).json({ error: '图片不存在、已过期或无权访问' }); }
+    try { noteImages.deleteUnboundNoteImage(userId, req.params.id); res.json({ success: true }); }
+    catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : '移除图片失败' }); }
+  });
   app.get('/api/note-items', authenticate, (req, res) => {
     try {
       const userId = (req as any).user.userId;
@@ -27,7 +55,7 @@ export function createNotesRouter({
       const userId = (req as any).user.userId;
       const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
       const input = body.contents !== undefined ? body.contents : body.content;
-      const items = noteItemService.createNoteItems(userId, input, body.color === undefined ? 'neutral' : body.color);
+      const items = noteItemService.createNoteItems(userId, input, body.color === undefined ? 'neutral' : body.color, body.imageIds === undefined ? [] : body.imageIds);
       res.status(201).json({ items });
     } catch (error: any) {
       res.status(400).json({ error: error?.message || '保存记事失败' });
@@ -38,10 +66,10 @@ export function createNotesRouter({
     try {
       const userId = (req as any).user.userId;
       const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
-      const unknownFields = Object.keys(body).filter(key => !['content', 'completed', 'color', 'expectedContent', 'expectedRevision'].includes(key));
-      if (unknownFields.length) return res.status(400).json({ error: '只允许修改记事内容、完成状态或颜色' });
+      const unknownFields = Object.keys(body).filter(key => !['content', 'imageIds', 'completed', 'color', 'expectedContent', 'expectedRevision'].includes(key));
+      if (unknownFields.length) return res.status(400).json({ error: '只允许修改记事内容、图片、完成状态或颜色' });
       if (body.expectedContent !== undefined && (typeof body.expectedContent !== 'string' || typeof body.content !== 'string')) return res.status(400).json({ error: '原文校验必须与正文一起提交' });
-      if (body.expectedRevision !== undefined && (body.content === undefined || !Number.isInteger(body.expectedRevision) || body.expectedRevision < 0)) return res.status(400).json({ error: '正文版本校验必须与正文一起提交' });
+      if (body.expectedRevision !== undefined && ((body.content === undefined && body.imageIds === undefined) || !Number.isInteger(body.expectedRevision) || body.expectedRevision < 0)) return res.status(400).json({ error: '正文版本校验必须与正文或图片一起提交' });
       const item = noteItemService.updateNoteItem(userId, req.params.id, body);
       if (!item) return res.status(404).json({ error: '记事不存在或无权访问' });
       res.json({ item });
@@ -63,6 +91,7 @@ export function createNotesRouter({
       if (!note) return res.status(404).json({ error: '记事不存在或无权访问' });
       if (note.content !== snapshot.expectedContent || note.contentRevision !== snapshot.expectedRevision) throw new noteItemService.NoteContentConflict();
       if (note.isOptimized) throw new noteItemService.NoteOptimizationConflict('ALREADY_OPTIMIZED', '这条记事已经优化，请先撤回后再优化。');
+      if (!note.content.trim()) return res.status(400).json({ error: '仅图片记事没有可优化的文字' });
       const run = await optimizePrompt(userId, note.content, controller, runId);
       const item = noteItemService.commitOptimizedNote(userId, note.id, snapshot.expectedContent, snapshot.expectedRevision, run.optimizedText);
       if (!item) throw new noteItemService.NoteContentConflict();

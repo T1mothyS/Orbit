@@ -19,20 +19,26 @@
 .calendar-operation-feedback button { min-height:36px; padding:4px 8px; border-radius:6px; background:var(--td-bg-color-container); }
 .orbit-refresh-status { padding:6px 14px; color:var(--td-text-color-secondary); background:var(--td-bg-color-page); font-size:12px; }
 .ai-schedule-page-card .schedule-ai-composer-wrap { padding:8px 12px max(8px,env(safe-area-inset-bottom)); }
-.orbit-composer-controls { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
-.orbit-segmented { position:relative; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:2px; min-width:0; background:var(--td-bg-color-component); border-radius:10px; isolation:isolate; touch-action:pan-y; }
-.orbit-segmented button { position:relative; min-height:44px; min-width:44px; padding:0 10px; border-radius:7px; font-size:12px; font-weight:500; white-space:nowrap; color:var(--td-text-color-secondary); }
-.orbit-segmented button[aria-pressed=true] { color:var(--td-text-color-primary); }
+.orbit-composer-controls { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; }
+.orbit-segmented { --segment-color:var(--td-brand-color); position:relative; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:0 2px; min-width:0; background:transparent; border-radius:50px; isolation:isolate; touch-action:pan-y; }
+.orbit-segmented::before { content:''; position:absolute; inset:5px 0; border-radius:50px; background:var(--td-bg-color-component); z-index:-2; }
+.orbit-segmented[data-value=note] { --segment-color:#a94f69; }
+.orbit-segmented[data-value=workbuddy] { --segment-color:#3f7359; }
+.dark .orbit-segmented[data-value=note] { --segment-color:#d38ba0; }
+.dark .orbit-segmented[data-value=workbuddy] { --segment-color:#86b99e; }
+.orbit-segmented[data-value=chatgpt] { --segment-color:var(--td-text-color-secondary); }
+.orbit-segmented button { position:relative; min-height:44px; min-width:44px; padding:0 10px; border-radius:50px; font-size:12px; font-weight:500; white-space:nowrap; color:var(--td-text-color-secondary); transition:color var(--orbit-motion-feedback); }
+.orbit-segmented button[aria-pressed=true] { color:var(--segment-color); }
 .orbit-segmented button:hover:not(:disabled) { color:var(--td-brand-color); }
 .orbit-segmented button:active:not(:disabled) { opacity:.7; }
 .orbit-segmented[aria-disabled=true] { opacity:.55; }
-.orbit-segmented-indicator { position:absolute; z-index:-1; top:2px; bottom:2px; left:2px; width:calc(50% - 2px); background:var(--td-bg-color-container); border:1px solid var(--td-component-stroke); border-radius:7px; transition:transform var(--orbit-motion-feedback) var(--orbit-ease); }
+.orbit-segmented-indicator { position:absolute; z-index:-1; top:7px; bottom:7px; left:2px; width:calc(50% - 2px); background:color-mix(in srgb,var(--segment-color) 12%,var(--td-bg-color-container)); border:1px solid color-mix(in srgb,var(--segment-color) 25%,var(--td-component-stroke)); border-radius:50px; transition:transform var(--orbit-motion-feedback) var(--orbit-ease),background-color var(--orbit-motion-feedback),border-color var(--orbit-motion-feedback); }
 .orbit-segmented[data-index="1"] .orbit-segmented-indicator { transform:translateX(100%); }
-.ai-schedule-page-card .schedule-ai-composer.orbit-compact-composer { grid-template-columns:44px minmax(0,1fr) 72px; align-items:end; gap:6px; padding:6px; min-height:56px; border:1px solid var(--td-component-stroke); border-radius:12px; background:var(--td-bg-color-container); box-shadow:none; }
-.ai-schedule-page-card .orbit-compact-composer.is-note-mode { border-color:var(--td-brand-color); background:var(--td-bg-color-container); }
+.ai-schedule-page-card .schedule-ai-composer.orbit-compact-composer { grid-template-columns:44px minmax(0,1fr) 68px; align-items:end; gap:4px; padding:2px; min-height:50px; border:1px solid var(--td-component-stroke); border-radius:var(--orbit-radius-control,8px); background:var(--td-bg-color-container); box-shadow:none; }
+.ai-schedule-page-card .orbit-compact-composer.is-note-mode { border-color:color-mix(in srgb,#b35d74 60%,var(--td-component-stroke)); background:var(--td-bg-color-container); }
 .ai-schedule-page-card .orbit-compact-composer:focus-within { border-color:var(--td-brand-color); }
-.ai-schedule-page-card .orbit-compact-composer textarea { min-height:40px!important; max-height:144px; padding:9px 2px!important; font-family:inherit; font-size:15px; line-height:22px!important; }
-.ai-schedule-page-card .orbit-compact-composer .schedule-ai-send-button { width:72px; height:44px; gap:5px; padding:0 8px; border-radius:8px; margin:0; font-size:13px; }
+.ai-schedule-page-card .orbit-compact-composer textarea { min-height:40px!important; max-height:144px; padding:9px 2px!important; font-family:inherit; font-size:16px; line-height:22px!important; }
+.ai-schedule-page-card .orbit-compact-composer .schedule-ai-send-button { width:68px; height:44px; gap:5px; padding:0 6px; border-radius:var(--orbit-radius-control,8px); margin:0; font-size:13px; }
 .orbit-composer-plus { display:grid; place-items:center; width:44px; height:44px; border-radius:8px; color:var(--td-text-color-secondary); }
 .orbit-composer-plus:hover:not(:disabled) { background:var(--td-bg-color-component-hover); color:var(--td-brand-color); }
 .orbit-composer-plus:active:not(:disabled) { background:var(--td-bg-color-component); }
@@ -62,9 +68,11 @@
 .orbit-composer-history .orbit-preference { min-height:44px; }
 .orbit-composer-menu :disabled,.orbit-composer-plus:disabled { opacity:.5; cursor:not-allowed; }
 @media(max-width:899px) {
-  .ai-assistant-topbar { grid-template-columns:minmax(0,1fr) auto; min-height:54px; gap:6px; padding:5px 12px; }
+  .ai-assistant-topbar { grid-template-columns:minmax(0,1fr) auto; min-height:44px; gap:4px; padding:0 12px; }
   .ai-assistant-topbar-title { display:none; }
-  .ai-assistant-topbar-actions > button:first-child { display:none; }
+  .ai-assistant-topbar-actions { grid-column:2; }
+  .ai-assistant-topbar-actions > button:first-child { display:inline-flex; }
+  .ai-workspace-action { min-height:44px; padding:0 8px; }
   .orbit-chat-toolbar { display:none; }
 }
 @media(max-width:640px) {
@@ -72,7 +80,7 @@
   .orbit-composer-menu { width:100%; max-height:80dvh; border-radius:16px 16px 0 0; padding-bottom:env(safe-area-inset-bottom); border-bottom:0; }
   .orbit-composer-controls { gap:8px; }
   .orbit-segmented button { padding-inline:9px; }
-  .ai-schedule-page-card .schedule-ai-composer-wrap { padding-inline:10px; }
+  .ai-schedule-page-card .schedule-ai-composer-wrap { padding:4px 12px max(4px,env(safe-area-inset-bottom)); }
 }
 @media(prefers-reduced-motion:reduce) {
   .orbit-composer-menu { animation:none; }

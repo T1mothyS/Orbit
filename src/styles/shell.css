@@ -253,11 +253,10 @@
   .ai-assistant-tabs { justify-content: center; gap: 1px; }
   .ai-assistant-tab { min-height: 44px; gap: 5px; padding: 0 7px; font-size: 12px; }
   .ai-assistant-topbar-actions { gap: 1px; }
-  .ai-workspace-action { width: 44px; min-width: 44px; height: 44px; padding: 0; }
-  .ai-workspace-action > span { display: none; }
-  .ai-workspace-action em { position: absolute; top: 1px; right: 0; }
+  .ai-workspace-action { min-width:44px; min-height:44px; padding:0 8px; }
+  .ai-workspace-action > span { display:inline; }
   .ai-assistant-tool-content { min-height: 0; flex: 1 1 auto; overflow: hidden; }
-  .ai-assistant-tool-content > .ai-import-page { min-height: 560px; }
+  .ai-assistant-tool-content > .ai-import-page { min-height:0; }
 }
 @media (max-width: 680px) {
   .action-center-page { padding: 20px 14px 46px; overflow-x: hidden; }
@@ -272,8 +271,8 @@
     display: grid;
     grid-template-columns: 22px minmax(0, 1fr) 44px;
     align-items: start;
-    gap: 12px;
-    padding: 14px;
+    gap:8px;
+    padding:12px;
   }
   .action-row:not(.completed) > .priority-dot,
   .suspended-todo-row > .priority-dot { justify-self: center; margin-top: 7px; }

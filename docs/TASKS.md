@@ -18,6 +18,8 @@
 | F08 | 四库写回/恢复风险：同步事务、保存点、可靠写回与可恢复协议已实施。 | [架构](ARCHITECTURE.md)及[历史工程证据](archive/engineering/PHASE3-PERSISTENCE-RECOVERY.md)。 |
 | F09 | 旧依赖/Markdown、邮件格式安全修复及读取空态：已有对应阶段修复。 | [2026-09-19 修复快照](archive/engineering/FORMAT-SECURITY-REPAIR-20260919.md)；只证明该时点，不能代表今日 audit 为零。 |
 | F10 | 普通升级误用服务器安装/构建入口：旧脚本加显式参数闸门，发布检查只运行一轮，数据备份在停写后完成。 | [发布流程](RELEASE.md)、[部署路径](DEPLOYMENT-PATHS.md)；本轮 shell 语法和入口拒绝验证。 |
+| F11 | 已保存记事切 Tab 后恢复：账号/会话草稿统一同步内存与浏览器缓存，成功消费原修订，保留并发新输入。 | `server/composer-draft.test.ts` 与隔离浏览器跨页面、邮箱、失败及慢保存回归；不依赖列表刷新成功。 |
+| F12 | 手机工具栏和输入区臃肿：六导航、全局搜索、统一筛选面板、头像菜单及双色分段控件压缩。图文记事独立于聊天保存。 | [UI 规范](UI-GUIDELINES.md)、[图片/备份合同](ARCHITECTURE.md#记事图片与草稿合同)、[本地验收](TEST-MATRIX.md#移动紧凑界面与图文记事)；物理手机软键盘和 Safari 另验。 |
 
 ## 主站能力
 

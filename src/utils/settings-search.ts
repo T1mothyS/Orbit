@@ -1,5 +1,6 @@
 export interface SearchableSetting {id:string;section:string;label:string;description:string;keywords:string[]}
 const aliases:Record<string,string[]>={
+ '导出全库':['知识库','library','knowledge','export','下载','备份知识库'],
  '开启每日提醒':['每日总结','每天的总结','每天总结','日程摘要','每天发送','每日提醒'],
  'Orbit Weekly':['周报','每周总结','weekly','周期复盘','周期报告'], '用户头像':['头像','照片','个人入口'],
  '个人 API Key':['密钥','workbuddy','codebuddy','apikey','api key'], 'AI 连接状态':['连接','认证','登录','验证'], '日程 AI 模型':['model','glm','minimax','模型选择'],

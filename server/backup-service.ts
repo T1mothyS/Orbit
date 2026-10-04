@@ -14,6 +14,7 @@ import * as activityStore from './activity-store.js';
 import { validateDigestV3Backup } from './digest-v3-store.js';
 import { validateResearchBackup } from './digest-research-store.js';
 import * as attachmentService from './attachment-service.js';
+import * as noteImages from './note-image-service.js';
 import { dailyReportMediaRoot } from './daily-report-media-service.js';
 import * as dailyReportCloudStore from './daily-report-cloud-store.js';
 import { captureBridgeState, pauseForRestoreSync } from './caldav-control.js';
@@ -36,6 +37,7 @@ interface UserBackupPayload {
   reminder: ReturnType<typeof reminderStore.exportUserReminderData>;
   orbit?: ReturnType<typeof exportOrbit>;
   noteItems?: ReturnType<typeof db.exportUserNoteItems>;
+  noteImages?: noteImages.NoteImageLink[];
   libraryEntries?: ReturnType<typeof db.exportUserLibraryEntries>;
   dailyReportCloudContext?: ReturnType<typeof dailyReportCloudStore.getDailyReportCloudContext>;
   activity: ReturnType<typeof activityStore.exportUserActivity>;
@@ -156,6 +158,7 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
     return { ...row, id: crypto.randomUUID(), run_id: digestRunIds.get(row.run_id), payload_json: JSON.stringify(payload) };
   });
   const noteIds = createIdMap((payload.noteItems || []).map(row => row.id));
+  payload.noteImages = payload.noteImages?.map(link => ({ ...link, note_id: noteIds.get(link.note_id)! }));
   const libraryIds = createIdMap((payload.libraryEntries || []).map(row => row.id));
 
   const scheduleIds = new Map<string, string>();
@@ -251,7 +254,7 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
   payload.files = payload.files.map(file => ({
     ...file,
     completionId: file.completionId ? completionIds.get(String(file.completionId)) || null : null,
-    importId: file.importId?.startsWith('orbit:')?'orbit:'+crypto.randomUUID():file.importId ? importIds.get(String(file.importId)) || null : null,
+    importId: file.importId?.startsWith('note:') ? 'note:' + crypto.randomUUID() : file.importId?.startsWith('orbit:')?'orbit:'+crypto.randomUUID():file.importId ? importIds.get(String(file.importId)) || null : null,
   }));
   if (payload.account.reminder && typeof payload.account.reminder === 'object') {
     (payload.account.reminder as Record<string, unknown>).id = crypto.randomUUID();
@@ -325,6 +328,7 @@ export function createUserBackup(userId: string, password: string, allowMissingD
     reminder: reminderStore.exportUserReminderData(userId),
     orbit: exportOrbit(userId),
     noteItems: db.exportUserNoteItems(userId),
+    noteImages: noteImages.exportNoteImageLinks(userId),
     libraryEntries: db.exportUserLibraryEntries(userId),
     dailyReportCloudContext: dailyReportCloudStore.getDailyReportCloudContext(userId),
     activity,
@@ -352,6 +356,19 @@ function validateUserPayload(payload: UserBackupPayload): void {
   const researchUser = researchRows?.researchRuns[0]?.user_id;
   if (v3User && researchUser && v3User !== researchUser) throw new Error('研究备份与事件记录账号不一致');
   if (payload.noteItems !== undefined && !Array.isArray(payload.noteItems)) throw new Error('备份记事内容不完整');
+  if (payload.noteImages !== undefined) {
+    if (!Array.isArray(payload.noteImages)) throw new Error('备份记事图片关联无效');
+    const notes = new Set((payload.noteItems || []).map(note => note.id));
+    const grouped = new Map<string, Set<string>>();
+    for (const link of payload.noteImages) {
+      if (!link || typeof link.note_id !== 'string' || !notes.has(link.note_id) || typeof link.image_id !== 'string' || !link.image_id || !Number.isInteger(link.position) || link.position < 0 || link.position > 2) throw new Error('备份记事图片关联无效');
+      const ids = grouped.get(link.note_id) || new Set<string>();
+      if (ids.has(link.image_id) || ids.size >= 3 || payload.noteImages.some(other => other !== link && other.note_id === link.note_id && other.position === link.position)) throw new Error('备份记事图片顺序或数量无效');
+      ids.add(link.image_id); grouped.set(link.note_id, ids);
+      const file = payload.files.find(file => file.attachmentId === link.image_id);
+      if (file && !['image/jpeg', 'image/png', 'image/webp'].includes(file.mimeType)) throw new Error('备份记事图片格式无效');
+    }
+  }
   if (payload.libraryEntries !== undefined && !Array.isArray(payload.libraryEntries)) throw new Error('备份知识库内容不完整');
   if (payload.dailyReportCloudContext !== undefined) {
     const context = payload.dailyReportCloudContext as unknown as Record<string, unknown>;
@@ -382,6 +399,7 @@ export function inspectUserBackup(buffer: Buffer, password: string): Record<stri
       aiImports: (payload.activity.aiImports || []).length,
       dailyReports: (payload.activity.dailyReports || []).length,
       noteItems: (payload.noteItems || []).length,
+      noteImages: (payload.noteImages || []).length,
       libraryEntries: (payload.libraryEntries || []).length,
       dailyReportCloudContext: payload.dailyReportCloudContext && payload.dailyReportCloudContext.version > 0 ? 1 : 0,
       digestV3Events: (payload.activity.digestV3Events || []).length,
@@ -404,6 +422,7 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
   if (!targetAccount) throw new Error('目标账号不存在');
   const isForeignAccount = String(decrypted.account.email || '').toLowerCase() !== targetAccount.email.toLowerCase();
   const payload = isForeignAccount ? remapForeignUserPayload(decrypted) : decrypted;
+  if (mode === 'replace' && payload.noteImages === undefined && noteImages.exportNoteImageLinks(userId).length) throw new Error('旧备份不包含记事图片，请使用合并恢复以保留现有图文记事');
   activityStore.digestV3Store.validateRestore(userId, payload.activity, mode);
   activityStore.digestResearchStore.validateRestore(userId, payload.activity, mode);
   const safetyCopy = createUserBackup(userId, password, true);
@@ -421,7 +440,10 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
     if (mode === 'replace') db.deleteUserOperationResults(userId);
     const schedule = scheduleStore.restoreUserScheduleData(userId, payload.schedule, mode);
     const reminder = reminderStore.restoreUserReminderData(userId, payload.reminder, mode);
-    const noteItems = db.restoreUserNoteItems(userId, payload.noteItems || [], mode);
+    const existingNotes = new Set(mode === 'merge' ? db.exportUserNoteItems(userId).map(note => note.id) : []);
+    if (mode === 'replace') noteImages.clearNoteImageLinks(userId);
+    const imageLinks = (payload.noteImages || []).filter(link => !existingNotes.has(link.note_id)).sort((a, b) => a.position - b.position);
+    const noteItems = db.restoreUserNoteItems(userId, payload.noteItems || [], mode, new Set(imageLinks.map(link => link.note_id)));
     const libraryEntries = db.restoreUserLibraryEntries(userId, payload.libraryEntries || [], mode);
     const activity = activityStore.restoreUserActivity(userId, payload.activity, mode);
     if (payload.dailyReportCloudContext !== undefined) {
@@ -461,6 +483,7 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
       }
     }
     if(payload.orbit)restoreOrbit(userId,payload.orbit,mode,isForeignAccount,attachmentIds);
+    const missingNoteImages = noteImages.restoreNoteImageLinks(userId, imageLinks, attachmentIds);
     return {
       schedule,
       reminder,
@@ -472,10 +495,11 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
       mode,
       idsRemapped: isForeignAccount,
       historicalReferencesUnavailable:isForeignAccount&&!!payload.orbit?.connected,
-      partial: attachmentFailures.length > 0 || missingMedia.length > 0,
-      status: attachmentFailures.length || missingMedia.length ? 'PARTIAL' : 'COMPLETED',
+      partial: attachmentFailures.length > 0 || missingMedia.length > 0 || missingNoteImages.length > 0,
+      status: attachmentFailures.length || missingMedia.length || missingNoteImages.length ? 'PARTIAL' : 'COMPLETED',
       attachmentFailures,
       missingMedia,
+      missingNoteImages,
     };
   });
   // Metadata is now durable. Reused content-addressed files must not be deleted.

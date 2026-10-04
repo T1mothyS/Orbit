@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { NoteBoard, type NoteItem } from './NoteBoard';
+import type { NoteImage } from '../utils/note-images';
 
 async function readJsonResponse(response: Response): Promise<any> {
   const raw = await response.text();
@@ -18,6 +19,7 @@ function normaliseNoteItem(item: NoteItem): NoteItem {
   const contentRevision = Number(item.contentRevision);
   return {
     ...item,
+    images: Array.isArray(item.images) ? item.images : [],
     isOptimized: item.isOptimized === true || Number(item.isOptimized) === 1,
     optimizationCount: Number.isInteger(optimizationCount) && optimizationCount >= 0 ? optimizationCount : 0,
     contentRevision: Number.isInteger(contentRevision) && contentRevision >= 0 ? contentRevision : 0,
@@ -32,9 +34,9 @@ export interface AiNoteBoardController {
   pendingCount: number;
   toggleDrawer: () => void;
   closeDrawer: () => void;
-  createNote: (content: string) => Promise<void>;
+  createNote: (content: string, imageIds?: string[]) => Promise<void>;
   toggleCompleted: (note: NoteItem) => Promise<void>;
-  edit: (note: NoteItem, content: string) => Promise<void>;
+  edit: (note: NoteItem, content: string, images: NoteImage[]) => Promise<void>;
   changeColor: (note: NoteItem, color: NoteItem['color']) => Promise<void>;
   merge: (source: NoteItem, target: NoteItem) => Promise<void>;
   optimize: (note: NoteItem, signal?: AbortSignal) => Promise<NoteItem>;
@@ -112,9 +114,9 @@ export function useAiNoteBoard({ initialNoteId }: UseAiNoteBoardOptions): AiNote
     }
   }, [updateNote]);
 
-  const edit = useCallback(async (note: NoteItem, content: string) => {
+  const edit = useCallback(async (note: NoteItem, content: string, images: NoteImage[]) => {
     try {
-      await updateNote(note.id, { content, expectedContent: note.content, expectedRevision: note.contentRevision });
+      await updateNote(note.id, { content, imageIds: images.map(image => image.id), expectedContent: note.content, expectedRevision: note.contentRevision });
     } catch (editError) {
       setError(editError instanceof Error ? editError.message : '更新记事失败');
       throw editError;
@@ -151,14 +153,14 @@ export function useAiNoteBoard({ initialNoteId }: UseAiNoteBoardOptions): AiNote
     }
   }, [authHeaders]);
 
-  const createNote = useCallback(async (content: string) => {
+  const createNote = useCallback(async (content: string, imageIds: string[] = []) => {
     const trimmedContent = content.trim();
-    if (!trimmedContent) return;
+    if (!trimmedContent && !imageIds.length) return;
     try {
       const response = await fetch('/api/note-items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ content: trimmedContent }),
+        body: JSON.stringify({ content: trimmedContent, imageIds }),
       });
       const data = await readJsonResponse(response);
       if (!response.ok) throw new Error(data.error || '保存记事失败');

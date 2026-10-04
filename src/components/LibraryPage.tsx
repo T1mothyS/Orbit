@@ -1,10 +1,11 @@
-import { BookOpen, Download, RefreshCw, Search, SlidersHorizontal } from 'lucide-react';
+import { BookOpen, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { CompactFilterSheet } from './CompactFilterSheet';
 import { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useReadingReturn } from '../hooks/useReadingReturn';
 import { FeatureBoundary } from './FeatureBoundary';
-import { DEFAULT_LIBRARY_SORT, downloadResponse, formatTime, isLibrarySort, kindLabels, LibraryEntry, LibraryKind, LibrarySort, LibraryType, readError, sortLabels, statusLabels, typeLabels } from './library/library-shared';
+import { DEFAULT_LIBRARY_SORT, formatTime, isLibrarySort, kindLabels, LibraryEntry, LibraryKind, LibrarySort, LibraryType, readError, sortLabels, statusLabels, typeLabels } from './library/library-shared';
 import './library/library.css';
 
 const LibraryDetailPage = lazy(() => import('./library/LibraryDetailPage').then(module => ({ default: module.LibraryDetailPage })));
@@ -14,12 +15,12 @@ function LibraryHomePage() {
   const navigate = useNavigate();
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
   const [total, setTotal] = useState(0);
-  const [searchText, setSearchText] = useState('');
-  const [query, setQuery] = useState('');
   const [kind, setKind] = useState<'all' | LibraryKind>('all');
   const [type, setType] = useState<'all' | LibraryType>('all');
   const [status, setStatus] = useState<'active' | 'all' | 'draft' | 'archived'>('active');
   const [sort, setSort] = useState<LibrarySort>(DEFAULT_LIBRARY_SORT);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [pendingFilters, setPendingFilters] = useState({ kind, type, status, sort });
   const [sortPreferenceReady, setSortPreferenceReady] = useState(false);
   const [sortSaving, setSortSaving] = useState(false);
   const [preferenceError, setPreferenceError] = useState<string | null>(null);
@@ -28,8 +29,8 @@ function LibraryHomePage() {
   const listRef = useRef<HTMLDivElement>(null);
   const loadGeneration = useRef(0);
   useReadingReturn(user?.id, 'library-list', listRef, !loading && sortPreferenceReady,
-    { searchText, query, kind, type, status }, saved => {
-      setSearchText(saved.searchText); setQuery(saved.query); setKind(saved.kind); setType(saved.type); setStatus(saved.status);
+    { kind, type, status }, saved => {
+      setKind(saved.kind); setType(saved.type); setStatus(saved.status);
     });
 
   const loadPreference = useCallback(async () => {
@@ -57,7 +58,6 @@ function LibraryHomePage() {
     setError(null);
     try {
       const params = new URLSearchParams({ status, kind, type, sort, pageSize: '100' });
-      if (query.trim()) params.set('q', query.trim());
       const response = await fetch(`/api/library?${params.toString()}`, { headers: authHeaders() });
       if (!response.ok) throw await readError(response, '知识库加载失败');
       const data = await response.json();
@@ -69,13 +69,14 @@ function LibraryHomePage() {
     } finally {
       if (generation === loadGeneration.current) setLoading(false);
     }
-  }, [authHeaders, kind, query, sort, status, type]);
+  }, [authHeaders, kind, sort, status, type]);
 
   useEffect(() => { void loadPreference(); }, [loadPreference]);
   useEffect(() => { if (sortPreferenceReady) void load(); }, [load, sortPreferenceReady]);
 
   const saveSortPreference = async (nextSort: LibrarySort) => {
-    if (!sortPreferenceReady || sortSaving || nextSort === sort) return;
+    if (!sortPreferenceReady || sortSaving) return false;
+    if (nextSort === sort) return true;
     setSortSaving(true);
     setPreferenceError(null);
     try {
@@ -89,23 +90,23 @@ function LibraryHomePage() {
       const savedSort = data?.preference?.sort;
       if (!isLibrarySort(savedSort)) throw new Error('服务返回的排序偏好无效');
       setSort(savedSort);
+      return true;
     } catch (preferenceSaveError) {
       const message = preferenceSaveError instanceof Error ? preferenceSaveError.message : '排序偏好保存失败';
       setPreferenceError(`排序偏好保存失败，当前仍按${sortLabels[sort]}显示：${message}`);
+      return false;
     } finally {
       setSortSaving(false);
     }
   };
 
-  const downloadFullExport = async () => {
-    try {
-      const response = await fetch('/api/library/export', { headers: authHeaders() });
-      if (!response.ok) throw await readError(response, '全库导出失败');
-      await downloadResponse(response, 'library-export.json');
-    } catch (downloadError) {
-      setError(downloadError instanceof Error ? downloadError.message : '全库导出失败');
-    }
-  };
+  const filterCount = Number(type !== 'all') + Number(kind !== 'all') + Number(status !== 'active') + Number(sort !== DEFAULT_LIBRARY_SORT);
+  const filterFields = (value: typeof pendingFilters, change: (value: typeof pendingFilters) => void, disabled = false) => <>
+    <label>类型<select value={value.type} disabled={disabled} onChange={event => change({ ...value, type: event.target.value as typeof type })} aria-label="筛选内容类型"><option value="all">全部类型</option>{(Object.keys(typeLabels) as LibraryType[]).map(option => <option key={option} value={option}>{typeLabels[option]}</option>)}</select></label>
+    <label>形态<select value={value.kind} disabled={disabled} onChange={event => change({ ...value, kind: event.target.value as typeof kind })} aria-label="筛选内容形态"><option value="all">全部形态</option><option value="article">正式知识</option><option value="fragment">知识碎片</option></select></label>
+    <label>状态<select value={value.status} disabled={disabled} onChange={event => change({ ...value, status: event.target.value as typeof status })} aria-label="筛选内容状态"><option value="active">有效内容</option><option value="draft">草稿</option><option value="archived">已归档</option><option value="all">全部状态</option></select></label>
+    <label>排序<select value={value.sort} disabled={disabled} onChange={event => change({ ...value, sort: event.target.value as LibrarySort })} aria-label="知识库排序">{(Object.keys(sortLabels) as LibrarySort[]).map(option => <option key={option} value={option}>{sortLabels[option]}</option>)}</select></label>
+  </>;
 
   return (
     <div className="library-page" ref={listRef} aria-busy={loading}>
@@ -115,40 +116,15 @@ function LibraryHomePage() {
           <p>阅读、回顾，连接你的知识。</p>
         </div>
         <div className="library-header-actions">
-          <button type="button" className="library-secondary-button" onClick={() => void load()} disabled={loading}><RefreshCw size={14} className={loading ? 'spin' : undefined} />刷新</button>
-          <button type="button" className="library-secondary-button" onClick={() => void downloadFullExport()}><Download size={14} />导出全库</button>
+          <button type="button" className="library-secondary-button mobile-filter-trigger" disabled={!sortPreferenceReady || sortSaving} onClick={() => { setPendingFilters({ kind, type, status, sort }); setFiltersOpen(true); }}><SlidersHorizontal size={16} />筛选{filterCount > 0 && <span className="filter-count">{filterCount}</span>}</button>
         </div>
       </header>
 
       {preferenceError && <div className="library-notice error" role="alert">{preferenceError}<button type="button" onClick={() => void loadPreference()}>重试排序偏好</button></div>}
       {error && <div className="library-notice error" role="alert">{error}<button type="button" onClick={() => void load()}>重试</button></div>}
 
-      <section className="library-toolbar" aria-label="知识库筛选">
-        <form className="library-search" onSubmit={event => { event.preventDefault(); setQuery(searchText); }}>
-          <Search size={16} aria-hidden="true" />
-          <input value={searchText} onChange={event => setSearchText(event.target.value)} placeholder="搜索标题、摘要、正文或标签" aria-label="搜索知识库" />
-          <button type="submit">搜索</button>
-        </form>
-        <div className="library-filters">
-          <select value={type} onChange={event => setType(event.target.value as typeof type)} aria-label="筛选内容类型">
-            <option value="all">全部类型</option>{(Object.keys(typeLabels) as LibraryType[]).map(option => <option key={option} value={option}>{typeLabels[option]}</option>)}
-          </select>
-          <details className="library-filter-more">
-            <summary><SlidersHorizontal size={14} aria-hidden="true" />更多筛选{(kind !== 'all' || status !== 'active') && <span className="library-filter-active-dot" aria-label="已有更多筛选条件" />}</summary>
-            <div className="library-filter-more-panel">
-              <label>形态<select value={kind} onChange={event => setKind(event.target.value as typeof kind)} aria-label="筛选内容形态">
-                <option value="all">全部形态</option><option value="article">正式知识</option><option value="fragment">知识碎片</option>
-              </select></label>
-              <label>有效性<select value={status} onChange={event => setStatus(event.target.value as typeof status)} aria-label="筛选内容状态">
-                <option value="active">有效内容</option><option value="draft">草稿</option><option value="archived">已归档</option><option value="all">全部状态</option>
-              </select></label>
-            </div>
-          </details>
-          <select className="library-sort-select" value={sort} onChange={event => void saveSortPreference(event.target.value as LibrarySort)} disabled={!sortPreferenceReady || sortSaving} aria-busy={sortSaving} aria-label="知识库排序">
-            {(Object.keys(sortLabels) as LibrarySort[]).map(option => <option key={option} value={option}>{sortLabels[option]}</option>)}
-          </select>
-        </div>
-      </section>
+      <section className="library-toolbar desktop-filters" aria-label="知识库筛选"><div className="library-filters">{filterFields({ kind, type, status, sort }, value => { setKind(value.kind); setType(value.type); setStatus(value.status); void saveSortPreference(value.sort); }, !sortPreferenceReady || sortSaving)}</div></section>
+      {filtersOpen && <CompactFilterSheet title="知识库筛选" busy={sortSaving} error={preferenceError} onClose={() => setFiltersOpen(false)} onReset={() => setPendingFilters({ kind: 'all', type: 'all', status: 'active', sort: DEFAULT_LIBRARY_SORT })} onApply={() => { void saveSortPreference(pendingFilters.sort).then(success => { if (success) { setKind(pendingFilters.kind); setType(pendingFilters.type); setStatus(pendingFilters.status); setFiltersOpen(false); } }); }}>{filterFields(pendingFilters, setPendingFilters)}</CompactFilterSheet>}
 
       <div className="library-list-meta"><span>{loading ? '正在加载…' : `显示 ${entries.length} 条，共 ${total} 条`}</span><span>当前按{sortLabels[sort]}</span></div>
       {loading && !entries.length ? (

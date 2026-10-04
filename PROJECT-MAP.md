@@ -58,7 +58,9 @@ Cloud 新新闻信息图准备入口为 `daily_report.prepare_visuals_v2`，绘�
 
 V3 Core 位于同一个 `activity.db`：`server/digest-v3-store.ts` 管理 Event/Revision/Evidence/Analysis、引用表与 D09 本地冻结行，`activity-store.ts` 负责初始化和可靠写回。原 `backup-service.ts` 账号备份当前包含八组 V3 行，兼容旧七组备份并保护已有冻结记录；同账号替换和跨账号 ID 重映射均有本地验证。D07 的 `digest-v3-local-flow.ts` 对人工审核来源做原子写入和精确预览，`routes/digest-v3.ts` 提供登录态的受控提交、按账号/截点分页历史，以及 D09 具体日报版本的引用冻结/读取。D08 的 `digest-v3-offline-match.ts` 只在隔离回放里给双轴建议，`digest-v3-offline-extract.ts` 只对有界短摘录作限定规则抽取并保留事实支持文本；两者均不写活动库。详见 [V3 Core 合同](docs/DAILY-DIGEST-V3-CORE-CONTRACT.md#d09-第一步人工核验引用冻结2026-09-28)与[阶段事实安全评测](docs/archive/digest/DAILY-DIGEST-D08-FACT-STATUS-SAFETY-20260927.md)。没有人工纠正/恢复、Work/MCP 写入、正式日报发布或真实 Shadow 自动匹配。
 
-D13 本地 Research/Thesis 位于同一活动库：`server/digest-research-store.ts` 管理研究历史、提案与确认版本，登录态 API 位于 `server/routes/research.ts`，网页 `/research` 从日报页进入。账号级备份/恢复包含三张新表；Workspace Agent 触发仅有合成协议探针，真实 Work 与结果回传尚未接通。完整边界见 [研究与观点合同](docs/DAILY-DIGEST-RESEARCH-THESIS.md)。
+D13 本地 Research/Thesis 位于同一活动库：`server/digest-research-store.ts` 管理研究历史、提案与确认版本，登录态 API 位于 `server/routes/research.ts`，网页 `/research` 从头像菜单进入。账号级备份/恢复包含三张新表；Workspace Agent 触发仅有合成协议探针，真实 Work 与结果回传尚未接通。完整边界见 [研究与观点合同](docs/DAILY-DIGEST-RESEARCH-THESIS.md)。
+
+图文记事由 `note-item-service.ts`、`note-image-service.ts` 与 `routes/notes.ts` 维护，复用账号附件存储，独立于聊天关联。移动筛选共用 `CompactFilterSheet`，图文编辑/查看共用 `NoteImages`，草稿及Clipboard分别在 `composer-draft.ts` 和 `note-clipboard.ts`。生命周期/备份合同见 [架构](docs/ARCHITECTURE.md#记事图片与草稿合同)，使用方式见 [用户指南](docs/USER-GUIDE.md)。
 
 ```mermaid
 flowchart LR

@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last local verification: 2026-10-03，Orbit P0–P7 基础升级候选；版本源为 package.json，验证入口/结果见 TEST-MATRIX。真实 AI、生产、自然定时与收件箱未验；日报历史证据按各节日期使用。
+- Last local verification: 2026-10-05，移动紧凑界面与图文记事本地验证；版本源为 package.json，验证入口/结果见 TEST-MATRIX。此轮不包含真实 AI、生产、自然定时与收件箱；其他历史证据按各节日期使用。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -99,13 +99,25 @@ server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与�
 
 ## 5. 领域边界
 
+### 记事图片与草稿合同
+
+`chat.db` 的 `note_images` 登记账号图片，`note_item_images(user_id,note_id,image_id,position)` 保存有序关联；元数据和字节复用 `activity.db` 附件与现有内容寻址存储，不加入聊天的 `orbit_attachments`。增量建表前快照既有数据库。`POST /api/note-items/images` 接受 JPEG/PNG/WebP base64，检查签名、10MB/40Mpx上限，sharp 旋转/压缩至最长边2048并移除元数据；认证 GET/DELETE 检查账号。DELETE 只接受无人引用的图片。上传前独立清理超过24小时的未绑定图片，不使用聊天清理规则。
+
+记事 POST/PATCH 接受 `imageIds`，一条最多3张、合计20MB，沿用账号配额。图文或仅图片为一条，纯文字保留逐行保存。图片编辑必须提供 `expectedRevision`；正文修订也覆盖图片，慢优化/编辑不得覆盖新图文。关联与正文跨库事务提交；废纸篓保留图片，合并目标在前、来源在后并去重，超限整笔拒绝。永久删除只清理没有任何记事引用的文件。清空/删除账号包含新表。
+
+格式1加密用户备份增加 `noteImages` 有序关联及附件字节，跨账号重映射记事和文件ID，恢复缺图返回 `PARTIAL/missingNoteImages`；仅图片记事可恢复。合并保持已有卡片的图文编辑，旧备份缺少关联字段时禁止替换已有图文，只允许合并；恢复前保留安全副本。普通TXT/CSV不包含图片。
+
+前端 `composer-draft.ts` 同步内存及按账号/会话的 `sessionStorage`，兼容旧文字缓存。提交捕获来源和修订，成功消费对应版本；较新的文字保留，已提交图片从新草稿移除。切走后的成功响应仍消费原草稿，列表刷新不决定保存成功。退出清理账号缓存。`note-clipboard.ts` 单个ClipboardItem提供经转义的HTML（图片内嵌字节）和纯文本，独立PNG复制另用image/png；不保证目标应用保留图片，失败使用原生模态预览复制。
+
+ClipboardItem 的多种 MIME 是同一条内容的可选表示，目标应用决定读取哪种；设计参考 [W3C Clipboard 工作草案](https://www.w3.org/TR/clipboard-apis/) 和 [WebKit Async Clipboard 说明](https://webkit.org/blog/10855/async-clipboard-api/)。点击时立即调用 write，图片准备以 Promise 数据交付，避免先异步读取丢失用户激活；真实 Safari 兼容性仍需设备验收。
+
 | 领域 | 前端入口 | 后端入口/服务 | 关键规则 |
 | --- | --- | --- | --- |
 | 认证与账号 | LoginPage、useAuth | auth 路由、db | JWT 与账号状态；所有数据按用户隔离 |
 | 日程与分类 | ScheduleView、CalendarView | schedule-store、日历 API | 日期、时区、冲突和分类逻辑可测试 |
 | 周期事务与通知 | ReminderPage、ActionCenterPage | reminder-store、notification-service、scheduler | 月末兜底、逾期完成、免打扰和失败重试 |
 | AI | AiSchedulePanel、AiImportPage | AI 服务、ai-plan、ai-import-service | 生成计划不等于写入；必须用户确认 |
-| AI 记事 | NoteBoard | note-item-service | 记事独立于行动中心；合并以事务更新目标并将来源移入废纸篓；导出确定性生成 |
+| AI 记事 | NoteBoard、NoteImages | note-item-service、note-image-service | 图文独立于聊天；有序图片关联和文字事务保存；废纸篓保留引用，合并超限原子拒绝；TXT/CSV 是文字导出 |
 | 知识库 | LibraryPage | library-service、library-markdown、library publish API | V2 本地加工、服务器只读呈现、评论、版本、关系原样保存和安全 Markdown；不在服务器做 AI 加工 |
 | 日报 | DailyReportsPage | daily-report API、模板、media service、delivery policy | Local/Cloud 按来源和内容哈希保存；媒体先校验/托管；来源设置决定 `RECEIVED` 或 `CANDIDATE` 及邮件入队 |
 | 完成和附件 | ActionCenterPage | completion、attachment service | 所有权、大小、MIME 和恢复边界 |

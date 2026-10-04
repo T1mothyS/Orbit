@@ -1,0 +1,44 @@
+/* Shared secondary surfaces: filtering, image viewing and clipboard fallback. */
+.mobile-filter-trigger { display:none !important; }
+.filter-count { display:inline-grid; place-items:center; min-width:18px; height:18px; padding:0 4px; border-radius:50px; background:var(--td-brand-color-light); color:var(--td-brand-color); font-size:11px; }
+.compact-sheet-overlay { display:flex; justify-content:center; align-items:center; padding:16px; background:rgb(15 23 42 / .32); }
+.compact-sheet { width:min(480px,100%); max-height:90dvh; display:flex; flex-direction:column; min-height:0; border:1px solid var(--td-component-stroke); border-radius:var(--orbit-radius-panel,12px); background:var(--td-bg-color-container); }
+.compact-sheet header { display:flex; align-items:center; gap:8px; padding:4px 12px; border-bottom:1px solid var(--td-component-stroke); flex-shrink:0; }
+.compact-sheet h2 { flex:1; margin:0; font-size:16px; font-weight:600; }
+.compact-sheet header button { width:44px; height:44px; display:grid; place-items:center; border-radius:var(--orbit-radius-control,8px); }
+.compact-sheet-body { min-height:0; overflow:auto; overscroll-behavior:contain; padding:12px; }
+.compact-sheet fieldset { border:0; padding:0; margin:0; display:grid; gap:12px; min-width:0; }
+.compact-sheet label { display:grid; gap:6px; font-size:13px; }
+.compact-sheet select { width:100%; min-width:0; min-height:44px; padding:8px 12px; border-radius:var(--orbit-radius-control,8px); border:1px solid var(--td-component-stroke); background:var(--td-bg-color-container); color:inherit; font-size:16px; }
+.compact-sheet footer { display:flex; justify-content:flex-end; gap:8px; padding:8px 12px max(8px,env(safe-area-inset-bottom)); border-top:1px solid var(--td-component-stroke); flex-shrink:0; }
+.compact-sheet footer button { min-height:44px; }
+.compact-sheet footer button:first-child { margin-right:auto; }
+.compact-filter-hint,.note-copy-sheet p { font-size:12px; color:var(--td-text-color-secondary); line-height:1.6; margin:0; }
+.library-filters label { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--td-text-color-secondary); }
+.report-view-status { display:inline-block; margin-top:4px; color:var(--td-text-color-secondary); font-size:12px; }
+.note-images { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+.note-image { width:88px; min-width:0; }
+.note-image-preview { width:88px; height:64px; display:grid; place-items:center; border:1px solid var(--td-component-stroke); border-radius:var(--orbit-radius-control,8px); overflow:hidden; background:var(--td-bg-color-page); }
+.note-image-preview img { width:100%; height:100%; object-fit:cover; }
+.note-image-preview span { font-size:11px; color:var(--td-text-color-secondary); }
+.note-image-actions { display:flex; justify-content:space-between; }
+.note-image-actions button { min-width:28px; height:36px; display:grid; place-items:center; }
+.note-image-overlay { display:flex; align-items:center; justify-content:center; padding:12px; background:rgb(0 0 0 / .65); }
+.note-image-overlay section { position:relative; max-width:100%; max-height:100%; }
+.note-image-overlay img { max-width:100%; max-height:85dvh; object-fit:contain; }
+.note-image-overlay button { display:grid; place-items:center; min-height:44px; padding:0 12px; margin-left:auto; color:var(--td-text-color-primary); background:var(--td-bg-color-container); border-radius:8px; }
+.note-image-editor > button { display:flex; align-items:center; gap:6px; min-height:44px; }
+.note-copy-preview { margin:12px 0; padding:12px; border:1px solid var(--td-component-stroke); border-radius:8px; user-select:text; }
+.note-copy-preview p { margin:0 0 8px; font-size:16px; color:inherit; }
+.note-copy-preview img { max-width:100%; max-height:320px; object-fit:contain; }
+.note-copy-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.note-copy-actions button { min-height:44px; }
+@media(max-width:767px) {
+  .mobile-filter-trigger { display:inline-flex !important; align-items:center; gap:6px; }
+  .desktop-filters { display:none !important; }
+  .compact-sheet-overlay { align-items:flex-end; padding:0; }
+  .compact-sheet { width:100%; max-height:85dvh; border-radius:16px 16px 0 0; border-bottom:0; }
+  .note-image-actions { position:relative; width:132px; margin-left:-22px; }
+  .note-image-actions button { min-width:44px; height:44px; }
+  .note-images:has(.note-image-actions) { gap:44px; padding-inline:22px; }
+}

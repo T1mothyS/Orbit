@@ -201,12 +201,13 @@ export function restoreUserNoteItems(
   userId: string,
   rows: Array<Partial<DbNoteItem> & { linkedScheduleIds?: unknown; completedAt?: unknown; color?: unknown }>,
   mode: 'merge' | 'replace',
+  imageNoteIds: Set<string> = new Set(),
 ): { items: number } {
   if (mode === 'replace') run('DELETE FROM note_items WHERE user_id = ?', [userId]);
   let items = 0;
   for (const row of rows || []) {
     const content = String(row.content || '').trim().slice(0, 2_000);
-    if (!content) continue;
+    if (!content && !imageNoteIds.has(String(row.id))) continue;
     const id = String(row.id || '').trim() || crypto.randomUUID();
     if (getNoteItem(id, userId)) continue;
     const now = new Date().toISOString();

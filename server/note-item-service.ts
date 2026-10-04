@@ -1,5 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import * as db from './db.js';
+import { listNoteImages, validateNoteImageIds, replaceNoteImages, detachNoteImages, deleteUnboundNoteImage } from './note-image-service.js';
+import type { NoteImage } from '../src/utils/note-images.js';
+import { queryOne } from './database/connection.js';
+import { addLog } from './log-service.js';
 
 export const NOTE_CONTENT_MAX_LENGTH = 2_000;
 export const NOTE_BATCH_MAX = 100;
@@ -19,6 +23,7 @@ export const NOTE_COLOR_LABELS: Record<NoteColor, string> = {
 export interface NoteItem {
   id: string;
   content: string;
+  images: NoteImage[];
   isOptimized: boolean;
   optimizationCount: number;
   contentRevision: number;
@@ -63,6 +68,7 @@ function toNoteItem(row: db.DbNoteItem): NoteItem {
   return {
     id: row.id,
     content: row.content,
+    images: listNoteImages(row.user_id, row.id),
     isOptimized: row.is_optimized === 1,
     optimizationCount: Number.isInteger(Number(row.optimization_count)) && Number(row.optimization_count) >= 0 ? Number(row.optimization_count) : 0,
     contentRevision: Number.isInteger(Number(row.content_revision)) && Number(row.content_revision) >= 0 ? Number(row.content_revision) : 0,
@@ -95,50 +101,61 @@ export function normaliseNoteContents(value: unknown): string[] {
     .filter(Boolean);
 }
 
-function validateContent(content: unknown): string {
+function validateContent(content: unknown, allowEmpty = false): string {
   const value = String(content ?? '').trim();
-  if (!value) throw new Error('记事内容不能为空');
+  if (!value && !allowEmpty) throw new Error('记事内容不能为空');
   if (value.length > NOTE_CONTENT_MAX_LENGTH) throw new Error(`单条记事不能超过 ${NOTE_CONTENT_MAX_LENGTH} 个字符`);
   return value;
 }
 
-export function createNoteItems(userId: string, contents: unknown, color: unknown = 'neutral'): NoteItem[] {
-  const values = normaliseNoteContents(contents);
+export function createNoteItems(userId: string, contents: unknown, color: unknown = 'neutral', imageIds: unknown = []): NoteItem[] {
+  const images = validateNoteImageIds(userId, imageIds);
+  if (images.length && typeof contents !== 'string') throw new Error('图片记事必须使用完整文字正文');
+  const values = images.length ? [validateContent(contents, true)] : normaliseNoteContents(contents);
   if (values.length > NOTE_BATCH_MAX) throw new Error(`一次最多保存 ${NOTE_BATCH_MAX} 条记事`);
-  const validated = values.map(validateContent);
+  const validated = values.map(content => validateContent(content, images.length > 0));
   const noteColor = validateColor(color);
   const totalLength = validated.reduce((sum, value) => sum + value.length, 0);
   if (totalLength > NOTE_BATCH_TOTAL_MAX_LENGTH) throw new Error(`一次保存的记事总长度不能超过 ${NOTE_BATCH_TOTAL_MAX_LENGTH} 个字符`);
   const now = new Date().toISOString();
-  return validated.map(content => toNoteItem(db.createNoteItem({
-    id: uuidv4(),
-    user_id: userId,
-    content,
-    is_optimized: 0,
-    optimization_count: 0,
-    optimization_previous_content: null,
-    content_revision: 0,
-    completed: 0,
-    completed_at: null,
-    color: noteColor,
-    linked_schedule_ids: '[]',
-    created_at: now,
-    updated_at: now,
-  })));
+  return withPersistenceTransaction(() => validated.map(content => {
+    const row = db.createNoteItem({
+      id: uuidv4(),
+      user_id: userId,
+      content,
+      is_optimized: 0,
+      optimization_count: 0,
+      optimization_previous_content: null,
+      content_revision: 0,
+      completed: 0,
+      completed_at: null,
+      color: noteColor,
+      linked_schedule_ids: '[]',
+      created_at: now,
+      updated_at: now,
+    });
+    if (images.length) replaceNoteImages(userId, row.id, images);
+    return toNoteItem(row);
+  }));
 }
 
-export function updateNoteItem(userId: string, id: string, updates: { expectedContent?: unknown; expectedRevision?: unknown; content?: unknown; completed?: unknown; color?: unknown }): NoteItem | undefined {
+export function updateNoteItem(userId: string, id: string, updates: { expectedContent?: unknown; expectedRevision?: unknown; content?: unknown; imageIds?: unknown; completed?: unknown; color?: unknown }): NoteItem | undefined {
   const existing = db.getNoteItem(id, userId);
   if (!existing) return undefined;
   if (updates.expectedContent !== undefined && updates.expectedContent !== existing.content) throw new NoteContentConflict();
   if (updates.expectedRevision !== undefined && updates.expectedRevision !== existing.content_revision) throw new NoteContentConflict();
+  const imageIds = updates.imageIds === undefined ? undefined : validateNoteImageIds(userId, updates.imageIds);
+  if (imageIds !== undefined && !Number.isInteger(updates.expectedRevision)) throw new Error('修改图片必须提供正文版本');
+  const images = imageIds || listNoteImages(userId, id).map(image => image.id);
+  if (updates.content === undefined && !existing.content.trim() && !images.length) throw new Error('请保留文字或至少一张图片');
   const patch: Parameters<typeof db.updateNoteItem>[2] = {};
   if (updates.content !== undefined) {
-    patch.content = validateContent(updates.content);
+    patch.content = validateContent(updates.content, images.length > 0);
     patch.is_optimized = 0;
     patch.optimization_previous_content = null;
     patch.content_revision = existing.content_revision + 1;
   }
+  if (imageIds !== undefined) patch.content_revision = existing.content_revision + 1;
   if (updates.color !== undefined) patch.color = validateColor(updates.color);
   if (updates.completed !== undefined) {
     if (typeof updates.completed !== 'boolean') throw new Error('完成状态不正确');
@@ -146,12 +163,15 @@ export function updateNoteItem(userId: string, id: string, updates: { expectedCo
     patch.completed_at = updates.completed ? new Date().toISOString() : null;
   }
   if (!Object.keys(patch).length) return toNoteItem(existing);
-  const updated = db.updateNoteItem(id, userId, patch, {
-    content: updates.content !== undefined ? existing.content : undefined,
-    contentRevision: updates.content !== undefined ? existing.content_revision : undefined,
+  return withPersistenceTransaction(() => {
+    const updated = db.updateNoteItem(id, userId, patch, {
+      content: updates.content !== undefined ? existing.content : undefined,
+      contentRevision: updates.content !== undefined || imageIds !== undefined ? existing.content_revision : undefined,
+    });
+    if (!updated && (updates.content !== undefined || imageIds !== undefined)) throw new NoteContentConflict();
+    if (updated && imageIds !== undefined) replaceNoteImages(userId, id, imageIds);
+    return updated ? toNoteItem(updated) : undefined;
   });
-  if (!updated && updates.content !== undefined) throw new NoteContentConflict();
-  return updated ? toNoteItem(updated) : undefined;
 }
 
 export function commitOptimizedNote(userId: string, id: string, expectedContent: string, expectedRevision: number, optimizedContent: unknown): NoteItem | undefined {
@@ -186,22 +206,36 @@ export function mergeNoteItems(userId: string, sourceId: string, targetId: strin
   const target = db.getNoteItem(targetId, userId);
   if (!source || !target) return undefined;
 
-  const mergedContent = `${target.content}\n${source.content}`;
+  const mergedContent = [target.content, source.content].filter(Boolean).join('\n');
+  const imageIds = [...new Set([...listNoteImages(userId, targetId), ...listNoteImages(userId, sourceId)].map(image => image.id))];
+  validateNoteImageIds(userId, imageIds);
   if (mergedContent.length > NOTE_CONTENT_MAX_LENGTH) {
     throw new Error(`合并后的记事不能超过 ${NOTE_CONTENT_MAX_LENGTH.toLocaleString('en-US')} 个字符`);
   }
 
   const completedAt = new Date().toISOString();
-  const merged = db.mergeNoteItems(sourceId, userId, targetId, mergedContent, completedAt);
-  if (!merged) return undefined;
-  return {
-    source: toNoteItem(merged.source),
-    target: toNoteItem(merged.target),
-  };
+  return withPersistenceTransaction(() => {
+    const merged = db.mergeNoteItems(sourceId, userId, targetId, mergedContent, completedAt);
+    if (!merged) return undefined;
+    replaceNoteImages(userId, targetId, imageIds);
+    return {
+      source: toNoteItem(merged.source),
+      target: toNoteItem(merged.target),
+    };
+  });
 }
 
 export function deleteNoteItem(userId: string, id: string): boolean {
-  return db.deleteNoteItem(id, userId);
+  const ids: string[] = [];
+  const deleted = withPersistenceTransaction(() => {
+    if (!db.getNoteItem(id, userId)) return false;
+    ids.push(...detachNoteImages(userId, id));
+    return db.deleteNoteItem(id, userId);
+  });
+  for (const imageId of ids) if (!queryOne('SELECT image_id FROM note_item_images WHERE user_id=? AND image_id=?', [userId, imageId])) {
+    try { deleteUnboundNoteImage(userId, imageId); } catch { addLog('warn', 'system', '记事已删除，未引用图片清理暂未完成'); }
+  }
+  return deleted;
 }
 
 export function exportNoteItems(userId: string): NoteItem[] {

@@ -21,7 +21,13 @@ test('additive report migration freezes every existing store before schema write
   assert.equal(snapshots.length,1);
   for(const name of ['chat.db','schedule.db','reminder.db','activity.db'])assert.deepEqual(fs.readFileSync(path.join(root,'migration-backups',snapshots[0],name)),bytes);
   assert.ok(connection.queryOne("SELECT name FROM sqlite_master WHERE name='orbit_activity_reports'"));
+  const imageSnapshots = fs.readdirSync(path.join(root, 'migration-backups')).filter(name => name.startsWith('note-images-'));
+  assert.equal(imageSnapshots.length, 1);
+  for (const name of ['chat.db', 'schedule.db', 'reminder.db', 'activity.db']) assert.deepEqual(fs.readFileSync(path.join(root, 'migration-backups', imageSnapshots[0], name)), bytes);
+  assert.ok(connection.queryOne("SELECT name FROM sqlite_master WHERE name='note_images'"));
+  assert.ok(connection.queryOne("SELECT name FROM sqlite_master WHERE name='note_item_images'"));
   assert.equal(connection.queryOne<{value:string}>('SELECT value FROM synthetic_legacy_marker')?.value,'preserve-me');
   await connection.initDb();
   assert.equal(fs.readdirSync(path.join(root,'migration-backups')).filter(name=>name.startsWith('connected-report-')).length,1);
+  assert.equal(fs.readdirSync(path.join(root, 'migration-backups')).filter(name => name.startsWith('note-images-')).length, 1);
 });

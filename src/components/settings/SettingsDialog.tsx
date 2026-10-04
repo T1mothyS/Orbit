@@ -1,7 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { Dialog } from 'tdesign-react';
-import { APP_CONFIG } from '../../config';
 import { SettingsPage } from './SettingsPage';
 import './settings.css';
 
@@ -58,7 +57,6 @@ export function SettingsDialog({ onClose, onOpenAdmin, onOpenTools, onOpenProjec
             <button type="button" onClick={onOpenTools} disabled={!onOpenTools}>Tools 工具中心</button>
             <button type="button" onClick={onOpenStatistics} disabled={!onOpenStatistics}>统计</button>
           </nav>
-          <span className="settings-dialog-version">V{APP_CONFIG.version}</span>
           <button type="button" className="settings-dialog-close" ref={closeRef} onClick={onClose} aria-label="关闭设置">
             <X size={20} aria-hidden="true" />
           </button>

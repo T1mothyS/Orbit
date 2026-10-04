@@ -285,3 +285,14 @@
   .library-comment-compose { align-items: stretch; flex-direction: column; }
   .library-comment-compose .library-primary-button { align-self: flex-start; }
 }
+@media (max-width:767px) {
+  .app-shell .library-header { flex-direction:row; align-items:center; gap:8px; margin-bottom:12px; }
+  .library-header p { display:none; }
+  .library-list-meta { margin-bottom:8px; gap:8px; }
+  .library-grid { gap:8px; }
+  .library-header-actions > button { width:auto; }
+  .app-shell .library-card { min-height:0; border-radius:var(--orbit-radius-control,8px); }
+  .app-shell .library-card h2 { margin:8px 0; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .app-shell .library-card p { min-height:0; margin-bottom:0; -webkit-line-clamp:2; }
+  .app-shell .library-card-footer { padding-top:0; margin-top:8px; }
+}

@@ -1,4 +1,4 @@
-import { Mail, MessageCircle, RotateCcw, StickyNote } from 'lucide-react';
+import { ArrowLeft, Plus, StickyNote } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AiImportPage } from '../components/AiImportPage';
@@ -13,11 +13,10 @@ export function AiAssistantPage() {
   const chatPanelRef = useRef<AiSchedulePanelHandle>(null);
   const [openScheduleId, setOpenScheduleId] = useState<string | null>(null);
   const [chatError,setChatError]=useState('');
-  const [chatState, setChatState] = useState({ hasMessages: false, busy: false });
   const noteBoard = useAiNoteBoard({
     initialNoteId: searchParams.get('note') || undefined,
   });
-  const saveNote = useCallback((content: string) => noteBoard.createNote(content), [noteBoard.createNote]);
+  const saveNote = useCallback((content: string, imageIds?: string[]) => noteBoard.createNote(content, imageIds), [noteBoard.createNote]);
 
   const selectTool = (tool: 'chat' | 'email-import') => {
     const next = new URLSearchParams(searchParams);
@@ -35,34 +34,9 @@ export function AiAssistantPage() {
         <header className="ai-assistant-topbar">
           <div className="ai-assistant-topbar-title">
             <span className="eyebrow">ORBIT</span>
-            <strong>个人事务中心</strong>
+            <strong>{activeTool === 'email-import' ? '邮箱导入' : '个人事务中心'}</strong>
           </div>
-          <nav className="ai-assistant-tabs" role="tablist" aria-label="AI 工作区">
-            <button
-              type="button"
-              role="tab"
-              id="ai-tab-chat"
-              aria-controls="ai-panel-content"
-              aria-selected={activeTool === 'chat'}
-              className={`ai-assistant-tab${activeTool === 'chat' ? ' active' : ''}`}
-              onClick={() => selectTool('chat')}
-            >
-              <MessageCircle size={16} aria-hidden="true" />
-              <span>AI 对话</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="ai-tab-email-import"
-              aria-controls="ai-panel-content"
-              aria-selected={activeTool === 'email-import'}
-              className={`ai-assistant-tab${activeTool === 'email-import' ? ' active' : ''}`}
-              onClick={() => selectTool('email-import')}
-            >
-              <Mail size={16} aria-hidden="true" />
-              <span>邮箱导入</span>
-            </button>
-          </nav>
+          {activeTool === 'email-import' && <button type="button" className="ai-workspace-action" onClick={() => selectTool('chat')}><ArrowLeft size={16} />返回对话</button>}
           <div className="ai-assistant-topbar-actions">
             <button
               type="button"
@@ -72,7 +46,7 @@ export function AiAssistantPage() {
               title={resetTitle}
               aria-label={resetTitle}
             >
-              <RotateCcw size={16} aria-hidden="true" />
+              <Plus size={16} aria-hidden="true" />
               <span>新对话</span>
             </button>
             <button
@@ -93,8 +67,7 @@ export function AiAssistantPage() {
         <section
           id="ai-panel-content"
           className="ai-assistant-tool-content"
-          role="tabpanel"
-          aria-labelledby={activeTool === 'chat' ? 'ai-tab-chat' : 'ai-tab-email-import'}
+          aria-label={activeTool === 'chat' ? 'AI 对话' : '邮箱导入'}
         >
           {activeTool === 'email-import' ? (
             <AiImportPage />
@@ -105,7 +78,6 @@ export function AiAssistantPage() {
                   ref={chatPanelRef}
                   onSaveNote={saveNote}
                   onOpenSchedule={setOpenScheduleId}
-                  onChatStateChange={setChatState}
                 />
               </section>
             </div>

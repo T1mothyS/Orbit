@@ -194,17 +194,37 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 @keyframes orbit-side-depart { to { opacity:0; transform:translateX(12px); } }
 @media(min-width:1100px) { .app-shell .product-nav-item.icon-only { width:auto; padding:8px 12px; gap:7px; } .app-shell .product-nav-label { display:inline; font-size:13px; } }
 @media(max-width:767px) {
-  .app-shell .app-topbar { flex-basis:auto; padding:8px 12px 4px; gap:4px 12px; }
-  .app-shell .product-nav { padding:0; gap:4px; }
-  .app-shell .product-nav-item.icon-only { height:44px; width:44px; }
+  .app-shell .app-topbar { flex-basis:88px; padding:0 12px; gap:0 8px; }
+  .app-shell .product-nav { padding:0; gap:0; }
+  .app-shell .product-nav-item.icon-only { position:relative; isolation:isolate; height:44px; width:auto; flex:1 1 16.6667%; padding:0; background:transparent; }
+  .app-shell .product-nav-item.icon-only::before { content:''; position:absolute; z-index:-1; inset:5px 6px; border-radius:var(--orbit-radius-control,8px); }
+  .app-shell .product-nav-item.icon-only.active::before { background:var(--td-brand-color-light); }
+  .app-shell .product-nav-lucide { width:24px; height:24px; }
   .app-shell :is(.action-center-header,.library-header,.daily-reports-header,.reminder-hero) h1 { font-size:24px; }
-  .app-shell :is(.action-center-page,.library-page,.daily-reports-page) { padding:18px 16px 32px; }
-  .app-shell .reminder-content { padding:18px 16px 32px; }
+  .app-shell :is(.action-center-page,.library-page,.daily-reports-page) { padding:12px 12px 24px; }
+  .app-shell .reminder-content { padding:12px 12px 24px; width:100%; }
+  .app-shell :is(.action-center-header,.reminder-hero) { margin-bottom:12px; gap:8px; }
+  .app-shell .reminder-hero h1 { margin-top:0; }
+  .app-shell .task-card { padding:12px; }
+  .app-shell .task-card-head { gap:8px; }
+  .app-shell .stats-grid { margin-bottom:12px; }
   .app-shell .action-header-tools { flex-direction:row; width:auto; }
   .app-shell .action-header-tools button { flex:0 1 auto; }
   .app-shell .library-header { gap:12px; }
   .app-shell .library-header-actions { gap:8px; }
-  .app-shell .library-card-open { padding:16px; }
+  .app-shell .library-card-open { padding:12px; }
+  .app-shell .library-card-footer { margin-top:12px; }
+  .app-shell .library-card-tags { margin-top:8px; }
+  .app-shell .global-search-trigger { width:44px; height:44px; min-width:44px; min-height:44px; }
+  .app-shell .account-menu summary { min-width:44px; min-height:44px; align-items:center; justify-content:center; }
+  .app-shell .brand-mark { width:30px; height:30px; }
+  .app-shell .brand-subtitle { display:none; }
+  .note-board-header { min-height:52px; padding:4px 12px; }
+  .note-board-heading > div > span { display:none; }
+  .note-board-body { padding:8px; }
+  .note-board-close { width:44px; height:44px; }
+  .note-board-row-toolbar { gap:0; flex-wrap:wrap; }
+  .note-board-action,.note-board-select { width:44px; min-width:44px; height:44px; min-height:44px; }
   .app-shell :is(.primary-button,.secondary-button,.complete-button,.library-secondary-button,.daily-report-toolbar-button,.research-button) { min-height:44px; }
   .app-shell :is(input,textarea,select),.orbit-dialog-content :is(input,textarea,select),.orbit-composer-models select { font-size:16px; }
   .app-shell .stats-grid { gap:8px; }

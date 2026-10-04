@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, FileText, Mail, MoreHorizontal, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Check, FileText, Mail, MoreHorizontal, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { CompactFilterSheet } from './CompactFilterSheet';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
@@ -105,6 +106,8 @@ export function DailyReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const viewMode = searchParams.get('view') === 'shadow' ? 'shadow' : searchParams.get('view') === 'candidates' ? 'candidates' : 'received';
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [pendingView, setPendingView] = useState<typeof viewMode>(viewMode);
   const listRef = useRef<HTMLDivElement>(null);
   const loadGeneration = useRef(0);
   const [returnLimit, setReturnLimit] = useState(INITIAL_REPORT_LIMIT);
@@ -204,21 +207,18 @@ export function DailyReportsPage() {
         <div>
           <div className="daily-reports-eyebrow">PRIVATE INTELLIGENCE</div>
           <h1>日报</h1>
-          <p>{viewMode === 'shadow' ? '新版隔离预览，仅供对照，不进入正式日报或邮件。' : viewMode === 'received' ? '正式接收的日报会进入网页和邮件；来源由设置控制。' : '候选日报已经写入生产服务器，但当前未进入正式网页和邮件。'}</p>
+          {viewMode !== 'received' && <span className="report-view-status">{viewMode === 'shadow' ? '新版预览 · 非正式' : '候选对照 · 非正式'}</span>}
         </div>
         <div className="daily-report-toolbar-actions">
-          <Link className="daily-report-toolbar-button" to="/research">研究与观点</Link>
-          <div className="daily-report-view-toggle" role="tablist" aria-label="日报查看范围">
+          <button type="button" className="daily-report-toolbar-button mobile-filter-trigger" onClick={() => { setPendingView(viewMode); setFiltersOpen(true); }}><SlidersHorizontal size={16} />筛选{viewMode !== 'received' && <span className="filter-count">1</span>}</button>
+          <div className="daily-report-view-toggle desktop-filters" role="tablist" aria-label="日报查看范围">
             <button type="button" role="tab" aria-selected={viewMode === 'received'} className={viewMode === 'received' ? 'active' : undefined} onClick={() => switchView('received')}>正式日报</button>
             <button type="button" role="tab" aria-selected={viewMode === 'candidates'} className={viewMode === 'candidates' ? 'active' : undefined} onClick={() => switchView('candidates')}>候选对照</button>
             <button type="button" role="tab" aria-selected={viewMode === 'shadow'} className={viewMode === 'shadow' ? 'active' : undefined} onClick={() => switchView('shadow')}>新版预览</button>
           </div>
-          <button type="button" className="daily-report-toolbar-button" onClick={() => void load()} disabled={loading}>
-            <RefreshCw size={15} className={loading ? 'spin' : undefined} />
-            刷新
-          </button>
         </div>
       </header>
+      {filtersOpen && <CompactFilterSheet title="日报筛选" onClose={() => setFiltersOpen(false)} onReset={() => setPendingView('received')} onApply={() => { switchView(pendingView); setFiltersOpen(false); }}><label>查看范围<select aria-label="日报查看范围" value={pendingView} onChange={event => setPendingView(event.target.value as typeof viewMode)}><option value="received">正式日报</option><option value="candidates">候选对照</option><option value="shadow">新版预览</option></select></label><p className="compact-filter-hint">候选和新版预览用于对照，不进入正式日报或邮件。</p></CompactFilterSheet>}
 
       {error && (
         <div className="daily-report-notice error" role="alert">

@@ -5,7 +5,7 @@ export function OrbitSegmentedControl<T extends string>({ label, value, options,
 }) {
   const gesture = useRef<{ id: number; x: number; y: number; axis?: 'x' | 'y' } | null>(null);
   const suppressClick = useRef(false);
-  return <div className="orbit-segmented" role="group" aria-label={label} aria-disabled={disabled || undefined} data-index={options.findIndex(option => option.value === value)}
+  return <div className="orbit-segmented" role="group" aria-label={label} aria-disabled={disabled || undefined} data-value={value} data-index={options.findIndex(option => option.value === value)}
     onPointerDown={event => { if (!disabled && event.isPrimary && event.button === 0) { suppressClick.current = false; gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY }; } }}
     onPointerMove={event => {
       const start = gesture.current; if (!start || start.id !== event.pointerId) return;

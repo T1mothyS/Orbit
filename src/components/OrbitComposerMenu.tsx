@@ -4,10 +4,11 @@ import { ArrowLeft, ChevronRight, MessageSquare, Paperclip, Plus, SlidersHorizon
 import { useDialogLifecycle } from '../hooks/useDialogLifecycle';
 import type { useAiSelection } from '../hooks/useAiSelection';
 
-export function OrbitComposerMenu({ ai, onClose, onAttach, onNew, children, busy, attachmentsDisabled, autoKnowledge, onKnowledge }: {
+export function OrbitComposerMenu({ ai, onClose, onAttach, onNew, children, busy, attachmentsDisabled, autoKnowledge, onKnowledge, noteMode = false }: {
   ai: ReturnType<typeof useAiSelection>; onClose: () => void; onAttach: () => void; onNew: () => void;
   children: ReactNode; busy: boolean; attachmentsDisabled: boolean;
   autoKnowledge:boolean;onKnowledge:(value:boolean)=>void;
+  noteMode?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useDialogLifecycle(dialog);
@@ -27,10 +28,10 @@ export function OrbitComposerMenu({ ai, onClose, onAttach, onNew, children, busy
         <button type="button" aria-label="关闭更多功能" onClick={close}><X size={18} /></button></header>
       <div className="orbit-composer-menu-body">
         {view === 'tools' ? <div className="orbit-composer-tools">
-          <button type="button" aria-pressed={autoKnowledge} onClick={()=>onKnowledge(!autoKnowledge)}><span><strong>自动检索知识库 · {autoKnowledge?'已开启':'已关闭'}</strong><small>关闭时，明确提到知识库才检索</small></span></button>
+          {!noteMode && <button type="button" aria-pressed={autoKnowledge} onClick={()=>onKnowledge(!autoKnowledge)}><span><strong>自动检索知识库 · {autoKnowledge?'已开启':'已关闭'}</strong><small>关闭时，明确提到知识库才检索</small></span></button>}
           <button type="button" onClick={()=>{onClose();window.dispatchEvent(new CustomEvent('orbit:open-settings',{detail:'notifications'}));}}><span><strong>通知设置</strong><small>站内提醒发到 Orbit 主对话</small></span><ChevronRight size={16}/></button>
-          <button type="button" onClick={() => setView('models')}><SlidersHorizontal size={20} /><span><strong>模型设置</strong><small>{ai.loading ? '正在读取模型…' : selected?.name || ai.model || '选择或连接模型'}</small></span><ChevronRight size={16} /></button>
-          <button type="button" disabled={attachmentsDisabled} onClick={onAttach}><Paperclip size={20} /><span><strong>图片与文件</strong><small>添加附件，最多 3 个</small></span><ChevronRight size={16} /></button>
+          {!noteMode && <button type="button" onClick={() => setView('models')}><SlidersHorizontal size={20} /><span><strong>模型设置</strong><small>{ai.loading ? '正在读取模型…' : selected?.name || ai.model || '选择或连接模型'}</small></span><ChevronRight size={16} /></button>}
+          <button type="button" disabled={attachmentsDisabled} onClick={onAttach}><Paperclip size={20} /><span><strong>{noteMode ? '插入图片' : '图片与文件'}</strong><small>{noteMode ? '最多 3 张，与文字一起保存' : '添加附件，最多 3 个'}</small></span><ChevronRight size={16} /></button>
           <button type="button" onClick={() => setView('history')}><MessageSquare size={20} /><span><strong>历史对话</strong><small>继续对话、管理历史和提醒偏好</small></span><ChevronRight size={16} /></button>
           <button type="button" disabled={busy} onClick={onNew}><Plus size={20} /><span><strong>新建对话</strong><small>当前输入会保留为草稿</small></span><ChevronRight size={16} /></button>
         </div> : view === 'models' ? <div className="orbit-composer-models">

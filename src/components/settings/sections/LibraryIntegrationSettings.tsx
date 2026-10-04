@@ -3,6 +3,7 @@ import { Button, MessagePlugin } from 'tdesign-react';
 import { SettingSection } from '../SettingSection';
 import { SettingRow } from '../SettingRow';
 import type { SettingsAuthHeaders } from '../types';
+import { downloadResponse, readError } from '../../library/library-shared';
 
 interface LibraryTokenStatus {
   exists: boolean;
@@ -18,6 +19,13 @@ export function LibraryIntegrationSettings({ authHeaders }: { authHeaders: Setti
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [exportBusy, setExportBusy] = useState(false), [exportError, setExportError] = useState('');
+  const exportLibrary = async () => {
+    setExportBusy(true); setExportError('');
+    try { const response = await fetch('/api/library/export', { headers: authHeaders() }); if (!response.ok) throw await readError(response, '全库导出失败'); await downloadResponse(response, 'library-export.json'); MessagePlugin.success('全库导出已下载'); }
+    catch (error) { setExportError(error instanceof Error ? error.message : '全库导出失败'); }
+    finally { setExportBusy(false); }
+  };
 
   const loadStatus = useCallback(async () => {
     setLoadError('');
@@ -68,8 +76,10 @@ export function LibraryIntegrationSettings({ authHeaders }: { authHeaders: Setti
   };
 
   return (
-    <SettingSection id="library" title="知识库集成" description="令牌只允许当前账号的本地知识库 V2 发布和更新正式 Markdown。它不能登录网页，也不能读取、评论、修改日程、记事或其他账号数据。服务器只保存令牌哈希。">
+    <SettingSection id="library" title="知识库" description="导出与本地知识库发布集成。">
+      <SettingRow id="library-full-export" label="导出全库" description="下载当前账号的完整知识库 JSON。"><Button tag="button" loading={exportBusy} disabled={exportBusy} onClick={exportLibrary}>导出全库</Button>{exportError && <p role="alert" className="orbit-inline-error">{exportError}</p>}</SettingRow>
       <SettingRow label="知识库发布令牌">
+        <p className="settings-help">令牌仅用于本地知识库 V2 发布和更新；不能登录或访问其他账号及功能。服务器只保存哈希。</p>
         <div className="settings-status" role="status">
           <strong>{loadError || (status?.active ? '已启用' : status?.exists ? '已撤销' : status ? '尚未生成' : '加载状态中…')}</strong>
           {status?.prefix && <span>令牌前缀：{status.prefix}…</span>}

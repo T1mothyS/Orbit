@@ -1,4 +1,8 @@
 import { NoteLinks } from './NoteLinks';
+import { NoteImageGallery, NoteImageEditor } from './NoteImages';
+import { NoteCopyDialog } from './NoteCopyDialog';
+import { copyRichNote } from '../utils/note-clipboard';
+import type { NoteImage } from '../utils/note-images';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useDialogLifecycle } from '../hooks/useDialogLifecycle';
@@ -10,6 +14,7 @@ import { NOTE_COLORS, NOTE_COLOR_LABELS, NOTE_COLOR_STYLES, normaliseNoteColor, 
 export interface NoteItem {
   id: string;
   content: string;
+  images: NoteImage[];
   isOptimized: boolean;
   optimizationCount: number;
   contentRevision: number;
@@ -31,7 +36,7 @@ interface NoteBoardProps {
   drawerOpen: boolean;
   onCloseDrawer: () => void;
   onToggleCompleted: (note: NoteItem) => Promise<void>;
-  onEdit: (note: NoteItem, content: string) => Promise<void>;
+  onEdit: (note: NoteItem, content: string, images: NoteImage[]) => Promise<void>;
   onColorChange: (note: NoteItem, color: NoteColor) => Promise<void>;
   onMerge: (source: NoteItem, target: NoteItem) => Promise<void>;
   onOptimize: (note: NoteItem, signal?: AbortSignal) => Promise<NoteItem>;
@@ -98,6 +103,9 @@ function NoteRow({
   aiBusy,
   editing,
   editValue,
+  editImages,
+  onEditImagesChange,
+  onImageBusyChange,
   saving,
   colorPickerOpen,
   copyFeedback,
@@ -124,6 +132,9 @@ function NoteRow({
   aiBusy: boolean;
   editing: boolean;
   editValue: string;
+  editImages: NoteImage[];
+  onEditImagesChange: (images: NoteImage[]) => void;
+  onImageBusyChange: (busy: boolean) => void;
   saving: boolean;
   colorPickerOpen: boolean;
   copyFeedback: CopyFeedback;
@@ -222,7 +233,7 @@ function NoteRow({
         />
         <div className="note-board-row-text">
           {editing ? (
-            <textarea
+            <><textarea
               className="note-board-edit-input"
               value={editValue}
               onChange={event => onEditValueChange(event.target.value)}
@@ -239,12 +250,13 @@ function NoteRow({
               disabled={disabled}
               autoFocus
               aria-label="编辑记事正文"
-            />
+            /><NoteImageEditor images={editImages} onChange={onEditImagesChange} disabled={disabled} onBusyChange={onImageBusyChange} /></>
           ) : (
             <div className="note-board-content-button" onClick={()=>{if(!disabled)onStartEdit();}}>
               <NoteLinks text={note.content}/>
             </div>
           )}
+          {!editing && <NoteImageGallery images={note.images} />}
         </div>
       </div>
     </article>
@@ -269,6 +281,9 @@ export function NoteBoard({
   const [completedOpen, setCompletedOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [editImages, setEditImages] = useState<NoteImage[]>([]);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [copyPreview, setCopyPreview] = useState<NoteItem | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [mergeSourceId, setMergeSourceId] = useState<string | null>(null);
@@ -327,24 +342,26 @@ export function NoteBoard({
 
   const currentEditing = useRef(editingId);currentEditing.current=editingId;
   const startEdit = (note: NoteItem) => {
-    if (optimizationBusyId === note.id) return;
+    if (optimizationBusyId === note.id || imageBusy) return;
     if (editingId !== note.id && hasUnsavedEdit && !window.confirm('当前记事有未保存的修改，确定切换吗？')) return;
     setEditingId(note.id);
     setEditValue(note.content);
+    setEditImages(note.images);
     setColorPickerId(null);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditValue('');
+    setEditImages([]);
   };
 
   const saveEdit = async (note: NoteItem) => {
     const content = editValue.trim();
-    if (!content) return;
+    if (imageBusy || (!content && !editImages.length)) return;
     setSavingId(note.id);
     try {
-      await onEdit(note, content);
+      await onEdit(note, content, editImages);
       cancelEdit();
     } catch {
       // 父组件会把错误显示在记事板顶部，保留编辑态便于修正后重试。
@@ -354,7 +371,7 @@ export function NoteBoard({
   };
 
   const editingNote = editingId ? notes.find(note => note.id === editingId) : undefined;
-  const hasUnsavedEdit = Boolean(editingNote && editValue !== editingNote.content);
+  const hasUnsavedEdit = Boolean(editingNote && (editValue !== editingNote.content || editImages.map(image => image.id).join() !== editingNote.images.map(image => image.id).join()));
 
   const runOptimization = async (note: NoteItem) => {
     if (optimizationBusyId !== null) return;
@@ -363,6 +380,7 @@ export function NoteBoard({
     if (editingId !== note.id) {
       setEditingId(note.id);
       setEditValue(note.content);
+      setEditImages(note.images);
       setColorPickerId(null);
     }
 
@@ -402,11 +420,11 @@ export function NoteBoard({
 
   const copyNote = async (note: NoteItem) => {
     try {
-      if (!navigator.clipboard?.writeText) throw new Error('当前浏览器不支持剪贴板');
-      await navigator.clipboard.writeText(note.content);
+      await copyRichNote(note.content, note.images);
       setCopyFeedback({ id: note.id, kind: 'success' });
     } catch {
       setCopyFeedback({ id: note.id, kind: 'error' });
+      if (note.images.length) setCopyPreview(note);
     }
     if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
     copyTimerRef.current = window.setTimeout(() => setCopyFeedback({ id: '', kind: null }), 1500);
@@ -518,14 +536,17 @@ export function NoteBoard({
       aiBusy={aiBusy}
       editing={editingId === note.id}
       editValue={editingId === note.id ? editValue : note.content}
-      saving={savingId === note.id}
+      editImages={editImages}
+      onEditImagesChange={setEditImages}
+      onImageBusyChange={setImageBusy}
+      saving={savingId === note.id || (editingId === note.id && imageBusy)}
       colorPickerOpen={colorPickerId === note.id}
       copyFeedback={copyFeedback.id === note.id ? copyFeedback.kind : null}
       mergeSourceSelected={mergeSourceId === note.id}
       mergeSourceExists={mergeSourceId !== null}
       mergeBusy={mergeBusy}
       optimizing={optimizationBusyId === note.id}
-      optimizationDisabled={optimizationBusyId !== null || hasUnsavedEdit}
+      optimizationDisabled={optimizationBusyId !== null || hasUnsavedEdit || !note.content.trim()}
       onToggleSelected={() => toggleSelected(note.id)}
       onStartEdit={() => startEdit(note)}
       onEditValueChange={setEditValue}
@@ -547,8 +568,8 @@ export function NoteBoard({
         <span>{selectedCount ? `已选 ${selectedCount}` : '未选择'}</span>
         <button type="button" onClick={() => selectSection(sectionNotes)} disabled={!sectionNotes.length}>全选</button>
         <button type="button" onClick={() => clearSection(sectionNotes)} disabled={!selectedCount}>全不选</button>
-        <button type="button" onClick={() => downloadSection(section, sectionNotes, 'txt')} disabled={!selectedCount}>导出 TXT</button>
-        <button type="button" onClick={() => downloadSection(section, sectionNotes, 'csv')} disabled={!selectedCount}>导出 CSV</button>
+        <button type="button" onClick={() => downloadSection(section, sectionNotes, 'txt')} disabled={!selectedCount} title="仅导出文字，不包含图片">文字 TXT</button>
+        <button type="button" onClick={() => downloadSection(section, sectionNotes, 'csv')} disabled={!selectedCount} title="仅导出文字，不包含图片">文字 CSV</button>
       </div>
     );
   };
@@ -597,7 +618,7 @@ export function NoteBoard({
       <span className="sr-only">AI 优化会在当前编辑框中锁定正文并直接保存结果；优化完成后可撤回一次，手动保存新正文会建立新的撤回基线。</span>
     </aside>
   );
-  return mobile ? createPortal(<dialog ref={dialogRef} className="orbit-note-dialog" aria-label="AI 记事板" data-phase={presence.phase}
+  return <>{copyPreview && <NoteCopyDialog note={copyPreview} onClose={() => setCopyPreview(null)} />}{mobile ? createPortal(<dialog ref={dialogRef} className="orbit-note-dialog" aria-label="AI 记事板" data-phase={presence.phase}
     onCancel={event => { event.preventDefault(); event.stopPropagation(); if (colorPickerId) setColorPickerId(null); else onCloseDrawer(); }}
-    onClick={event => { if (event.target === event.currentTarget) onCloseDrawer(); }}>{panel}</dialog>, document.body) : panel;
+    onClick={event => { if (event.target === event.currentTarget) onCloseDrawer(); }}>{panel}</dialog>, document.body) : panel}</>;
 }
