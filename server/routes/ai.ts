@@ -47,6 +47,15 @@ import { selectKnowledgeReferences } from '../orbit-knowledge.js';
 import { schedulesForQuery } from '../orbit-schedule-context.js';
 import { getProactivePreference, setProactivePreference,proactiveEventView } from '../orbit-proactive.js';
 
+function clearOwnedConversation(userId: string, cid: string, remove = false) {
+  orbit.conversation(userId, cid);
+  const requests = queryAll<{id:string}>('SELECT id FROM orbit_requests WHERE user_id=? AND conversation_id=?', [userId, cid]);
+  const failures = clearConversationAttachments(userId, cid, () => remove ? orbit.deleteConversation(userId, cid) : orbit.clearConversationHistory(userId, cid));
+  for (const request of requests) aiChatRequestRecords.delete(`${userId}:${request.id}`);
+  for (const [id, plan] of aiSchedulePlans) if (plan.userId === userId && plan.conversationId === cid) aiSchedulePlans.delete(id);
+  return failures;
+}
+
 export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAuth>, 'authenticate'>) {
   const app = Router();
   const user = (req: any) => req.user.userId as string;
@@ -59,7 +68,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
   app.post('/api/orbit/conversations', authenticate, safe((req,res) => res.json({ conversation: orbit.createConversation(user(req), String(req.body?.title || '新对话'),req.body?.scopeScheduleId) })));
   app.post('/api/orbit/conversations/:id/read', authenticate, safe((req,res) => {orbit.markConversationRead(user(req),req.params.id,req.body?.observedAt);res.json({success:true});}));
   app.patch('/api/orbit/conversations/:id', authenticate, safe((req,res) => { orbit.renameConversation(user(req),req.params.id,String(req.body?.title || ''));res.json({success:true}); }));
-  app.delete('/api/orbit/conversations/:id', authenticate, safe((req,res) => {const uid=user(req),cid=req.params.id;if(orbit.conversation(uid,cid).is_main)throw new Error('主对话不能删除');if(queryAll("SELECT id FROM orbit_requests WHERE user_id=? AND conversation_id=? AND state IN ('queued','running')",[uid,cid]).length)throw new Error('请先取消请求');clearConversationAttachments(uid,cid);orbit.deleteConversation(uid,cid);res.json({success:true}); }));
+  app.delete('/api/orbit/conversations/:id', authenticate, safe((req,res) => {const uid=user(req),cid=req.params.id;if(orbit.conversation(uid,cid).is_main)throw new Error('主对话不能删除');const failures=clearOwnedConversation(uid,cid,true);res.json({success:true,...(failures?{attachmentCleanupPending:true}:{})}); }));
   app.get('/api/orbit/preferences', authenticate, safe((req,res) => res.json({ autoKnowledge: orbit.getAiPreference(user(req)),aiSelection:orbit.getAiSelection(user(req)),proactiveEnabled:getProactivePreference(user(req)),runnerEnabled:process.env.ORBIT_PROACTIVE_ENABLED==='true' })));
   app.patch('/api/orbit/preferences', authenticate, safe((req,res) => {
     const body = req.body || {};
@@ -186,12 +195,9 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       const payload = (req as any).user as JwtPayload;
       const cid = String(req.query.conversationId || orbit.ensureDefaultConversation(payload.userId));
       orbit.conversation(payload.userId,cid);
-      if (orbitQueue.listOrbitRequests(payload.userId,cid).some(r => ['queued','running'].includes(r.state))) throw new Error('请先取消这个会话中的请求');
-      clearConversationAttachments(payload.userId,cid);
-      run('DELETE FROM ai_schedule_messages WHERE user_id=? AND conversation_id=?',[payload.userId,cid]);
-      run('UPDATE orbit_conversations SET active_plan_message_id=NULL WHERE user_id=? AND id=?',[payload.userId,cid]);
+      const failures=clearOwnedConversation(payload.userId,cid);
       const deleted = true;
-      res.json({ success: true, deleted });
+      res.json({ success: true, deleted, ...(failures ? { attachmentCleanupPending: true } : {}) });
     } catch (error: any) {
       res.status(400).json({ error: error?.message || '清空历史失败' });
     }

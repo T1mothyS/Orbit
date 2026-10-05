@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last local verification: 2026-10-05，移动紧凑界面与图文记事本地验证；版本源为 package.json，验证入口/结果见 TEST-MATRIX。此轮不包含真实 AI、生产、自然定时与收件箱；其他历史证据按各节日期使用。
+- Last local verification: 2026-10-06，聊天清理、入口精简及记事链接本地验证；版本源为 package.json，验证入口/结果见 TEST-MATRIX。此轮不包含真实 AI、生产、自然定时与收件箱；其他历史证据按各节日期使用。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -155,10 +155,15 @@ Orbit 使用现有 chat.db 和同步持久化事务，未增加数据库服务�
 
 前端 useOrbitChat 用同步创建标记阻止新对话创建期间发送/重复创建，select 先更新当前目标引用，旧会话回调不能提交。页面对应显示创建进度；没有被接受的提交不会清空输入。正常模型请求运行不等于创建/切换，仍沿持久队列接收后续消息。
 
+清空当前对话与行内删除共用一次待确认状态，5 秒超时/外部点击/Escape/切换/关闭菜单复位，第二次点击才请求接口。清理期间同步锁阻止重复提交与新发送，并使清理前的刷新响应失效；成功后更新本地空历史，后续刷新失败明确报告已清理、状态正在重连。取消请求在服务端仍保留持久状态，但从页面状态列表移除；失败和中断继续显示重试。
+
+清空和删除在同一同步持久化事务内清理账号/会话所属的聊天附件元数据、消息、请求及处理步骤、活跃计划指针，queued/running 时拒绝。提交成功后只清除该会话的计划/请求缓存，失败不动缓存。清空保留会话、正式事务、记事及浏览器文字/记事图片草稿；聊天附件列表同步重置，未确认发送的重试编号失效。文件在事务成功后按共享引用清理，写入失败保留原记录和字节；若提交后文件删除失败，兼容响应增加 `attachmentCleanupPending: true` 并显示存储清理提示，不能把已接受的历史清空误报为整体失败。计划确认继续从所属账号的持久消息解析，清空后的缓存不能恢复已删除计划。
+
 | 接口 | 合同 |
 | --- | --- |
 | GET/POST `/api/orbit/conversations` | 当前账号会话列表/创建 |
 | PATCH/DELETE `/api/orbit/conversations/:id` | 重命名/删除；存在 queued/running 时先取消；保留事务数据 |
+| DELETE `/api/ai-schedule/history?conversationId=<id>` | 当前账号会话清空；保留会话和正式事务，移除消息、全部历史请求、聊天附件及计划关联；queued/running 时拒绝 |
 | GET/PATCH `/api/orbit/preferences` | 账号自动知识检索、主动聊天开关及 aiSelection；PATCH 全部字段校验后才写入 |
 | POST `/api/orbit/requests` | 接受有 requestId/conversationId/text 的有界请求，返回 202 和状态；每账号最多 20 个等待/执行请求 |
 | GET `/api/orbit/requests?conversationId=...` | 指定账号会话最近 40 个请求状态 |

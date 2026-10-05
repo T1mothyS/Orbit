@@ -73,9 +73,21 @@ export function deleteConversation(userId: string, id: string) {
     if (queryOne('SELECT id FROM orbit_requests WHERE conversation_id=? AND user_id=? AND state IN (\'queued\',\'running\')', [id, userId]))
         throw new Error('请先取消这个会话中的请求');
     withPersistenceTransaction(() => {
+        run('DELETE FROM orbit_request_steps WHERE user_id=? AND request_id IN (SELECT id FROM orbit_requests WHERE user_id=? AND conversation_id=?)', [userId, userId, id]);
         run('DELETE FROM orbit_requests WHERE conversation_id=? AND user_id=?', [id, userId]);
         run('DELETE FROM ai_schedule_messages WHERE conversation_id=? AND user_id=?', [id, userId]);
         run('DELETE FROM orbit_conversations WHERE id=? AND user_id=?', [id, userId]);
+    });
+}
+export function clearConversationHistory(userId: string, id: string) {
+    conversation(userId, id);
+    if (queryOne("SELECT id FROM orbit_requests WHERE user_id=? AND conversation_id=? AND state IN ('queued','running')", [userId, id]))
+        throw new Error('请先取消这个会话中的请求');
+    withPersistenceTransaction(() => {
+        run('DELETE FROM orbit_request_steps WHERE user_id=? AND request_id IN (SELECT id FROM orbit_requests WHERE user_id=? AND conversation_id=?)', [userId, userId, id]);
+        run('DELETE FROM orbit_requests WHERE user_id=? AND conversation_id=?', [userId, id]);
+        run('DELETE FROM ai_schedule_messages WHERE user_id=? AND conversation_id=?', [userId, id]);
+        run('UPDATE orbit_conversations SET active_plan_message_id=NULL WHERE user_id=? AND id=?', [userId, id]);
     });
 }
 export function historyContext(userId: string, id: string): string {

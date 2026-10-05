@@ -16,7 +16,23 @@ export function messageAttachments(userId:string,id:string){return queryAll<{att
 function busy(userId:string,id:string){return queryAll<{body:string}>("SELECT body FROM orbit_requests WHERE user_id=? AND state IN ('queued','running')",[userId]).some(r=>JSON.parse(r.body).attachmentIds?.includes(id));}
 export function deleteChatAttachment(userId:string,id:string){attachment(userId,id);if(busy(userId,id))throw new Error('附件正在使用，请先取消请求');let record:activity.AttachmentRecord|null=null;withPersistenceTransaction(()=>{run('DELETE FROM orbit_message_attachments WHERE user_id=? AND attachment_id=?',[userId,id]);run('DELETE FROM orbit_attachments WHERE user_id=? AND id=?',[userId,id]);record=activity.deleteAttachment(id,userId);});if(record)storage.deleteAttachmentFileIfUnused(record);}
 export function cleanupUnsentAttachments(userId:string){for(const r of queryAll<ChatAttachment>('SELECT a.* FROM orbit_attachments a WHERE a.user_id=? AND a.created_at<? AND NOT EXISTS(SELECT 1 FROM orbit_message_attachments m WHERE m.user_id=a.user_id AND m.attachment_id=a.id)',[userId,new Date(Date.now()-86400000).toISOString()]))if(!busy(userId,r.id))deleteChatAttachment(userId,r.id);}
-export function clearConversationAttachments(userId:string,cid:string){ownedConversation(userId,cid);for(const r of queryAll<ChatAttachment>('SELECT * FROM orbit_attachments WHERE user_id=? AND conversation_id=?',[userId,cid]))deleteChatAttachment(userId,r.id);}
+export function clearConversationAttachments(userId:string,cid:string,clearHistory:()=>void=()=>{}) {
+  ownedConversation(userId,cid);
+  const rows=queryAll<ChatAttachment>('SELECT * FROM orbit_attachments WHERE user_id=? AND conversation_id=?',[userId,cid]);
+  if(rows.some(row=>busy(userId,row.id)))throw new Error('附件正在使用，请先取消请求');
+  const records:activity.AttachmentRecord[]=[];
+  withPersistenceTransaction(()=>{
+    for(const row of rows) {
+      run('DELETE FROM orbit_message_attachments WHERE user_id=? AND attachment_id=?',[userId,row.id]);
+      run('DELETE FROM orbit_attachments WHERE user_id=? AND id=?',[userId,row.id]);
+      const record=activity.deleteAttachment(row.id,userId);if(record)records.push(record);
+    }
+    clearHistory();
+  });
+  let failures=0;
+  for(const record of records)try{storage.deleteAttachmentFileIfUnused(record);}catch{failures++;console.error('[Orbit] 附件记录已清理，文件清理失败');}
+  return failures;
+}
 export function validateChatAttachments(userId:string,cid:string,ids:unknown):string[]{if(!Array.isArray(ids)||ids.length>3||ids.some(id=>typeof id!=='string')||new Set(ids).size!==ids.length)throw new Error('每轮最多 3 个不同附件');let total=0;for(const id of ids){const row=attachment(userId,id);if(row.conversation_id!==cid||row.state!=='ready')throw new Error('附件不属于当前会话或尚未处理完成');total+=activity.getAttachment(id,userId)!.sizeBytes;}if(total>20*1024*1024)throw new Error('每轮附件总大小不能超过 20MB');return ids;}
 export function linkMessageAttachments(userId:string,messageId:string,ids:string[]){const m=queryOne<any>('SELECT conversation_id FROM ai_schedule_messages WHERE user_id=? AND id=?',[userId,messageId]);if(!m)throw new Error('消息不存在');validateChatAttachments(userId,m.conversation_id,ids);for(const id of ids)run('INSERT OR IGNORE INTO orbit_message_attachments(user_id,message_id,attachment_id) VALUES (?,?,?)',[userId,messageId,id]);}
 export async function uploadChatAttachment(userId:string,cid:string,input:{name:string;mime:string;base64:string},signal?:AbortSignal){ownedConversation(userId,cid);cleanupUnsentAttachments(userId);if(!CHAT_ATTACHMENT_TYPES.includes(input.mime))throw new Error('目前支持图片、TXT、Markdown、PDF、DOCX、XLSX 和 CSV');if(typeof input.base64!=='string'||input.base64.length>14*1024*1024||typeof input.name!=='string')throw new Error('附件格式或大小不正确');let bytes=Buffer.from(input.base64,'base64');storage.validateAttachmentBytes(input.mime,bytes,true);

@@ -1,9 +1,11 @@
-import { ArrowLeft, Plus, StickyNote } from 'lucide-react';
+import { ArrowLeft, Check, Eraser, Loader2, StickyNote } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AiImportPage } from '../components/AiImportPage';
 import { AiNoteBoardHost, useAiNoteBoard } from '../components/AiNoteBoardHost';
 import { AiSchedulePanel, type AiSchedulePanelHandle } from '../components/AiSchedulePanel';
+import { useInlineConfirmation } from '../hooks/useInlineConfirmation';
+import { useAuth } from '../hooks/useAuth';
 
 import { OrbitScheduleEditor } from '../components/OrbitScheduleEditor';
 
@@ -13,6 +15,9 @@ export function AiAssistantPage() {
   const chatPanelRef = useRef<AiSchedulePanelHandle>(null);
   const [openScheduleId, setOpenScheduleId] = useState<string | null>(null);
   const [chatError,setChatError]=useState('');
+  const { user } = useAuth();
+  const confirmation = useInlineConfirmation(`${user?.id || ''}:${searchParams.get('conversation') || ''}:${activeTool}`);
+  const [chatState, setChatState] = useState({ hasMessages: false, busy: false, clearDisabled: true });
   const noteBoard = useAiNoteBoard({
     initialNoteId: searchParams.get('note') || undefined,
   });
@@ -25,8 +30,11 @@ export function AiAssistantPage() {
     setSearchParams(next);
   };
 
-  const resetDisabled = activeTool !== 'chat';
-  const resetTitle = '新建对话';
+  const clearKey = `clear:${searchParams.get('conversation') || ''}`;
+  const clearing = confirmation.busy === clearKey;
+  const clearArmed = confirmation.pending === clearKey;
+  const resetDisabled = activeTool !== 'chat' || chatState.clearDisabled || !!confirmation.busy;
+  const resetTitle = clearing ? '正在清空…' : clearArmed ? '确认清空当前对话' : '清空当前对话';
 
   return (
     <div className="ai-assistant-page">
@@ -41,13 +49,15 @@ export function AiAssistantPage() {
             <button
               type="button"
               className="ai-workspace-action"
-              onClick={() => { void chatPanelRef.current?.resetHistory().catch(e=>setChatError(e instanceof Error?e.message:'创建对话失败')); }}
+              data-confirm-action={clearKey}
+              aria-pressed={clearArmed}
+              onClick={() => { void confirmation.confirm(clearKey, async () => { setChatError(''); await chatPanelRef.current?.clearCurrentConversation(); }).catch(e=>setChatError(e instanceof Error?e.message:'清空对话失败')); }}
               disabled={resetDisabled}
               title={resetTitle}
               aria-label={resetTitle}
             >
-              <Plus size={16} aria-hidden="true" />
-              <span>新对话</span>
+              {clearing ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : clearArmed ? <Check size={16} aria-hidden="true" /> : <Eraser size={16} aria-hidden="true" />}
+              <span>{resetTitle}</span>
             </button>
             <button
               type="button"
@@ -78,6 +88,8 @@ export function AiAssistantPage() {
                   ref={chatPanelRef}
                   onSaveNote={saveNote}
                   onOpenSchedule={setOpenScheduleId}
+                  confirmation={confirmation}
+                  onChatStateChange={setChatState}
                 />
               </section>
             </div>

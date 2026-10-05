@@ -142,8 +142,6 @@ function AppContent() {
         onClose={closeSettings}
         onOpenAdmin={() => { setShowSettings(false); setShowAdmin(true); }}
         onOpenTools={() => { setShowSettings(false); navigate('/tools'); }}
-        onOpenProject={() => { setShowSettings(false); navigate('/project'); }}
-        onOpenStatistics={() => { setShowSettings(false); navigate('/project?view=statistics'); }}
       /></FeatureBoundary>}
 
       {/* 管理员弹层 */}

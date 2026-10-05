@@ -20,6 +20,8 @@
 .orbit-refresh-status { padding:6px 14px; color:var(--td-text-color-secondary); background:var(--td-bg-color-page); font-size:12px; }
 .ai-schedule-page-card .schedule-ai-composer-wrap { padding:8px 12px max(8px,env(safe-area-inset-bottom)); }
 .orbit-composer-controls { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; }
+.orbit-composer-content { width:min(100%,960px); margin-inline:auto; }
+.orbit-conversation-actions button[aria-pressed=true] { color:var(--td-error-color); background:var(--td-error-color-light); }
 .orbit-segmented { --segment-color:var(--td-brand-color); position:relative; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:0 2px; min-width:0; background:transparent; border-radius:50px; isolation:isolate; touch-action:pan-y; }
 .orbit-segmented::before { content:''; position:absolute; inset:5px 0; border-radius:50px; background:var(--td-bg-color-component); z-index:-2; }
 .orbit-segmented[data-value=note] { --segment-color:#a94f69; }
@@ -73,7 +75,6 @@
   .ai-assistant-topbar-actions { grid-column:2; }
   .ai-assistant-topbar-actions > button:first-child { display:inline-flex; }
   .ai-workspace-action { min-height:44px; padding:0 8px; }
-  .orbit-chat-toolbar { display:none; }
 }
 @media(max-width:640px) {
   .orbit-composer-overlay { padding:0; }

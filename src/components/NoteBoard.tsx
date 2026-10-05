@@ -3,11 +3,11 @@ import { NoteImageGallery, NoteImageEditor } from './NoteImages';
 import { NoteCopyDialog } from './NoteCopyDialog';
 import { copyRichNote } from '../utils/note-clipboard';
 import type { NoteImage } from '../utils/note-images';
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDialogLifecycle } from '../hooks/useDialogLifecycle';
 import { usePanelPresence } from '../hooks/usePanelPresence';
-import { Check, ChevronDown, ChevronRight, ChevronUp, CircleX, Copy, Forward, GitMerge, Sparkles, Pencil, RotateCcw, StickyNote, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, CircleX, Copy, Forward, GitMerge, Sparkles, Pencil, RotateCcw, StickyNote, X } from 'lucide-react';
 import { formatNotesAsCsv, formatNotesAsText, noteExportFilename } from '../utils/note-export';
 import { NOTE_COLORS, NOTE_COLOR_LABELS, NOTE_COLOR_STYLES, normaliseNoteColor, type NoteColor } from '../utils/note-colors';
 
@@ -296,21 +296,12 @@ export function NoteBoard({
   const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 1100px)').matches);
   const presence = usePanelPresence(drawerOpen);
   useDialogLifecycle(dialogRef, mobile && presence.present, '.note-board-close');
-  const [dragOffset, setDragOffset] = useState(0);
-  const drag = useRef<{ id: number; x: number; y: number } | null>(null);
   useEffect(() => {
     const media = window.matchMedia('(max-width: 1100px)');
     const update = () => setMobile(media.matches);
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
-  const endDrag = (event: PointerEvent<HTMLDivElement>, cancel = false) => {
-    const start = drag.current;
-    drag.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    setDragOffset(0);
-    if (!cancel && start && event.clientX - start.x > 80 && Math.abs(event.clientY - start.y) < (event.clientX - start.x) / 2) onCloseDrawer();
-  };
   const copyTimerRef = useRef<number | null>(null);
   const optimizationAbortRef = useRef<AbortController | null>(null);
 
@@ -576,11 +567,7 @@ export function NoteBoard({
 
   const panel = (
     <aside id={id} ref={drawerRef} className={`note-board note-board-drawer${presence.present ? ' is-open' : ''}`}
-      data-phase={presence.phase} data-dragging={!!dragOffset} style={dragOffset ? { transform: `translateX(${dragOffset}px)` } : undefined} aria-label="AI 记事板">
-      {mobile && <div className="note-board-drag-handle" aria-hidden="true"
-        onPointerDown={event => { if (event.button !== 0) return; drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); }}
-        onPointerMove={event => { const start = drag.current; if (!start || start.id !== event.pointerId) return; const x = event.clientX - start.x, y = Math.abs(event.clientY - start.y); if (y > 12 && y > Math.abs(x)) { endDrag(event, true); return; } if (x > 8 && x > y * 1.5) setDragOffset(Math.min(x, 220)); }}
-        onPointerUp={event => endDrag(event)} onPointerCancel={event => endDrag(event, true)} onLostPointerCapture={() => { drag.current = null; setDragOffset(0); }}><ChevronRight size={12} /><span>向右滑动关闭</span></div>}
+      data-phase={presence.phase} aria-label="AI 记事板">
       <div className="note-board-header">
         <div className="note-board-heading">
           <span className="note-board-heading-icon"><StickyNote size={17} /></span>

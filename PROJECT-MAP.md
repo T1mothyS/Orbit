@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Source review: 2026-10-04；版本以 package.json 为准，状态以 docs/TASKS.md 为准。
+- Source review: 2026-10-06 核对聊天清理及个人菜单入口；版本以 package.json 为准，状态以 docs/TASKS.md 为准。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -117,7 +117,7 @@ flowchart LR
 
 ## 4. 任务路由与源码入口
 
-项目成长展示与维护从 [project-evolution/README.md](project-evolution/README.md) 进入：`/project` 为登录后只读页面，服务端 JSON 为构建外资源，账号共享项目事实，不读取个人日程、邮件或知识内容。Tools 与项目成长均在设置顶部提供快捷入口。
+项目成长展示与维护从 [project-evolution/README.md](project-evolution/README.md) 进入：`/project` 为登录后只读页面，服务端 JSON 为构建外资源，账号共享项目事实，不读取个人日程、邮件或知识内容。Tools、项目成长与“使用统计”均从头像菜单进入；统计继续复用 `/project?view=statistics`，成长页和设置顶部不再重复提供统计入口。
 
 | 任务 | 首先查看 | 不应越过的边界 |
 | --- | --- | --- |

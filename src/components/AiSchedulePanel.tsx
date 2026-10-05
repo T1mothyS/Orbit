@@ -3,7 +3,8 @@ import type { NoteImage } from '../utils/note-images';
 import { NoteImageGallery, NoteImageInput, useNoteImageUpload } from './NoteImages';
 import { OrbitNotificationCard, type NotificationMeta } from './OrbitNotificationCard';
 import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle } from 'react';
-import { Bot, BookOpen, Send, Loader2, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus } from 'lucide-react';
+import { Bot, BookOpen, Send, Loader2, Check, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus } from 'lucide-react';
+import type { InlineConfirmation } from '../hooks/useInlineConfirmation';
 import {safeChatHref} from '../utils/chat-markdown';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -108,11 +109,12 @@ interface AiSchedulePanelProps {
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
   onSaveNote: (content: string, imageIds?: string[]) => Promise<void>;
-  onChatStateChange?: (state: { hasMessages: boolean; busy: boolean }) => void;
+  confirmation: InlineConfirmation;
+  onChatStateChange?: (state: { hasMessages: boolean; busy: boolean; clearDisabled: boolean }) => void;
 }
 
 export interface AiSchedulePanelHandle {
-  resetHistory: () => Promise<void>;
+  clearCurrentConversation: () => Promise<void>;
   startConversation:(id:string,title:string)=>Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -552,6 +554,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   collapsed = false,
   onSaveNote,
   onChatStateChange,
+  confirmation,
 }, ref) {
   const [inputText, setInputText] = useState('');
   const [noteImages, setNoteImages] = useState<NoteImage[]>([]);
@@ -574,12 +577,12 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const followBottom=useRef(true),seenMessages=useRef(new Set<string>());
   const [hasNewReply,setHasNewReply]=useState(false);
   const orbit = useOrbitChat(authHeaders,isAuthenticated);
+  const activeConversation = useRef(orbit.cid); activeConversation.current = orbit.cid;
   const attachments=useChatAttachments(orbit.cid,authHeaders);
   const isLoading = orbit.requests.some(r => r.state === 'running' || r.state === 'queued');
   const [composerMenuOpen, setComposerMenuOpen] = useState(false);
   const setConversationDrawer = setComposerMenuOpen;
   const [renameTitle, setRenameTitle] = useState<string | null>(null);
-  const [deleteDialog, setDeleteDialog] = useState(false);
   const [targetConversation, setTargetConversation] = useState('');
   const location=useLocation();
   const notificationContext=useRef<string|undefined>();
@@ -589,17 +592,27 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const changeImages = useCallback((images: NoteImage[]) => { updateComposerDraft(draftKey, { images }); }, [draftKey]);
   const imageUpload = useNoteImageUpload(noteImages, changeImages);
   const draftReady = !!user?.id && !!orbit.cid;
-  const cannotSend = !draftReady || orbit.creating || orbit.submitting || savingNotes || (noteMode ? imageUpload.busy || (!inputText.trim() && !noteImages.length) : (!inputText.trim() && !attachments.files.length) || !attachments.ready || !ai.ready);
+  const mutationBusy = !!confirmation.busy || orbit.mutating;
+  const destructiveBlocked = orbit.creating || orbit.submitting || savingNotes || imageUpload.busy || !!confirmingPlanId || !!savingPlanOperationKey || attachments.files.some(file => ['uploading', 'processing'].includes(file.state));
+  const clearDisabled = !draftReady || destructiveBlocked || isLoading || mutationBusy;
+  const cannotSend = !draftReady || orbit.creating || orbit.submitting || savingNotes || mutationBusy || (noteMode ? imageUpload.busy || (!inputText.trim() && !noteImages.length) : (!inputText.trim() && !attachments.files.length) || !attachments.ready || !ai.ready);
   useEffect(() => {
     const sync = (key: string) => { if (key === draftKey) { const draft = readComposerDraft(key); setInputText(draft.text); setNoteImages(draft.images); } };
     sync(draftKey); return subscribeComposerDraft(sync);
   }, [draftKey]);
   useEffect(()=>{const continueChat=(e:Event)=>{const detail=(e as CustomEvent<{notificationId:string;title:string}>).detail;notificationContext.current=detail.notificationId;const previous=readComposerDraft(draftKey).text;changeText(previous+(previous?'\n\n':'')+'关于“'+detail.title+'”：');textareaRef.current?.focus();};window.addEventListener('orbit:continue-notification',continueChat);return()=>window.removeEventListener('orbit:continue-notification',continueChat);},[draftKey,changeText]);
-  useEffect(()=>{notificationContext.current=undefined;setRenameTitle(null);setDeleteDialog(false);followBottom.current=true;seenMessages.current.clear();setHasNewReply(false);},[orbit.cid,user?.id]);
+  useEffect(()=>{notificationContext.current=undefined;setRenameTitle(null);followBottom.current=true;seenMessages.current.clear();setHasNewReply(false);},[orbit.cid,user?.id]);
 
   useEffect(() => {
-    onChatStateChange?.({ hasMessages: messages.length > 0, busy: isLoading });
-  }, [isLoading, messages.length, onChatStateChange]);
+    onChatStateChange?.({ hasMessages: messages.length > 0, busy: isLoading, clearDisabled });
+  }, [isLoading, messages.length, clearDisabled, onChatStateChange]);
+
+  const clearConversation = useCallback(async (id: string) => {
+    if (destructiveBlocked || (id === orbit.cid && isLoading)) throw new Error('请等待当前操作结束后再清空对话');
+    await orbit.clear(id);
+    if (id === activeConversation.current) { attachments.clear(); notificationContext.current = undefined; setHasNewReply(false); }
+  }, [destructiveBlocked, isLoading, orbit.cid, orbit.clear, attachments.clear]);
+  const closeComposerMenu = () => { confirmation.reset(); setComposerMenuOpen(false); };
 
   useEffect(() => {
     setMessages(orbit.history.map(m => ({
@@ -665,7 +678,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   }, [inputText, submitMessage]);
 
   const handleSaveNotes = useCallback(async () => {
-    if (savingNotesRef.current || orbit.creating || imageUpload.busy || (!inputText.trim() && !noteImages.length)) return;
+    if (savingNotesRef.current || orbit.creating || mutationBusy || imageUpload.busy || (!inputText.trim() && !noteImages.length)) return;
     savingNotesRef.current = true;
     const submitted = snapshotComposerDraft(draftKey);
     setSavingNotes(true);
@@ -679,7 +692,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
       savingNotesRef.current = false; setSavingNotes(false);
       textareaRef.current?.focus();
     }
-  }, [inputText, noteImages, imageUpload.busy, onSaveNote, orbit.creating, draftKey, orbit.setError]);
+  }, [inputText, noteImages, imageUpload.busy, onSaveNote, orbit.creating, mutationBusy, draftKey, orbit.setError]);
 
 
   const handleConfirmPlan = useCallback(async (messageId: string, planId: string) => {
@@ -743,7 +756,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     }
   };
 
-  useImperativeHandle(ref, () => ({ resetHistory: orbit.create, refresh: orbit.refresh,startConversation:(id:string,title:string)=>orbit.create(id,title) }), [orbit.create,orbit.refresh]);
+  useImperativeHandle(ref, () => ({ clearCurrentConversation: () => clearConversation(orbit.cid), refresh: orbit.refresh,startConversation:(id:string,title:string)=>orbit.create(id,title) }), [clearConversation,orbit.cid,orbit.create,orbit.refresh]);
 
   const jumpedMessage=useRef('');
   useEffect(()=>{const id=new URLSearchParams(location.search).get('message');if(!id||jumpedMessage.current===location.search)return;const element=document.getElementById('orbit-message-'+id);if(element){followBottom.current=false;element.scrollIntoView({block:'center'});element.classList.add('setting-search-target');jumpedMessage.current=location.search;}},[location.search,messages]);
@@ -756,24 +769,33 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   ];
   const conversationContent = <>
         <div className="orbit-sidebar-head"><strong>Orbit</strong></div>
-        <button type="button" className="primary-button" disabled={orbit.creating} onClick={() => {void orbit.create().catch(e=>orbit.setError(e.message));setConversationDrawer(false);}}>{orbit.creating?'正在创建…':'＋ 新对话'}</button>
-        <div className="orbit-conversation-list">{orbit.conversations.map(c => <div key={c.id} className={`orbit-conversation-row${c.id===orbit.cid?' active':''}`}><button type="button" className="orbit-conversation-select" onClick={() => {orbit.select(c.id);setConversationDrawer(false);}} title={c.title}>{c.is_main ? <Pin size={13} aria-hidden="true"/> : null}<span>{c.title}</span>{!!c.unread && <em aria-label={`${c.unread} 条未读提醒`}>{c.unread}</em>}</button><div className="orbit-conversation-actions">{!c.is_main && <button type="button" aria-label={`重命名对话：${c.title}`} title="重命名" onClick={()=>{setTargetConversation(c.id);setRenameTitle(c.title);setConversationDrawer(false);}}><Edit3 size={14}/></button>}<button type="button" aria-label={`${c.is_main?'清理历史':'删除对话'}：${c.title}`} title={c.is_main?'清理主对话历史':'删除对话'} onClick={()=>{setTargetConversation(c.id);setDeleteDialog(true);setConversationDrawer(false);}}><Trash2 size={14}/></button></div></div>)}</div>
+        <button type="button" className="primary-button" disabled={orbit.creating || mutationBusy} onClick={() => {void orbit.create().catch(e=>orbit.setError(e.message));closeComposerMenu();}}>{orbit.creating?'正在创建…':'＋ 新对话'}</button>
+        <div className="orbit-conversation-list">{orbit.conversations.map(c => {
+          const key = `delete:${c.id}`, armed = confirmation.pending === key, busy = confirmation.busy === key;
+          const label = `${c.is_main ? '清理主对话历史' : '删除对话'}：${c.title}`;
+          return <div key={c.id} className={`orbit-conversation-row${c.id===orbit.cid?' active':''}`}>
+            <button type="button" className="orbit-conversation-select" disabled={mutationBusy || orbit.creating} onClick={() => {confirmation.reset();orbit.select(c.id);setConversationDrawer(false);}} title={c.title}>{c.is_main ? <Pin size={13} aria-hidden="true"/> : null}<span>{c.title}</span>{!!c.unread && <em aria-label={`${c.unread} 条未读提醒`}>{c.unread}</em>}</button>
+            <div className="orbit-conversation-actions">{!c.is_main && <button type="button" disabled={mutationBusy || orbit.creating} aria-label={`重命名对话：${c.title}`} title="重命名" onClick={()=>{setTargetConversation(c.id);setRenameTitle(c.title);closeComposerMenu();}}><Edit3 size={14}/></button>}
+              <button type="button" data-confirm-action={key} aria-pressed={armed} disabled={mutationBusy || destructiveBlocked || (c.id===orbit.cid && isLoading)} aria-label={`${armed?'确认':''}${label}`} title={busy?'正在处理…':armed?`确认${label}`:label}
+                onClick={()=>{void confirmation.confirm(key,async()=>{orbit.setError('');if(c.is_main)await clearConversation(c.id);else await orbit.remove(c.id);closeComposerMenu();}).catch(e=>orbit.setError(e.message));}}>{busy?<Loader2 size={14} className="animate-spin"/>:armed?<Check size={14}/>:<Trash2 size={14}/>}</button>
+            </div>
+          </div>;
+        })}</div>
 
   </>;
   return (
     <div className="ai-assistant-workspace orbit-workspace">
       <aside className="orbit-conversations" aria-label="对话列表">{conversationContent}</aside>
-      {composerMenuOpen && <OrbitComposerMenu ai={ai} onClose={() => setComposerMenuOpen(false)} busy={orbit.creating || orbit.submitting || savingNotes}
+      {composerMenuOpen && <OrbitComposerMenu ai={ai} onClose={closeComposerMenu} busy={orbit.creating || orbit.submitting || savingNotes || mutationBusy}
         autoKnowledge={orbit.autoKnowledge} onKnowledge={value=>{void orbit.preference(value).catch(e=>orbit.setError(e.message));}}
-        noteMode={noteMode} attachmentsDisabled={(noteMode ? noteImages.length >= 3 || imageUpload.busy : attachments.files.length >= 3) || orbit.creating || orbit.submitting || savingNotes}
+        noteMode={noteMode} attachmentsDisabled={(noteMode ? noteImages.length >= 3 || imageUpload.busy : attachments.files.length >= 3) || orbit.creating || orbit.submitting || savingNotes || mutationBusy}
         onAttach={() => { (noteMode ? noteImageInputRef : attachmentInputRef).current?.click(); setComposerMenuOpen(false); }}
         onNew={() => { setComposerMenuOpen(false); void orbit.create().catch(error => orbit.setError(error.message)); }}>
         {conversationContent}
       </OrbitComposerMenu>}
       <div className="orbit-chat-main">
-      <div className="orbit-chat-toolbar"><button type="button" className="orbit-sidebar-toggle" onClick={() => setComposerMenuOpen(true)}>更多功能</button><strong>{orbit.creating?'正在创建对话…':orbit.conversations.find(c=>c.id===orbit.cid)?.title || '对话'}</strong></div>
+      {orbit.creating && <div className="orbit-refresh-status" role="status">正在创建对话…</div>}
       {renameTitle!==null && <form className="orbit-dialog-row" onSubmit={e => {e.preventDefault();void orbit.rename(renameTitle,targetConversation).then(()=>setRenameTitle(null)).catch(e=>orbit.setError(e.message));}}><input aria-label="对话名称" value={renameTitle} maxLength={100} onChange={e=>setRenameTitle(e.target.value)} autoFocus /><button type="submit">保存</button><button type="button" onClick={()=>setRenameTitle(null)}>取消</button></form>}
-      {deleteDialog && <div className="orbit-dialog-row" role="alertdialog" aria-label="删除对话确认"><span>{orbit.conversations.find(c=>c.id===targetConversation)?.is_main?'清理主对话的历史？Orbit 入口保留。':'删除这段对话？'}已创建的事务会保留。</span><button type="button" onClick={()=>{const operation=orbit.conversations.find(c=>c.id===targetConversation)?.is_main?orbit.clear(targetConversation):orbit.remove(targetConversation);void operation.then(()=>setDeleteDialog(false)).catch(e=>orbit.setError(e.message));}}>确认</button><button type="button" onClick={()=>setDeleteDialog(false)}>取消</button></div>}
       {orbit.refreshError && <div className="orbit-refresh-status" role="status">{orbit.refreshError}</div>}
       {orbit.error && <div className="orbit-error" role="alert">{orbit.error}<button type="button" onClick={()=>orbit.setError('')} aria-label="关闭提示">×</button></div>}
 
@@ -847,7 +869,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
 
           </div>
 
-            <div className="orbit-request-list" aria-live="polite">{orbit.requests.filter(r=>r.state!=='completed').map(r=><OrbitRequestStatus key={r.id} request={r} onAction={verb=>{void orbit.action(r.id,verb).catch(e=>orbit.setError(e.message));}}/>)}</div>
+            <div className="orbit-request-list" aria-live="polite">{orbit.requests.filter(r=>!['completed','cancelled'].includes(r.state)).map(r=><OrbitRequestStatus key={r.id} request={r} onAction={verb=>{void orbit.action(r.id,verb).catch(e=>orbit.setError(e.message));}}/>)}</div>
           </div>
 
           {/* 输入框 */}
@@ -855,19 +877,20 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
             className="flex-shrink-0 schedule-ai-composer-wrap"
             style={{ borderTop: '1px solid var(--td-component-stroke)' }}
           >
+            <div className="orbit-composer-content">
             {!noteMode && orbit.autoKnowledge&&<button type="button" className="orbit-knowledge-chip" onClick={()=>void orbit.preference(false).catch(e=>orbit.setError(e.message))}>知识库已开启 ×</button>}
             <div className="orbit-composer-controls">
               <OrbitSegmentedControl label="发送方式" value={noteMode ? 'note' : 'command'} options={[{ value: 'command', label: '指令' }, { value: 'note', label: '记事' }]}
-                disabled={orbit.creating || orbit.submitting || savingNotes} onChange={value => setNoteMode(value === 'note')} />
-              {!noteMode && <AiProviderSelect provider={ai.provider} disabled={ai.loading || ai.saving || orbit.creating || orbit.submitting || savingNotes} onChange={provider => void ai.chooseProvider(provider)} />}
+                disabled={orbit.creating || orbit.submitting || savingNotes || mutationBusy} onChange={value => setNoteMode(value === 'note')} />
+              {!noteMode && <AiProviderSelect provider={ai.provider} disabled={ai.loading || ai.saving || orbit.creating || orbit.submitting || savingNotes || mutationBusy} onChange={provider => void ai.chooseProvider(provider)} />}
             </div>
-            <div hidden={noteMode}><ChatAttachmentComposer {...attachments} inputRef={attachmentInputRef} showAddButton={false} disabled={noteMode || orbit.creating || orbit.submitting} /></div>
-            <NoteImageInput inputRef={noteImageInputRef} disabled={orbit.creating || imageUpload.busy || savingNotes} onFiles={files => { void imageUpload.add(files); }} />
-            {noteMode && <><NoteImageGallery images={noteImages} editable disabled={savingNotes || imageUpload.busy} onChange={changeImages} />{imageUpload.busy && <p role="status">图片上传中…</p>}{imageUpload.error && <p role="alert" className="orbit-inline-error">{imageUpload.error}</p>}</>}
+            <div hidden={noteMode}><ChatAttachmentComposer {...attachments} inputRef={attachmentInputRef} showAddButton={false} disabled={noteMode || orbit.creating || orbit.submitting || mutationBusy} /></div>
+            <NoteImageInput inputRef={noteImageInputRef} disabled={orbit.creating || imageUpload.busy || savingNotes || mutationBusy} onFiles={files => { void imageUpload.add(files); }} />
+            {noteMode && <><NoteImageGallery images={noteImages} editable disabled={savingNotes || imageUpload.busy || mutationBusy} onChange={changeImages} />{imageUpload.busy && <p role="status">图片上传中…</p>}{imageUpload.error && <p role="alert" className="orbit-inline-error">{imageUpload.error}</p>}</>}
             {!noteMode && (ai.error || ai.saveError) && <button type="button" className="orbit-composer-hint is-warning" onClick={() => setComposerMenuOpen(true)}>{ai.error || ai.saveError} · 打开模型设置</button>}
             <div className={`schedule-ai-composer orbit-compact-composer${noteMode ? ' is-note-mode' : ''}`}>
               <button type="button" className="orbit-composer-plus" aria-label="更多功能" aria-haspopup="dialog" aria-expanded={composerMenuOpen}
-                disabled={orbit.creating || orbit.submitting || savingNotes} onClick={() => setComposerMenuOpen(true)}><Plus size={22} aria-hidden="true" /></button>
+                disabled={orbit.creating || orbit.submitting || savingNotes || mutationBusy} onClick={() => setComposerMenuOpen(true)}><Plus size={22} aria-hidden="true" /></button>
               <textarea
                 ref={textareaRef}
                 value={inputText}
@@ -883,7 +906,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
                   }
                 }}
                 onKeyDown={handleKeyDown}
-                disabled={!draftReady || orbit.creating}
+                disabled={!draftReady || orbit.creating || mutationBusy}
                 placeholder={noteMode ? noteImages.length ? '记录文字，与图片一起保存…' : '每行一条，或添加图片…' : '发消息或安排日程…'}
                 rows={1}
                 className="resize-none text-sm outline-none bg-transparent border-0 schedule-ai-composer-field"
@@ -914,6 +937,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
                 }
                 <span>{noteMode ? '保存' : '发送'}</span>
               </button>
+            </div>
             </div>
           </div>
         </>

@@ -159,9 +159,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .orbit-note-dialog::backdrop { background:rgb(0 0 0 / .28); }
 .orbit-note-dialog .note-board-drawer { display:flex; position:relative; width:min(380px,calc(100vw - 24px)); height:100%; min-width:0; border-left:1px solid var(--td-component-stroke); box-shadow:var(--orbit-shadow-overlay); transform:translateX(0); opacity:1; transition:transform var(--orbit-motion-panel) var(--orbit-ease),opacity var(--orbit-motion-overlay) var(--orbit-ease); }
 .orbit-note-dialog .note-board-drawer[data-phase=entering],.orbit-note-dialog .note-board-drawer[data-phase=closing] { transform:translateX(100%); opacity:0; }
-.orbit-note-dialog .note-board-drawer[data-dragging=true] { transition:none; }
 .orbit-note-dialog .note-board-close { display:grid; }
-.note-board-drag-handle { display:flex; align-items:center; justify-content:center; gap:4px; flex:0 0 24px; font-size:11px; color:var(--td-text-color-placeholder); cursor:grab; touch-action:pan-y; user-select:none; }
 .orbit-login-page { background:var(--td-bg-color-page); color:var(--td-text-color-primary); }
 .orbit-login-page p,.orbit-login-page footer { color:var(--td-text-color-secondary); }
 .orbit-login-card { border:1px solid var(--td-component-stroke); border-radius:12px; background:var(--td-bg-color-container); }

@@ -74,7 +74,7 @@ function ProjectEvolutionContent() {
   }, [milestone?.id, view]);
 
   return <main className="evolution-page">
-    <header className="evolution-header"><span className="evolution-kicker">ORBIT / PROJECT EVOLUTION</span><Link to="/project?view=statistics">使用统计</Link><Link to="/today"><ArrowLeft size={15} /> 返回应用</Link></header>
+    <header className="evolution-header"><span className="evolution-kicker">ORBIT / PROJECT EVOLUTION</span><Link to="/today"><ArrowLeft size={15} /> 返回应用</Link></header>
     <section className="evolution-hero">
       <div><p className="evolution-eyebrow">一个项目，持续生长</p><h1 ref={heading} tabIndex={-1}>从一张日历，<br />到个人信息系统。</h1><p className="evolution-intro">回看每一次能力的增加，也看清它们如何连接在一起。</p></div>
       <div className="evolution-current"><span>当前应用版本</span><strong>V{APP_CONFIG.version}</strong><p>历史收录与应用版本独立更新</p>{data && <small>收录截止提交 <code>{data.baseline.slice(0, 7)}</code><br />最早可追溯记录 {data.facts[0] ? day(data.facts[0].date) : '—'}</small>}</div>

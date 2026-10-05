@@ -27,6 +27,8 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     const [submitting, setSubmitting] = useState(false);
     const [creating, setCreating] = useState(false);
     const creatingRef = useRef(false);
+    const [mutating, setMutating] = useState(false);
+    const mutatingRef = useRef(false);
     const submittingRef = useRef(false);
     const pendingSubmission = useRef<{
         signature:string;
@@ -50,7 +52,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         setParams(previous => { const next = new URLSearchParams(previous); next.set('conversation', id); return next; });
     }, [setParams]);
     const refresh = useCallback(async () => {
-        if (!cid)
+        if (!cid || mutatingRef.current)
             return;
         const revision = ++refreshRevision.current;
         const [messages, jobs, list] = await Promise.all([api(`/api/ai-schedule/history?conversationId=${encodeURIComponent(cid)}`), api(`/api/orbit/requests?conversationId=${encodeURIComponent(cid)}`),api('/api/orbit/conversations')]);
@@ -107,7 +109,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         return () => { stopped = true; clearTimeout(timer); };
     }, [authenticated, cid, refresh]);
     const create = useCallback(async (scopeScheduleId?: string, title?: string) => {
-        if (creatingRef.current) return;
+        if (creatingRef.current || mutatingRef.current) return;
         creatingRef.current = true;
         setCreating(true);
         try {
@@ -120,7 +122,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         }
     }, [api, refreshConversations, select]);
     const send = useCallback(async (text: string, body: Record<string, unknown>) => {
-        if (creatingRef.current || current.current !== cid) return false;
+        if (creatingRef.current || mutatingRef.current || current.current !== cid) return false;
         if (!cid)
             throw new Error('请先选择一个对话');
         if (submittingRef.current)
@@ -147,11 +149,30 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     }, [api, cid, refresh]);
     const action = useCallback(async (id: string, verb: 'cancel' | 'retry') => { await api(`/api/orbit/requests/${encodeURIComponent(id)}/${verb}`, 'POST', {}); await refresh(); }, [api, refresh]);
     const rename = useCallback(async (title: string, id=cid) => { await api(`/api/orbit/conversations/${encodeURIComponent(id)}`, 'PATCH', { title }); await refreshConversations(); }, [api, cid, refreshConversations]);
-    const remove = useCallback(async (id=cid) => { await api(`/api/orbit/conversations/${encodeURIComponent(id)}`, 'DELETE'); const items = await refreshConversations(); if (items[0] && current.current===id)
-        select(items[0].id); }, [api, cid, refreshConversations, select]);
-    const clear = useCallback(async (id=cid)=>{await api(`/api/ai-schedule/history?conversationId=${encodeURIComponent(id)}`,'DELETE');await refresh();},[api,cid,refresh]);
+    const remove = useCallback(async (id=cid) => {
+        if (mutatingRef.current || creatingRef.current || submittingRef.current) throw new Error('请等待当前操作结束');
+        mutatingRef.current = true; setMutating(true); ++refreshRevision.current;
+        try {
+            const result = await api(`/api/orbit/conversations/${encodeURIComponent(id)}`, 'DELETE');
+            if (result.attachmentCleanupPending) setError('对话已删除，部分附件文件清理失败，请联系管理员检查存储权限。');
+            const remaining = conversations.filter(c => c.id !== id);
+            setConversations(remaining);
+            if (current.current === id && remaining[0]) select(remaining[0].id);
+            try { await refreshConversations(); } catch { setRefreshError('对话已删除，列表暂时无法刷新；正在重新连接…'); }
+        } finally { mutatingRef.current = false; setMutating(false); }
+    }, [api, cid, conversations, refreshConversations, select]);
+    const clear = useCallback(async (id=cid) => {
+        if (!id || mutatingRef.current || creatingRef.current || submittingRef.current) throw new Error('请等待当前操作结束');
+        mutatingRef.current = true; setMutating(true); ++refreshRevision.current;
+        try {
+            const result = await api(`/api/ai-schedule/history?conversationId=${encodeURIComponent(id)}`, 'DELETE');
+            if (result.attachmentCleanupPending) setError('历史已清空，部分附件文件清理失败，请联系管理员检查存储权限。');
+            if (current.current === id) { pendingSubmission.current = null; setHistory([]); setRequests([]); }
+        } finally { mutatingRef.current = false; setMutating(false); }
+        try { await refresh(); } catch { setRefreshError('历史已清空，状态暂时无法刷新；正在重新连接…'); }
+    }, [api, cid, refresh]);
     const preference = useCallback(async (value: boolean) => { await api('/api/orbit/preferences', 'PATCH', { autoKnowledge: value }); setAutoKnowledge(value); }, [api]);
     const proactivePreference=useCallback(async(value:boolean)=>{await api('/api/orbit/preferences','PATCH',{proactiveEnabled:value});setProactiveEnabled(value);},[api]);
     const reminderAction=useCallback(async(id:string,action:string)=>{await api(`/api/orbit/reminders/${encodeURIComponent(id)}/${action}`,'POST',{});await refresh();},[api,refresh]);
-    return { cid, conversations, requests, history, error, refreshError, setError, autoKnowledge,proactiveEnabled,runnerEnabled, submitting, creating, select, create, send, action, rename, remove, clear, preference,proactivePreference,reminderAction, refresh };
+    return { cid, conversations, requests, history, error, refreshError, setError, autoKnowledge,proactiveEnabled,runnerEnabled, submitting, creating, mutating, select, create, send, action, rename, remove, clear, preference,proactivePreference,reminderAction, refresh };
 }
