@@ -76,7 +76,7 @@ export function AppShell({
 
         <div className="topbar-actions">
           <GlobalSearch />
-          <details className="account-menu" ref={menu} onKeyDown={e=>{if(e.key==='Escape'){close();menu.current?.querySelector('summary')?.focus();}}} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))close();}}>
+          <details className="account-menu" ref={menu} onKeyDown={e=>{if(e.key==='Escape'){close();menu.current?.querySelector('summary')?.focus();}}} onBlur={e=>{const nextTarget=e.relatedTarget;if(!(nextTarget instanceof Node)||!e.currentTarget.contains(nextTarget))close();}}>
             <summary aria-label="个人菜单" title={user?.email}><AccountAvatar email={user?.email||'O'}/></summary>
             <div className="account-menu-panel"><strong>{user?.email}</strong>
               <button type="button" onClick={()=>{close();onOpenSettings();}}><Settings size={16}/> 设置</button>
