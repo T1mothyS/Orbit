@@ -35,7 +35,7 @@ const baseline=process.argv.includes('--baseline');fs.mkdirSync(output,{recursiv
       await page.screenshot({path:path.join(output,`${baseline?'before':'after'}-notes-${width}-${theme}.png`)});
       if(await page.getByLabel('关闭记事板',{exact:true}).isVisible())await page.getByLabel('关闭记事板',{exact:true}).click();else await page.getByLabel('打开 AI 记事板',{exact:true}).click();
       if(!baseline) {
-        await page.locator('summary[aria-label="个人菜单"]').click();assert.equal(await page.getByRole('link',{name:'使用统计',exact:true}).count(),1);
+        await page.locator('summary[aria-label="个人菜单"]').click();await page.locator('.account-menu-panel > strong').click();assert.ok(await page.locator('.account-menu').evaluate(e=>e.open));assert.equal(await page.getByRole('link',{name:'使用统计',exact:true}).count(),1);
         await page.getByRole('button',{name:'设置',exact:true}).click();await page.getByRole('dialog',{name:'设置',exact:true}).waitFor();assert.equal(await page.locator('.settings-header-links').count(),0);
         assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.getByLabel('关闭设置',{exact:true}).click();checks.push(`settings and menu ${width} ${theme}`);
       }

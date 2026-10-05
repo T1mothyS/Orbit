@@ -28,6 +28,7 @@ Mobile Compact 沿现有组件实施：手机页面/卡片通常12px内边距，
 - 可交互区域在触屏上至少接近 44px；图标按钮必须有可见的 hover/focus 状态和 aria-label。
 - Switch 同时表达视觉状态和 aria-checked/disabled 状态；loading 时阻止重复提交并保留错误反馈。
 - 表单标签和辅助说明与控件保持关联；键盘焦点、Escape、返回焦点和 Dialog 关闭行为要可预测。
+- 个人菜单邮箱是展示文字，点击后菜单保持展开。原生 `details` 的失焦事件只有明确转入外部节点时才收起；焦点目标为空时交由外部点击和 Escape 关闭，避免在 Chromium 聚焦过程中同步折叠菜单导致页面卡死。
 
 ## 4. Settings Row 规范
 
