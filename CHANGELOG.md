@@ -2,6 +2,13 @@
 
 本文件记录具体版本变更；版本唯一来源为 package.json。历史生产结果属于当次记录，不代表当前上线状态。任务状态见 [TASKS](docs/TASKS.md)，未来目标见 [route.md](route.md)。
 
+## 0.50.0-261006.1454 — Daily Digest 三来源候选与拓展阅读
+
+- 新增默认关闭、按账号启用的 `daily_report.prepare_sources_v2`：AIHot REST/ETag 缓存及有界失败回退，接收网页版 Work Gmail 提取的 Bloomberg/Polymarket 短摘录，冻结到原七天输入快照。账号/权限/阶段/并发保护不改变个人输入，正文不进入永久 manifest 或日志。
+- 每来源最多40条、规范链接和相同事实去重，保留不同事实与来源归因；明确无新邮件、过旧、截断、失败、未配置状态，概率单位/时间窗未知不猜测。Web Search 继续核验、逐项研究 Watchlist 并做有界补漏。
+- 新 generation `2026-10-06.1` 支持最多三条可选拓展阅读，网页、HTML邮件、纯文本共享推荐理由和证据引用；保留旧 generation 校验/历史渲染、许可图片及原创事实信息图链路。
+- 没有新增依赖、数据库迁移、Gmail OAuth、市场 API 或定时任务。手动 Gmail 探测与本地验证见 [测试矩阵](docs/TEST-MATRIX.md#三来源候选与拓展阅读)；未 push、部署、修改正式任务或发信，两个真实日期 Shadow 及 Polymarket 新一期另验。
+
 ## 0.49.5-261006.1015 — 定向修复生产依赖漏洞
 
 - Nodemailer 升级10.0.15；锁定 proxy-addr 2.0.8、fast-uri 3.1.8 和 brace-expansion 1.x 的1.1.21。只改变六个安装路径、四个纯JavaScript包，没有新增依赖关系或原生模块变化。

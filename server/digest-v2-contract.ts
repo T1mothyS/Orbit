@@ -1,23 +1,27 @@
 import crypto from 'node:crypto';
 import net from 'node:net';
 import { isValidDateKey } from './date-key.js';
+import type { DigestSourcesSnapshot } from './digest-v2-sources.js';
 
 export const DIGEST_V2_VERSION = 'daily-digest.v2';
-export const DIGEST_V2_GENERATION = '2026-09-28.1';
-export const DIGEST_V2_EDITORIAL_GENERATIONS = ['2026-09-27.1', '2026-09-27.2', DIGEST_V2_GENERATION];
+export const DIGEST_V2_GENERATION = '2026-10-06.1';
+export const DIGEST_V2_EDITORIAL_GENERATIONS = ['2026-09-27.1', '2026-09-27.2', '2026-09-28.1', DIGEST_V2_GENERATION];
 export const DIGEST_V2_ILLUSTRATED_GENERATIONS = ['2026-09-26.1', ...DIGEST_V2_EDITORIAL_GENERATIONS];
+const checkedGenerations = ['2026-09-27.2', '2026-09-28.1', DIGEST_V2_GENERATION];
+const watchlistEvidenceGenerations = ['2026-09-28.1', DIGEST_V2_GENERATION];
 export type CheckStatus = 'complete' | 'partial' | 'failed' | 'not_configured';
 export interface InputItem { id: string; title: string; detail: string }
 export interface InputSection { status: CheckStatus; items: InputItem[] }
 export interface DigestSnapshot {
   date: string; timezone: string; cutoff: string; contextVersion: number;
   calendar: InputSection; mail: InputSection; watchlist: InputSection;
+  sources?: DigestSourcesSnapshot;
 }
 export function digestSnapshotWarnings(snapshot: DigestSnapshot, generationVersion = DIGEST_V2_GENERATION): string[] {
   if (generationVersion === '2026-09-21.1' || generationVersion === '2026-09-22.2') {
     return (['calendar', 'mail', 'watchlist'] as const).filter(section => ['failed', 'partial'].includes(snapshot[section].status)).map(section => `${section.toUpperCase()}_INCOMPLETE`);
   }
-  return (['calendar', 'mail', 'watchlist'] as const).flatMap(section => {
+  const personal = (['calendar', 'mail', 'watchlist'] as const).flatMap(section => {
     const status = snapshot[section].status;
     if (section === 'mail' && status === 'not_configured') return ['MAIL_NOT_CONFIGURED'];
     if (section === 'mail' && status === 'failed') return ['MAIL_READ_FAILED'];
@@ -25,6 +29,13 @@ export function digestSnapshotWarnings(snapshot: DigestSnapshot, generationVersi
     if (section === 'watchlist' && status === 'failed') return ['WATCHLIST_READ_FAILED'];
     return status === 'failed' || status === 'partial' ? [`${section.toUpperCase()}_INCOMPLETE`] : [];
   });
+  const sources = generationVersion === DIGEST_V2_GENERATION ? (snapshot.sources?.statuses || []).flatMap(item => {
+    const prefix = `SOURCE_${item.source.toUpperCase()}`;
+    if (item.status !== 'complete') return [`${prefix}_${item.status.toUpperCase()}`];
+    if (item.reasonCodes.includes('no_new_mail')) return [`${prefix}_NO_NEW_MAIL`];
+    return item.freshness === 'stale' || item.reasonCodes.includes('stale') ? [`${prefix}_STALE`] : [];
+  }) : [];
+  return [...personal, ...sources];
 }
 export interface DigestEvidence { id: string; url: string; source: string; published_at: string }
 export interface DigestStory {
@@ -40,6 +51,7 @@ export interface DigestV2 {
   market: DigestStory[]; macro: DigestStory[]; stories: DigestStory[];
   watchlist: Array<{ input_id: string; summary: string; check: 'complete' | 'incomplete'; change: 'material' | 'nothing_material' | 'unknown'; evidence_ids: string[] }>;
   what_matters_next: string[]; evidence: DigestEvidence[]; media: DigestMedia[];
+  further_reading?: Array<{ id: string; title: string; reason: string; evidence_ids: string[] }>;
 }
 type Schema = { type: 'object' | 'array' | 'string'; description?: string; properties?: Record<string, Schema>; required?: string[]; additionalProperties?: false; items?: Schema; maxItems?: number; minLength?: number; maxLength?: number; enum?: readonly string[]; format?: 'id' | 'url' | 'date' | 'timestamp' };
 const str = (maxLength = 2000): Schema => ({ type: 'string', maxLength });
@@ -49,7 +61,7 @@ const array = (items: Schema, maxItems = 100): Schema => ({ type: 'array', items
 const obj = (properties: Record<string, Schema>): Schema => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const refs = array(id, 20);
 const story = obj({ id, title: { ...str(250), minLength: 1 }, summary: { ...prose(4000), minLength: 1 }, evidence_ids: refs, media_ids: refs, verification: { ...str(), enum: ['verified', 'partial', 'unverified'] } });
-export const DIGEST_V2_SCHEMA = obj({
+const legacySchema = obj({
   schema_version: { ...str(), enum: [DIGEST_V2_VERSION] }, date: { ...str(), format: 'date' }, title: { ...str(200), minLength: 1 },
   executive_signals: array({ ...prose(500), minLength: 1 }, 5), calendar: array(obj({ input_id: id, text: { ...prose(), minLength: 1 } }), 300),
   mail: array(obj({ input_id: id, summary: { ...prose(3000), minLength: 1, description: `${prose(3000).description} 登录态私人日报应保留邮件中明确的服务或事项名称、具体动作和已知期限。未知期限不得猜测；同一事项多封邮件可写各自新增事实，不重复泛化文案。` }, action: prose() })),
@@ -59,6 +71,10 @@ export const DIGEST_V2_SCHEMA = obj({
   evidence: array(obj({ id, url: { ...str(2048), format: 'url' }, source: { ...str(200), minLength: 1, description: '只填写媒体或机构名称，不加入核验状态、图片处理过程、时间说明或网址。' }, published_at: { ...str(40), format: 'timestamp' } }), 200),
   media: array(obj({ id, evidence_id: id, url: { ...str(2048), format: 'url' }, category: { ...str(), enum: ['AI', 'Semiconductor', 'Banking', 'Macro', 'Gaming', 'China', 'International', 'Company', 'Market'] } }), 20),
 });
+export const DIGEST_V2_SCHEMA: Schema = { ...legacySchema, properties: { ...legacySchema.properties,
+  further_reading: array(obj({ id, title: { ...str(250), minLength: 1 }, reason: { ...prose(500), minLength: 1 }, evidence_ids: refs }), 3),
+} };
+export function digestV2Schema(generationVersion: string): Schema { return generationVersion === DIGEST_V2_GENERATION ? DIGEST_V2_SCHEMA : legacySchema; }
 
 /** No DNS/network here. The fetch boundary independently validates DNS and redirects. */
 export function publicDigestUrl(value: string): boolean {
@@ -70,6 +86,17 @@ export function publicDigestUrl(value: string): boolean {
       && !u.hostname.endsWith('.home.arpa') && !/[\u0000-\u0020\u007f]/.test(value)
       && ![...u.searchParams.keys()].some(k => /^(token|access_token|api_key|authorization|signature|x-amz-credential|x-amz-signature)$/i.test(k));
   } catch { return false; }
+}
+/** Public references only; never follow recipient-specific newsletter redirects. */
+export function canonicalSourceUrl(value: string): string {
+  if (!value || !publicDigestUrl(value)) return '';
+  const url = new URL(value);
+  if (/(?:^|\.)(?:customeriomail\.com|message\.bloomberg\.com|spmailtechnolo\.com|googleusercontent\.com|mail\.google\.com|sli\.bloomberg\.com)$/.test(url.hostname)
+    || /(?:unsubscribe|manage_subscription_preferences|img-proxy)/i.test(url.pathname)
+    || [...url.searchParams.keys()].some(key => /^(?:sig|exp|recipient|email|user_id|uid|tracking_id)$/i.test(key))) return '';
+  url.hash = '';
+  for (const key of [...url.searchParams.keys()]) if (/^(?:utm_.+|fbclid|gclid|mc_cid|mc_eid)$/i.test(key)) url.searchParams.delete(key);
+  url.searchParams.sort(); return url.toString();
 }
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']';
@@ -88,7 +115,7 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
       const o = v as Record<string, unknown>;
       for (const k of Object.keys(o)) if (!Object.hasOwn(s.properties!, k)) issue(path, 'UNKNOWN_FIELD');
       for (const [k, sub] of Object.entries(s.properties!)) {
-        if (!Object.hasOwn(o, k)) issue(`${path}.${k}`, 'REQUIRED'); else visit(o[k], sub, `${path}.${k}`);
+        if (!Object.hasOwn(o, k)) { if (s.required?.includes(k)) issue(`${path}.${k}`, 'REQUIRED'); } else visit(o[k], sub, `${path}.${k}`);
       }
     } else if (s.type === 'array') {
       if (!Array.isArray(v)) return issue(path, 'TYPE_ARRAY');
@@ -102,6 +129,7 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
       if (s.format === 'date' && !isValidDateKey(v)) issue(path, 'DATE');
       if (s.format === 'timestamp' && v !== '' && (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(v) || !Number.isFinite(Date.parse(v)))) issue(path, 'TIMESTAMP');
       if (s.format === 'url' && !publicDigestUrl(v)) issue(path, 'URL');
+      if (s.format === 'url' && generationVersion === DIGEST_V2_GENERATION && publicDigestUrl(v) && !canonicalSourceUrl(v)) issue(path, 'PRIVATE_SOURCE_URL');
       if (/(?:\bBearer\s+[A-Za-z0-9._~-]{16,}|\b(?:password|api[_-]?key|secret)\s*[:=]\s*\S{8,}|[A-Za-z]:\\)/i.test(v)) issue(path, 'SENSITIVE_CONTENT');
       if (DIGEST_V2_EDITORIAL_GENERATIONS.includes(generationVersion) && s.description?.startsWith('正文')) {
         const parts = v.split('**');
@@ -111,13 +139,13 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
     }
   }
   if (Buffer.byteLength(JSON.stringify(value) || '') > 750_000) issue('$', 'SIZE_LIMIT');
-  else visit(value, DIGEST_V2_SCHEMA, '$');
+  else visit(value, digestV2Schema(generationVersion), '$');
   if (errors.length) return { valid: false, errors, warnings: [] as string[], reviewIssues, contentHash: null };
   const d = value as DigestV2;
   const unique = (ids: string[], path: string) => { if (new Set(ids).size !== ids.length) issue(path, 'DUPLICATE_ID'); };
   const stories = [...d.market, ...d.macro, ...d.stories];
   unique(stories.map(x => x.id), '$.stories'); unique(d.evidence.map(x => x.id), '$.evidence'); unique(d.media.map(x => x.id), '$.media');
-  if (generationVersion === '2026-09-27.2' || generationVersion === DIGEST_V2_GENERATION) {
+  if (checkedGenerations.includes(generationVersion)) {
     const normalized = (value: string) => value.normalize('NFKC').replace(/\*\*/g, '').replace(/\s+/gu, ' ').trim().toLowerCase();
     const seen = new Set<string>();
     for (const section of ['market', 'macro', 'stories'] as const) {
@@ -137,9 +165,15 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
     }
   }
   const eids = new Set(d.evidence.map(x => x.id)); const mids = new Set(d.media.map(x => x.id));
-  for (const [i, s] of [...stories, ...d.watchlist].entries()) {
+  const readings = d.further_reading || [];
+  unique(readings.map(item => item.id), '$.further_reading');
+  for (const [i, s] of [...stories, ...d.watchlist, ...readings].entries()) {
     unique(s.evidence_ids, `$.references[${i}]`);
     if (s.evidence_ids.some(id => !eids.has(id))) issue(`$.references[${i}]`, 'EVIDENCE_NOT_FOUND');
+  }
+  for (const [i, item] of readings.entries()) {
+    if (!item.evidence_ids.length) issue(`$.further_reading[${i}]`, 'EVIDENCE_REQUIRED');
+    if (stories.some(story => story.id === item.id)) issue(`$.further_reading[${i}]`, 'DUPLICATE_ID');
   }
   for (const [i, s] of stories.entries()) {
     unique(s.media_ids, `$.stories[${i}].media_ids`);
@@ -152,7 +186,7 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
     if (!stories.some(s => s.media_ids.includes(m.id))) issue(`$.media[${i}]`, 'UNREFERENCED_MEDIA');
   }
   for (const [i, w] of d.watchlist.entries()) {
-    if ((w.change !== 'unknown' && w.check !== 'complete') || (w.check === 'complete' && !w.evidence_ids.length && (w.change !== 'unknown' || generationVersion === DIGEST_V2_GENERATION))) issue(`$.watchlist[${i}]`, 'CHECK_EVIDENCE_REQUIRED');
+    if ((w.change !== 'unknown' && w.check !== 'complete') || (w.check === 'complete' && !w.evidence_ids.length && (w.change !== 'unknown' || watchlistEvidenceGenerations.includes(generationVersion)))) issue(`$.watchlist[${i}]`, 'CHECK_EVIDENCE_REQUIRED');
   }
   if (snapshot) {
     if (d.date !== snapshot.date) issue('$.date', 'SNAPSHOT_DATE_MISMATCH');

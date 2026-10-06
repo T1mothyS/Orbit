@@ -971,6 +971,11 @@ export function createDigestRun(row: DigestRunRow): void {
 export function updateDigestRunManifest(userId: string, id: string, manifest: unknown): void {
   run('UPDATE digest_v2_runs SET manifest_json = ? WHERE id = ? AND user_id = ?', [JSON.stringify(manifest), id, userId]);
 }
+/** Compare-and-swap only the unexpired snapshot; callers preserve all personal sections. */
+export function updateDigestRunSnapshot(userId: string, id: string, expected: string, snapshot: unknown): boolean {
+  return run('UPDATE digest_v2_runs SET snapshot_json = ? WHERE id = ? AND user_id = ? AND snapshot_json = ? AND expires_at > ?',
+    [JSON.stringify(snapshot), id, userId, expected, nowIso()]) === 1;
+}
 export function getDigestRun(userId: string, id: string): DigestRunRow | null {
   const row = queryOne<DigestRunRow>('SELECT * FROM digest_v2_runs WHERE user_id = ? AND id = ?', [userId, id]);
   return row ? { ...row, snapshot_json: row.expires_at > nowIso() ? row.snapshot_json : null } : null;

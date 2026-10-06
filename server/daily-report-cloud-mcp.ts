@@ -1,5 +1,6 @@
 import express from 'express';
-import { readDigestV2Inputs, validateDigestRun, publishDigestV2, prepareDigestVisuals } from './digest-v2-service.js';
+import { readDigestV2Inputs, validateDigestRun, publishDigestV2, prepareDigestVisuals, prepareDigestSources } from './digest-v2-service.js';
+import { digestSourcesEnabled, NEWSLETTER_INPUT_SCHEMA } from './digest-v2-sources.js';
 import { NEWS_VISUAL_PLAN_SCHEMA } from './digest-v2-visuals.js';
 import { DIGEST_V2_SCHEMA } from './digest-v2-contract.js';
 import * as db from './db.js';
@@ -72,6 +73,7 @@ interface McpTool {
 }
 
 const TOOL_SCOPES: Record<string, DailyReportCloudScope[]> = {
+  'daily_report.prepare_sources_v2': ['daily_report:read_mail', 'daily_report:read_context'],
   'daily_report.read_inputs_v2': ['daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context', 'daily_report:read_history'],
   'daily_report.validate_v2': ['daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context'],
   'daily_report.prepare_visuals_v2': ['daily_report:media_prepare', 'daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context'],
@@ -99,6 +101,7 @@ function oauthSecurity(toolName: string): Array<{ type: 'oauth2'; scopes: string
 }
 
 const toolDefinitions: McpTool[] = [
+  { name: 'daily_report.prepare_sources_v2', securitySchemes: oauthSecurity('daily_report.prepare_sources_v2'), description: '汇集AIHOT匿名REST与Work通过当前网页版Gmail只读连接提取的Bloomberg/Polymarket短候选，冻结在当前账号runId的七天快照；Gmail读取结果由Work报告，服务器不读取Gmail。仅结构化短摘录，禁止全文、HTML/MIME、headers、附件、凭据和跟踪链接。同一输入幂等，修改输入需新run。返回来源失败/过旧/截断状态及候选，仍须公开核验和Watchlist独立研究；不发布、不发信、不授权图片。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, newsletters: NEWSLETTER_INPUT_SCHEMA }, required: ['runId', 'newsletters'], additionalProperties: false } },
   { name: 'daily_report.prepare_visuals_v2', securitySchemes: oauthSecurity('daily_report.prepare_visuals_v2'), description: '为具体新闻生成原创事实信息图并保存本站持久媒体；标签必须来自该条标题/摘要，显式标明非现场照片。绑定当前账号、runId、新闻及证据，改稿需重新准备。返回带 media 的 digest；随后 validate_v2 并按授权发布。不批准外站照片、不发布、不发信。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, digest: DIGEST_V2_SCHEMA, visuals: NEWS_VISUAL_PLAN_SCHEMA }, required: ['runId', 'digest', 'visuals'], additionalProperties: false } },
   { name: 'daily_report.read_inputs_v2', securitySchemes: oauthSecurity('daily_report.read_inputs_v2'), description: '创建账号隔离的新版日报输入快照和 runId，有效期七天；不发布、不发信。', inputSchema: { type: 'object', properties: { date: { type: 'string' } }, required: ['date'], additionalProperties: false } },
   { name: 'daily_report.validate_v2', securitySchemes: oauthSecurity('daily_report.validate_v2'), description: '对照输入快照纯校验 daily-digest.v2 JSON；无媒体下载、持久化或通知副作用。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, digest: DIGEST_V2_SCHEMA }, required: ['runId', 'digest'], additionalProperties: false } },
@@ -377,6 +380,10 @@ async function callTool(auth: OAuthBearerContext, name: string, rawArguments: un
   if (!toolScopeAllowed(auth, name)) throw new DailyReportCloudMcpAuthError(TOOL_SCOPES[name] || []);
   const args = objectValue(rawArguments);
   if (name === 'daily_report.read_inputs_v2') return readDigestV2Inputs(auth.userId, stringValue(args.date));
+  if (name === 'daily_report.prepare_sources_v2') {
+    if (Object.keys(args).some(key => !['runId', 'newsletters'].includes(key))) throw new Error('SOURCE_INPUT_FIELDS');
+    return prepareDigestSources(auth.userId, stringValue(args.runId), args.newsletters);
+  }
   if (name === 'daily_report.validate_v2') return validateDigestRun(auth.userId, stringValue(args.runId), args.digest);
   if (name === 'daily_report.prepare_visuals_v2') return prepareDigestVisuals(auth.userId, stringValue(args.runId), args.digest, args.visuals);
   if (name === 'daily_report.publish_v2') return publishDigestV2(auth.userId, stringValue(args.runId), args.digest, args.mode === undefined ? 'dry_run' : stringValue(args.mode));
@@ -665,7 +672,7 @@ async function handleJsonRpc(request: JsonRpcRequest, auth: OAuthBearerContext):
     };
   }
   if (method === 'tools/list') {
-    return { jsonrpc: '2.0', id, result: { tools: toolDefinitions.filter(tool => (process.env.DIGEST_V2_ENABLED === 'true' || !tool.name.endsWith('_v2')) && (process.env.DIGEST_SHADOW_ONLY !== 'true' || tool.name.endsWith('_v2') || ['daily_report.read_calendar', 'daily_report.read_mail', 'daily_report.read_context', 'daily_report.read_history'].includes(tool.name))) } };
+    return { jsonrpc: '2.0', id, result: { tools: toolDefinitions.filter(tool => (tool.name !== 'daily_report.prepare_sources_v2' || digestSourcesEnabled(auth.userId)) && (process.env.DIGEST_V2_ENABLED === 'true' || !tool.name.endsWith('_v2')) && (process.env.DIGEST_SHADOW_ONLY !== 'true' || tool.name.endsWith('_v2') || ['daily_report.read_calendar', 'daily_report.read_mail', 'daily_report.read_context', 'daily_report.read_history'].includes(tool.name))) } };
   }
   if (method === 'tools/call') {
     const params = objectValue(request.params);

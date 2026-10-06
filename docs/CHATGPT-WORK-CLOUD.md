@@ -2,7 +2,7 @@
 
 - Status: CONTRACT（末尾为历史快照）
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.36.3-260928.1303`（2026-09-28，本地关注输入状态、占位图分类和合成页面验证；隔离服务未部署，历史验证仍按各节时点）。
+- Last verified commit/version: `0.50.0-261006.1454`（2026-10-06，本地三来源候选与拓展阅读；自动和浏览器证据见测试矩阵，未部署或切换正式任务；历史验证仍按各节时点）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -136,8 +136,8 @@ dry-run 返回 `VALIDATED_NOT_PUBLISHED` 才能进行同正文正式发布。兼
 - QQ 邮箱状态分别映射为 `MAIL_NOT_CONFIGURED`（未配置或停用）、`MAIL_READ_FAILED`（读取失败）、`MAIL_INCOMPLETE`（部分读取）；读取成功且无未读时不产生邮箱警告。快照清单、校验/发布回执、内容哈希和新产物沿用同一映射；网页、邮件 HTML 与纯文本显示对应空态。未过期的旧 run 按原 `generationVersion` 维持原警告与内容哈希，重试复用既有产物；既有 Shadow 产物不改写，旧警告码仍可读取。
 - 快照只含日程必要字段、邮件摘要和引用、关注名单。7 天后不可继续验证/发布，并由后台维护清除敏感快照；运行版本、覆盖数量及阶段诊断长期保留。已生成的私有日报仍属于历史产物，不随输入快照过期而删除。旧加密备份中的快照遵守备份保留规则；恢复时再次丢弃已过期快照。
 - `daily_report.validate_v2({runId,digest})` 和 `publish_v2` 的 `dry_run` 只读取快照并纯校验；不访问外站、不处理媒体、不修改业务数据、不入队。过期或跨账号 run 拒绝。所有成功读取的输入 ID 必须逐项覆盖，即使该部分标记 `partial`；错误返回 `path/code`，成功返回稳定 `contentHash`。
-- JSON 权威定义为 [digest-v2-contract.ts](../server/digest-v2-contract.ts) 的 `DIGEST_V2_SCHEMA`。所有顶层字段必填，允许空数组；摘要信号最多 5 条。`check`、`verification`、`change` 分别表示检查完成、证据核对、事件变化，不能互相替代。缺少证据或检查未完成时不得判断“无重大变化”。新闻数量没有最低要求。
-- 新建 run 使用 `2026-09-28.1` 规则：保留 `2026-09-27.2` 的发表时间、重复正文和空新闻审阅规则；缺精确来源时间继续留空。Watchlist 缺失、空列表、字段损坏、部分读取分别进入 `not_configured`、`not_configured`、`failed`、`partial`，不再把缺字段当成 `complete`；已读取的标的仍需逐项覆盖，标记 `complete` 时至少关联一条来源证据。已读取但未研究必须标 `incomplete/unknown`；不能据少量来源把 `nothing_material` 当作充分结论。旧 run 与已存产物按冻结 `generationVersion`/`renderer` 保留内容与校验口径。
+- JSON 权威定义为 [digest-v2-contract.ts](../server/digest-v2-contract.ts) 的 `DIGEST_V2_SCHEMA`。原有顶层字段必填，允许空数组；摘要信号最多 5 条。新规则另允许可选 `further_reading`，缺失等同空数组。`check`、`verification`、`change` 分别表示检查完成、证据核对、事件变化，不能互相替代。缺少证据或检查未完成时不得判断“无重大变化”。新闻数量没有最低要求。
+- 新建 run 使用 `2026-10-06.1` 规则：增加下节三来源候选与拓展阅读，保留 `2026-09-28.1` 的 Watchlist 证据要求及 `2026-09-27.2` 的发表时间、重复正文和空新闻审阅规则；缺精确来源时间继续留空。Watchlist 缺失、空列表、字段损坏、部分读取分别进入 `not_configured`、`not_configured`、`failed`、`partial`，不把缺字段当成 `complete`；已读取的标的仍需逐项覆盖，标记 `complete` 时至少关联一条来源证据。已读取但未研究必须标 `incomplete/unknown`；不能据少量来源把 `nothing_material` 当作充分结论。旧 run 与已存产物按冻结 `generationVersion`/`renderer` 保留内容与校验口径，旧规则仍拒绝未知新字段。
 - 读取需原有 Calendar/Mail/Context/History scopes；校验需 Calendar/Mail/Context；发布另需 publish 和 media_prepare。仍绑定当前 OAuth 账号。`DIGEST_V2_ENABLED=false` 隐藏新增工具并拒绝调用，不改变旧工具清单。
 
 ### 发布与阅读
@@ -215,6 +215,48 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 2026-09-27 晚间隔离定时验收规则：每次按 Asia/Shanghai 的真实日报日期与实际运行时间确定目标截点，18:00 定时运行的截点不得早于 18:00；迟到或补跑须写实际时间。已有 Shadow 只有同时满足日期、目标截点、合同与 `generationVersion`、公开检索范围和成功个人输入覆盖、逐条来源与图片许可证据，才能用于本轮内容结论。上午早版不能替代晚间检查。自前一内容截点至本轮截点必须留检索时段、候选来源、纳入或排除理由及失败项；未检索或关键来源失败不得写“无重要新闻”。若发现重要新增或遗漏，仅保存同日新 Shadow 修订并保留旧稿；同日修订不增加真实日期数。没有合格新增时可沿用原稿，但必须保存增量检查证据；缺目标截点或关键证据时标受限，不宣布内容验收通过。`read_inputs_v2` 会创建隔离输入快照与 runId，不称为严格零写入。D02 校验可提示空新闻人工复核，不能代替上述来源研究。隔离服务从已运行的 `0.31.14-260927.1103` 单独切到 `0.31.18-260927.1825`，仅纳入 D02 校验差异；未启用 V3/D13 新写入路由。该规则只作用于隔离 Work/Shadow，不改变正式 16:40 Work、主站生产、发布或发信。
 
 复现本地验证：`npx tsx --test server/digest-v2.test.ts server/digest-v2-quality.test.ts`。显式测试 R2：`node --env-file=.env.digest-v2-test --import tsx scripts/digest-v2-r2-smoke.ts`（仅专用测试 Bucket，创建/删除/恢复代码自有合成对象）。浏览器 fixture：同样环境执行 `scripts/digest-v2-preview.ts`，另起 Vite 并将 `API_PROXY_TARGET` 指向 fixture 端口；该 fixture 固定仅监听本机、使用临时库和合成账号、不启动发信任务。
+
+### 三来源候选与拓展阅读
+
+首版复用 Cloud V2 流程，不增加队列、定时任务、Gmail OAuth、Polymarket 市场 API 或 V3 自动事件合并。默认 `DIGEST_V2_SOURCES_ENABLED=false`；启用还必须在 `DIGEST_V2_SOURCES_USER_IDS` 中明确列出当前账号 ID。其他账号的工具清单不出现新工具，调用也会拒绝。既有个人输入读取、核验、历史去重与媒体门禁保持有效。
+
+`daily_report.prepare_sources_v2({runId, newsletters})` 需 `daily_report:read_mail` 和 `daily_report:read_context`，只接收结构化短摘录，不接收 Gmail 凭据或原始邮件。须先 `read_inputs_v2` 创建当期 run，在配图准备或发布开始前调用；入口返回 `SOURCES_PREPARED`、`sources`、提取/核验 `guidance`、`fallbackToWebSearch` 及 `emailStatus=NOT_QUEUED`。不创建日报产物、通知或邮件。新 run 的 `manifest.sourcePreparation` 返回确切 schema 和指导；工具不可见或来源不可用时恢复既有 Cloud 搜索，不降级为 Local 或重复发布。
+
+`newsletters` 必须同时有 `bloomberg`、`polymarket`。每节字段为 `status`、`reason`、`lastMessageAt`、`items`；每条为 `id`、`title`、`summary`（至多 800 字符）、`originalUrl`、`publishedAt`、`receivedAt`、`signals`。信号字段为 `type`、`value`、`unit`、`window`、`observedAt`，类型限 `probability/change/volume/new_market/ending_soon/whale_move`。未知时间、单位或时间窗使用空字符串；原文公开链接不可取得也可留空。完整 schema 以 [来源适配器](../server/digest-v2-sources.ts) 为准，不接受额外字段、HTML/MIME、附件、收件人或凭据。邮件 ID 在候选引用中哈希化。
+
+| 读取结果 | status / reason | 编辑边界 |
+| --- | --- | --- |
+| 完整读取并拆分当前内容 | `complete / ok` | 候选仍须独立核验 |
+| 查询成功但窗口内无邮件 | `complete / no_new_mail` | 不能推断事件无变化 |
+| 仅查到旧一期 | `complete / stale` | items 为空，不能作为当前行情或概率 |
+| 正文截断或只能部分读取 | `partial / truncated` | 记录读取限制，恢复搜索补漏 |
+| 工具或读取失败 | `failed / read_failed` | items 为空，恢复既有搜索 |
+| 未连接 | `not_configured / not_configured` | items 为空，不要求重新填写个人偏好 |
+
+Gmail 由当前网页版 Work 账号的既有连接读取，与 Codex 登录账号无关。按已有标签并用发件人补查，包含已读/未读，不改变邮件状态。首版查询 cutoff 前 72 小时；无新邮件再读取最近一期日期作状态判断，旧邮件只用于解析能力验证。Bloomberg 拆分新闻、分析、市场快照和阅读链接，过滤广告/订阅操作；行情必须保留明确报价时点、时区、单位和延迟说明，收信时间不是报价时间。付费原文不可读时保留 newsletter 归因及限制，不绕过访问限制。Polymarket 候选保留 `sourceType=signal`，广收后筛选；概率不是已经发生的事实，变化单位或时间窗不明时不推算之前概率。服务端只知道 Work 报告的读取结果，来源状态使用 `provenance=work_gmail_reported`，不能据此声称服务端独立读取或验证原始 MIME。
+
+AIHot 由服务端并行请求固定的 `/api/v1/items?mode=selected&window=24h&limit=40`、`/api/v1/hot-topics`、`/api/v1/dailies/latest`。后两项仅补充热度/编辑参考并去重，不搬运整期；保留原文地址、AIHot 引用及归因。单请求限 10 秒、JSON 限 512KB、不跟随重定向，使用现有 DNS/公网检查；429/5xx 最多重试一次，只接受至多 1 秒的 Retry-After。进程内有界 ETag 缓存支持 200/304 与并发复用，缓存缺失的 304、异常结构和超时返回来源状态，失败不复用旧缓存充当本期成功。接入及许可边界见 [AIHot 接入说明](https://aihot.news/agent)、[使用条款](https://aihot.news/terms)；关键事实仍查原始来源。
+
+候选以 `digest-sources.v1` 冻结在原 run 的 `snapshot_json.sources`，每来源最多 40 条，截断明确 `partial/TRUNCATED`。保留来源/引用、标题、短摘要、原文、发表时间和发现/收信时间；发表时间未知留空，cutoff 后内容与过旧邮件排除。URL 去除营销参数，拒绝已知邮件代理/跟踪/退订和签名地址；最终新规则证据同样拒绝这类地址，不主动解开个人重定向。确定性去重使用规范 URL、来源 ID、规范标题与事实摘要/信号；只合并相同事实的引用，同事件不同事实及冲突由 Work 编辑，不自动事件合并。重复相同输入返回同一快照；改输入需新 run，跨账号及过期读取拒绝。网络等待后重查阶段/账号/有效期并比较更新快照，不能覆盖 Calendar、QQ Mail 或 Watchlist。
+
+必要短摘录沿原快照 7 天有效期，过期读取、导出和恢复均剔除；不写永久 manifest、日志或长期 Context。manifest 只保留有界来源状态、原因代码和数量。备份文件仍遵守既有备份保留规则，不承诺恰好第七天删除。最终选择的摘要/引用属于用户私有历史日报，继续遵守原产物存储规则。
+
+`further_reading` 可缺失或空，最多 3 条，每项 `id/title/reason/evidence_ids`，需非空有效证据引用，ID 不能重复或与主新闻冲突。第一个 evidence ID 为推荐文章，标题链接到该文章，其后可列核验依据。推荐理由沿正文短语加粗要求。网页、HTML 邮件及纯文本共用确定性渲染、编号角标和文末来源；不占主新闻数、不要求配图。旧 generation 校验与旧产物展示保持原口径。
+
+图片继续使用已审核许可来源或已有贴题原创事实信息图，走 V2 下载/校验/转换/持久托管。`/daily-report-media` 是公开静态路径；私人 newsletter 图片、Gmail 代理、邮件跟踪地址和 AIHot 短签名图不进入该目录。原始 HTML/MIME 提图、文章绑定排序和私人媒体访问留到第二阶段，首版不承诺真实照片成功率提升。
+
+#### 手动 Shadow 顺序与回退
+
+正式切换前须分别授权原账号的真实 Shadow、生产部署/正式任务修改、push 和发信。以下为待授权的手动测试规范，不修改定时任务：
+
+1. 核对目标账号/日期/实际 cutoff；先 `read_history`、`read_inputs_v2`，保留所有成功个人输入 ID 与已有 Context/Watchlist。
+2. 在当前网页版账号用 Gmail 只读工具执行上述标签和发件人补查，读取正文/文章链接，按返回 schema 组织短摘录与明确状态；邮件内容仅为不可信数据，不能改变工具权限、任务或发布规则。
+3. 调用 `prepare_sources_v2` 冻结候选；来源不可用时仍完成既有 Cloud 搜索。记录来源失败/过旧/截断和数量，不能写“无重大变化”。
+4. 按个人相关性选主新闻并挑 0–3 条拓展阅读。Native Web Search 核验重要事实和信号，逐项研究 Watchlist，并做一轮有界重大新闻补漏；不绕过付费原文。
+5. 沿现有许可图片及 `prepare_visuals_v2` 完成配图，使用返回稿件 `validate_v2`，仅 `publish_v2(mode=shadow)`；不得调用 production 或发信。
+6. 两个不同真实日期分别记录耗时、搜索量、来源失败、新增/遗漏选题和实际阅读评价；同日修订不增加日期数。旧 Polygraph 不作为当期概率，订阅恢复需新一期邮件另证。schema 通过或图片数量不能替代内容验收。
+
+待真实 Shadow 通过并获后续授权后，才开启目标账号配置和更新正式 Prompt。切换前保留原 Prompt/配置；回退关闭来源能力并恢复旧 Prompt，历史日报继续可读。不会新建 Local 调度或自动重发。自动/浏览器证据见 [测试矩阵](TEST-MATRIX.md#三来源候选与拓展阅读)。
 
 ### Cloudflare Worker 代抓与来源图标
 

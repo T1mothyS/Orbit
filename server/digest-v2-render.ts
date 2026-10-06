@@ -1,4 +1,4 @@
-import { canonicalJson, publicDigestUrl, validateDigestV2, DIGEST_V2_EDITORIAL_GENERATIONS, DIGEST_V2_ILLUSTRATED_GENERATIONS, type DigestV2, type DigestStory, type DigestEvidence } from './digest-v2-contract.js';
+import { canonicalJson, publicDigestUrl, validateDigestV2, DIGEST_V2_GENERATION, DIGEST_V2_EDITORIAL_GENERATIONS, DIGEST_V2_ILLUSTRATED_GENERATIONS, type DigestV2, type DigestStory, type DigestEvidence } from './digest-v2-contract.js';
 import type { MediaCredit, PreparedImage } from './digest-v2-media.js';
 
 const marker = '<!-- daily-digest.v2 -->\n';
@@ -46,6 +46,11 @@ export function digestV2Cover(p: DigestPublication) {
   };
 }
 const warnings: Record<string, string> = { CALENDAR_INCOMPLETE: '本期日程读取不完整，未取得的事项未包含。', MAIL_NOT_CONFIGURED: '本期未配置日报邮箱，邮件摘要未读取。', MAIL_READ_FAILED: '本期邮箱读取失败，邮件摘要未取得。', MAIL_INCOMPLETE: '本期邮箱读取不完整，未取得的邮件未包含。', WATCHLIST_NOT_CONFIGURED: '个人关注列表尚未配置，本期未检查关注对象。', WATCHLIST_READ_FAILED: '个人关注列表读取失败，本期无法判断关注对象变化。', WATCHLIST_INCOMPLETE: '本期观察名单读取不完整，未取得的标的尚未检查。' };
+for (const [source, label] of [['AIHOT', 'AIHot'], ['BLOOMBERG', 'Bloomberg'], ['POLYMARKET', 'Polymarket / Polygraph']]) {
+  for (const [code, detail] of Object.entries({ FAILED: '读取失败', PARTIAL: '读取不完整或候选已截断', NOT_CONFIGURED: '尚未连接或配置', NO_NEW_MAIL: '本期窗口内没有新邮件', STALE: '最近内容已过旧，不能作为当前数据' })) {
+    warnings[`SOURCE_${source}_${code}`] = `${label}：${detail}；不能据此判断相关事件无变化。`;
+  }
+}
 function emptyWatchlistMessage(p: DigestPublication): string {
   if (p.warnings.includes('WATCHLIST_NOT_CONFIGURED')) return '个人关注列表尚未配置，本期未检查关注对象。';
   if (p.warnings.includes('WATCHLIST_READ_FAILED')) return '个人关注列表读取失败，本期无法判断关注对象变化。';
@@ -138,9 +143,16 @@ function renderEditorialDigestV2(p: DigestPublication, email: boolean): string {
     : email ? 'height:auto;max-height:440px;aspect-ratio:16/9;object-fit:cover' : 'height:70svh;min-height:360px;max-height:720px;object-fit:cover';
   const cover = coverImage && coverStory ? `<figure class="digest-v2-cover" style="margin:0 0 8px"><img src="${esc(coverImage.publicUrl)}" alt="${esc(imageAlt(coverImage, coverStory))}" width="680" style="display:block;width:100%;${coverStyle};border-radius:6px"/></figure>` : '';
   const coverCredit = coverImage ? `<p style="font-size:11px;line-height:1.5;opacity:.75;margin:4px 0 0">${conciseImageCredit(coverImage)}</p>` : '';
+  const readings = p.renderer === DIGEST_V2_GENERATION ? d.further_reading || [] : [];
+  const renderFurtherReading = () => readings.length ? section('拓展阅读', `<ul style="padding-left:24px">${readings.map(item => {
+    const source = d.evidence.find(evidence => evidence.id === item.evidence_ids[0]);
+    const title = source && publicDigestUrl(source.url) ? `<a href="${esc(source.url)}" rel="noopener noreferrer" style="color:${email ? '#285eaa' : 'var(--td-brand-color, #285eaa)'}">${esc(item.title)}</a>` : esc(item.title);
+    return `<li class="digest-v2-reading" style="margin:16px 0"><strong>${title}</strong><p style="margin:4px 0">${emphasis(item.reason)}${citations(item.evidence_ids)}</p></li>`;
+  }).join('')}</ul>`) : '';
   const body = `${section('Executive Signals · 重点信号', list(d.executive_signals) || '<p>在本期检查范围内，没有选出重大信号。</p>')}${section('个人日程', list(d.calendar.map(item => item.text)) || (p.warnings.includes('CALENDAR_INCOMPLETE') ? '<p>未取得可展示的日程内容。</p>' : ''))}${section('邮件简报与行动', d.mail.length ? `<ul style="padding-left:24px">${d.mail.map(item => `<li style="margin:8px 0">${emphasis(item.summary)}${item.action ? `<br/><span>行动：${emphasis(item.action)}</span>` : ''}</li>`).join('')}</ul>` : emptyMailHtml(p))}${section('市场快照', stories(d.market))}${section('Macro Radar · 宏观简报', stories(d.macro))}${section('重要新闻', stories(d.stories, true))}${section('Watchlist · 持续关注', d.watchlist.length ? d.watchlist.map(item => `<p>${emphasis(item.summary)}${citations(item.evidence_ids)}<br/><small>${watchlistCheckMessage(item)}</small></p>`).join('') : `<p>${emptyWatchlistMessage(p)}</p>`)}${section('What Matters Next · 后续关注', list(d.what_matters_next))}`;
+  const furtherReading = renderFurtherReading();
   const references = sources.size ? section('来源', `<ol style="padding-left:24px">${[...sources.values()].map(({ number, evidence }) => `<li id="digest-source-${number}" style="margin:10px 0;font-size:13px;scroll-margin-top:20px">${sourceIcon(evidence)}${esc(evidence.source)} · 发布时间：${evidenceTime(evidence.published_at)} · <a href="${esc(evidence.url)}" rel="noopener noreferrer" style="color:${email ? '#285eaa' : 'var(--td-brand-color, #285eaa)'}">原文链接</a></li>`).join('')}</ol>`) : '';
-  return `<div class="digest-v2" style="max-width:680px;margin:0 auto;overflow-wrap:anywhere;line-height:1.8;${email ? 'color:#253247;background:#fff;font-family:Arial,sans-serif;padding:20px' : 'color:inherit'}">${cover}<header><h1 style="font-size:26px;line-height:1.4;margin:12px 0 2px">${esc(digestDisplayTitle(p))}</h1><p style="font-size:12px;letter-spacing:.08em;margin:0">DAILY DIGEST · ${esc(d.date)}</p></header>${coverCredit}${alerts ? `<aside role="status" style="border-left:4px solid #bd830e;padding:4px 16px"><strong>本期信息不完整</strong>${alerts}</aside>` : ''}${body}${references}</div>`;
+  return `<div class="digest-v2" style="max-width:680px;margin:0 auto;overflow-wrap:anywhere;line-height:1.8;${email ? 'color:#253247;background:#fff;font-family:Arial,sans-serif;padding:20px' : 'color:inherit'}">${cover}<header><h1 style="font-size:26px;line-height:1.4;margin:12px 0 2px">${esc(digestDisplayTitle(p))}</h1><p style="font-size:12px;letter-spacing:.08em;margin:0">DAILY DIGEST · ${esc(d.date)}</p></header>${coverCredit}${alerts ? `<aside role="status" style="border-left:4px solid #bd830e;padding:4px 16px"><strong>${p.renderer === DIGEST_V2_GENERATION && p.warnings.some(warning => warning.startsWith('SOURCE_')) ? '本期来源与输入说明' : '本期信息不完整'}</strong>${alerts}</aside>` : ''}${body}${furtherReading}${references}</div>`;
 }
 export function renderDigestV2(p: DigestPublication, email = false): string {
   if (DIGEST_V2_EDITORIAL_GENERATIONS.includes(p.renderer)) return renderEditorialDigestV2(p, email);
@@ -192,8 +204,9 @@ export function digestV2Text(p: DigestPublication): string {
     };
     const stories = [...d.market, ...d.macro, ...d.stories].map(story => story.title + '\n' + plainEmphasis(story.summary) + refs(story.evidence_ids));
     const watchlist = d.watchlist.length ? d.watchlist.map(item => plainEmphasis(item.summary) + refs(item.evidence_ids) + ' · ' + watchlistCheckMessage(item)) : [emptyWatchlistMessage(p)];
+    const readings = p.renderer === DIGEST_V2_GENERATION ? (d.further_reading || []).map(item => item.title + '\n' + plainEmphasis(item.reason) + refs(item.evidence_ids)) : [];
     const sourceList = [...sources.values()].map((item, index) => `[${index + 1}] ${item.source} · 发布时间：${item.published_at ? item.published_at.replace('T', ' ') : '时间未知'} · ${item.url}`);
-    return [d.date, digestDisplayTitle(p), ...p.warnings.map(w => warnings[w] || ''), '重点信号', ...d.executive_signals.map(plainEmphasis), '日程', ...d.calendar.map(item => plainEmphasis(item.text)), '邮件', ...d.mail.map(item => plainEmphasis(item.summary) + (item.action ? '\n行动：' + plainEmphasis(item.action) : '')), ...(d.mail.length ? [] : [emptyMailMessage(p)]), '新闻', ...stories, '观察名单', ...watchlist, '后续关注', ...d.what_matters_next.map(plainEmphasis), '来源', ...sourceList, '图片署名', ...p.media.filter(media => media.publicUrl && media.kind !== 'source_icon').map(plainImageCredit)].join('\n\n');
+    return [d.date, digestDisplayTitle(p), ...p.warnings.map(w => warnings[w] || ''), '重点信号', ...d.executive_signals.map(plainEmphasis), '日程', ...d.calendar.map(item => plainEmphasis(item.text)), '邮件', ...d.mail.map(item => plainEmphasis(item.summary) + (item.action ? '\n行动：' + plainEmphasis(item.action) : '')), ...(d.mail.length ? [] : [emptyMailMessage(p)]), '新闻', ...stories, '观察名单', ...watchlist, '后续关注', ...d.what_matters_next.map(plainEmphasis), ...(readings.length ? ['拓展阅读', ...readings] : []), '来源', ...sourceList, '图片署名', ...p.media.filter(media => media.publicUrl && media.kind !== 'source_icon').map(plainImageCredit)].join('\n\n');
   }
   return [d.date, digestDisplayTitle(p), ...p.warnings.map(w => warnings[w] || ''), '重点信号', ...d.executive_signals, '日程', ...d.calendar.map(x => x.text), '邮件', ...d.mail.map(x => x.summary + '\n' + x.action), ...(d.mail.length === 0 && p.renderer !== '2026-09-21.1' && p.renderer !== '2026-09-22.2' ? [emptyMailMessage(p)] : []), ...[...d.market, ...d.macro, ...d.stories].map(x => x.title + '\n' + x.summary), '观察名单', ...(d.watchlist.length ? d.watchlist.map(x => x.summary + ' · ' + watchlistCheckMessage(x)) : [emptyWatchlistMessage(p)]), '后续关注', ...d.what_matters_next, '图片署名', ...p.media.filter(m => m.publicUrl && m.kind !== 'source_icon').map(m => imageCredit(m, false)), '来源', ...d.evidence.map(x => x.source + ': ' + x.url)].join('\n\n');
 }
