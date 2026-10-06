@@ -66,7 +66,7 @@ const legacySchema = obj({
   executive_signals: array({ ...prose(500), minLength: 1 }, 5), calendar: array(obj({ input_id: id, text: { ...prose(), minLength: 1 } }), 300),
   mail: array(obj({ input_id: id, summary: { ...prose(3000), minLength: 1, description: `${prose(3000).description} 登录态私人日报应保留邮件中明确的服务或事项名称、具体动作和已知期限。未知期限不得猜测；同一事项多封邮件可写各自新增事实，不重复泛化文案。` }, action: prose() })),
   market: array(story, 30), macro: array(story, 30), stories: array(story, 30),
-  watchlist: array(obj({ input_id: id, summary: { ...prose(), description: `${prose().description} 逐项写明有界检索时间窗、来源、重要变化或无变化依据、失败情况。未完成研究时明确说明，不能写本期无新增内容。` }, check: { ...str(), enum: ['complete', 'incomplete'] }, change: { ...str(), enum: ['material', 'nothing_material', 'unknown'] }, evidence_ids: refs })),
+  watchlist: array(obj({ input_id: id, summary: { ...prose(), description: `${prose().description} 面向读者写标的名称、窗口时间：月日至月日，每条事实用 • 起一行，一点一句。末尾可单列参考内容：，下一行起按 evidence_ids 顺序写等量原文标题，已确认的日期可写在标题中，不能猜时间；链接由渲染器生成。不要把检索、重试、PDF报错或执行步骤写入摘要。研究完整性保留在 check/change，不足时 incomplete/unknown，不能写本期无新增内容。` }, check: { ...str(), enum: ['complete', 'incomplete'] }, change: { ...str(), enum: ['material', 'nothing_material', 'unknown'] }, evidence_ids: refs })),
   what_matters_next: array(prose(1000), 20),
   evidence: array(obj({ id, url: { ...str(2048), format: 'url' }, source: { ...str(200), minLength: 1, description: '只填写媒体或机构名称，不加入核验状态、图片处理过程、时间说明或网址。' }, published_at: { ...str(40), format: 'timestamp' } }), 200),
   media: array(obj({ id, evidence_id: id, url: { ...str(2048), format: 'url' }, category: { ...str(), enum: ['AI', 'Semiconductor', 'Banking', 'Macro', 'Gaming', 'China', 'International', 'Company', 'Market'] } }), 20),

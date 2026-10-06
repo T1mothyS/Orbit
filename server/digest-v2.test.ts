@@ -112,6 +112,37 @@ test('input reader covers synthetic account calendar and watchlist, and rejects 
   assert.ok(malformedRun.manifest.warnings.includes('WATCHLIST_READ_FAILED'));
 });
 
+test('watchlist reader layout keeps facts, dated source links, and coverage separate', () => {
+  const d = digest();
+  d.evidence = [
+    { id: 'reading:date', source: '公司公告', url: 'https://example.com/disclosure', published_at: '' },
+    { id: 'reading:time', source: '新闻机构', url: 'https://example.com/article', published_at: '2026-10-06T05:25:22Z' },
+  ];
+  d.watchlist = [{ input_id: 'watch', summary: '**合成标的**\r\n窗口时间：10月3日至10月6日\r\n• 公司发布**季度公告**。\n● 报道列出**新合作**。\n参考内容：\n季度公告（10月5日）\n新闻报道 **<script>标题</script>**', check: 'incomplete', change: 'unknown', evidence_ids: ['reading:date', 'reading:time'] }];
+  const p = { digest: d, media: [], warnings: [], renderer: DIGEST_V2_GENERATION };
+  for (const email of [false, true]) {
+    const html = renderDigestV2(p, email);
+    const article = html.match(/<article class="digest-v2-watchlist"[\s\S]*?<\/article>/)?.[0] || '';
+    assert.match(article, /<li[^>]*>公司发布<strong>季度公告<\/strong>。<\/li>/);
+    assert.match(article, /href="https:\/\/example.com\/disclosure"[^>]*>季度公告（10月5日）<\/a>/);
+    assert.ok(article.includes('10月6日 13:25（北京时间）'));
+    assert.ok(!article.includes('时间未知'));
+    assert.ok(article.includes('&lt;script&gt;标题&lt;/script&gt;'));
+    assert.ok(!article.includes('<script>'));
+    assert.ok(!article.includes('已读取，尚未完成研究或核验'));
+    assert.ok(article.includes('未覆盖全部动态'));
+    assert.equal((article.match(/参考内容：/g) || []).length, 1);
+  }
+  const text = digestV2Text(p);
+  assert.ok(text.includes('窗口时间：10月3日至10月6日\n• 公司发布季度公告。\n● 报道列出新合作。'));
+  assert.ok(text.includes('• 季度公告（10月5日） https://example.com/disclosure'));
+  assert.ok(!text.includes('已读取，尚未完成研究或核验'));
+  d.watchlist[0].summary = '窗口时间：10月3日至10月6日\n• 已确认**公告**。\n参考内容：\n数量不符的标题';
+  const fallback = renderDigestV2(p);
+  assert.ok(fallback.includes('>公司公告</a> · 发布时间：时间未知'));
+  assert.ok(!fallback.includes('数量不符的标题'));
+});
+
 test('watchlist distinguishes missing, malformed, partial, and researched states', async () => {
   const base = { version: 1, createdAt: now, updatedAt: now, readFailed: false };
   const input = service.digestWatchlistInput;

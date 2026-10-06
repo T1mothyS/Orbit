@@ -26,7 +26,7 @@ export function createDigestSnapshotRun(userId: string, snapshot: DigestSnapshot
   Object.assign(manifest, { visualPreparation: { tool: 'daily_report.prepare_visuals_v2', schema: NEWS_VISUAL_PLAN_SCHEMA, guidance: '照片仍需已有许可；无已审核贴题图时，可提交仅使用本条标题/摘要连续原文短语的新闻信息图方案。返回的 digest 已绑定本站持久媒体；使用它重新校验。信息图明确标为原创、非现场。更改新闻或来源后须重新准备，不复用旧图。' } });
   if (digestSourcesEnabled(userId)) Object.assign(manifest, { sourcePreparation: { tool: 'daily_report.prepare_sources_v2', schema: NEWSLETTER_INPUT_SCHEMA, guidance: DIGEST_SOURCE_GUIDANCE } });
   store.createDigestRun({ id, user_id: userId, report_date: snapshot.date, snapshot_json: JSON.stringify(snapshot), manifest_json: JSON.stringify(manifest), created_at: now.toISOString(), expires_at: new Date(now.getTime() + 7 * 86400000).toISOString() });
-  return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA, editorialGuidance: '仅在正文中用 **原文短词组** 标重点；每句一到两处，优先关键对象、数字、结论或行动。标题不加标记，不能整句加粗。邮件逐封保留服务或事项名称、具体动作和已知期限；同一事项突出各封新增事实，未知期限不猜。对每个关注标的记录检索时间窗、来源、重要变化或无变化依据及失败情况；未配置、读取失败、未研究不可写成无变化。新闻说明具体事实、关注关系与下一步；候选、排除及失败另留有界记录。图片须贴合具体新闻，不能把类别图形当贴题插画。图片是否为现场只在图注说明，正文不重复。来源和发布时间由服务端生成角标与文末引用，不要写入摘要。' };
+  return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA, editorialGuidance: '仅在正文中用 **原文短词组** 标重点；每句一到两处，优先关键对象、数字、结论或行动。标题不加标记，不能整句加粗。邮件逐封保留服务或事项名称、具体动作和已知期限；同一事项突出各封新增事实，未知期限不猜。关注正文面向读者：标的名称、窗口时间：月日至月日、每条以 • 起一行的一句客观事实；参考内容：后按evidence_ids顺序写等量原文标题，可保留已确认的日期，链接由渲染器生成。检索/重试/PDF报错留在执行记录，不放正文。check/change如实保留，未配置、读取失败、未研究不可写成无变化。新闻说明具体事实、关注关系与下一步；候选、排除及失败另留有界记录。图片须贴合具体新闻，不能把类别图形当贴题插画。图片是否为现场只在图注说明，正文不重复。来源和发布时间由服务端生成角标与文末引用，不要写入摘要。' };
 }
 export function digestWatchlistInput(context: ReturnType<typeof getDailyReportCloudContext>): InputSection {
   if (context.readFailed) return { status: 'failed', items: [] };
