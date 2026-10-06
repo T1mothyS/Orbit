@@ -387,6 +387,37 @@ test('Shadow draft readback is scoped, immutable, and excludes production and sn
   finally { process.env.DIGEST_V2_ENABLED = 'true'; }
 });
 
+test('automatic photo tool preserves snapshots, enforces account/scope/expiry and strict Shadow images', async () => {
+  const mcp = await import('./daily-report-cloud-mcp.js');
+  const keys = ['DIGEST_SHADOW_ONLY', 'DIGEST_V2_COMMONS_ENABLED', 'DIGEST_V2_SOURCES_ENABLED', 'DIGEST_V2_SOURCES_USER_IDS'];
+  const previous = keys.map(k => process.env[k]);
+  let calls = 0; const fake: typeof fetch = async () => { calls++; return Response.json({ batchcomplete: true }); };
+  try {
+    process.env.DIGEST_SHADOW_ONLY = 'true'; process.env.DIGEST_V2_COMMONS_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_USER_IDS = `${userId},other`;
+    const run = service.createDigestSnapshotRun(userId, snapshot()), before = activity.exportActivityDb();
+    const requests = [{ storyId: 's1', query: 'building' }];
+    const result = await service.findDigestRunPhotos(userId, run.runId, requests, fake);
+    assert.equal(result.emailStatus, 'NOT_QUEUED'); assert.equal(calls, 1); assert.deepEqual(activity.exportActivityDb(), before);
+    await assert.rejects(service.findDigestRunPhotos('other', run.runId, requests, fake), /RUN_NOT_FOUND/);
+    activity.createDigestRun({ id: 'expired-photo-run', user_id: userId, report_date: snapshot().date, snapshot_json: JSON.stringify(snapshot()), manifest_json: '{}', created_at: '2026-01-01T00:00:00Z', expires_at: '2026-01-08T00:00:00Z' });
+    await assert.rejects(service.findDigestRunPhotos(userId, 'expired-photo-run', requests, fake), /SNAPSHOT_EXPIRED/);
+    const auth = { userId, clientId: 'test', resource: 'https://example.com/mcp', scopes: [] };
+    await assert.rejects(mcp.callTool(auth, 'daily_report.find_photos_v2', { runId: run.runId, requests }), /scope|授权|权限/i);
+    await assert.rejects(mcp.callTool({ ...auth, scopes: ['daily_report:read_context'] }, 'daily_report.find_photos_v2', { runId: run.runId, requests, credentials: 'forbidden' }), /PHOTO_REQUEST_INVALID/);
+    const list = await mcp.handleJsonRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, auth);
+    assert.ok((list as any).result.tools.some((t: any) => t.name === 'daily_report.find_photos_v2'));
+    const rejected = illustrated(); rejected.date = '2026-10-30';
+    const strictRun = service.createDigestSnapshotRun(userId, { ...snapshot(), date: rejected.date });
+    await assert.rejects(service.publishDigestV2(userId, strictRun.runId, rejected, 'shadow', { storage, rules: [] }), /MEDIA_|IMAGE_/);
+    assert.ok(!activity.exportUserActivity(userId).digestV2Artifacts.some((row: any) => row.report_date === rejected.date));
+    process.env.DIGEST_SHADOW_ONLY = 'false';
+    await assert.rejects(service.findDigestRunPhotos(userId, run.runId, requests, fake), /DIGEST_PHOTOS_DISABLED/);
+    const hidden = await mcp.handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, auth);
+    assert.ok(!(hidden as any).result.tools.some((t: any) => t.name === 'daily_report.find_photos_v2'));
+    assert.equal(calls, 1);
+  } finally { keys.forEach((k, i) => { if (previous[i] === undefined) delete process.env[k]; else process.env[k] = previous[i]; }); }
+});
+
 test('validate and dry_run are pure; foreign account and expired run are rejected', async () => {
   const run = service.createDigestSnapshotRun(userId, snapshot());
   const before = activity.exportActivityDb(); const files = fs.readdirSync(root);

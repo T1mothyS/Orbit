@@ -2,7 +2,7 @@
 
 - Status: CONTRACT（末尾为历史快照）
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.50.3-261006.1722`（2026-10-06，三来源候选、拓展阅读、Watchlist 阅读排版及 Shadow 原稿只读回读；生产版本与正式任务未切换；分层验证见测试矩阵与当日快照，历史验证仍按各节时点）。
+- Last verified commit/version: `0.51.0-261006.2307`（2026-10-06，三来源候选、拓展阅读、Watchlist 阅读排版、Shadow 原稿回读及仅限 Shadow 的自动资料照/回环代理；生产版本与正式任务未切换；自然任务触发与阅读分层验收，历史验证仍按各节时点）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -194,6 +194,19 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 - 真实媒体下架当前没有可审计的引用替换入口。9/27 只读核对发现同一对象可被多份冻结 Shadow 产物引用；删除 R2 对象会让这些页面继续输出失效 URL。安全下架的实施闸门是：先完整列出目标键在相关账号和历史产物中的引用，独立备份并逐字节核对；再提供可恢复、可审计的列表和详情显示降级，使被下架 URL 不再从阅读接口输出；最后才删除目标对象、按精确 URL 清除 CDN，并实测目标 404、无关图片继续 200。恢复演练还需验证字节哈希和页面引用。上述引用降级机制未实现前，不对真实图片执行删除演练。
 
 ### 隔离 Work 执行提示与验收
+
+#### Shadow 自动资料照与专用代理
+
+此能力默认关闭，只在 `DIGEST_SHADOW_ONLY=true`、`DIGEST_V2_COMMONS_ENABLED=true` 且当前账号在既有三来源白名单内时启用，不改变正式账号或 Local 媒体规则。
+
+- `daily_report.find_photos_v2({runId, requests:[{storyId,query}]})` 使用既有 `daily_report:read_context` scope。检查当前账号的未过期 run，最多8条新闻、每条最多5个 Commons 文件，最多两项查询并行。只读候选，不修改个人快照、manifest、产物或通知；等待结束后再次检查账号开关和过期时间。输入不接受凭据、路径或额外字段。
+- 只读固定 Commons API 的文件元数据，15秒限时、1MiB流上限；空结果与请求失败分别返回。只接受足够尺寸的 JPEG/PNG/WebP 位图，署名和文件页相符，许可 URL 与 CC BY/CC BY-SA 2.0–4.0 或 CC0 标签相符且没有额外限制。未知许可、SVG、图标和小图不自动放行。HTML 元数据转为有界纯文字，不能成为任务指令。上传时间不是拍摄时间；拍摄日期未知保持未知。
+- Work 须按具体新闻选图；将候选 `pageUrl` 加入证据，`media.url` 使用 `imageUrl`。`publish_v2(mode=shadow)` 再查询同一文件，核对原图/缩略图精确地址后临时形成单文件许可规则。没有整域授权，不写公共许可清单；实际字节继续经过原有大小、解码、像素、转换、哈希和本站持久托管检查。回执保存署名、许可、资料照图注、原始字节哈希，不保存私有代理配置。
+- `DIGEST_MEDIA_PROXY_URL` 只允许无凭据的 `http://127.0.0.1:<端口>`，与 Worker relay 配置互斥。下载器先验证源站所有 DNS 地址，再向代理 CONNECT 已验证的数字 IP，TLS 使用原始主机名并验证证书。请求不转发 Cookie/Authorization。连接/TLS有界超时，失败不静默直连。代理是独立回环服务，使用现有获授权出口，不改变原 OpenAI 分流。
+- 新网络回执 `sourceTransport=http_proxy` 与 `audited_copy/network/cloudflare_worker` 分开。存在 `sourceFile` 的旧规则仍读审核副本；要证明自动下载，须选未绑定副本的新文件或移除精确规则的副本字段并保留备份。工具存在、代理 active、已有图片可访问都不能代替新文件的完整链路验证。
+- 启用此能力的 Shadow 同样执行逐新闻图片完整性硬闸门：缺图、分类占位或下载/托管失败不得保存成成功日报。旧 Shadow 和未启用账号保持原合同；默认关闭的生产不具备自动 Commons 权限。
+
+一次性云端验收须在连接 Gmail 与隔离日报插件的网页版账号安排 Work 任务，明确绝对日期、时区和只运行一次。正式任务保持原状态；任务只调用 V2、创建当期新 run、只保存 Shadow、不发信、不读本机、不创建后续任务。配置保存、自然触发、成稿与用户阅读是独立验收层；定时执行结果在实际发生后记录。
 
 独立服务入口为 `server/digest-shadow-server.ts`，以 `tsconfig.shadow.json` 编译后运行。它只监听回环地址，要求专用端口和绝对 `DATA_DIR`（末级为 `digest-v2-shadow-data`），拒绝已有符号链接目录；配置验证先于数据库初始化。测试账号由独立邮箱标识和 bcrypt 哈希初始化，JWT 与 HTTPS `APP_URL` 仍按原认证要求验证。
 

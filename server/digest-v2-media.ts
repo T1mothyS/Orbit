@@ -7,6 +7,7 @@ import { S3Client, HeadObjectCommand, PutObjectCommand, GetObjectCommand, Delete
 import { controlledMediaFetch, dailyReportMediaRoot, getDailyReportMediaPublicOrigin, storeProvidedDailyReportMedia, type ControlledDailyReportMediaOptions } from './daily-report-media-service.js';
 import { publicDigestUrl, type DigestV2 } from './digest-v2-contract.js';
 import { isValidDateKey } from './date-key.js';
+import { approvedCommonsRule } from './digest-v2-photos.js';
 
 export interface MediaCredit { caption: string; author: string; sourcePage: string; licenseName: string; licenseUrl: string }
 export interface MediaRule { pageHost: string; imageHosts: string[]; policy: 'OWNED_OPEN' | 'LICENSED' | 'EXTERNAL_ALLOWED'; licenseRef: string; pageUrl?: string; imageUrls?: string[]; credit?: MediaCredit; sourceFile?: string; sourceSha256?: string; kind?: 'source_icon'; visualKind?: 'photo' | 'archive_photo' | 'illustration' }
@@ -15,7 +16,7 @@ export interface PreparedImage {
   policy: string; publicUrl: string; key: string; filename: string; sha256: string;
   width: number; height: number; bytes: number; mime: string; fallback: boolean; failure: string | null;
   credit?: MediaCredit;
-  sourceTransport?: 'network' | 'audited_copy' | 'cloudflare_worker';
+  sourceTransport?: 'network' | 'audited_copy' | 'cloudflare_worker' | 'http_proxy';
   kind?: 'source_icon';
   sourceHost?: string;
   sourceSha256?: string;
@@ -151,7 +152,7 @@ async function fallbackImage(category: string, seed = '') {
   const svg = `<svg width="960" height="320" xmlns="http://www.w3.org/2000/svg"><rect width="960" height="320" fill="${background}"/><circle cx="775" cy="155" r="138" fill="${accent}" opacity=".13"/>${blocks}<path d="M0 270 C210 ${205 + digest[15] % 55}, 300 ${205 + digest[16] % 55}, 520 290 L0 320Z" fill="${accent}" opacity=".22"/><text x="48" y="72" font-size="18" letter-spacing="3" fill="${foreground}" font-family="sans-serif">EDITORIAL ILLUSTRATION</text><text x="48" y="180" font-size="60" font-weight="700" fill="${foreground}" font-family="sans-serif">${categories[index]}</text><path d="M48 207 H330" stroke="${accent}" stroke-width="8" stroke-linecap="round"/></svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer({ resolveWithObject: true });
 }
-export async function prepareDigestMedia(d: DigestV2, options: { storage?: ObjectStorage | null; rules?: MediaRule[]; fetchOptions?: ControlledDailyReportMediaOptions; mode: 'shadow' | 'production'; mediaRoot?: string; storyIllustrations?: boolean }) {
+export async function prepareDigestMedia(d: DigestV2, options: { storage?: ObjectStorage | null; rules?: MediaRule[]; fetchOptions?: ControlledDailyReportMediaOptions; mode: 'shadow' | 'production'; mediaRoot?: string; storyIllustrations?: boolean; allowCommons?: boolean }) {
   if (!isValidDateKey(d.date)) throw new Error('INVALID_DATE');
   const localOrigin = process.env.DIGEST_V2_MEDIA_STORE === 'local' ? getDailyReportMediaPublicOrigin() : null;
   if (localOrigin && (!publicDigestUrl(localOrigin) || new URL(localOrigin).origin !== localOrigin)) throw new Error('LOCAL_MEDIA_ORIGIN_INVALID');
@@ -174,12 +175,13 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
   });
   for (const m of [...d.media.map(m => ({ ...m, kind: undefined as 'source_icon' | undefined })), ...icons]) {
     const evidence = d.evidence.find(e => e.id === m.evidence_id)!;
-    const rule = rules.find(r => r.kind === m.kind && r.pageHost === new URL(evidence.url).hostname && (!r.pageUrl || r.pageUrl === evidence.url) && r.imageHosts.includes(new URL(m.url).hostname) && (!r.imageUrls || r.imageUrls.includes(m.url)));
+    let rule = rules.find(r => r.kind === m.kind && r.pageHost === new URL(evidence.url).hostname && (!r.pageUrl || r.pageUrl === evidence.url) && r.imageHosts.includes(new URL(m.url).hostname) && (!r.imageUrls || r.imageUrls.includes(m.url)));
     let fallback = false; let failure: string | null = null;
     let sourceSha256: string | undefined;
     let transport: PreparedImage['sourceTransport'];
     let result: Awaited<ReturnType<typeof transformDigestImage>>;
     try {
+      if (!rule && !m.kind && options.mode === 'shadow' && options.allowCommons) rule = await approvedCommonsRule(evidence.url, m.url);
       if (!rule) throw new Error('LICENSE_NOT_APPROVED');
       let bytes: Buffer | undefined;
       if (rule.sourceFile) {
@@ -190,8 +192,9 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
         bytes = fs.readFileSync(rule.sourceFile);
         if (crypto.createHash('sha256').update(bytes).digest('hex') !== rule.sourceSha256) throw new Error('SOURCE_COPY_HASH');
       } else {
+        const approvedRule = rule;
         const relay = digestMediaFetcher(); transport = relay.transport;
-        await controlledMediaFetch(m.url, { fetcher: relay.fetcher, ...options.fetchOptions, authorizeUrl: u => { if (u.protocol !== 'https:' || !rule.imageHosts.includes(u.hostname) || (rule.imageUrls && !rule.imageUrls.includes(u.href))) throw new Error('LICENSE_REDIRECT_BLOCKED'); }, persistMedia: (body, validated) => { bytes = body; return validated; } });
+        await controlledMediaFetch(m.url, { fetcher: relay.fetcher, ...options.fetchOptions, authorizeUrl: u => { if (u.protocol !== 'https:' || !approvedRule.imageHosts.includes(u.hostname) || (approvedRule.imageUrls && !approvedRule.imageUrls.includes(u.href))) throw new Error('LICENSE_REDIRECT_BLOCKED'); }, persistMedia: (body, validated) => { bytes = body; return validated; } });
       }
       sourceSha256 = crypto.createHash('sha256').update(bytes!).digest('hex');
       result = m.kind === 'source_icon' ? await transformDigestIcon(bytes!) : await transformDigestImage(bytes!);
