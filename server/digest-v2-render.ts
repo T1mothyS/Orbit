@@ -127,7 +127,8 @@ function renderEditorialDigestV2(p: DigestPublication, email: boolean): string {
       const image = imageFor(story);
       const lead = story.id === leadId;
       const title = `<h3 style="margin:0 0 8px;font-size:${lead ? '24px' : '17px'};line-height:1.4">${esc(story.title)}</h3>`;
-      const summary = `<p style="margin:8px 0 0">${emphasis(story.summary)}${citations(story.evidence_ids)}</p>`;
+      const paragraphs = story.summary.split(/\r?\n\s*\r?\n/);
+      const summary = paragraphs.map((paragraph, index) => `<p style="margin:8px 0 0">${emphasis(paragraph)}${index === paragraphs.length - 1 ? citations(story.evidence_ids) : ''}</p>`).join('');
       const frame = `class="digest-v2-story${lead ? ' digest-v2-story--lead' : ' digest-v2-story--compact'}" style="margin:24px 0;padding-top:16px;border-top:1px solid #c9d0d8"`;
       if (!image) return `<article class="digest-v2-story digest-v2-story--no-image" style="margin:24px 0;padding-top:16px;border-top:1px solid #c9d0d8">${title}<p style="font-size:12px;opacity:.7">此条暂无可用配图</p>${summary}</article>`;
       if (image === coverImage) return `<article ${frame}>${title}${summary}</article>`;

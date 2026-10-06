@@ -253,6 +253,18 @@ test('editorial digest renders selective emphasis, one opening cover, numbered s
   const escaped = structuredClone(p); escaped.digest.stories[0].summary = '**<img src=x onerror=alert(1)>** 后续内容。';
   assert.ok(renderDigestV2(escaped).includes('<strong>&lt;img src=x onerror=alert(1)&gt;</strong>'));
   assert.ok(!renderDigestV2(escaped).includes('<img src=x'));
+  const deepRead = structuredClone(p);
+  deepRead.digest.stories[0].summary = '报道中的**关键事实**。\r\n\r\n机制分析包含**<script>数据</script>**。\n \n后续观察**融资变化**。';
+  for (const email of [false, true]) {
+    const html = renderDigestV2(deepRead, email);
+    const article = html.match(/<article[^>]*>[\s\S]*?<\/article>/g)?.find(value => value.includes('关键事实')) || '';
+    assert.match(article, /关键事实<\/strong>。<\/p><p[^>]*>机制分析/);
+    assert.match(article, /&lt;script&gt;数据&lt;\/script&gt;<\/strong>。<\/p><p[^>]*>后续观察/);
+    assert.match(article, /融资变化<\/strong>。<sup\b/);
+    assert.equal((article.match(/href="#digest-source-1"/g) || []).length, 1);
+    assert.doesNotMatch(article, /<script>/);
+  }
+  assert.ok(digestV2Text(deepRead).includes('关键事实。\r\n\r\n机制分析'));
   const illustratedCover = { ...p, media: [{ id: 'story-art', storyId: d.stories[0].id, publicUrl: 'https://images.example.com/editorial.png', fallback: true } as any] };
   for (const email of [false, true]) {
     const html = renderDigestV2(illustratedCover, email);

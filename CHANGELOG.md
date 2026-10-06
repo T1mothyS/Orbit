@@ -2,6 +2,11 @@
 
 本文件记录具体版本变更；版本唯一来源为 package.json。历史生产结果属于当次记录，不代表当前上线状态。任务状态见 [TASKS](docs/TASKS.md)，未来目标见 [route.md](route.md)。
 
+## 0.50.1-261006.1628 — 日报中文深读分段
+
+- 修复新版新闻摘要中的空行被 HTML 合并为一段：网页与邮件共同保留深读段落，引用集中在最后一段，加粗与文本转义保持原规则；单段和旧 generation 渲染兼容。
+- 外部照片继续复用现有 V2 精确审核、哈希副本、校验与托管能力，无新图片依赖或公共域名通配授权；独立 Shadow 运行与实际阅读结果见 [当日快照](docs/archive/digest/DAILY-DIGEST-SOURCES-SHADOW-20261006.md)。
+
 ## 0.50.0-261006.1454 — Daily Digest 三来源候选与拓展阅读
 
 - 新增默认关闭、按账号启用的 `daily_report.prepare_sources_v2`：AIHot REST/ETag 缓存及有界失败回退，接收网页版 Work Gmail 提取的 Bloomberg/Polymarket 短摘录，冻结到原七天输入快照。账号/权限/阶段/并发保护不改变个人输入，正文不进入永久 manifest 或日志。
