@@ -59,3 +59,43 @@ Work 回合报告的初稿调用为 Shadow 8 次、Gmail 只读 9 次、公开�
 同一 run 新增局部修订产物 `d1f0ee5d-6ef8-4c90-81a7-927b7a2b639a`：只替换拓展阅读推荐理由为具体业务流程、部署与软件内容，删除空泛免责句。`validate_v2` 通过，`SHADOW_SAVED`、`NOT_QUEUED`；测试数据库只读对比确认其他 digest 字段与媒体完全一致，邮件投递记录仍为零。Chrome 再次检查四规定尺寸的新版段落，引用有效、无横向溢出，尺寸恢复；无 UI 源码变更，不重复声明此前主题验证为新一轮用户验收。
 
 原网页版会话另形成七条新闻的扩充文本草稿，其中三条 Bloomberg 来源，并就其欧洲债市头条形成分段中文深读，解释利差、传染路径和央行工具。材料范围为已读 newsletter 与公开核验资料，没有声称读取付费全文。扩充稿只留在会话供阅读，不新增候选快照、不写永久邮件摘录、不发布缺图完整稿，也没有批量生成更多用户已否定的模板图。模板图片质量、更多新闻的逐条配图和完整新版阅读仍待解决；正式任务及主站未切换。
+
+## 同日外部照片链路与完整新稿
+
+用户暂且认可扩充内容，明确要求打通图片链路并生成完整新日报供阅读。本节追加后续结果，保留前面各时点的失败、反馈和未完成状态。只更新独立 Shadow；没有正式任务切换、主站部署、push 或发信。
+
+### 实际网络与入站路径
+
+本次确实取得外部文件，而非继续增加模板：已有图片转发入口返回 HTTP 403 / `NOT_AUTHORIZED`，服务器直接读取公共 Wikimedia 图片在 15 秒内超时；403 回执本身不能确定是签名、主机授权还是其他配置问题。本地能下载七张照片，两次暂时失败各重试一次后成功。核对公共原页面、精确文件、摄影、日期和许可证，目视照片后，通过现有 operator-reviewed `sourceFile/sourceSha256` 通道装入独立服务。精确 URL 与文件哈希同时绑定，Work 不获得私有文件路径或审批能力。没有关闭 URL、安全、文件格式、大小、像素、来源归属或发布闸门。
+
+发布入口实际完成读取审核副本、转换/压缩 JPEG、SHA 检查、本站持久托管、统一正文引用。七图均为 `archive_photo / audited_copy`、`fallback=false`、`failure=null`；对最终产物的七个托管地址逐一 GET 均 200，返回文件 SHA 与媒体记录一致，摄影与许可图注均存在。本次证明审核副本路径成功，不能写成服务器直接抓取成功或后续所有新闻已可自动配图。私人 newsletter 图片提取与私人媒体仍未实施。
+
+| 配图对象 | 资料日期 | 本次使用的公共照片 / 许可 |
+| --- | --- | --- |
+| 欧洲债市头条 | 2019-07 | [欧洲央行总部](https://commons.wikimedia.org/wiki/File:Europ%C3%A4ische_Zentralbank_Frankfurt.jpg)，Thomas Wolf，CC BY-SA 3.0 DE |
+| 施耐德 / PTC | 2024-10 | [Aubenas 厂区](https://commons.wikimedia.org/wiki/File:Schneider_Electric_Aubenas_Ard%C3%A8che_10_2024.jpg)，Kakoula10，CC BY-SA 4.0 |
+| Altman / Cerebras | 2019-10 | [TechCrunch Disrupt 近景](https://commons.wikimedia.org/wiki/File:Disrupt_SF_TechCrunch_Disrupt_San_Francisco_2019_-_Day_2_(48838377432)_(cropped).jpg)，Steve Jennings / Getty Images for TechCrunch，经 TechCrunch，CC BY 2.0 |
+| Beam | 2026-05 | [NVIDIA DGX Spark](https://commons.wikimedia.org/wiki/File:Nvidia_DGX_front_view_dllu.jpg)，Daniel Lu，CC BY-SA 4.0；明确不是训练所用 GB300 |
+| Wikimedia | 2018-03 | [基金会办公室入口](https://commons.wikimedia.org/wiki/File:Wikimedia_Foundation_office_at_One_Montgomery_Tower_-_March_2018_(1327).jpg)，Gregory Varnum / Wikimedia Foundation，CC BY-SA 4.0 |
+| Liquid d1 | 2016-04 | [机器视觉相机](https://commons.wikimedia.org/wiki/File:Working_Optics_(152438439).jpeg)，Greg Francke，CC BY 3.0；不是该公司产品设备 |
+| Together Link | 拍摄日期未知 | [编程场景](https://commons.wikimedia.org/wiki/File:Laptop_Programmcode.jpg)，Negative Space，CC0；不是产品界面 |
+
+照片使用范围及精确文件以当时原页面和测试媒体规则为准。后台旧 11 条规则追加七条后为 18 条，随后追加 Altman 近景为 19 条；两次配置变更前均保留回退副本，旧照片与历史托管媒体保留。没有引入新抓取服务、依赖或定时任务。
+
+### 内容与修订证据
+
+同一 run 先保存完整七图稿 `ab098fa1-b6a4-476d-9b24-78b81c6613b1`。实际页面发现封面按 `stories → market → macro` 取首图，因此只把欧洲债市对象移到 `stories[0]`，保存 `e3b50998-16a5-4621-946b-4b89030383e2`。实际侧图又发现原 Altman 竖幅照片裁切后只显示衣服，换用已目视审核的近景；没有修改整体裁切规则或生成 AI 图片。
+
+最终 artifact `b0413f8d-b1fb-486d-8c5f-b025e7cc4b98`，contentHash `f303fff60a8b19431db9e322a9a00f333f9ca4ca8f5382cd1caac0d531e121de`。数据库只读对比确认最终相对上一稿仅替换 Altman 图片证据和媒体两个 URL，新闻、个人输入及其他照片完全一致；旧产物仍存在。同日三轮均实际校验和 Shadow 保存成功，回执 `NOT_QUEUED`；最终独立账号邮件投递记录仍为零。
+
+完整新稿为七条新闻、三条 Bloomberg 来源、一篇头条中文深读和一条拓展阅读，深读去除强调标记后 751 字符、七段。旧程序图、占位、缺图、回退和媒体失败均为零。AIHot / Bloomberg / Polymarket 的冻结输入仍为 23 / 5 / 0，前两者 `complete/current`、后者 `complete/stale`；不新增来源快照，不把旧概率写成今日数据，两项股票仍为 `incomplete/unknown`。用户此前暂且认可的是扩充内容，不能据此宣布新照片视觉评价或全部研究覆盖通过。
+
+### 展示修复、部署与验证
+
+实际阅读发现深读空行原先被合成一个段落，最小修改为按空行输出多个 `<p>`，引用只放最后一段；网页与 HTML 邮件共用修复，旧单段不变。已有回归测试补查 CRLF/空白行、强调、HTML 转义、末段引用和纯文本分段，不放松内容合同。源码 checkpoint `90dac0fc40589a22feb134effb7c205590bd9941`，版本 PATCH 从 `0.50.0-261006.1454` 到 `0.50.1-261006.1628`，package/lock 同步。typecheck、463/463 测试、Web/Electron staging 构建和 diff 检查通过；既有大块构建提示保留。
+
+独立服务从冻结提交构建 396 文件 SHA 清单，发布包 SHA `cdbcac045eea742ee2ec384114adf9d79fb36b9ef428b0952b2417b00c3bef1e`；服务器校验完整、规范化依赖锁一致，以测试服务身份完成 Linux Node、Sharp 及渲染加载。停测试写进程后备份 unit、配置与测试数据，再只切换测试代码；健康恢复、无自动重启，主站 PID 未改变。旧版本和回退备份保留，未实际演练回滚；机器地址、路径及恢复步骤只写本机 runbook。
+
+最终新稿在实际 Chrome 检查 390×844、430×932、768×1024、1440×900 明暗共八组：七张新闻照片全部加载，Altman 人脸可见，图注与长摘要换行，无横向溢出，深读为七段，引用均能对应来源编号。列表最新卡片与阅读页均选欧洲央行封面；其余机器视觉、编程与基金会照片也实际目视检查。当前页面捕获的控制台 error 为零。临时主题和尺寸恢复，截图与测量只存本机临时证据，不进 Git。
+
+本次网页实读与本地渲染测试不代表 Gmail/Outlook 客户端、真机、自然任务或 SMTP/收件箱通过。只有一个真实日期，股票研究、Polymarket 新一期、第二日期与成本对照仍待完成；新稿已交用户评阅，不提前宣布图片审美或 Phase 3 全部通过。正式主站与正式任务未切换。
