@@ -302,6 +302,15 @@ function assertStoryImagesReady(publication: DigestPublication): void {
         && ['photo', 'archive_photo', 'illustration'].includes(item.visualKind || 'archive_photo'))) throw new Error('STORY_IMAGE_NOT_READY');
   }
 }
+export function readDigestShadowArtifact(userId: string, artifactId: string) {
+  assertDigestV2Enabled();
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(artifactId)) throw new Error('INVALID_ARTIFACT_ID');
+  const row = store.getDigestArtifact(userId, artifactId);
+  if (!row || row.mode !== 'shadow') throw new Error('SHADOW_ARTIFACT_NOT_FOUND');
+  const payload = JSON.parse(row.payload_json);
+  const publication = payload.publication as DigestPublication;
+  return { readOnly: true, artifactId: row.id, runId: row.run_id, date: row.report_date, contentHash: row.content_hash, generationVersion: publication.renderer, digest: publication.digest };
+}
 export function digestArtifactView(row: store.DigestArtifactRow) {
   const payload = JSON.parse(row.payload_json); const p = payload.publication as DigestPublication;
   return { id: row.id, date: row.report_date, ...digestV2Cover(p), contentHash: row.content_hash, publishedAt: row.created_at, updatedAt: row.created_at, source: 'cloud', deliveryStatus: 'CANDIDATE', emailStatus: 'DISABLED', emailNotificationId: null, markdown: encodeDigestPublication(p), html: renderDigestV2(p), shadow: true };

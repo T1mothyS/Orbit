@@ -365,6 +365,28 @@ test('an unexpired legacy run keeps its warning hash and frozen artifact on retr
   assert.equal(activity.getDigestArtifact(userId, String(first.artifactId))!.payload_json, artifact.payload_json);
 });
 
+test('Shadow draft readback is scoped, immutable, and excludes production and snapshots', async () => {
+  const mcp = await import('./daily-report-cloud-mcp.js');
+  const run = service.createDigestSnapshotRun(userId, snapshot());
+  const saved = await service.publishDigestV2(userId, run.runId, digest(), 'shadow');
+  const auth = { userId, clientId: 'test', resource: 'https://example.com/mcp', scopes: ['daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context', 'daily_report:read_history'] as const };
+  const args = { artifactId: String(saved.artifactId) };
+  const before = activity.exportActivityDb();
+  const result = await mcp.callTool({ ...auth, scopes: [...auth.scopes] }, 'daily_report.read_shadow_v2', args);
+  assert.deepEqual(result, { readOnly: true, artifactId: args.artifactId, runId: run.runId, date: digest().date, contentHash: saved.contentHash, generationVersion: DIGEST_V2_GENERATION, digest: digest() });
+  await assert.rejects(mcp.callTool({ ...auth, scopes: ['daily_report:read_history'] }, 'daily_report.read_shadow_v2', args), /scope|授权|权限/i);
+  await assert.rejects(mcp.callTool({ ...auth, userId: 'other', scopes: [...auth.scopes] }, 'daily_report.read_shadow_v2', args), /SHADOW_ARTIFACT_NOT_FOUND/);
+  await assert.rejects(mcp.callTool({ ...auth, scopes: [...auth.scopes] }, 'daily_report.read_shadow_v2', { ...args, userId: 'other' }), /SHADOW_READ_FIELDS/);
+  assert.throws(() => service.readDigestShadowArtifact(userId, '../activity.db'), /INVALID_ARTIFACT_ID/);
+  assert.deepEqual(activity.exportActivityDb(), before);
+  const productionId = crypto.randomUUID();
+  activity.saveDigestArtifact({ id: productionId, user_id: userId, run_id: run.runId, report_date: digest().date, mode: 'production', content_hash: 'synthetic-production', payload_json: activity.getDigestArtifact(userId, args.artifactId)!.payload_json, created_at: now });
+  assert.throws(() => service.readDigestShadowArtifact(userId, productionId), /SHADOW_ARTIFACT_NOT_FOUND/);
+  process.env.DIGEST_V2_ENABLED = 'false';
+  try { assert.throws(() => service.readDigestShadowArtifact(userId, args.artifactId), /DIGEST_V2_DISABLED/); }
+  finally { process.env.DIGEST_V2_ENABLED = 'true'; }
+});
+
 test('validate and dry_run are pure; foreign account and expired run are rejected', async () => {
   const run = service.createDigestSnapshotRun(userId, snapshot());
   const before = activity.exportActivityDb(); const files = fs.readdirSync(root);

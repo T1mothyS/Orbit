@@ -2,7 +2,7 @@
 
 - Status: CONTRACT（末尾为历史快照）
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.50.2-261006.1715`（2026-10-06，三来源候选、拓展阅读及 Watchlist 阅读排版；生产版本与正式任务未切换；分层验证见测试矩阵与当日快照，历史验证仍按各节时点）。
+- Last verified commit/version: `0.50.3-261006.1722`（2026-10-06，三来源候选、拓展阅读、Watchlist 阅读排版及 Shadow 原稿只读回读；生产版本与正式任务未切换；分层验证见测试矩阵与当日快照，历史验证仍按各节时点）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -132,6 +132,7 @@ dry-run 返回 `VALIDATED_NOT_PUBLISHED` 才能进行同正文正式发布。兼
 ### 输入、校验和权限
 
 - `daily_report.read_inputs_v2({date})` 返回账号隔离的 `runId`、输入快照、Context 及 JSON schema。生成日期、时区、截止时间、Context 版本由服务端绑定；合同/生成规则版本由程序记录，模型版本为 `unknown`。Calendar 最多 300、Mail 最多 100、Watchlist 最多 100；达到截断条件显式 `partial`。
+- `daily_report.read_shadow_v2({artifactId})` 只读当前 OAuth 账号已保存的 Shadow `digest`、runId、内容哈希及 generation，用于在云端修订原稿；不读取生产稿或原始输入快照、不新建 run、不写 manifest、不下载图片、不发布或发信。要求既有 Calendar/Mail/Context/History 四项读取 scope，与 `read_inputs_v2` 相同，单独历史摘要权限不足；账号不匹配或非 Shadow 均返回不存在。仅在 V2 开启时提供，不改变旧 `read_history` 的正式日报去重摘要语义。
 - Watchlist 沿用当前 OAuth 账号已有的 `watchlist.stocks`。标的可内嵌 `thesis`，也可用 `thesis_file` 引用同一 Context 的 `theses/<key>.yaml`；后一种只在引用格式合法、键存在且标的代码一致时拼接必要研究字段。缺失或不一致标为 `partial`，不写成“无变化”；不复制隔离账号配置或覆盖正式 Context。
 - QQ 邮箱状态分别映射为 `MAIL_NOT_CONFIGURED`（未配置或停用）、`MAIL_READ_FAILED`（读取失败）、`MAIL_INCOMPLETE`（部分读取）；读取成功且无未读时不产生邮箱警告。快照清单、校验/发布回执、内容哈希和新产物沿用同一映射；网页、邮件 HTML 与纯文本显示对应空态。未过期的旧 run 按原 `generationVersion` 维持原警告与内容哈希，重试复用既有产物；既有 Shadow 产物不改写，旧警告码仍可读取。
 - 快照只含日程必要字段、邮件摘要和引用、关注名单。7 天后不可继续验证/发布，并由后台维护清除敏感快照；运行版本、覆盖数量及阶段诊断长期保留。已生成的私有日报仍属于历史产物，不随输入快照过期而删除。旧加密备份中的快照遵守备份保留规则；恢复时再次丢弃已过期快照。
