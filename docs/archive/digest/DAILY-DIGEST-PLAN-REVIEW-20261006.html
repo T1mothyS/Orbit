@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Daily Digest · 三来源改造盘点</title>
+  <style>
+    :root { color-scheme: light; --bg:#f5f6f8; --paper:#fff; --ink:#192637; --muted:#536173; --line:#dce2e9; --accent:#2259a5; --accent-soft:#edf3fc; --good:#147454; --good-soft:#eaf5ef; --wait:#895b13; --wait-soft:#fff5e4; --nav:#ffffffed; }
+    :root[data-theme="dark"] { color-scheme: dark; --bg:#131a24; --paper:#1c2633; --ink:#e9eff7; --muted:#aebbcf; --line:#354252; --accent:#a8caff; --accent-soft:#24374f; --good:#90d8b9; --good-soft:#21392f; --wait:#f1ca83; --wait-soft:#3c3324; --nav:#1c2633ed; }
+    * { box-sizing:border-box; }
+    html { scroll-padding-top:100px; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.75 "Segoe UI","Microsoft YaHei","PingFang SC",sans-serif; }
+    a { color:var(--accent); text-underline-offset:4px; overflow-wrap:anywhere; }
+    button { font:inherit; color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:8px 13px; cursor:pointer; }
+    a:focus-visible, button:focus-visible, summary:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+    p { margin:0 0 14px; }
+    strong { font-weight:650; }
+    h1,h2,h3 { line-height:1.35; margin:0; text-wrap:balance; }
+    h1 { font-size:clamp(28px,4vw,42px); letter-spacing:-.6px; }
+    h2 { font-size:26px; }
+    h3 { font-size:18px; }
+    ul,ol { margin:10px 0 0; padding-left:23px; }
+    li { padding-left:3px; margin:7px 0; }
+    .shell { max-width:1120px; margin:0 auto; padding:0 32px; }
+    .bar { border-bottom:1px solid var(--line); background:var(--nav); position:sticky; top:0; z-index:10; }
+    .bar .shell { display:flex; gap:16px; align-items:center; justify-content:space-between; min-height:64px; }
+    .brand { font-size:14px; letter-spacing:.5px; font-weight:650; white-space:nowrap; }
+    .tools { display:flex; gap:8px; }
+    .tools button { font-size:14px; }
+    .skip { position:absolute; left:10px; top:-80px; padding:10px; background:var(--paper); z-index:20; }
+    .skip:focus { top:8px; }
+    header { padding-top:45px; }
+    .eyebrow { color:var(--muted); font-size:13px; letter-spacing:1px; margin-bottom:12px; }
+    .intro { font-size:18px; margin:20px 0; max-width:870px; }
+    .note { color:var(--muted); font-size:14px; }
+    .verdict { background:var(--accent-soft); border-left:4px solid var(--accent); padding:20px 24px; border-radius:0 10px 10px 0; margin:24px 0; }
+    .verdict p:last-child { margin:0; }
+    .verdict-title { font-weight:650; font-size:20px; margin-bottom:8px; }
+    .nav { display:flex; flex-wrap:wrap; gap:6px 20px; padding:12px 0 26px; border-bottom:1px solid var(--line); }
+    .nav a { font-size:14px; text-decoration:none; padding:7px 0; }
+    section { padding:35px 0; border-bottom:1px solid var(--line); }
+    .section-head { display:flex; align-items:baseline; gap:15px; margin-bottom:18px; }
+    .section-no { color:var(--accent); font-size:14px; font-weight:650; letter-spacing:1px; flex:none; }
+    .lead { color:var(--muted); margin:0 0 22px; }
+    .metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:24px 0; }
+    .metric { padding:18px 20px; background:var(--paper); border-radius:10px; border:1px solid var(--line); }
+    .metric strong { display:block; font-size:29px; line-height:1.3; margin-bottom:5px; }
+    .metric span { color:var(--muted); font-size:14px; }
+    .compare { width:100%; border-collapse:collapse; table-layout:fixed; background:var(--paper); }
+    .compare th,.compare td { border-bottom:1px solid var(--line); padding:15px 17px; text-align:left; vertical-align:top; overflow-wrap:anywhere; }
+    .compare th { background:var(--accent-soft); font-size:14px; }
+    .compare th:first-child { width:16%; }
+    .compare th:nth-child(2) { width:35%; }
+    .compare td:first-child { font-weight:650; }
+    .comparison-note { margin-top:14px; }
+    .tag { display:inline-block; font-size:12px; line-height:1.5; font-weight:650; padding:3px 8px; border-radius:5px; color:var(--muted); background:var(--bg); }
+    .tag.good { color:var(--good); background:var(--good-soft); }
+    .tag.wait { color:var(--wait); background:var(--wait-soft); }
+    .phase-list { display:grid; gap:0; }
+    .phase { display:grid; grid-template-columns:155px 1fr; gap:20px; padding:20px 0; border-bottom:1px solid var(--line); }
+    .phase:first-child { padding-top:0; }
+    .phase:last-child { border:0; padding-bottom:0; }
+    .phase h3 { margin:8px 0; }
+    .phase p { margin:0 0 6px; }
+    .phase .phase-label { color:var(--muted); font-size:13px; }
+    .warning { margin-top:22px; background:var(--wait-soft); padding:17px 20px; border-radius:8px; color:var(--ink); }
+    .warning strong { color:var(--wait); }
+    .flow { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:22px 0; }
+    .flow-step { position:relative; background:var(--paper); padding:18px; border:1px solid var(--line); border-radius:9px; }
+    .flow-step:not(:last-child)::after { content:"→"; position:absolute; right:-13px; top:39px; z-index:1; color:var(--muted); background:var(--bg); font-size:20px; line-height:20px; }
+    .flow-step .number { display:block; font-size:13px; color:var(--muted); margin-bottom:8px; }
+    .flow-step h3 { margin-bottom:10px; }
+    .flow-step p { font-size:14px; color:var(--muted); margin:9px 0 0; }
+    .photo-detail { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .photo-detail > div { padding:20px; background:var(--paper); border-radius:9px; border:1px solid var(--line); }
+    .photo-detail h3 { margin-bottom:10px; }
+    .photo-detail p:last-child { margin:0; }
+    .tasks { list-style:none; margin:0; padding:0; counter-reset:task; }
+    .tasks li { margin:0; padding:22px 0 22px 55px; position:relative; border-bottom:1px solid var(--line); }
+    .tasks li:last-child { border:0; }
+    .tasks li::before { counter-increment:task; content:counter(task,decimal-leading-zero); position:absolute; top:22px; left:0; font-size:22px; font-weight:650; color:var(--accent); }
+    .task-title { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; margin-bottom:8px; }
+    .tasks p { margin:0 0 8px; }
+    .accept { font-size:14px; color:var(--muted); }
+    .trim-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:22px; }
+    .trim-column h3 { padding-bottom:12px; border-bottom:2px solid var(--line); }
+    .trim-column.keep h3 { border-color:var(--good); }
+    .trim-column.drop h3 { border-color:var(--accent); }
+    .trim-column.later h3 { border-color:var(--wait); }
+    .trim-column ul { padding-left:20px; }
+    .trim-column li { margin:14px 0; font-size:15px; }
+    .trim-column li strong { display:block; margin-bottom:3px; }
+    .launch { padding:24px; border:1px solid var(--line); border-radius:10px; background:var(--paper); }
+    .launch h3 { font-size:22px; margin-bottom:13px; }
+    .launch-line { display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin:22px 0; }
+    .launch-stop { border-top:3px solid var(--line); padding-top:13px; }
+    .launch-stop strong { display:block; }
+    .launch-stop span { color:var(--muted); font-size:14px; display:block; margin-top:5px; }
+    .launch-stop:first-child { border-color:var(--wait); }
+    .launch-stop:nth-child(2) { border-color:var(--accent); }
+    .launch-answer { margin:20px 0 0; }
+    details { border-bottom:1px solid var(--line); padding:16px 0; }
+    summary { cursor:pointer; font-weight:650; padding:5px 0; }
+    .details-body { padding-top:15px; color:var(--muted); }
+    .history { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+    .history strong { font-size:15px; display:block; margin-bottom:5px; color:var(--ink); }
+    .history p { font-size:14px; }
+    code { font-family:Consolas,monospace; font-size:.9em; overflow-wrap:anywhere; }
+    footer { padding:24px 0 40px; font-size:13px; color:var(--muted); }
+    @media (max-width:800px) {
+      .flow,.launch-line { grid-template-columns:repeat(2,1fr); }
+      .flow-step:nth-child(2)::after { display:none; }
+      .trim-grid { grid-template-columns:1fr; gap:18px; }
+      .trim-column ul { display:grid; grid-template-columns:1fr 1fr; gap:0 26px; }
+      .history { grid-template-columns:1fr 1fr; }
+      .photo-detail { grid-template-columns:1fr; }
+      .compare th:first-child { width:18%; }
+      .compare th:nth-child(2) { width:34%; }
+    }
+    @media (max-width:560px) {
+      .shell { padding:0 20px; }
+      header { padding-top:28px; }
+      body { font-size:15px; }
+      h2 { font-size:22px; }
+      .intro { font-size:17px; }
+      .bar .shell { min-height:60px; gap:8px; }
+      .brand { font-size:12px; }
+      .tools { gap:6px; }
+      .tools button { font-size:12px; padding:8px 9px; min-height:40px; }
+      .nav { gap:3px 16px; }
+      .nav a { min-height:44px; display:flex; align-items:center; }
+      .verdict { padding:17px 18px; }
+      .verdict-title { font-size:18px; }
+      .metrics { gap:8px; }
+      .metric { padding:13px 11px; }
+      .metric strong { font-size:23px; }
+      .metric span { font-size:12px; }
+      section { padding:28px 0; }
+      .section-head { gap:10px; align-items:center; }
+      .compare,.compare tbody,.compare tr,.compare td { display:block; width:100%; }
+      .compare thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+      .compare tr { border-bottom:1px solid var(--line); padding:12px 15px; }
+      .compare td { padding:5px 0; border:0; }
+      .compare td:first-child { font-size:17px; margin-bottom:5px; }
+      .compare td[data-label] { display:grid; grid-template-columns:40px 1fr; gap:10px; }
+      .compare td[data-label]::before { content:attr(data-label); color:var(--muted); font-size:13px; padding-top:2px; }
+      .phase { grid-template-columns:1fr; gap:8px; }
+      .phase h3 { display:inline; margin-right:10px; }
+      .phase .tag { vertical-align:2px; }
+      .flow { gap:12px; }
+      .flow-step { padding:14px; }
+      .flow-step h3 { font-size:16px; }
+      .flow-step p { font-size:13px; }
+      .trim-column ul { display:block; }
+      .launch { padding:18px; }
+      .launch h3 { font-size:19px; }
+      .launch-line { gap:16px; }
+      .tasks li { padding-left:40px; }
+      .history { grid-template-columns:1fr; }
+    }
+    @media print {
+      :root,:root[data-theme="dark"] { color-scheme:light; --bg:#fff; --paper:#fff; --ink:#192637; --muted:#536173; --line:#ccd3dc; --accent:#2259a5; --accent-soft:#edf3fc; --good:#147454; --good-soft:#eaf5ef; --wait:#895b13; --wait-soft:#fff5e4; }
+      .bar,.nav,.skip { display:none; }
+      .shell { max-width:none; padding:0; }
+      header { padding-top:0; }
+      body { font-size:11pt; }
+      section { padding:20px 0; }
+      h1 { font-size:27pt; } h2 { font-size:18pt; }
+      h2,h3 { break-after:avoid; }
+      .flow-step,.phase,.metric,.tasks li,.launch-stop,.compare tr { break-inside:avoid; }
+      details { display:none; }
+      .verdict,.launch,.metric { print-color-adjust:exact; }
+      footer { padding-bottom:0; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">跳到说明正文</a>
+  <div class="bar">
+    <div class="shell">
+      <span class="brand">DAILY DIGEST / 项目盘点</span>
+      <div class="tools">
+        <button type="button" id="theme-toggle" aria-pressed="false">深色阅读</button>
+        <button type="button" id="print">打印 / PDF</button>
+      </div>
+    </div>
+  </div>
+  <div class="shell">
+    <header>
+      <div class="eyebrow">2026 年 10 月 6 日 · 三来源接入与图片链路</div>
+      <h1>日报改造，做到了哪里？</h1>
+      <p class="intro">新版已能生成内容更丰富、包含 Bloomberg 中文深读和外部照片的测试日报。接下来应集中解决<strong>图片自动下载</strong>，完成跨日验收，再切换原来的正式任务。</p>
+      <div class="verdict">
+        <p class="verdict-title">主要工程余量在取图自动化；正式运行仍待验证。</p>
+        <p>七张照片已由服务器重新取得并进入日报，但这一轮用了<strong>一次性下载操作</strong>。因此“服务器能下载”已经证实，“每天自动找新图、下载并发布”仍未完成。</p>
+      </div>
+      <p class="note">本文的“旧版”指本次三来源改造前的 Cloud 日报；“新版”指当前 <code>0.50.3-261006.1722</code> 的测试版本。Shadow 指隔离测试日报：保存供阅读，不发信。本次盘点不执行部署或任务切换。</p>
+      <nav class="nav" aria-label="说明目录">
+        <a href="#comparison">01 旧版与新版</a><a href="#status">02 当前进度</a><a href="#next">03 下一步</a><a href="#trim">04 可省的步骤</a><a href="#launch">05 距离上线</a>
+      </nav>
+    </header>
+    <main id="main">
+      <section id="comparison" aria-labelledby="comparison-title">
+        <div class="section-head"><span class="section-no">01</span><h2 id="comparison-title">旧版与新版分别做了什么</h2></div>
+        <p class="lead">这次是在现有 Cloud 日报上增加候选来源和改善阅读。账号隔离、内容核验、媒体托管和发布机制继续复用。</p>
+        <table class="compare">
+          <thead><tr><th scope="col">能力</th><th scope="col">旧版：改造前已有</th><th scope="col">新版：本次已做</th></tr></thead>
+          <tbody>
+            <tr><td>内容来源</td><td data-label="旧版">Work 搜集公开资料，结合个人输入选题；另有 Local RSS 流程。</td><td data-label="新版">服务端读取 AIHot；Work 通过网页版 Gmail 拆分 Bloomberg 和 Polymarket，再统一成候选。保留搜索核验与补漏。</td></tr>
+            <tr><td>个人关注</td><td data-label="旧版">已有日程、个人邮件、Context 和 Watchlist，按账号读取并检查完整性。</td><td data-label="新版">复用已有配置。获授权后仅复制 Context 与六项关注到独立测试账号，保留备份；没有复制邮箱凭据或整库。</td></tr>
+            <tr><td>候选整理</td><td data-label="旧版">已有历史去重、输出去重、证据和时间检查；Local 有 RSS 标准化。</td><td data-label="新版">增加 Cloud 候选冻结、确定性去重、来源状态与失败回退。每来源最多 40 条，短摘录保留七天；同一 run 输入冻结后不能偷偷换稿。</td></tr>
+            <tr><td>内容与阅读</td><td data-label="旧版">已有新闻、关注项、来源引用和统一输出。</td><td data-label="新版">增加最多三条“拓展阅读”；提高新闻量和 Bloomberg 比重，重要报道作中文深读；删去空泛免责句，保留有信息量的事实边界。</td></tr>
+            <tr><td>Watchlist</td><td data-label="旧版">栏目与研究状态已有，但样稿把读取报错、检索过程写进了正文。</td><td data-label="新版">改成日期范围、圆点客观事实，以及带标题、链接、日期的参考内容。研究不足仍如实标记，操作日志留在执行记录。</td></tr>
+            <tr><td>图片</td><td data-label="旧版">已有下载、格式与大小检查、转换、持久托管和图注；缺图可生成原创信息图。</td><td data-label="新版">这次实际使用七张许可资料照，修正封面与人像裁切。服务器重新下载成功，转换、托管、正文引用均跑通；自动取得新图尚待接线。</td></tr>
+            <tr><td>修稿与发布</td><td data-label="旧版">已有校验、dry run、Shadow、正式发布和邮件闸门。</td><td data-label="新版">增加同账号 Shadow 原稿回读，Work 可保留整稿、只改指定段落。正式主站与原定时任务没有切换。</td></tr>
+          </tbody>
+        </table>
+        <p class="note comparison-note">新版没有增加消息队列、向量数据库、独立抓取服务、Gmail OAuth、市场 API 或新的定时任务，也没有进入 V3 自动事件合并。</p>
+      </section>
+
+      <section id="status" aria-labelledby="status-title">
+        <div class="section-head"><span class="section-no">02</span><h2 id="status-title">当前进度与图片卡点</h2></div>
+        <p class="lead">已完成代码实现，并形成首日真实样稿；图片自动化与正式运行待完成。</p>
+        <div class="metrics" aria-label="最新测试日报已验证的规模">
+          <div class="metric"><strong>7 条</strong><span>新闻，其中 3 条来自 Bloomberg</span></div>
+          <div class="metric"><strong>1 篇</strong><span>中文深读，751 字符、7 段</span></div>
+          <div class="metric"><strong>7 张</strong><span>资料照，服务器重新下载成功</span></div>
+        </div>
+        <p>另有一条拓展阅读。七图转换后本站访问均成功，缺图、占位和回退为零。关注项的新稿已改成分点事实和可点击参考内容。这些结果都来自<strong>10 月 6 日同一批输入</strong>。</p>
+        <div class="phase-list">
+          <div class="phase">
+            <div><span class="phase-label">原计划 Phase 1</span><h3>读取能力</h3><span class="tag good">手动已验证</span></div>
+            <div><p>原网页版账号的 Gmail 已实际读取 Bloomberg 正文和文章链接；AIHot 候选已由服务端取得。Polymarket 补查后仍只有旧一期，当期候选为零。</p><p class="note">正式定时任务能否稳定使用同样的 Gmail 工具，还需在原任务环境验证。手动能读，不能直接替代自然运行证据。</p></div>
+          </div>
+          <div class="phase">
+            <div><span class="phase-label">原计划 Phase 2</span><h3>实现与测试</h3><span class="tag good">已完成</span></div>
+            <div><p>来源接口、七天快照、去重、状态、拓展阅读与兼容渲染已实现；后续补齐深读分段、关注项排版和 Shadow 回读。</p><p class="note">当前源码的类型检查、465/465 测试、构建和 diff 检查已有通过记录。独立测试服务已更新；这不表示正式主站已更新。</p></div>
+          </div>
+          <div class="phase">
+            <div><span class="phase-label">原计划 Phase 3</span><h3>真实 Shadow</h3><span class="tag wait">完成一个日期</span></div>
+            <div><p>已实际读取来源、冻结候选、生成、修订并保存。内容获得“暂且满意”的反馈；最新照片和最终关注项排版仍需实际阅读确认。</p><p class="note">同日多次修稿算一个日期。测试账号中普通日程和邮件为空，不能代替正式账号的真实个人输入；四项行业关注用于筛选，也不能等同于六项关注全部完成研究。</p></div>
+          </div>
+          <div class="phase">
+            <div><span class="phase-label">正式切换</span><h3>生产与自然运行</h3><span class="tag wait">尚未执行</span></div>
+            <div><p>本次三来源能力尚未切到正式主站或原日报任务。没有真实发信，也没有收件箱验收。</p><p class="note">旧 Cloud 日报仍是已有体系；“新版未上线”并不表示项目没有可用的旧日报。</p></div>
+          </div>
+        </div>
+        <div class="warning"><strong>还没有证实：</strong>新图片每天自动成功、第二个日期稳定运行、正式账号完整输入、原任务自然触发、成本下降。不能用图片数量或校验通过替代这些结果。</div>
+
+        <h3 style="margin-top:30px">图片到底卡在哪一步？</h3>
+        <p style="margin-top:10px">从外面拿图进入日报，只需要理解下面四步。</p>
+        <div class="flow" aria-label="图片从外部进入日报的四个步骤">
+          <div class="flow-step"><span class="number">第 1 步</span><h3>选一张合适的图</h3><span class="tag wait">本次逐张审核</span><p>找到对应文章或对象的照片，确认可以使用，记录来源与署名。</p></div>
+          <div class="flow-step"><span class="number">第 2 步</span><h3>服务器下载</h3><span class="tag wait">待永久接线</span><p>这七张已成功。日常下载器与常驻代理还没有接成稳定的一条路。</p></div>
+          <div class="flow-step"><span class="number">第 3 步</span><h3>检查并保存</h3><span class="tag good">已有能力，已跑通</span><p>检查文件、大小与哈希，转换压缩后放到本站持久媒体。</p></div>
+          <div class="flow-step"><span class="number">第 4 步</span><h3>放进网页和邮件</h3><span class="tag good">已渲染；未投递</span><p>正文引用同一个托管结果，显示图注。实际邮件到达另验。</p></div>
+        </div>
+        <div class="photo-detail">
+          <div><h3>“能连 OpenAI”为何还不够？</h3><p>当时常驻代理只把 OpenAI 请求送往代理出口，图片域名仍走直连；日报下载器也没有接入这个代理。另一个图片转发入口返回 403，具体授权原因尚未确认。</p><p>把已审核图片请求临时送往现有代理出口后，服务器七张全部下载成功。<strong>网络能力存在，缺的是常驻分流和应用接线。</strong></p></div>
+          <div><h3>下一步应该解决什么？</h3><p>选定一条正式取图路线，让日报下载器每次都能使用，并用<strong>新的图片 URL</strong>验证。优先评估已证明可用的服务器代理路线。</p><p>还要验证 Work 能为新新闻选出贴题、可用的素材，进入现有审核规则。不能让每份日报都依赖一次人工搬运。</p></div>
+        </div>
+        <p class="note" style="margin-top:14px">这批图是许可资料照，不是所有新闻发生现场的照片。此次成功没有涉及 Bloomberg 邮件正文图片提取；临时代理已清理，原生日报下载器的永久接线尚未实施。</p>
+      </section>
+
+      <section id="next" aria-labelledby="next-title">
+        <div class="section-head"><span class="section-no">03</span><h2 id="next-title">后续按这四步推进</h2></div>
+        <p class="lead">收敛到同一条上线链路。每一步产出明确证据，避免不断生成相同内容的测试稿。</p>
+        <ol class="tasks">
+          <li><div class="task-title"><h3>把图片路线接成常驻流程</h3><span class="tag wait">下一项核心工程</span></div><p>在服务器代理与现有转发入口之间选定主路线。推荐先沿已成功的代理方案做最小集成，保留来源、文件与安全检查，同时解决新素材如何进入可用范围。</p><p class="accept">通过标准：Work 为新新闻选图，服务器自动取得新文件，转换、托管、正文显示正常；不靠本地下载、重复使用旧副本或逐次临时启动代理。取图失败的处理方式需明确，不能回到已被否定的模板图。</p></li>
+          <li><div class="task-title"><h3>在另一个真实日期做一次合并验收</h3><span class="tag wait">内容 + 图片 + 真实输入</span></div><p>先补最新稿的阅读评价，再换一个日期，以新候选、新文章和新图片测试。核对原任务实际 Prompt、Gmail 工具与正式账号个人输入；无需再次填写已有配置。</p><p class="accept">通过标准：关注项有可读事实与参考链接，各项覆盖状态真实；来源缺失能回到搜索；主新闻、深读、拓展阅读和照片实际阅读通过。一次记录耗时、搜索量与失败，不另外拆成多轮重复测试。现有日程或邮件为空时，须确认是实际空值。</p></li>
+          <li><div class="task-title"><h3>受控部署，并更新原来的正式任务</h3><span class="tag">后续授权后执行</span></div><p>备份旧配置与 Prompt，部署冻结版本，仅为目标账号开启来源能力，更新原有任务。必要时刷新连接器工具目录，核对实际可见工具。</p><p class="accept">回退方式：关闭来源能力并恢复旧 Prompt；代码保留回退版本，历史日报继续可读。生产部署、正式任务修改、GitHub push 与真实发信按各自授权执行，不新建第二个日报定时任务。</p></li>
+          <li><div class="task-title"><h3>观察一次自然触发</h3><span class="tag wait">自动日报闭环</span></div><p>让原任务按时间自行运行，核对读取、选题、取图、发布和是否重复执行。若正式交付包含邮件，再按授权检查邮件客户端与收件箱。</p><p class="accept">通过标准：自然运行生成正确的新日报；邮件需要确认实际到达。保存成功、排队成功或 SMTP 接受，只证明对应环节。这一轮之后仍需短期观察来源与代理稳定性。</p></li>
+        </ol>
+      </section>
+
+      <section id="trim" aria-labelledby="trim-title">
+        <div class="section-head"><span class="section-no">04</span><h2 id="trim-title">必须做、可省掉、可延后</h2></div>
+        <div class="trim-grid">
+          <div class="trim-column keep"><h3>上线前保留</h3><ul>
+            <li><strong>常驻图片路线与新图验证</strong>它直接决定明天是否仍要人工搬图。</li>
+            <li><strong>另一个真实日期</strong>用于排除只在同一批邮件和七张旧图上成功。</li>
+            <li><strong>正式账号输入与原任务核对</strong>测试账号空日程、空邮件，不能当成完整验收。</li>
+            <li><strong>实际阅读与最小回退检查</strong>看新稿的图文效果；确认旧 Prompt、配置和代码可恢复。无新代码时不机械重跑全套检查。</li>
+          </ul></div>
+          <div class="trim-column drop"><h3>可以停止或合并</h3><ul>
+            <li><strong>反复复刻同一七张照片</strong>定位问题时有用，如今已证实服务器可下载。下一轮应换新素材。</li>
+            <li><strong>同时修代理和 Worker</strong>选择一条可用主路线即可；另一条不必成为并行上线条件。</li>
+            <li><strong>继续批量生成旧模板图</strong>用户已明确否定，不再用“每条有图”代替图片质量。</li>
+            <li><strong>为了上线增加队列或新调度</strong>首版没有必要；复用原任务、现有快照和托管即可。</li>
+          </ul></div>
+          <div class="trim-column later"><h3>可在上线后观察或后续做</h3><ul>
+            <li><strong>等待 Polymarket 新邮件</strong>不应单独卡住全体来源上线。无新邮件如实记录，搜索补漏；其恢复成功另验。</li>
+            <li><strong>证明已经省搜索成本</strong>目前没有旧流程对照。先记真实用量，积累后再比较，不以“省钱”包装现状。</li>
+            <li><strong>邮件原始 HTML、私有图片与市场 API</strong>属于第二阶段。当前内容与许可资料照已能走现有路径。</li>
+            <li><strong>V3、向量库与完整投资研究</strong>不把其他路线全部变成本次前置条件。每日关注先给可靠事实，研究不充分如实说明。</li>
+          </ul></div>
+        </div>
+        <p class="note" style="margin-top:18px">“可省掉”是本次盘点的收敛建议，并未自动修改已有发布规则。Polymarket 暂时空缺可不阻断整体上线，但不能因此声称其新一期或概率链路已验收。</p>
+      </section>
+
+      <section id="launch" aria-labelledby="launch-title">
+        <div class="section-head"><span class="section-no">05</span><h2 id="launch-title">距离上线还有多远</h2></div>
+        <div class="launch">
+          <h3>剩余路径：一项核心工程，一次跨日验收，一次受控切换，一次自然运行。</h3>
+          <p>手动测试版已经可以阅读。要成为每天自动生成的正式日报，下面四个环节还必须闭合；其中工程工作主要集中在第一项。</p>
+          <div class="launch-line" aria-label="到正式自动日报的剩余路径">
+            <div class="launch-stop"><strong>取新图自动化</strong><span>代理接线、素材选取和失败处理</span></div>
+            <div class="launch-stop"><strong>跨日验收</strong><span>新内容、新图片、真实个人输入与实读</span></div>
+            <div class="launch-stop"><strong>正式切换</strong><span>获得相应授权，部署并改原任务</span></div>
+            <div class="launch-stop"><strong>自然运行</strong><span>确认到点能产出，按范围验证邮件</span></div>
+          </div>
+          <p class="launch-answer"><strong>时间边界：</strong>至少还要覆盖一个不同的真实日期，再观察一次自然触发。若新图路线与正式 Gmail 调用顺利，不需要重做主体架构；若它们失败，需要先排障，当前证据不足以给出可靠的固定天数。</p>
+          <p class="launch-answer"><strong>建议的下一项工作：</strong>先把服务器取图接成常驻流程，并用一组新 URL 验证。Polymarket 来信、成本对比和第二阶段功能不应拖住这一步。</p>
+        </div>
+        <p class="note" style="margin-top:18px">生产切换完成即可说“新版代码与任务已上线”；经过一次自然触发，才有证据说“自动流程已跑通”。长期稳定性需要后续观察，不能由一次成功保证。</p>
+      </section>
+
+      <section aria-labelledby="evidence-title" id="evidence">
+        <div class="section-head"><h2 id="evidence-title">依据与边界</h2></div>
+        <p class="note">这是 2026-10-06 的盘点快照。对照用户已确认的三来源计划、当前任务分支与当日真实验收记录；本轮没有重新查询正式服务器版本或再次生成日报。</p>
+        <details>
+          <summary>版本沿革：四次修改分别解决什么</summary>
+          <div class="details-body history">
+            <div><strong>0.50.0 · 来源接入</strong><p>AIHot、邮件候选、冻结去重、状态和拓展阅读；新增功能阶段。</p></div>
+            <div><strong>0.50.1 · 深读分段</strong><p>修复网页与邮件把空行合并的问题，保留中文深读段落。</p></div>
+            <div><strong>0.50.2 · 关注项阅读</strong><p>圆点事实、日期窗口和带标题的原文参考，兼容旧摘要。</p></div>
+            <div><strong>0.50.3 · 原稿回读</strong><p>Work 可读取同账号指定 Shadow，避免为改两段而猜写整份日报。</p></div>
+          </div>
+        </details>
+        <details>
+          <summary>本次验收证明了什么，没证明什么</summary>
+          <div class="details-body">
+            <ul>
+              <li>首日候选：AIHot 23 条，Bloomberg 5 条，Polymarket 0 条且过旧。不是三个来源都已有当期内容。</li>
+              <li>旧七图稿完成过四尺寸、明暗共八组浏览器检查；最新服务器重现稿的云端浏览器访问受策略拒绝，不能借用旧检查冒充新稿实读。</li>
+              <li>最新稿保留七条新闻、七图、一篇深读和一条拓展阅读；同上一稿相比仅修订两个股票关注摘要，仍只有一个真实日期。</li>
+              <li>最新源码有 465/465、类型检查、构建和 diff 通过记录。本文只新增说明文件，不改应用行为，不重复全量测试或升级应用版本。</li>
+              <li>本次三来源改造只部署了独立测试服务；没有切换主站、正式任务或真实发信，也没有 GitHub push。</li>
+              <li>完整回滚恢复、真实邮件客户端、收件箱与长期稳定性尚未验证。依据发布风险选择验证范围，无须把所有历史任务都作为本次上线前置条件。</li>
+            </ul>
+          </div>
+        </details>
+        <details>
+          <summary>查看项目依据</summary>
+          <div class="details-body">
+            <ul>
+              <li><a href="DAILY-DIGEST-SOURCES-SHADOW-20261006.md">10 月 6 日来源、图片和 Work 实测记录</a>：按时间追加，保留失败与后续修复。</li>
+              <li><a href="../../CHATGPT-WORK-CLOUD.md#三来源候选与拓展阅读">Cloud 日报合同</a>：接口、来源状态、图片边界与切换顺序。</li>
+              <li><a href="../../TEST-MATRIX.md#三来源候选与拓展阅读">测试矩阵</a>：自动检查与真实运行的证据范围。</li>
+              <li><a href="../../TASKS.md#日报任务">当前日报任务清单</a>：三来源与其他长期路线分别管理。</li>
+              <li><a href="../../../CHANGELOG.md">版本更新记录</a>：0.50.0 至 0.50.3 的具体改动。</li>
+            </ul>
+          </div>
+        </details>
+      </section>
+    </main>
+    <footer>Daily Digest 三来源改造盘点 · 2026-10-06 · 本文为说明与建议，不触发任何服务、任务或邮件操作。应用版本保持 0.50.3-261006.1722。</footer>
+  </div>
+  <script>
+    const root = document.documentElement;
+    const themeButton = document.getElementById('theme-toggle');
+    function applyTheme(dark) {
+      root.dataset.theme = dark ? 'dark' : 'light';
+      themeButton.setAttribute('aria-pressed', String(dark));
+      themeButton.textContent = dark ? '浅色阅读' : '深色阅读';
+    }
+    applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches);
+    themeButton.addEventListener('click', () => applyTheme(root.dataset.theme !== 'dark'));
+    document.getElementById('print').addEventListener('click', () => window.print());
+  </script>
+</body>
+</html>
