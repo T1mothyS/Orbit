@@ -36,7 +36,7 @@
 | --- | --- |
 | [架构](ARCHITECTURE.md) | 运行时、持久化、账号所有权、队列/草稿、Provider/工具、OAuth 和共享附件 |
 | [日历数据](CALENDAR-DATA-GUIDE.md) | 事项/周期/日期语义及历史兼容包袱 |
-| [Cloud 日报](CHATGPT-WORK-CLOUD.md) | OAuth/MCP、Local/Cloud、V2.5 输入/内容/媒体、三来源候选/拓展阅读与正式发布合同 |
+| [Cloud 日报](CHATGPT-WORK-CLOUD.md) | OAuth/MCP、Local/Cloud、V2.5 输入/内容/媒体、Shadow 原稿回读、三来源候选/拓展阅读与正式发布合同 |
 | [Cloud 排障](CLOUD-DIGEST-RECOVERY.md) | Prompt/模板/完整性/媒体分支核对 |
 | [V3 Core](DAILY-DIGEST-V3-CORE-CONTRACT.md) | Event/Revision/Evidence/Analysis、D07、D08 双轴与 D09 本地冻结 |
 | [Research/Thesis](DAILY-DIGEST-RESEARCH-THESIS.md) | Research → Proposal → 确认版本、租约/备份和真实通道限制 |
