@@ -7,6 +7,7 @@ import { withPersistenceTransaction } from './persistence.js';
 import { getSchedule, getAllSchedules } from './schedule-store.js';
 import {getAttachment} from './activity-store.js';
 import { addDateDays } from './orbit-time.js';
+import {scheduleItemsForPlan} from '../src/utils/plan-schedule-items.js';
 export interface OrbitContext {
     userId: string;
     conversationId: string;
@@ -233,10 +234,14 @@ export function recentObjectReferences(userId: string, id: string): Array<Array<
     conversation(userId, id);
     return queryAll<{
         schedule_items: string | null;
-    }>('SELECT schedule_items FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND role=? AND schedule_items IS NOT NULL ORDER BY created_at DESC,rowid DESC LIMIT 3', [userId, id, 'assistant']).map(row => {
+        type: string;
+        plan: string | null;
+    }>('SELECT schedule_items,type,plan FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND role=? AND schedule_items IS NOT NULL ORDER BY created_at DESC,rowid DESC LIMIT 3', [userId, id, 'assistant']).map(row => {
         try {
             const items = JSON.parse(row.schedule_items || '[]');
-            return Array.isArray(items) ? items.slice(0, 30).map(item => ({ id: String(item.id), title: String(item.title) })) : [];
+            const plan = row.plan ? JSON.parse(row.plan) : null;
+            const visible = row.type === 'plan' ? scheduleItemsForPlan(Array.isArray(items) ? items : [], Array.isArray(plan?.operations) ? plan.operations : []) : items;
+            return Array.isArray(visible) ? visible.slice(0, 30).map(item => ({ id: String(item.id), title: String(item.title) })) : [];
         }
         catch {
             return [];

@@ -1,6 +1,7 @@
 import * as dbModule from './db.js';
 import * as db from './db.js';
 import {messageAttachments} from './orbit-attachments.js';
+import {scheduleItemsForPlan} from '../src/utils/plan-schedule-items.js';
 
 export const AI_SCHEDULE_HISTORY_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -15,6 +16,8 @@ export function parseHistoryJson(value: string | null): any {
 }
 
 export function toAiScheduleHistoryMessage(message: dbModule.DbAiScheduleMessage) {
+  const plan = parseHistoryJson(message.plan);
+  const items = parseHistoryJson(message.schedule_items);
   return {
     id: message.id,
     conversationId: message.conversation_id,
@@ -22,8 +25,8 @@ export function toAiScheduleHistoryMessage(message: dbModule.DbAiScheduleMessage
     type: message.type,
     text: message.content,
     intent: message.intent || undefined,
-    scheduleItems: parseHistoryJson(message.schedule_items),
-    plan: parseHistoryJson(message.plan),
+    scheduleItems: message.type === 'plan' ? scheduleItemsForPlan(Array.isArray(items) ? items : [], Array.isArray(plan?.operations) ? plan.operations : []) : items,
+    plan,
     knowledgeSources: parseHistoryJson(message.knowledge_sources || null),
     timestamp: message.created_at,
     orbitMeta: parseHistoryJson(message.orbit_meta || null),

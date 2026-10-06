@@ -18,6 +18,7 @@ import { useOrbitChat } from '../hooks/useOrbitChat';
 import {useChatAttachments,type ChatFile} from '../hooks/useChatAttachments';
 import {ChatAttachmentCard,ChatAttachmentComposer} from './ChatAttachments';
 import { SCHEDULE_CATEGORY_COLORS, SCHEDULE_CATEGORY_LABELS } from '../utils/scheduleCategories';
+import {scheduleItemsForPlan} from '../utils/plan-schedule-items';
 
 // ==================== 类型 ====================
 
@@ -173,13 +174,14 @@ function operationToForm(operation: AiPlanOperation): PlanOperationForm {
   };
 }
 
-function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, onSave, disabled=false }: {
+function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, onSave, onRemove, disabled=false }: {
   operation: AiPlanOperation;
   editing: boolean;
   saving: boolean;
   onStartEdit: () => void;
   onCancel: () => void;
   onSave: (patch: Record<string, unknown>) => Promise<void>;
+  onRemove: () => Promise<void>;
   disabled?:boolean;
 }) {
   const [form, setForm] = useState<PlanOperationForm>(() => operationToForm(operation));
@@ -239,7 +241,10 @@ function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, 
     {!editing ? <>
       <div className="flex items-start justify-between gap-2">
         <div className="text-xs font-medium" style={{ color: 'var(--td-text-color-primary)' }}>{operation.title}</div>
-        {operation.type !== 'delete' && !disabled && <button type="button" className="ai-plan-edit-button" onClick={event => { event.stopPropagation(); onStartEdit(); }} aria-label={`编辑计划项 ${operation.title}`}><Edit3 size={13} /> 编辑</button>}
+        {!disabled && <div className="ai-plan-item-actions">
+          {operation.type !== 'delete' && <button type="button" className="ai-plan-edit-button" disabled={saving} onClick={event => { event.stopPropagation(); onStartEdit(); }} aria-label={`编辑计划项 ${operation.title}`}><Edit3 size={13} /> 编辑</button>}
+          {['create','create_recurring'].includes(operation.type) && <button type="button" className="ai-plan-edit-button ai-plan-remove-button" disabled={saving} onClick={event => { event.stopPropagation(); void onRemove(); }} aria-label={`删除待创建条目 ${operation.title}`}><Trash2 size={13} /> 删除</button>}
+        </div>}
       </div>
       <div className="text-[11px] mt-0.5" style={{ color: 'var(--td-text-color-secondary)' }}>{actionLabel[operation.type] || '处理'} · {timeLabel}</div>
       {operation.before && <div className="text-[11px] mt-1" style={{color:'var(--td-text-color-secondary)'}}>原事项：{operation.before.title} · {operation.before.startTime?.replace('T',' ')} → {operation.startTime?.replace('T',' ') || '保留原时间'}{operation.scheduleId?.startsWith('reminder-cycle:') ? '（仅本周期安排日期）' : ''}</div>}
@@ -402,7 +407,7 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
   onOpenScheduleMenu?: (id: string, x: number, y: number) => void;
   onConfirmPlan?: (messageId: string, planId: string) => void;
   onDiscardPlan?: (messageId: string) => void;
-  onUpdatePlanOperation?: (planId: string, key: string, patch: Record<string, unknown>) => Promise<void>;
+  onUpdatePlanOperation?: (planId: string, key: string, patch: Record<string, unknown>, action?: 'remove') => Promise<void>;
   confirmingPlanId?: string | null;
   savingPlanOperationKey?: string | null;
 }) {
@@ -411,6 +416,7 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
   const [editingOperationKey, setEditingOperationKey] = useState<string | null>(null);
   const [reminderBusy,setReminderBusy]=useState(false),[reminderError,setReminderError]=useState('');
   const timestamp = parseMessageTimestamp(msg.timestamp);
+  const scheduleItems = msg.type === 'plan' ? scheduleItemsForPlan(msg.scheduleItems || [], msg.plan?.operations || []) : msg.scheduleItems;
   const messageTime = <time className={`ai-message-timestamp${isUser ? ' is-user' : ''}${msg.type === 'error' ? ' is-error' : ''}`} dateTime={timestamp ? msg.timestamp || undefined : undefined}>{formatMessageTimestamp(msg.timestamp)}</time>;
 
   if (isUser) {
@@ -498,18 +504,25 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
                     operation={operation}
                     disabled={!!msg.plan?.state&&msg.plan.state!=='pending'}
                     editing={editingOperationKey === operation.key}
-                    saving={savingPlanOperationKey === `${msg.plan!.id}:${operation.key}`}
+                    saving={!!savingPlanOperationKey || !!confirmingPlanId}
                     onStartEdit={() => {if(!msg.plan?.state||msg.plan.state==='pending')setEditingOperationKey(operation.key);}}
                     onCancel={() => setEditingOperationKey(null)}
                     onSave={async patch => {
                       await onUpdatePlanOperation?.(msg.plan!.id, operation.key, patch);
                       setEditingOperationKey(null);
                     }}
+                    onRemove={async () => {
+                      setReminderError('');
+                      try {
+                        await onUpdatePlanOperation?.(msg.plan!.id, operation.key, {}, 'remove');
+                        setEditingOperationKey(null);
+                      } catch (error) { setReminderError(error instanceof Error ? error.message : '删除待创建条目失败'); }
+                    }}
                   />)}
                 </div>
                 {(!msg.plan.state || msg.plan.state==='pending') && <div className="flex justify-end gap-2 mt-2.5">
-                  <button type="button" className="secondary-button" onClick={() => onDiscardPlan?.(msg.id)} disabled={confirmingPlanId === msg.plan.id}>取消</button>
-                  <button type="button" className="primary-button" onClick={() => onConfirmPlan?.(msg.id, msg.plan!.id)} disabled={confirmingPlanId === msg.plan.id}>
+                  <button type="button" className="secondary-button" onClick={() => onDiscardPlan?.(msg.id)} disabled={!!confirmingPlanId || !!savingPlanOperationKey}>取消</button>
+                  <button type="button" className="primary-button" onClick={() => onConfirmPlan?.(msg.id, msg.plan!.id)} disabled={!!confirmingPlanId || !!savingPlanOperationKey}>
                     {confirmingPlanId === msg.plan.id ? '正在执行…' : '确认并执行'}
                   </button>
                 </div>}
@@ -518,9 +531,9 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
             )}
 
             {/* 使用结构化数据渲染可点击日程卡片 */}
-            {msg.scheduleItems && msg.scheduleItems.length > 0 && (
+            {scheduleItems && scheduleItems.length > 0 && (
               <div className="mt-2">
-                {msg.scheduleItems.map(schedule => (
+                {scheduleItems.map(schedule => (
                   <ScheduleMiniCard
                     key={schedule.id}
                     schedule={schedule}
@@ -564,6 +577,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [confirmingPlanId, setConfirmingPlanId] = useState<string | null>(null);
   const [savingPlanOperationKey, setSavingPlanOperationKey] = useState<string | null>(null);
+  const planMutationRef = useRef(false);
   const [noteMode, setNoteMode] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
 
@@ -640,14 +654,16 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     textarea.style.overflowY = textarea.scrollHeight > 144 ? 'auto' : 'hidden';
   }, [inputText, collapsed]);
 
-  const handleUpdatePlanOperation = useCallback(async (planId: string, key: string, patch: Record<string, unknown>) => {
+  const handleUpdatePlanOperation = useCallback(async (planId: string, key: string, patch: Record<string, unknown>, action?: 'remove') => {
+    if (planMutationRef.current) throw new Error('计划正在处理中，请稍候');
+    planMutationRef.current = true;
     const savingKey = `${planId}:${key}`;
     setSavingPlanOperationKey(savingKey);
     try {
       const expectedRevision=messages.find(m=>m.plan?.id===planId)?.plan?.revision||1;
       const lifecycle=['resume','retry'].includes(key);
       const response = await fetch(lifecycle?`/api/ai-chat/plans/${encodeURIComponent(planId)}/${key}`:`/api/ai-chat/plans/${encodeURIComponent(planId)}/operations/${encodeURIComponent(key)}`, {
-        method: lifecycle?'POST':'PATCH',
+        method: lifecycle?'POST':action === 'remove' ? 'DELETE' : 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({...patch,expectedRevision}),
       });
@@ -657,8 +673,10 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
       setMessages(previous => previous.map(message => message.plan?.id === planId ? {
         ...message,
         plan: data.plan,
+        ...(action === 'remove' ? {text: data.plan.reply} : {}),
       } : message));
     } finally {
+      planMutationRef.current = false;
       setSavingPlanOperationKey(null);
     }
   }, [authHeaders,messages,orbit.refresh]);
@@ -696,7 +714,8 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
 
 
   const handleConfirmPlan = useCallback(async (messageId: string, planId: string) => {
-    if (confirmingPlanId) return;
+    if (planMutationRef.current) return;
+    planMutationRef.current = true;
     setConfirmingPlanId(planId);
     try {
       const response = await fetch('/api/ai-chat/confirm', {
@@ -725,19 +744,24 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
         timestamp: new Date().toISOString(),
       }]);
     } finally {
+      planMutationRef.current = false;
       setConfirmingPlanId(null);
     }
   }, [authHeaders, confirmingPlanId, onSchedulesCreated,messages,orbit.refresh]);
 
   const handleDiscardPlan = useCallback(async (messageId: string) => {
+    if (planMutationRef.current) return;
     const discarded = messages.find(message => message.id === messageId);
     if (discarded?.plan) {
+      planMutationRef.current = true;
+      setSavingPlanOperationKey(`${discarded.plan.id}:cancel`);
       try { const response=await fetch(`/api/ai-chat/plans/${encodeURIComponent(discarded.plan.id)}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ expectedRevision: discarded.plan.revision||1 }),
       });const data=await readJsonResponse(response);if(!response.ok)throw new Error(data.error||'取消失败');await orbit.refresh();}
       catch(error){orbit.setError(error instanceof Error?error.message:'取消失败');}
+      finally { planMutationRef.current = false; setSavingPlanOperationKey(null); }
     }
   }, [authHeaders, messages,orbit.refresh,orbit.setError]);
 

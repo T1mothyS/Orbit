@@ -22,7 +22,9 @@ React/Vite 与 Electron 壳都使用同一套前端页面。Electron 主进程�
 
 ## 2. 前端
 
-项目成长 `/project` 从设置顶部打开，页面及样式按路由懒加载。只读 `GET /api/project-evolution` 使用现有 Bearer 认证，读取服务端校验后的 `project-evolution/generated.json`；有效账号共享项目事实，不读取业务数据库，不在运行时调用 Git 或 AI。合同见 [项目成长维护说明](../project-evolution/README.md)。
+SettingsLayout 在正文滚动容器中测量章节位置，使用帧节流及尺寸观察更新导航高亮；导航自身只滚动到当前分类，不移动键盘焦点。知识库手机阅读页以专用样式覆盖通用页面顶部留白，箭头返回及章节控制条铺满阅读区域并覆盖后方正文。
+
+项目成长 `/project` 从头像菜单打开，页面及样式按路由懒加载。只读 `GET /api/project-evolution` 使用现有 Bearer 认证，读取服务端校验后的 `project-evolution/generated.json`；有效账号共享项目事实，不读取业务数据库，不在运行时调用 Git 或 AI。合同见 [项目成长维护说明](../project-evolution/README.md)。
 
 入口和主要页面：
 
@@ -43,7 +45,7 @@ React/Vite 与 Electron 壳都使用同一套前端页面。Electron 主进程�
 | src/pages/ToolsPage.tsx | 登录后的挂载应用菜单；不加入产品顶部导航 |
 | src/components/settings/ | Settings V2 的 Dialog、Layout、Section、Row 和领域设置 |
 
-当前登录后页面路由是 /today、/schedule、/assistant、/reminders、/reports、/reports/:date、/research、/library、/library/:id、/tools 和 /project；/import 重定向到 /assistant?tool=email-import；未登录时使用 /login。设置通过产品壳按钮打开 SettingsDialog，没有独立 /settings 路由；Tools 可从设置顶部快捷入口或“挂载工具”分区进入，不加入产品顶部导航。
+当前登录后页面路由是 /today、/schedule、/assistant、/reminders、/reports、/reports/:date、/research、/library、/library/:id、/tools 和 /project；/import 重定向到 /assistant?tool=email-import；未登录时使用 /login。设置通过产品壳按钮打开 SettingsDialog，没有独立 /settings 路由；Tools 可从头像菜单或设置“挂载工具”分区进入，不加入产品顶部导航。
 
 ### 前端加载边界（Phase 2，0.21.1-260915.1408）
 
@@ -158,6 +160,8 @@ Orbit 使用现有 chat.db 和同步持久化事务，未增加数据库服务�
 清空当前对话与行内删除共用一次待确认状态，5 秒超时/外部点击/Escape/切换/关闭菜单复位，第二次点击才请求接口。清理期间同步锁阻止重复提交与新发送，并使清理前的刷新响应失效；成功后更新本地空历史，后续刷新失败明确报告已清理、状态正在重连。取消请求在服务端仍保留持久状态，但从页面状态列表移除；失败和中断继续显示重试。
 
 清空和删除在同一同步持久化事务内清理账号/会话所属的聊天附件元数据、消息、请求及处理步骤、活跃计划指针，queued/running 时拒绝。提交成功后只清除该会话的计划/请求缓存，失败不动缓存。清空保留会话、正式事务、记事及浏览器文字/记事图片草稿；聊天附件列表同步重置，未确认发送的重试编号失效。文件在事务成功后按共享引用清理，写入失败保留原记录和字节；若提交后文件删除失败，兼容响应增加 `attachmentCleanupPending: true` 并显示存储清理提示，不能把已接受的历史清空误报为整体失败。计划确认继续从所属账号的持久消息解析，清空后的缓存不能恢复已删除计划。
+
+`DELETE /api/ai-chat/plans/:planId/operations/:key` 只移除 pending 状态的 create/create_recurring 草稿操作，必须携带正整数 expectedRevision；归属不匹配或编号不存在返回404，旧版本或非活跃/过期状态返回409。事务内保存新快照、正文说明和活跃计划指针，成功后更新缓存；剩余操作重新编号并递增版本，最后一项移除后保存空的cancelled终态，刷新/重启不复活。前端保存、移除、取消及确认共用同步锁。纯创建草稿不展示日程参考上下文；其他草稿只展示update/delete目标，历史读取及后续编号引用使用同一过滤规则，查询和正式执行结果保留原卡片合同。
 
 | 接口 | 合同 |
 | --- | --- |

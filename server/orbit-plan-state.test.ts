@@ -49,3 +49,64 @@ test('HTTP confirm restores without reading history, rejects stale revision and 
 });
 test('partial retry contains only failed operations and replays the same new draft',()=>{const p=draft();p.operations.push({key:'1',type:'create',data:{title:'失败项',start_time:'invalid'}});p.state='partially_completed';p.result={changed:true,changedDetails:{failures:[{index:1}]}};state.persistAiPlan(p);const next=state.retryFailedPlan(p);assert.equal(next.operations.length,1);assert.equal(next.operations[0].data.title,'失败项');assert.notEqual(next.id,p.id);assert.equal(state.retryFailedPlan(state.resolveAiPlan('plan-owner',p.id)!).id,next.id);assert.equal(state.activeAiPlan('plan-owner',cidFor(next))?.id,next.id);});
 function cidFor(p:import('./ai-chat-state.js').PendingAiSchedulePlan){return p.conversationId!;}
+
+test('removing draft creates persists revisions, protects ownership and executes only remaining items', async () => {
+  const p = draft(store.createConversation('plan-owner', 'remove HTTP').id);
+  p.operations.push({key:'1',type:'create',data:{title:'保留待办',type:'todo',is_unscheduled:true}});
+  state.persistAiPlan(p);
+  const server = api.app.listen(0, '127.0.0.1'); await new Promise<void>(r => server.once('listening', r));
+  const base = `http://127.0.0.1:${(server.address() as {port:number}).port}`;
+  const request = (key:string, revision:unknown, owner='plan-owner') => fetch(`${base}/api/ai-chat/plans/${p.id}/operations/${key}`, {
+    method:'DELETE',headers:{Authorization:'Bearer '+api.signUserToken(db.getUserById(owner)!), 'Content-Type':'application/json'},body:JSON.stringify({expectedRevision:revision}),
+  });
+  try {
+    assert.equal((await request('0',1,'plan-other')).status,404);
+    assert.equal((await request('0',undefined)).status,400);
+    const removed = await request('0',1); assert.equal(removed.status,200);
+    const next = (await removed.json()).plan;
+    assert.equal(next.revision,2); assert.equal(next.operations.length,1);
+    assert.equal(next.operations[0].key,'0'); assert.equal(next.operations[0].title,'保留待办');
+    assert.equal((await request('0',1)).status,409);
+    state.aiSchedulePlans.clear();
+    const durable = state.resolveAiPlan('plan-owner',p.id)!;
+    assert.equal(durable.operations.length,1); assert.equal(durable.revision,2);
+    state.reviseAiPlan(durable,0,{title:'保留并编辑的待办'},2);
+    const confirmed = await fetch(base+'/api/ai-chat/confirm',{method:'POST',headers:{Authorization:'Bearer '+api.signUserToken(db.getUserById('plan-owner')!), 'Content-Type':'application/json'},body:JSON.stringify({planId:p.id,expectedRevision:3})});
+    assert.equal(confirmed.status,200);
+    const result = await confirmed.json();
+    assert.deepEqual(result.changedDetails.created.map((item:any)=>item.title),['保留并编辑的待办']);
+    assert.equal(result.changedDetails.created[0].is_unscheduled,true);
+    assert.equal((await request('0',4)).status,409);
+  } finally { server.closeAllConnections(); await new Promise<void>(r=>server.close(()=>r())); }
+});
+
+test('last draft removal survives cache reset, clears active pointer and cannot execute', () => {
+  const p = draft();
+  const count = schedules.getAllSchedules('plan-owner').length;
+  const next = state.removeAiPlanOperation(p,0,1);
+  assert.equal(next.state,'cancelled'); assert.equal(next.operations.length,0);
+  assert.equal(state.activeAiPlan('plan-owner',p.conversationId!),undefined);
+  state.aiSchedulePlans.clear();
+  const restored = state.resolveAiPlan('plan-owner',p.id)!;
+  assert.equal(restored.state,'cancelled'); assert.equal(restored.revision,2);
+  assert.throws(()=>state.assertPlanRevision(restored,2),/不可执行/);
+  assert.equal(schedules.getAllSchedules('plan-owner').length,count);
+  const expired = draft(); expired.expiresAt=Date.now()-1; state.persistAiPlan(expired);
+  assert.throws(()=>state.removeAiPlanOperation(state.resolveAiPlan('plan-owner',expired.id)!,0,1),/不可执行/);
+  const update = draft(); update.operations[0].type='update'; state.persistAiPlan(update);
+  assert.throws(()=>state.removeAiPlanOperation(update,0,1),/只能移除待创建/);
+});
+
+test('failed persistence retains the complete pending draft', () => {
+  const p=draft(), rename=fs.renameSync;
+  let rejected=false;
+  fs.renameSync=((from:fs.PathLike,to:fs.PathLike)=>{
+    if(!rejected && String(to)===path.join(root,'chat.db')) { rejected=true; throw new Error('synthetic write failure'); }
+    return rename(from,to);
+  }) as typeof fs.renameSync;
+  try { assert.throws(()=>state.removeAiPlanOperation(p,0,1),/synthetic write failure/); }
+  finally { fs.renameSync=rename; }
+  assert.equal(rejected,true); state.aiSchedulePlans.clear();
+  const restored=state.resolveAiPlan('plan-owner',p.id)!;
+  assert.equal(restored.state,'pending'); assert.equal(restored.operations.length,1); assert.equal(restored.revision,1);
+});

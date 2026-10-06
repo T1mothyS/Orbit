@@ -325,7 +325,7 @@ export function LibraryDetailPage({ id }: { id: string }) {
     if (destination !== current) navigate(destination);
   };
 
-  const readerBack = <button type="button" className="library-back-button library-reader-back" onClick={() => navigate('/library')}><ArrowLeft size={20} aria-hidden="true" />返回</button>;
+  const readerBack = <button type="button" className="library-back-button library-reader-back" onClick={() => navigate('/library')} aria-label="返回知识库" title="返回知识库"><ArrowLeft size={20} aria-hidden="true" /></button>;
   const readerStateNav = <nav className="library-reader-state-nav" aria-label="阅读导航">{readerBack}</nav>;
   if (loading && !detail) return <div className="library-page library-detail-page">{readerStateNav}<div className="library-state"><RefreshCw size={24} className="spin" /><span>正在加载知识详情…</span></div></div>;
   if (error && !detail) return <div className="library-page library-detail-page">{readerStateNav}<div className="library-state" role="alert"><BookOpen size={30} /><strong>知识详情暂时无法加载</strong><span>{error}</span><button type="button" className="library-secondary-button" onClick={() => void load()}>重试</button></div></div>;

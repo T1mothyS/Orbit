@@ -125,6 +125,7 @@ flowchart LR
 | 记事数据、迁移、备份恢复、优化状态 | `server/note-item-service.ts`、`server/note-prompt-optimization.ts`、`server/database/`（兼容入口 `db.ts`）、`server/backup-service.ts` | 保留旧 `linked_schedule_ids` 兼容字段；上一版正文仅服务端私有；所有状态按账号隔离；旧数据默认未优化 |
 | 知识库、Markdown 迁移 | `server/library-service.ts`、`server/library-markdown.ts`、独立 Knowledge Library 项目的 `scripts/process-migration-folder.ps1`、`docs/knowledge-library-operations.md` | 普通处理校验通过后默认 `publish`；`retire/restore/purge` 必须显式选择；本地关系和正文清理后再通过令牌写入；不直接修改运行中的数据库 |
 | AI 计划确认 | `server/routes/ai.ts`、`server/ai-plan.ts`、`server/operation-service.ts` | 先生成待确认草稿；确认结果与正式写入一起持久化；禁止旧专用入口自动完成来源记事 |
+| AI 草稿条目移除与卡片范围 | `server/ai-chat-state.ts`、`src/utils/plan-schedule-items.ts` | 版本化移除待创建操作，最后一项取消；草稿仅显示既有目标，查询和执行结果照常 |
 | 日报采集/生成/校验 | `日报-v2/scripts/`、`日报-v2/schemas/`、`日报-v2/tests/` | V2 只输出结构化内容；`-NoSend` 不发布、不入队、不发信 |
 | 日报媒体与发布 | `日报-v2/scripts/report_media.py`、`日报-v2/scripts/publish_report.py`、主仓库 `server/daily-report*.ts` | Local 先本地校验/上传媒体再 PUT；Cloud 按兼容/严格批次合同处理媒体；正式发布均先写记录，再按来源设置进入网页/邮件 |
 | 生产升级与回滚 | `DEPLOY.md`、`日报-v2/README.md` | 本地构建/验收与生产部署、真实 SMTP、收件箱验收分开授权和记录 |

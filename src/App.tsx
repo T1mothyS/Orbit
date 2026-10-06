@@ -128,7 +128,7 @@ function AppContent() {
         user={user}
         onLogout={logout}
       >
-        <FeatureBoundary key={activeSection === 'library' ? location.pathname : activeSection ?? (isProjectPage ? 'project' : 'tools')} navigation={isLibraryReader ? <Link className="feature-reader-back" to="/library">← 返回</Link> : undefined}>
+        <FeatureBoundary key={activeSection === 'library' ? location.pathname : activeSection ?? (isProjectPage ? 'project' : 'tools')} navigation={isLibraryReader ? <Link className="feature-reader-back" to="/library" aria-label="返回知识库">←</Link> : undefined}>
         {isProjectPage ? <ProjectEvolutionPage /> : activeSection === null ? <ToolsPage /> : activeSection === 'today' ? <ActionCenterPage /> : activeSection === 'schedule' ? (
           <SchedulePage user={user} />
         ) : activeSection === 'assistant' ? <AiAssistantPage /> : activeSection === 'reminders' ? (

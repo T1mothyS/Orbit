@@ -6,7 +6,7 @@ assert.equal(new URL(base).hostname,'127.0.0.1');
 const output=process.env.ORBIT_UI_QA_DIR||fs.mkdtempSync(path.join(os.tmpdir(),'orbit-chat-controls-'));
 const baseline=process.argv.includes('--baseline');fs.mkdirSync(output,{recursive:true});
 (async()=>{
-  const browser=await chromium.launch({channel:'msedge',headless:true}),checks=[],metrics=[],errors=[];
+  const browser=await chromium.launch({channel:process.env.ORBIT_BROWSER_CHANNEL||'msedge',headless:true}),checks=[],metrics=[],errors=[];
   let page;
   try {
     const context=await browser.newContext();

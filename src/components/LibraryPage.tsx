@@ -156,5 +156,5 @@ function LibraryCard({ entry, onOpen }: { entry: LibraryEntry; onOpen: () => voi
 }
 export function LibraryPage() {
   const { id } = useParams<{ id: string }>();
-  return id ? <FeatureBoundary key={id} navigation={<Link className="feature-reader-back" to="/library">← 返回</Link>}><LibraryDetailPage id={id} /></FeatureBoundary> : <LibraryHomePage />;
+  return id ? <FeatureBoundary key={id} navigation={<Link className="feature-reader-back" to="/library" aria-label="返回知识库">←</Link>}><LibraryDetailPage id={id} /></FeatureBoundary> : <LibraryHomePage />;
 }

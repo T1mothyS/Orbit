@@ -202,6 +202,10 @@
 
 .ai-plan-edit-button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; border: 1px solid #BFDBFE; border-radius: 6px; color: #1D4ED8; background: #EFF6FF; font-size: 10px; cursor: pointer; }
 .ai-plan-edit-button:hover, .ai-plan-edit-button:focus-visible { border-color: #60A5FA; outline: none; }
+.ai-plan-item-actions { display:flex; flex:0 0 auto; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
+.ai-plan-remove-button { color:var(--td-error-color); background:var(--td-error-color-1); border-color:var(--td-error-color-3); }
+.ai-plan-edit-button:disabled { opacity:.5; cursor:default; }
+@media (max-width:640px) { .ai-plan-item-actions button { min-height:44px; min-width:44px; } }
 .ai-plan-operation-editor { display: flex; flex-direction: column; gap: 8px; }
 .ai-plan-editor-head { display: flex; align-items: center; justify-content: space-between; color: var(--td-text-color-primary); font-size: 11px; }
 .ai-plan-operation-editor label { display: flex; flex-direction: column; gap: 4px; color: var(--td-text-color-secondary); font-size: 10px; }

@@ -13,7 +13,7 @@ import * as reminderCalendarSync from './reminder-calendar-sync.js';
 import { getDailyWeather, type WeatherLocation } from './weather-service.js';
 import { addLog } from './log-service.js';
 import { type KnowledgeSearchMatch } from './search-service.js';
-import { buildAiPlanSnapshot, rawOperationsFromSnapshot, scheduleFingerprint, updateAiPlanOperation, type PendingAiOperation } from './ai-plan.js';
+import { buildAiPlanSnapshot, rawOperationsFromSnapshot, scheduleFingerprint, updateAiPlanOperation, normaliseAiPlanOperations, type PendingAiOperation } from './ai-plan.js';
 import { resolveQueryDates } from './orbit-time.js';
 import { queryAll } from './database/connection.js';
 import * as db from './db.js';
@@ -225,7 +225,7 @@ export function hydratePendingAiSchedulePlans(userId: string, messages: dbModule
     const snapshot = parseHistoryJson(message.plan);
     if (!snapshot?.id || !snapshot?.expiresAt) continue;
     const operations = rawOperationsFromSnapshot(snapshot);
-    if (!operations.length) continue;
+    if (!operations.length && snapshot.state !== 'cancelled') continue;
     const restored: PendingAiSchedulePlan = {
       id: String(snapshot.id),
       userId,
@@ -297,6 +297,24 @@ export function reviseAiPlan(plan: PendingAiSchedulePlan, index: number, patch: 
   if (!plan.operations[index]) throw new Error('计划操作不存在');
   plan.operations[index] = updateAiPlanOperation(plan.operations[index], patch);
   plan.revision = (plan.revision || 1) + 1; persistAiPlan(plan);
+}
+export function removeAiPlanOperation(plan: PendingAiSchedulePlan, index: number, expected: unknown): PendingAiSchedulePlan {
+  assertPlanRevision(plan, expected);
+  const current = plan.operations[index];
+  if (!current) throw new Error('计划操作不存在');
+  if (!['create', 'create_recurring'].includes(current.type)) throw new Error('只能移除待创建条目');
+  const operations = normaliseAiPlanOperations(plan.operations.filter((_, i) => i !== index));
+  const next: PendingAiSchedulePlan = {
+    ...plan, operations, revision: (plan.revision || 1) + 1,
+    state: operations.length ? 'pending' : 'cancelled',
+    reply: operations.length ? `当前待确认计划共 ${operations.length} 项，确认后执行。` : '已移除全部待创建条目，计划已取消。',
+  };
+  withPersistenceTransaction(() => {
+    persistAiPlan(next);
+    if (!db.updateAiScheduleMessage(next.historyMessageId!, next.userId, { content: next.reply })) throw new Error('计划已移除');
+  });
+  aiSchedulePlans.set(next.id, next);
+  return next;
 }
 export function pendingInteraction(userId: string, cid: string, text: string): { handled: boolean; reply?: string; plan?: PendingAiSchedulePlan } {
   const plan = activeAiPlan(userId, cid);

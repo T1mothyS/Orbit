@@ -7,7 +7,8 @@ import {withWebCitations,type WebCitation} from '../chatgpt-web-search.js';
 import { chatGPTStatus } from '../chatgpt-connection.js';
 import { createOrbitTools } from '../orbit-tools.js';
 import { configureSearch,searchStatus } from '../orbit-search.js';
-import { activateAiPlan, activeAiPlan, resolveAiPlan, setAiPlanState, assertPlanRevision, reviseAiPlan, pendingInteraction,retryFailedPlan } from '../ai-chat-state.js';
+import { activateAiPlan, activeAiPlan, resolveAiPlan, setAiPlanState, assertPlanRevision, reviseAiPlan, removeAiPlanOperation, pendingInteraction,retryFailedPlan } from '../ai-chat-state.js';
+import {scheduleItemsForPlan} from '../../src/utils/plan-schedule-items.js';
 import { OptimizeError } from '../prompt-optimize.js';
 import { createPromptOptimizationRunId, runPromptOptimization } from '../note-prompt-optimization.js';
 import { parseAiSelection } from '../../src/utils/ai-selection.js';
@@ -175,6 +176,21 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       res.json({ success: true, planId: plan.id, plan:buildAiPlanSnapshot(plan), operation: planOperationPreview(plan.operations[index], index) });
     } catch (error: any) {
       res.status(/已更新|不可执行/.test(error?.message||'')?409:400).json({ error: error?.message || '保存计划修改失败' });
+    }
+  });
+  app.delete('/api/ai-chat/plans/:planId/operations/:key', authenticate, (req, res) => {
+    try {
+      const plan = resolveAiPlan(user(req), req.params.planId);
+      if (!plan) return res.status(404).json({ error: '待确认计划不存在' });
+      if (!/^\d+$/.test(req.params.key)) return res.status(400).json({ error: '计划操作编号不正确' });
+      const index = Number(req.params.key);
+      if (plan.operations[index]?.key !== req.params.key) return res.status(404).json({ error: '计划操作不存在' });
+      const expected = req.body?.expectedRevision;
+      if (!Number.isInteger(expected) || expected < 1) return res.status(400).json({ error: '请提供当前计划版本' });
+      const next = removeAiPlanOperation(plan, index, expected);
+      res.json({ success: true, planId: next.id, plan: buildAiPlanSnapshot(next) });
+    } catch (error: any) {
+      res.status(/已更新|不可执行/.test(error?.message || '') ? 409 : 400).json({ error: error?.message || '移除计划项失败' });
     }
   });
   app.post('/api/ai-chat/plans/:planId/:action', authenticate, safe((req,res)=>{
@@ -744,7 +760,7 @@ priority 识别：
           success: true,
           intent: plan.intent,
           reply: plan.reply,
-          scheduleItems: sortedSchedules,
+          scheduleItems: scheduleItemsForPlan(contextSchedules, operations),
           knowledgeSources,
           changed: false,
           requiresConfirmation: true,
