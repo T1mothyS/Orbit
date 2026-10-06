@@ -165,6 +165,7 @@ export function createLibraryRouter({ authenticate }: { authenticate: RequestHan
         if (unknownFields.length) return res.status(400).json({ success: false, error: { code: 'UNKNOWN_FIELD', message: `不允许的字段：${unknownFields.join(', ')}` } });
         if (!Array.isArray(body.sourceIds)) return res.status(400).json({ success: false, error: { code: 'INVALID_SOURCE_IDS', message: 'sourceIds 必须是非空字符串数组', field: 'sourceIds' } });
         const sourceIds = [...new Set(body.sourceIds.map(value => String(value || '').trim()).filter(Boolean))];
+        if (sourceIds.some(id => id.startsWith('orbit-experience:'))) return res.status(400).json({ error: { code: 'RESERVED_SOURCE', message: '请在经历入口中管理这条记录' } });
         if (!sourceIds.length || sourceIds.length > 100) return res.status(400).json({ success: false, error: { code: 'INVALID_SOURCE_IDS', message: 'sourceIds 数量必须在 1 到 100 之间', field: 'sourceIds' } });
         if (action === 'purge' && body.confirm !== true) return res.status(400).json({ success: false, error: { code: 'PURGE_CONFIRMATION_REQUIRED', message: '彻底清除必须显式提供 confirm: true', field: 'confirm' } });
         const result = libraryService.applyLibraryLifecycle(authenticated.userId, sourceIds, action);

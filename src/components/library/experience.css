@@ -1,0 +1,219 @@
+.experience-shell {
+  width: min(100%, 1100px);
+  margin: auto;
+  min-width: 0;
+}
+.experience-shell a:not([class]),
+.experience-memory-info a:not([class]) {
+  color: var(--td-brand-color);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.experience-shell header {
+  margin: 14px 0 24px;
+}
+.experience-shell h1 {
+  font-size: clamp(24px, 3vw, 34px);
+  margin: 8px 0;
+}
+.experience-shell p {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.experience-shell header p,
+.experience-empty p,
+.experience-resumes p {
+  color: var(--td-text-color-secondary);
+  font-size: 14px;
+}
+.experience-layout {
+  display: grid;
+  gap: 24px;
+}
+.experience-layout.has-preview {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.experience-conversation,
+.experience-preview {
+  min-width: 0;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 12px;
+  padding: 20px;
+  background: var(--td-bg-color-container);
+}
+.experience-message {
+  border-bottom: 1px solid var(--td-component-stroke);
+  padding: 12px 0;
+}
+.experience-message span {
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+}
+.experience-message p,
+.experience-lookup p {
+  white-space: pre-wrap;
+  font-size: 14px;
+  margin: 6px 0;
+}
+.experience-message.user {
+  padding-left: 12px;
+  border-left: 3px solid var(--td-brand-color);
+}
+.experience-empty {
+  padding: 18px 0;
+}
+.experience-shell label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  margin: 14px 0;
+}
+.experience-shell input,
+.experience-shell textarea,
+.experience-shell select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--td-text-color-primary);
+  background: var(--td-bg-color-container);
+  font: inherit;
+}
+.experience-shell textarea {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.6;
+}
+.experience-shell :is(input, textarea, select):focus-visible {
+  outline: 2px solid var(--td-brand-color);
+  outline-offset: 2px;
+}
+.experience-models {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px;
+}
+.experience-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.experience-preview fieldset {
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.experience-preview .experience-content-editor {
+  min-height: 240px;
+}
+.experience-preview h2,
+.experience-resumes h2 {
+  font-size: 19px;
+}
+.experience-lookup {
+  padding: 14px;
+  margin: 16px 0;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 8px;
+  background: var(--td-bg-color-secondarycontainer);
+}
+.experience-lookup a {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--td-brand-color);
+  font-size: 13px;
+  margin: 8px 0;
+}
+.experience-lookup span {
+  display: block;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.experience-photos {
+  margin-top: 20px;
+}
+.experience-discard {
+  margin-top: 28px;
+}
+.experience-resumes {
+  margin-top: 32px;
+}
+.experience-resumes > a {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid var(--td-component-stroke);
+  padding: 14px 0;
+  overflow-wrap: anywhere;
+}
+.experience-resumes span {
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  flex-shrink: 0;
+}
+.experience-memory-info {
+  margin: 20px 0;
+  border: 1px solid var(--td-component-stroke);
+  border-radius: 10px;
+  padding: 16px;
+}
+.experience-memory-info dl {
+  display: grid;
+  grid-template-columns: 85px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 14px;
+}
+.experience-memory-info dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.experience-memory-info dt {
+  color: var(--td-text-color-secondary);
+}
+.experience-transcript {
+  margin: 18px 0;
+}
+.experience-transcript p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.experience-memory-info .experience-actions {
+  margin: 0 0 16px;
+}
+.experience-page .note-image {
+  min-width: 0;
+}
+.experience-page summary {
+  cursor: pointer;
+  font-size: 14px;
+}
+.experience-page button:disabled {
+  opacity: 0.55;
+}
+.experience-page .orbit-inline-error {
+  overflow-wrap: anywhere;
+  margin: 14px 0;
+}
+@media (max-width: 800px) {
+  .experience-layout.has-preview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .experience-conversation,
+  .experience-preview {
+    padding: 14px;
+  }
+  .experience-page {
+    padding: 20px 14px 48px;
+  }
+  .experience-models {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .experience-resumes > a {
+    flex-direction: column;
+    gap: 4px;
+  }
+}

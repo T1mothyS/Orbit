@@ -90,7 +90,7 @@ server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与�
 
 数据层使用 sql.js。服务启动时把 SQLite 文件加载到内存，业务修改后导出并写回 data/。当前主要文件为：
 
-- chat.db：用户、会话、消息、AI 配置、记事、账号私有知识库、偏好与令牌哈希，以及 OAuth、Cloud Context/活动输入和媒体批次元数据；知识正文以 Markdown 为 source，HTML 按读取时安全渲染。日报正文不在此库。
+- chat.db：用户、会话、消息、AI 配置、记事、账号私有知识库、偏好与令牌哈希，以及 OAuth、Cloud Context/活动输入和媒体批次元数据；经历复盘使用独立的 `library_experience_sessions/images`，知识版本可保存元数据快照。知识正文以 Markdown 为 source，HTML 按读取时安全渲染。日报正文不在此库。
 - schedule.db：日历、分类和日程。
 - reminder.db：周期事务和提醒配置。
 - activity.db：`daily_reports` 日报正文和来源/投递状态、通知队列、完成记录、AI 导入草稿、附件元数据及 V3 事件记忆表，由 `activity-store.ts` 管理。
@@ -120,7 +120,8 @@ ClipboardItem 的多种 MIME 是同一条内容的可选表示，目标应用决
 | 周期事务与通知 | ReminderPage、ActionCenterPage | reminder-store、notification-service、scheduler | 月末兜底、逾期完成、免打扰和失败重试 |
 | AI | AiSchedulePanel、AiImportPage | AI 服务、ai-plan、ai-import-service | 生成计划不等于写入；必须用户确认 |
 | AI 记事 | NoteBoard、NoteImages | note-item-service、note-image-service | 图文独立于聊天；有序图片关联和文字事务保存；废纸篓保留引用，合并超限原子拒绝；TXT/CSV 是文字导出 |
-| 知识库 | LibraryPage | library-service、library-markdown、library publish API | V2 本地加工、服务器只读呈现、评论、版本、关系原样保存和安全 Markdown；不在服务器做 AI 加工 |
+| 知识库 | LibraryPage | library-service、library-markdown、library publish API | 普通文章由 V2 本地加工、服务器只读呈现、评论、版本、关系原样保存和安全 Markdown |
+| 经历记忆 | library/ExperiencePage、ExperienceDetails | experience-service、experience-ai、routes/experience | 独立复盘与按需联网、可编辑草稿、确认后存正式经历；普通 Chat 不召回，合同见 [知识库](LIBRARY.md#经历记忆) |
 | 日报 | DailyReportsPage | daily-report API、模板、media service、delivery policy | Local/Cloud 按来源和内容哈希保存；媒体先校验/托管；来源设置决定 `RECEIVED` 或 `CANDIDATE` 及邮件入队 |
 | 完成和附件 | ActionCenterPage | completion、attachment service | 所有权、大小、MIME 和恢复边界 |
 | 备份与管理 | Settings、AdminModal | backup-service、admin API | 高风险操作确认、快照和回滚 |

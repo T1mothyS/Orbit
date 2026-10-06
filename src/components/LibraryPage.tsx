@@ -1,7 +1,8 @@
 import { BookOpen, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { CompactFilterSheet } from './CompactFilterSheet';
 import { lazy, useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ExperiencePage } from './library/ExperiencePage';
 import { useAuth } from '../hooks/useAuth';
 import { useReadingReturn } from '../hooks/useReadingReturn';
 import { FeatureBoundary } from './FeatureBoundary';
@@ -116,6 +117,7 @@ function LibraryHomePage() {
           <p>阅读、回顾，连接你的知识。</p>
         </div>
         <div className="library-header-actions">
+          <Link className="library-primary-button" to="/library/experience">记录经历</Link>
           <button type="button" className="library-secondary-button mobile-filter-trigger" disabled={!sortPreferenceReady || sortSaving} onClick={() => { setPendingFilters({ kind, type, status, sort }); setFiltersOpen(true); }}><SlidersHorizontal size={16} />筛选{filterCount > 0 && <span className="filter-count">{filterCount}</span>}</button>
         </div>
       </header>
@@ -134,7 +136,7 @@ function LibraryHomePage() {
           {entries.map(entry => <LibraryCard key={entry.id} entry={entry} onOpen={() => navigate(`/library/${entry.id}`)} />)}
         </div>
       ) : (
-        <div className="library-state"><BookOpen size={34} /><strong>还没有符合条件的内容</strong><span>请在知识库V2项目中处理材料后，通过本地发布脚本上传。</span></div>
+        <div className="library-state"><BookOpen size={34} /><strong>还没有符合条件的内容</strong><span>可以记录经历，或在知识库V2项目处理材料后上传。</span></div>
       )}
     </div>
   );
@@ -156,5 +158,7 @@ function LibraryCard({ entry, onOpen }: { entry: LibraryEntry; onOpen: () => voi
 }
 export function LibraryPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  if (location.pathname.startsWith('/library/experience')) return <ExperiencePage />;
   return id ? <FeatureBoundary key={id} navigation={<Link className="feature-reader-back" to="/library" aria-label="返回知识库">←</Link>}><LibraryDetailPage id={id} /></FeatureBoundary> : <LibraryHomePage />;
 }

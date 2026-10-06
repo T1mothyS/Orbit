@@ -6,7 +6,7 @@ import { fetchNoteImage, removeUnboundNoteImage, uploadNoteImage } from '../util
 import { NOTE_IMAGES_MAX_BYTES, type NoteImage } from '../utils/note-images';
 import { copyNoteImage } from '../utils/note-clipboard';
 
-export function NoteImageGallery({ images, editable = false, disabled = false, onChange }: { images: NoteImage[]; editable?: boolean; disabled?: boolean; onChange?: (images: NoteImage[]) => void }) {
+export function NoteImageGallery({ images, editable = false, disabled = false, onChange, loadImage = fetchNoteImage, removeImage = removeUnboundNoteImage, label = '记事图片' }: { images: NoteImage[]; editable?: boolean; disabled?: boolean; onChange?: (images: NoteImage[]) => void; loadImage?: typeof fetchNoteImage; removeImage?: typeof removeUnboundNoteImage; label?: string }) {
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [view, setView] = useState<NoteImage | null>(null);
@@ -16,14 +16,14 @@ export function NoteImageGallery({ images, editable = false, disabled = false, o
   useEffect(() => {
     let active = true; const allocated: string[] = [];
     setError(''); setUrls({});
-    images.forEach(image => { void fetchNoteImage(image).then(blob => { if (!active) return; const url = URL.createObjectURL(blob); allocated.push(url); setUrls(previous => ({ ...previous, [image.id]: url })); }).catch(reason => { if (active) setError(reason.message); }); });
+    images.forEach(image => { void loadImage(image).then(blob => { if (!active) return; const url = URL.createObjectURL(blob); allocated.push(url); setUrls(previous => ({ ...previous, [image.id]: url })); }).catch(reason => { if (active) setError(reason.message); }); });
     return () => { active = false; allocated.forEach(url => URL.revokeObjectURL(url)); };
-  }, [images]);
-  return <>{!!images.length && <div className="note-images" aria-label="记事图片">{images.map((image, index) => <div className="note-image" key={image.id}>
+  }, [images, loadImage]);
+  return <>{!!images.length && <div className="note-images" aria-label={label}>{images.map((image, index) => <div className="note-image" key={image.id}>
     <button type="button" className="note-image-preview" onClick={() => { setCopyStatus(''); setView(image); }} aria-label={`查看图片 ${index + 1}：${image.name}`} disabled={!urls[image.id]}>{urls[image.id] ? <img src={urls[image.id]} alt={image.name} /> : <span>读取图片…</span>}</button>
-    {editable && <div className="note-image-actions"><button type="button" disabled={disabled || index === 0} aria-label={`图片 ${index + 1} 前移`} onClick={() => { const next = [...images]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; onChange?.(next); }}><ArrowLeft size={14} /></button><button type="button" disabled={disabled || index === images.length - 1} aria-label={`图片 ${index + 1} 后移`} onClick={() => { const next = [...images]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; onChange?.(next); }}><ArrowRight size={14} /></button><button type="button" disabled={disabled} aria-label={`移除图片 ${index + 1}`} onClick={() => { onChange?.(images.filter(value => value.id !== image.id)); void removeUnboundNoteImage(image).catch(reason => setError(reason.message)); }}><X size={14} /></button></div>}
+    {editable && <div className="note-image-actions"><button type="button" disabled={disabled || index === 0} aria-label={`图片 ${index + 1} 前移`} onClick={() => { const next = [...images]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; onChange?.(next); }}><ArrowLeft size={14} /></button><button type="button" disabled={disabled || index === images.length - 1} aria-label={`图片 ${index + 1} 后移`} onClick={() => { const next = [...images]; [next[index], next[index + 1]] = [next[index + 1], next[index]]; onChange?.(next); }}><ArrowRight size={14} /></button><button type="button" disabled={disabled} aria-label={`移除图片 ${index + 1}`} onClick={() => { onChange?.(images.filter(value => value.id !== image.id)); void removeImage(image).catch(reason => setError(reason.message)); }}><X size={14} /></button></div>}
   </div>)}</div>}{error && <p className="orbit-inline-error" role="alert">{error}</p>}
-  {view && createPortal(<dialog ref={dialog} className="orbit-dialog-viewport note-image-overlay" aria-label="查看记事图片" onCancel={event => { event.preventDefault(); setView(null); }} onClick={event => { if (event.target === event.currentTarget) setView(null); }}><section><button type="button" aria-label="关闭图片" onClick={() => setView(null)}><X size={20} /></button><img src={urls[view.id]} alt={view.name} /><button type="button" onClick={() => { void copyNoteImage(view).then(() => setCopyStatus('已复制图片')).catch(reason => setCopyStatus(reason.message)); }}>复制图片</button>{copyStatus && <p role="status">{copyStatus}</p>}</section></dialog>, document.body)}</>;
+  {view && createPortal(<dialog ref={dialog} className="orbit-dialog-viewport note-image-overlay" aria-label={`查看${label}`} onCancel={event => { event.preventDefault(); setView(null); }} onClick={event => { if (event.target === event.currentTarget) setView(null); }}><section><button type="button" aria-label="关闭图片" onClick={() => setView(null)}><X size={20} /></button><img src={urls[view.id]} alt={view.name} /><button type="button" onClick={() => { void copyNoteImage(view, loadImage).then(() => setCopyStatus('已复制图片')).catch(reason => setCopyStatus(reason.message)); }}>复制图片</button>{copyStatus && <p role="status">{copyStatus}</p>}</section></dialog>, document.body)}</>;
 }
 
 export function useNoteImageUpload(images: NoteImage[], onChange: (images: NoteImage[]) => void) {

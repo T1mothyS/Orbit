@@ -59,8 +59,8 @@ export function listLibraryEntries(userId: string, filters: DbLibraryListFilters
   }
   if (filters.q?.trim()) {
     const pattern = `%${escapeLike(filters.q.trim())}%`;
-    clauses.push("(title LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\' OR tags_json LIKE ? ESCAPE '\\')");
-    params.push(pattern, pattern, pattern, pattern);
+    clauses.push("(title LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\' OR tags_json LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM library_experience_sessions e WHERE e.user_id=library_entries.user_id AND e.entry_id=library_entries.id AND e.search_text LIKE ? ESCAPE '\\'))");
+    params.push(pattern, pattern, pattern, pattern, pattern);
   }
   const where = clauses.join(' AND ');
   const total = queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM library_entries WHERE ${where}`, params)?.count || 0;
@@ -261,9 +261,9 @@ export function applyLibraryLifecycle(userId: string, sourceIds: string[], actio
 export function createLibraryEntryVersion(version: DbLibraryEntryVersion): DbLibraryEntryVersion {
   run(
     `INSERT INTO library_entry_versions
-     (id, entry_id, user_id, content_hash, title, summary, content, tags_json, relations_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [version.id, version.entry_id, version.user_id, version.content_hash, version.title, version.summary, version.content, version.tags_json, version.relations_json, version.created_at],
+     (id, entry_id, user_id, content_hash, title, summary, content, tags_json, relations_json, created_at, metadata_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [version.id, version.entry_id, version.user_id, version.content_hash, version.title, version.summary, version.content, version.tags_json, version.relations_json, version.created_at, version.metadata_json || '{}'],
   );
   return version;
 }

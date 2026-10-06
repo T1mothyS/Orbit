@@ -290,6 +290,7 @@ export interface DbLibraryPreference {
 }
 
 export interface DbLibraryEntryVersion {
+  metadata_json?: string;
   id: string;
   entry_id: string;
   user_id: string;
