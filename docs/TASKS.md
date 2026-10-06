@@ -91,7 +91,7 @@
 
 ## 日报任务
 
-三来源接入 MVP 已完成本地实现：AIHot REST/ETag、Bloomberg/Polymarket 结构化提取与七天候选快照、确定性去重/状态/搜索回退、最多三条拓展阅读。默认关闭、按账号启用，正式任务与主站未切换。已按继续实施授权更新独立 Shadow 服务，并经用户单独授权复制 Context/Watchlist、保留回退备份；首日真实来源与内容验证见 [当日快照](archive/digest/DAILY-DIGEST-SOURCES-SHADOW-20261006.md)。第二个真实日期、Polymarket 新一期、用户阅读评价与成本对比仍待完成；后续正式切换需另行授权。接口与操作顺序见 [Cloud 合同](CHATGPT-WORK-CLOUD.md#三来源候选与拓展阅读)，本地验证见 [测试矩阵](TEST-MATRIX.md#三来源候选与拓展阅读)。私人 newsletter 图片仍为第二阶段。
+三来源接入 MVP 已完成本地实现：AIHot REST/ETag、Bloomberg/Polymarket 结构化提取与七天候选快照、确定性去重/状态/搜索回退、最多三条拓展阅读。默认关闭、按账号启用，正式任务与主站未切换。已按继续实施授权更新独立 Shadow 服务，并经用户单独授权复制 Context/Watchlist、保留回退备份；首日真实来源与内容验证见 [当日快照](archive/digest/DAILY-DIGEST-SOURCES-SHADOW-20261006.md)。用户实际阅读已指出新闻偏少、Bloomberg 比重不足、模板图难看、推荐理由含无用免责句；内容与图片体验尚未通过，先按 [阅读验收要求](CHATGPT-WORK-CLOUD.md#内容与图片的阅读验收)修订，不以技术链路成功抵消反馈。第二个真实日期、Polymarket 新一期、成本对比与新的用户阅读评价仍待完成；后续正式切换需另行授权。接口与操作顺序见 [Cloud 合同](CHATGPT-WORK-CLOUD.md#三来源候选与拓展阅读)，本地验证见 [测试矩阵](TEST-MATRIX.md#三来源候选与拓展阅读)。私人 newsletter 图片仍为第二阶段。
 
 | 卡 | 当前状态 | 尚未完成的结束条件 |
 | --- | --- | --- |
