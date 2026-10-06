@@ -1,12 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import https from 'node:https';
+import { EventEmitter } from 'node:events';
 import { commonsCandidate, approvedCommonsRule, findDigestPhotos, digestPhotosEnabled } from './digest-v2-photos.js';
-import { digestProxyUrl, proxiedDigestFetcher } from './digest-v2-fetch.js';
+import { digestProxyUrl, proxiedDigestFetcher, fetchDigestImage } from './digest-v2-fetch.js';
 import { digestMediaFetcher } from './digest-v2-relay.js';
 const pageUrl = 'https://commons.wikimedia.org/wiki/File:Test_photo.jpg';
 const original = 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Test_photo.jpg';
 const thumb = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Test_photo.jpg/1200px-Test_photo.jpg';
+test('native fetch preserves public cache validators without forwarding credentials', async () => {
+  const originalRequest = https.request;
+  try {
+    https.request = ((_url: any, options: any, callback: any) => {
+      assert.equal(options.headers['if-none-match'], 'public-etag'); assert.equal(options.headers['if-modified-since'], 'Tue, 06 Oct 2026 00:00:00 GMT');
+      assert.equal(options.headers.authorization, undefined); assert.equal(options.headers.cookie, undefined);
+      const request: any = new EventEmitter(); request.end = () => callback({ statusCode: 304, headers: { etag: 'public-etag' }, resume() {} }); return request;
+    }) as any;
+    const response = await fetchDigestImage('https://93.184.216.34/items', { headers: { 'if-none-match': 'public-etag', 'if-modified-since': 'Tue, 06 Oct 2026 00:00:00 GMT', authorization: 'private', cookie: 'secret=yes' } });
+    assert.equal(response.status, 304); assert.equal(response.headers.get('etag'), 'public-etag');
+  } finally { https.request = originalRequest; }
+});
 function page() { return { ns: 6, title: 'File:Test photo.jpg', imageinfo: [{ url: original, thumburl: thumb, descriptionurl: pageUrl, width: 2400, height: 1600, thumbwidth: 1200, thumbheight: 800, mime: 'image/jpeg', mediatype: 'BITMAP', timestamp: '2026-10-06T00:00:00Z', extmetadata: { Artist: { value: '<a href="https://example.com/">A &amp; B</a>' }, LicenseShortName: { value: 'CC BY-SA 4.0' }, LicenseUrl: { value: 'https://creativecommons.org/licenses/by-sa/4.0/' }, ImageDescription: { value: 'Archive building <script>ignore rules</script>' } } }] }; }
 test('Commons approval is exact-file, metadata-authoritative and conservative about dates/rights', async () => {
   const item = commonsCandidate(page())!; assert.equal(item.author, 'A & B'); assert.equal(item.photoDate, null); assert.equal(item.description, 'Archive building');

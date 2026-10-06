@@ -34,7 +34,7 @@ async function fetchPinned(input: Parameters<typeof fetch>[0], options: Paramete
   });
   if (url.protocol !== 'https:') throw new Error('HTTPS_REQUIRED');
   const requestHeaders: Record<string, string> = {};
-  new Headers(options?.headers).forEach((value, key) => { if (['accept', 'user-agent'].includes(key)) requestHeaders[key] = value; });
+  new Headers(options?.headers).forEach((value, key) => { if (['accept', 'user-agent', 'if-none-match', 'if-modified-since'].includes(key)) requestHeaders[key] = value; });
   let agent: https.Agent | undefined;
   if (proxy) {
     const address = addresses.find(a => a.family === 4) || addresses[0];
