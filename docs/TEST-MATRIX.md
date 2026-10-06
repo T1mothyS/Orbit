@@ -45,7 +45,7 @@ typecheck、463/463 服务测试、Web/Electron staging 构建及 diff 检查通
 
 隔离浏览器预览入口为 `DIGEST_PREVIEW_SOURCES=true` 下的 [digest-v2-preview.ts](../scripts/digest-v2-preview.ts)，仅创建系统临时数据及合成 Shadow，关闭后台任务，不读生产数据或发信；同稿 HTML 邮件由 `/fixture-email` 提供。Chrome 完成四尺寸明暗共8组网页布局：长标题/理由正常换行、三条推荐及对应来源均存在、无横向溢出，空新闻/未研究 Watchlist 与来源部分/过旧提示分别可读；Enter 激活来源角标跳到正确编号，控制台 error 为0。HTML 邮件完成四尺寸预览，保持固定白底/邮件样式、无溢出且公开链接与编号一致；不代表 Gmail/Outlook 实际客户端呈现。纯文本由自动测试验证引用，空/缺省拓展阅读及旧产物由回归测试覆盖。截图与测量 JSON 在系统临时目录，不入 Git，不代替真实选题阅读或生产验收。
 
-另一次网页版 Work 手动读取探测实际使用了当前账号 Gmail，能拆出 Bloomberg 与历史 Polygraph 的正文及公开文章链接；Work 报告无截断、HTML/MIME 可读取，但未导出原文件。真实邮件没有进入测试文件或本地 Orbit；这次只证明手动读取能力，不证明自然定时/完整日报任务。Polymarket 近期窗口仍无新邮件，历史样本不能作为本期概率。两个不同日期的原账号完整 Shadow、正式任务 Prompt 修改、部署、真实发信和收件箱仍未执行。
+初次网页版 Work 手动读取探测实际使用了当前账号 Gmail，能拆出 Bloomberg 与历史 Polygraph 的正文及公开文章链接；Work 报告无截断、HTML/MIME 可读取，但未导出原文件。当次真实邮件没有进入测试文件或本地 Orbit；这次只证明手动读取能力，不证明自然定时/完整日报任务。后续首日三来源真实读取、独立服务更新、经授权的最小个人配置复制、冻结候选及内容验收见 [2026-10-06 快照](archive/digest/DAILY-DIGEST-SOURCES-SHADOW-20261006.md)。Polymarket 近期窗口仍无新邮件，历史样本不能作为本期概率。第二个真实日期、正式任务 Prompt 修改、主站部署、真实发信和收件箱仍未验证。
 
 ### 个人菜单邮箱点击
 

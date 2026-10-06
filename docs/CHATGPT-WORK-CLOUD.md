@@ -2,7 +2,7 @@
 
 - Status: CONTRACT（末尾为历史快照）
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.50.0-261006.1454`（2026-10-06，本地三来源候选与拓展阅读；自动和浏览器证据见测试矩阵，未部署或切换正式任务；历史验证仍按各节时点）。
+- Last verified commit/version: `0.50.0-261006.1454`（2026-10-06，本地三来源候选与拓展阅读及独立 Shadow；生产版本与正式任务未切换；自动和浏览器证据见测试矩阵，历史验证仍按各节时点）。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -256,7 +256,7 @@ AIHot 由服务端并行请求固定的 `/api/v1/items?mode=selected&window=24h&
 5. 沿现有许可图片及 `prepare_visuals_v2` 完成配图，使用返回稿件 `validate_v2`，仅 `publish_v2(mode=shadow)`；不得调用 production 或发信。
 6. 两个不同真实日期分别记录耗时、搜索量、来源失败、新增/遗漏选题和实际阅读评价；同日修订不增加日期数。旧 Polygraph 不作为当期概率，订阅恢复需新一期邮件另证。schema 通过或图片数量不能替代内容验收。
 
-待真实 Shadow 通过并获后续授权后，才开启目标账号配置和更新正式 Prompt。切换前保留原 Prompt/配置；回退关闭来源能力并恢复旧 Prompt，历史日报继续可读。不会新建 Local 调度或自动重发。自动/浏览器证据见 [测试矩阵](TEST-MATRIX.md#三来源候选与拓展阅读)。
+待两个真实日期的 Shadow 通过并获后续授权后，才开启正式目标账号配置和更新正式 Prompt。独立测试账号可先按授权启用来源，不能据此推断正式账号已切换。切换前保留原 Prompt/配置；回退关闭来源能力并恢复旧 Prompt，历史日报继续可读。不会新建 Local 调度或自动重发。自动/浏览器证据见 [测试矩阵](TEST-MATRIX.md#三来源候选与拓展阅读)，首日真实运行见 [2026-10-06 快照](archive/digest/DAILY-DIGEST-SOURCES-SHADOW-20261006.md)。
 
 ### Cloudflare Worker 代抓与来源图标
 

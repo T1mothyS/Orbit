@@ -4,7 +4,7 @@
 
 历史的“当前”“待完成”“已上线”只对当时范围成立；不同日期报告不能合并成一次验收，不能拿旧测试数、SMTP 接受或空新闻合法代替当前业务成功。评测 JSON 保留原稳定路径，避免破坏回放输入。
 
-新增日期快照：[2026-10-04 Orbit UI / Motion 实施验收](engineering/ORBIT-UI-MOTION-VERIFICATION-20261004.md)。
+新增日期快照：[2026-10-04 Orbit UI / Motion 实施验收](engineering/ORBIT-UI-MOTION-VERIFICATION-20261004.md)、[2026-10-06 三来源独立 Shadow](digest/DAILY-DIGEST-SOURCES-SHADOW-20261006.md)。
 
 | 整理前路径 | 归档位置 |
 | --- | --- |

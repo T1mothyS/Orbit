@@ -91,7 +91,7 @@
 
 ## 日报任务
 
-三来源接入 MVP 已完成本地实现：AIHot REST/ETag、Bloomberg/Polymarket 结构化提取与七天候选快照、确定性去重/状态/搜索回退、最多三条拓展阅读。默认关闭、按账号启用，未更改正式任务或部署。真实 Gmail 读取能力已有一次网页版 Work 手动探测；两个不同日期的原账号 Shadow、Polymarket 新一期、选题质量/耗时/搜索量对比及后续正式切换仍待分别授权和验收。接口与操作顺序见 [Cloud 合同](CHATGPT-WORK-CLOUD.md#三来源候选与拓展阅读)，本地验证见 [测试矩阵](TEST-MATRIX.md#三来源候选与拓展阅读)。私人 newsletter 图片仍为第二阶段。
+三来源接入 MVP 已完成本地实现：AIHot REST/ETag、Bloomberg/Polymarket 结构化提取与七天候选快照、确定性去重/状态/搜索回退、最多三条拓展阅读。默认关闭、按账号启用，正式任务与主站未切换。已按继续实施授权更新独立 Shadow 服务，并经用户单独授权复制 Context/Watchlist、保留回退备份；首日真实来源与内容验证见 [当日快照](archive/digest/DAILY-DIGEST-SOURCES-SHADOW-20261006.md)。第二个真实日期、Polymarket 新一期、用户阅读评价与成本对比仍待完成；后续正式切换需另行授权。接口与操作顺序见 [Cloud 合同](CHATGPT-WORK-CLOUD.md#三来源候选与拓展阅读)，本地验证见 [测试矩阵](TEST-MATRIX.md#三来源候选与拓展阅读)。私人 newsletter 图片仍为第二阶段。
 
 | 卡 | 当前状态 | 尚未完成的结束条件 |
 | --- | --- | --- |
