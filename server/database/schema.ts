@@ -437,6 +437,22 @@ export function applyChatSchema(db: Database, { queryAll, queryOne }: SchemaQuer
 
   migrateLibraryVersions(db, { queryAll, queryOne });
 
+  if (!queryAll<{ name: string }>('PRAGMA table_info(library_entry_versions)').some(column => column.name === 'metadata_json')) {
+    db.run("ALTER TABLE library_entry_versions ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}'");
+  }
+  db.run(`CREATE TABLE IF NOT EXISTS library_experience_sessions (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, entry_id TEXT UNIQUE,
+    revision INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL,
+    data_json TEXT NOT NULL, search_text TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  )`);
+  db.run('CREATE INDEX IF NOT EXISTS idx_experience_user ON library_experience_sessions(user_id,updated_at)');
+  db.run(`CREATE TABLE IF NOT EXISTS library_experience_images (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, session_id TEXT NOT NULL,
+    upload_key TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(user_id,session_id,upload_key)
+  )`);
+  if (!queryAll<{name:string}>('PRAGMA table_info(library_experience_images)').some(column => column.name === 'upload_hash')) db.run("ALTER TABLE library_experience_images ADD COLUMN upload_hash TEXT NOT NULL DEFAULT ''");
+
   db.run(`
     CREATE TABLE IF NOT EXISTS library_comments (
       id TEXT PRIMARY KEY,

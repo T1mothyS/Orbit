@@ -19,9 +19,9 @@ export function copyNoteText(content: string): Promise<void> {
   if (!navigator.clipboard?.writeText) return Promise.reject(new Error('当前浏览器需要选择文字后使用系统复制'));
   try { return navigator.clipboard.writeText(content); } catch (reason) { return Promise.reject(reason); }
 }
-export function copyNoteImage(image: NoteImage): Promise<void> {
+export function copyNoteImage(image: NoteImage, loadImage = fetchNoteImage): Promise<void> {
   if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') return Promise.reject(new Error('当前浏览器不支持复制图片，请使用图片长按或右键菜单'));
-  const png = fetchNoteImage(image).then(async blob => {
+  const png = loadImage(image).then(async blob => {
     const bitmap = await createImageBitmap(blob);
     const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
     const context = canvas.getContext('2d'); if (!context) { bitmap.close(); throw new Error('图片转换失败'); }

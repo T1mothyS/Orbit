@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
 import * as db from './db.js';
+import { exportExperience, type ExperienceBackup } from './experience-service.js';
 import { renderLibraryMarkdown, type LibraryLinkTarget } from './library-markdown.js';
 
 export const LIBRARY_KINDS = ['fragment', 'article'] as const;
@@ -17,7 +18,7 @@ export const LIBRARY_STATUSES = ['draft', 'active', 'archived'] as const;
 export type LibraryStatus = (typeof LIBRARY_STATUSES)[number];
 
 export const LIBRARY_SOURCE_TYPES = [
-  'manual', 'calendar_event', 'daily_report', 'url', 'document', 'screenshot', 'api', 'codex', 'migration', 'fragment',
+  'manual', 'calendar_event', 'daily_report', 'url', 'document', 'screenshot', 'api', 'codex', 'migration', 'fragment', 'orbit_experience',
 ] as const;
 export type LibrarySourceType = (typeof LIBRARY_SOURCE_TYPES)[number];
 
@@ -67,6 +68,7 @@ export interface LibraryEntry {
 }
 
 export interface LibraryVersion {
+  metadata?: Record<string, unknown>;
   id: string;
   entryId: string;
   contentHash: string;
@@ -400,6 +402,7 @@ function toEntry(row: db.DbLibraryEntry, includeContent = false, linkTargets?: M
 
 function toVersion(row: db.DbLibraryEntryVersion): LibraryVersion {
   return {
+    metadata: parseJson<Record<string, unknown>>(row.metadata_json || '{}', {}),
     id: row.id,
     entryId: row.entry_id,
     contentHash: row.content_hash,
@@ -521,6 +524,7 @@ function entryFromNormalized(userId: string, id: string, input: NormalizedEntryI
 
 function saveArticleVersion(entry: db.DbLibraryEntry, now: string): void {
   db.createLibraryEntryVersion({
+    metadata_json: entry.metadata_json,
     id: uuidv4(),
     entry_id: entry.id,
     user_id: entry.user_id,
@@ -581,6 +585,7 @@ export function exportUserLibraryEntries(userId: string): LibraryEntry[] {
 }
 
 export interface LibraryExportBundle {
+  experience?: ExperienceBackup;
   format: 'ai-calendar-library-export';
   version: 1;
   exportedAt: string;
@@ -638,6 +643,7 @@ export function exportLibraryBundle(userId: string, exportedAt = new Date().toIS
     relations,
     comments,
     versions,
+    experience: exportExperience(userId, undefined, true),
   };
 }
 
@@ -710,6 +716,7 @@ export function updateLibraryEntry(userId: string, id: string, input: EntryInput
     || updated.summary !== existing.summary
     || updated.tags_json !== existing.tags_json
     || updated.relations_json !== existing.relations_json
+    || (updated.source_type === 'orbit_experience' && updated.metadata_json !== existing.metadata_json)
   );
   if (articleVersionChanged) saveArticleVersion(updated, updated.updated_at);
   return { status: 'UPDATED', entry: toEntry(updated, true), normalizedFields: normalized.normalizedFields, warnings: normalized.warnings };
@@ -717,6 +724,7 @@ export function updateLibraryEntry(userId: string, id: string, input: EntryInput
 
 export function publishLibraryArticle(userId: string, input: EntryInput): LibraryMutationResult {
   const sourceId = input.sourceId ?? input.externalId;
+  if (String(sourceId || '').trim().startsWith('orbit-experience:') || String(input.sourceType || '').trim() === 'orbit_experience') throw new LibraryInputError('RESERVED_SOURCE', '经历记录请通过知识库独立入口维护');
   if (!sourceId) throw new LibraryInputError('MISSING_FIELD', '正式知识发布必须提供 sourceId', 'sourceId');
   const existing = db.getLibraryEntryBySourceId(String(sourceId).trim(), userId);
   if (existing && existing.kind !== 'article') {

@@ -1,4 +1,6 @@
 import { recoverOrbitQueue } from './orbit-queue.js';
+import { recoverExperienceRuns } from './experience-ai.js';
+import { createExperienceRouter } from './routes/experience.js';
 import { cleanupAiScheduleHistory } from './ai-history.js';
 import { resolveAiImportCredential } from './ai-credentials.js';
 import { createRetiredRouter } from './routes/retired.js';
@@ -115,6 +117,7 @@ app.use(createNotesRouter({ authenticate }));
 
 // ============= Library / 知识库 MVP =============
 
+app.use(createExperienceRouter({ authenticate }));
 app.use(createLibraryRouter({ authenticate }));
 
 app.use(createSuspendedTodosRouter({ authenticate }));
@@ -150,7 +153,7 @@ if (isProduction) registerSpaFallback(app, path.resolve(__dirname, '../dist'));
 
 export const initializeServer = createStoreInitializer({
   config: runtimeConfig, onDatabaseReady: value => { db = value; },
-  onInviteCodesReady: ready => { inviteCodesInitialized = ready; }, onReady: () => { dbInitialized = true; recoverOrbitQueue(); },
+  onInviteCodesReady: ready => { inviteCodesInitialized = ready; }, onReady: () => { dbInitialized = true; recoverOrbitQueue(); recoverExperienceRuns(); },
 });
 
 export const backgroundJobs = createBackgroundJobs({ isReady: () => dbInitialized, resolveAiImportCredential, cleanupAiScheduleHistory });

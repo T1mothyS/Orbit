@@ -15,6 +15,7 @@ import { validateDigestV3Backup } from './digest-v3-store.js';
 import { validateResearchBackup } from './digest-research-store.js';
 import * as attachmentService from './attachment-service.js';
 import * as noteImages from './note-image-service.js';
+import * as experience from './experience-service.js';
 import { dailyReportMediaRoot } from './daily-report-media-service.js';
 import * as dailyReportCloudStore from './daily-report-cloud-store.js';
 import { captureBridgeState, pauseForRestoreSync } from './caldav-control.js';
@@ -39,6 +40,7 @@ interface UserBackupPayload {
   noteItems?: ReturnType<typeof db.exportUserNoteItems>;
   noteImages?: noteImages.NoteImageLink[];
   libraryEntries?: ReturnType<typeof db.exportUserLibraryEntries>;
+  experience?: experience.ExperienceBackup;
   dailyReportCloudContext?: ReturnType<typeof dailyReportCloudStore.getDailyReportCloudContext>;
   activity: ReturnType<typeof activityStore.exportUserActivity>;
   files: Array<{
@@ -160,6 +162,13 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
   const noteIds = createIdMap((payload.noteItems || []).map(row => row.id));
   payload.noteImages = payload.noteImages?.map(link => ({ ...link, note_id: noteIds.get(link.note_id)! }));
   const libraryIds = createIdMap((payload.libraryEntries || []).map(row => row.id));
+  if (payload.experience) {
+    const sessionIds = createIdMap(payload.experience.sessions.map(row => row.id));
+    payload.experience.sessions = payload.experience.sessions.map(row => ({ ...row, id: sessionIds.get(row.id)!, entry_id: row.entry_id ? libraryIds.get(row.entry_id)! : null }));
+    payload.experience.images = payload.experience.images.map(row => ({ ...row, session_id: sessionIds.get(row.session_id)! }));
+    payload.experience.versions = payload.experience.versions.map(row => ({ ...row, id: crypto.randomUUID(), entry_id: libraryIds.get(row.entry_id)! }));
+    for (const row of payload.libraryEntries || []) if (row.source_type === 'orbit_experience') row.source_id = 'orbit-experience:' + sessionIds.get(row.source_id!.slice('orbit-experience:'.length));
+  }
 
   const scheduleIds = new Map<string, string>();
   for (const schedule of payload.schedule.schedules || []) {
@@ -254,7 +263,7 @@ function remapForeignUserPayload(source: UserBackupPayload): UserBackupPayload {
   payload.files = payload.files.map(file => ({
     ...file,
     completionId: file.completionId ? completionIds.get(String(file.completionId)) || null : null,
-    importId: file.importId?.startsWith('note:') ? 'note:' + crypto.randomUUID() : file.importId?.startsWith('orbit:')?'orbit:'+crypto.randomUUID():file.importId ? importIds.get(String(file.importId)) || null : null,
+    importId: file.importId?.startsWith('note:') ? 'note:' + crypto.randomUUID() : file.importId?.startsWith('orbit:')?'orbit:'+crypto.randomUUID():file.importId?.startsWith('experience:')?'experience:'+crypto.randomUUID():file.importId ? importIds.get(String(file.importId)) || null : null,
   }));
   if (payload.account.reminder && typeof payload.account.reminder === 'object') {
     (payload.account.reminder as Record<string, unknown>).id = crypto.randomUUID();
@@ -330,6 +339,7 @@ export function createUserBackup(userId: string, password: string, allowMissingD
     noteItems: db.exportUserNoteItems(userId),
     noteImages: noteImages.exportNoteImageLinks(userId),
     libraryEntries: db.exportUserLibraryEntries(userId),
+    experience: experience.exportExperience(userId),
     dailyReportCloudContext: dailyReportCloudStore.getDailyReportCloudContext(userId),
     activity,
     files,
@@ -339,6 +349,8 @@ export function createUserBackup(userId: string, password: string, allowMissingD
 
 function validateUserPayload(payload: UserBackupPayload): void {
   if (payload?.format !== 'aicalendar-user' || payload.version !== FORMAT_VERSION) throw new Error('不支持的用户备份版本');
+  if (payload.experience !== undefined) experience.validateExperienceBackup(payload.experience, payload.libraryEntries || []);
+  else if (payload.libraryEntries?.some(row => row.source_type === 'orbit_experience')) throw new Error('备份缺少经历复盘数据');
   if (payload.digestMedia !== undefined) {
     if (!Array.isArray(payload.digestMedia)) throw new Error('新版媒体备份无效');
     for (const item of payload.digestMedia) {
@@ -423,6 +435,7 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
   const isForeignAccount = String(decrypted.account.email || '').toLowerCase() !== targetAccount.email.toLowerCase();
   const payload = isForeignAccount ? remapForeignUserPayload(decrypted) : decrypted;
   if (mode === 'replace' && payload.noteImages === undefined && noteImages.exportNoteImageLinks(userId).length) throw new Error('旧备份不包含记事图片，请使用合并恢复以保留现有图文记事');
+  if (mode === 'replace' && payload.experience === undefined && experience.exportExperience(userId).sessions.length) throw new Error('旧备份不包含经历记忆，请使用合并恢复保留现有经历');
   activityStore.digestV3Store.validateRestore(userId, payload.activity, mode);
   activityStore.digestResearchStore.validateRestore(userId, payload.activity, mode);
   const safetyCopy = createUserBackup(userId, password, true);
@@ -484,6 +497,7 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
     }
     if(payload.orbit)restoreOrbit(userId,payload.orbit,mode,isForeignAccount,attachmentIds);
     const missingNoteImages = noteImages.restoreNoteImageLinks(userId, imageLinks, attachmentIds);
+    const missingExperienceImages = experience.restoreExperience(userId, payload.experience, mode, attachmentIds);
     return {
       schedule,
       reminder,
@@ -495,11 +509,12 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
       mode,
       idsRemapped: isForeignAccount,
       historicalReferencesUnavailable:isForeignAccount&&!!payload.orbit?.connected,
-      partial: attachmentFailures.length > 0 || missingMedia.length > 0 || missingNoteImages.length > 0,
-      status: attachmentFailures.length || missingMedia.length || missingNoteImages.length ? 'PARTIAL' : 'COMPLETED',
+      partial: attachmentFailures.length > 0 || missingMedia.length > 0 || missingNoteImages.length > 0 || missingExperienceImages.length > 0,
+      status: attachmentFailures.length || missingMedia.length || missingNoteImages.length || missingExperienceImages.length ? 'PARTIAL' : 'COMPLETED',
       attachmentFailures,
       missingMedia,
       missingNoteImages,
+      missingExperienceImages,
     };
   });
   // Metadata is now durable. Reused content-addressed files must not be deleted.

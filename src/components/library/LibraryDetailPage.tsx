@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { ExperienceDetails, ExperienceSnapshot } from './ExperienceDetails';
 import { useReadingReturn } from '../../hooks/useReadingReturn';
 import { buildLibraryToc, copyText, downloadResponse, formatTime, kindLabels, LibraryDetail, LibraryTocItem, readError, relationItems, relationStatusLabels, richContentSource, showRichContentError, statusLabels, typeLabels } from './library-shared';
 
@@ -350,7 +351,7 @@ export function LibraryDetailPage({ id }: { id: string }) {
         <p>{entry.summary}</p>
         <div className="library-detail-meta"><span>更新于 {formatTime(entry.updatedAt)}</span><span>{entry.sourceType === 'manual' ? '手动整理' : '知识条目'}</span>{entry.tags.map(tag => <span className="library-tag" key={tag}>#{tag}</span>)}</div>
       </header>
-      <div className="library-detail-layout">
+      <div className={`library-detail-layout${tocItems.length ? '' : ' library-detail-layout-no-toc'}`}>
           <nav ref={tocRef} className={`library-toc${tocItems.length ? '' : ' library-toc-empty'}`} aria-label="文章章节导航">
             {readerBack}
             <div className="library-toc-heading"><span className="library-eyebrow">CONTENTS</span><strong>章节导航</strong></div>
@@ -371,6 +372,7 @@ export function LibraryDetailPage({ id }: { id: string }) {
             </div>
           </nav>
         <article className="library-document">
+          {entry.sourceType === 'orbit_experience' && <ExperienceDetails entry={entry} onChanged={() => void load()} />}
           <div ref={markdownRef} className="chat-markdown library-markdown" onClick={handleMarkdownClick} dangerouslySetInnerHTML={{ __html: entry.html || '' }} />
         </article>
         <aside className="library-detail-aside">
@@ -384,7 +386,7 @@ export function LibraryDetailPage({ id }: { id: string }) {
 
       <details className="library-versions"><summary>版本记录 · {detail.versions.length} 个版本</summary>
         <div className="library-section-heading"><div><span className="library-eyebrow">VERSIONS</span><h2>版本记录</h2></div><span>{detail.versions.length} 个版本</span></div>
-        {detail.versions.length ? <div className="library-version-list">{detail.versions.map(version => <details key={version.id} className="library-version"><summary><span>{formatTime(version.createdAt)}</span><code>{version.contentHash.slice(0, 16)}…</code></summary><pre>{version.content}</pre></details>)}</div> : <div className="library-comment-empty">暂无历史版本。</div>}
+        {detail.versions.length ? <div className="library-version-list">{detail.versions.map(version => <details key={version.id} className="library-version"><summary><span>{formatTime(version.createdAt)}</span><code>{version.contentHash.slice(0, 16)}…</code></summary><pre>{version.content}</pre>{entry.sourceType === 'orbit_experience' && <ExperienceSnapshot metadata={version.metadata} />}</details>)}</div> : <div className="library-comment-empty">暂无历史版本。</div>}
       </details>
 
       <section className="library-comments">

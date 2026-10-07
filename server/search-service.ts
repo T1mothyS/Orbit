@@ -219,18 +219,19 @@ function reportResults(userId: string, query: string): SearchResult[] {
 
 function libraryResults(userId: string, query: string): SearchResult[] {
   const rows = db.listLibraryEntries(userId, { q: query, status: 'active', limit: CANDIDATE_LIMIT, offset: 0 }).items;
+  const experiences = new Map(queryAll<{entry_id:string;search_text:string}>('SELECT entry_id,search_text FROM library_experience_sessions WHERE user_id=? AND entry_id IS NOT NULL', [userId]).map(row => [row.entry_id, row.search_text]));
   const matches = rows.flatMap(entry => {
     const tags = (() => {
       try { return JSON.parse(entry.tags_json) as string[]; } catch { return []; }
     })();
-    const fields = [entry.title, entry.summary, entry.content, tags.join(' ')];
+    const fields = [entry.title, entry.summary, entry.content, tags.join(' '), experiences.get(entry.id) || ''];
     const rank = matchRank(query, fields);
     if (!rank) return [];
     return [{
       type: 'library' as const,
       id: entry.id,
       title: entry.title || entry.summary || '未命名知识内容',
-      snippet: makeSnippet(query, [entry.summary, entry.content]),
+      snippet: makeSnippet(query, [entry.summary, entry.content, experiences.get(entry.id) || '']),
       date: entry.updated_at,
       target: { path: `/library/${encodeURIComponent(entry.id)}` },
       metadata: { kind: entry.kind, type: entry.type, sourceId: entry.source_id, sourceType: entry.source_type, tags },
@@ -245,6 +246,7 @@ export function searchLibraryForAi(userId: string, query: string, limit = 5): Kn
   if (!normalizedQuery) return [];
   const rows = db.listLibraryEntries(userId, { status: 'active', fetchAll: true, sort: 'updated_desc' }).items;
   const matches = rows.flatMap(entry => {
+    if (entry.source_type === 'orbit_experience') return [];
     let tags: string[] = [];
     try {
       const parsed = JSON.parse(entry.tags_json);

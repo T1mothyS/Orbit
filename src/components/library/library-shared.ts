@@ -46,6 +46,7 @@ export interface LibraryEntry {
 }
 
 export interface LibraryVersion {
+  metadata?: Record<string, unknown>;
   id: string;
   entryId: string;
   contentHash: string;
