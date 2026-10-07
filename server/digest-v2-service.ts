@@ -26,7 +26,7 @@ export function createDigestSnapshotRun(userId: string, snapshot: DigestSnapshot
   const manifest = { date: snapshot.date, timezone: snapshot.timezone, cutoff: snapshot.cutoff, contextVersion: snapshot.contextVersion, contractVersion: DIGEST_V2_VERSION, generationVersion: DIGEST_V2_GENERATION, modelVersion: 'unknown', status: 'INPUTS_SNAPSHOTTED', inputCounts: { calendar: snapshot.calendar.items.length, mail: snapshot.mail.items.length, watchlist: snapshot.watchlist.items.length }, warnings: digestSnapshotWarnings(snapshot) };
   Object.assign(manifest, { visualPreparation: { tool: 'daily_report.prepare_visuals_v2', schema: NEWS_VISUAL_PLAN_SCHEMA, guidance: '照片仍需已有许可；无已审核贴题图时，可提交仅使用本条标题/摘要连续原文短语的新闻信息图方案。返回的 digest 已绑定本站持久媒体；使用它重新校验。信息图明确标为原创、非现场。更改新闻或来源后须重新准备，不复用旧图。' } });
   if (digestSourcesEnabled(userId)) Object.assign(manifest, { sourcePreparation: { tool: 'daily_report.prepare_sources_v2', schema: NEWSLETTER_INPUT_SCHEMA, guidance: DIGEST_SOURCE_GUIDANCE } });
-  if (digestPhotosEnabled(userId)) Object.assign(manifest, { photoPreparation: { tool: 'daily_report.find_photos_v2', schema: PHOTO_REQUEST_SCHEMA, guidance: '为每条新闻用具体人物、地点、设施或产品名称找资料照。候选来自 Commons 的文件级开放许可核对，服务端经代理自动下载并托管。把选中图片 pageUrl 加入 evidence，media.url 使用 imageUrl。只有 Shadow 支持此能力；日期未知不猜，不把资料照称为现场。本次 Shadow 逐条配图完整性为硬闸门，不能用类别占位图掩盖失败。' } });
+  if (digestPhotosEnabled(userId)) Object.assign(manifest, { photoPreparation: { tool: 'daily_report.find_photos_v2', schema: PHOTO_REQUEST_SCHEMA, guidance: '为每条新闻用具体人物、地点、设施或产品名称找资料照。候选来自 Commons 的文件级开放许可核对，服务端经代理自动下载并托管。把选中图片 pageUrl 加入 evidence，media.url 使用 imageUrl。此能力限已启用账号，正式发布另需生产开关；日期未知不猜，不把资料照称为现场。逐条配图完整性为硬闸门，不能用类别占位图掩盖失败。' } });
   store.createDigestRun({ id, user_id: userId, report_date: snapshot.date, snapshot_json: JSON.stringify(snapshot), manifest_json: JSON.stringify(manifest), created_at: now.toISOString(), expires_at: new Date(now.getTime() + 7 * 86400000).toISOString() });
   return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA, editorialGuidance: '仅在正文中用 **原文短词组** 标重点；每句一到两处，优先关键对象、数字、结论或行动。标题不加标记，不能整句加粗。邮件逐封保留服务或事项名称、具体动作和已知期限；同一事项突出各封新增事实，未知期限不猜。关注正文面向读者：标的名称、窗口时间：月日至月日、每条以 • 起一行的一句客观事实；参考内容：后按evidence_ids顺序写等量原文标题，可保留已确认的日期，链接由渲染器生成。检索/重试/PDF报错留在执行记录，不放正文。check/change如实保留，未配置、读取失败、未研究不可写成无变化。新闻说明具体事实、关注关系与下一步；候选、排除及失败另留有界记录。图片须贴合具体新闻，不能把类别图形当贴题插画。图片是否为现场只在图注说明，正文不重复。来源和发布时间由服务端生成角标与文末引用，不要写入摘要。' };
 }
@@ -222,6 +222,7 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
   const key = `${userId}:${digest.date}`;
   const task = (locks.get(key) || Promise.resolve()).catch(() => {}).then(async () => {
     const { generationVersion } = snapshotFor(userId, runId);
+    const automaticPhotos = digestPhotosEnabled(userId);
     const started = Date.now();
     let phase = 'MEDIA_PREPARING';
     const recordPhase = (status: string, diagnostics: Record<string, unknown> = {}) => {
@@ -239,7 +240,8 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       else {
         const ownedRules = visualRules(digest, preparedVisuals(userId, runId));
         const rules = ownedRules.length ? [...(mediaOptions.rules || configuredMediaRules()), ...ownedRules] : mediaOptions.rules;
-        const media = await prepareDigestMedia(digest, { ...mediaOptions, rules, mode: mode as 'shadow' | 'production', storyIllustrations: DIGEST_V2_ILLUSTRATED_GENERATIONS.includes(generationVersion), allowCommons: mode === 'shadow' && digestPhotosEnabled(userId) });
+        const media = await prepareDigestMedia(digest, { ...mediaOptions, rules, mode: mode as 'shadow' | 'production', storyIllustrations: DIGEST_V2_ILLUSTRATED_GENERATIONS.includes(generationVersion), allowCommons: automaticPhotos });
+        if (automaticPhotos && !digestPhotosEnabled(userId)) throw new Error('DIGEST_PHOTOS_DISABLED');
         const publication = { digest, warnings: validation.warnings, media, renderer: generationVersion };
         if (mode === 'production' || digestPhotosEnabled(userId)) assertStoryImagesReady(publication);
         payload = { publication, status: 'PREPARED', renderHash: digestHash(publication) };
@@ -249,6 +251,7 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       recordPhase('MEDIA_PREPARED', { artifactId: existing.id, mediaFailures: payload.publication.media.filter(m => m.failure).map(m => ({ id: m.id, code: m.failure })) });
       // Re-check the switch after network work, before committing any formal side effect.
       assertDigestV2Enabled();
+      if (automaticPhotos && !digestPhotosEnabled(userId)) throw new Error('DIGEST_PHOTOS_DISABLED');
       if (mode === 'production') {
         if (process.env.DIGEST_PRODUCTION_CONTRACT !== 'daily-digest.v2') throw new Error('V2_PRODUCTION_DISABLED');
         const markdown = encodeDigestPublication(payload.publication);
@@ -299,20 +302,32 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       };
     } catch (error) {
       // Keep only bounded, non-sensitive stage diagnostics, never provider error messages.
-      try { recordPhase('FAILED', { failedPhase: phase, retryable: true }); } catch { /* Original durable-write failure remains primary. */ }
+      try { recordPhase('FAILED', { failedPhase: phase, retryable: true, ...(error instanceof DigestImageNotReadyError ? error.diagnostics : {}) }); } catch { /* Original durable-write failure remains primary. */ }
       throw error;
     }
   });
   locks.set(key, task);
   try { return await task; } finally { if (locks.get(key) === task) locks.delete(key); }
 }
+export class DigestImageNotReadyError extends Error {
+  readonly diagnostics;
+  constructor(readonly failedStories: Array<{ storyId: string; media: Array<{ id: string; code: string; stage?: string; reason?: string; attempts?: number }> }>) {
+    super('STORY_IMAGE_NOT_READY');
+    this.name = 'DigestImageNotReadyError';
+    this.diagnostics = { code: 'STORY_IMAGE_NOT_READY', status: 'FAILED', emailStatus: 'NOT_QUEUED', retryable: true, failedStories };
+  }
+}
 function assertStoryImagesReady(publication: DigestPublication): void {
   const media = publication.media;
+  const failedStories: DigestImageNotReadyError['failedStories'] = [];
   for (const story of [...publication.digest.market, ...publication.digest.macro, ...publication.digest.stories]) {
-    if (![...story.media_ids.map(id => media.find(item => item.id === id)), ...media.filter(item => item.storyId === story.id)]
-      .some(item => item && item.kind !== 'source_icon' && item.publicUrl && !item.failure && !item.fallback
-        && ['photo', 'archive_photo', 'illustration'].includes(item.visualKind || 'archive_photo'))) throw new Error('STORY_IMAGE_NOT_READY');
+    const images = [...story.media_ids.map(id => media.find(item => item.id === id)), ...media.filter(item => item.storyId === story.id)].filter(item => item && item.kind !== 'source_icon');
+    if (!images.some(item => item && item.publicUrl && !item.failure && !item.fallback
+        && ['photo', 'archive_photo', 'illustration'].includes(item.visualKind || 'archive_photo'))) {
+      failedStories.push({ storyId: story.id, media: images.map(item => ({ id: item!.id, code: item!.failure || (item!.fallback ? 'IMAGE_FALLBACK' : 'IMAGE_MISSING'), ...(item!.failureStage ? { stage: item!.failureStage, reason: item!.failureReason } : {}), ...(item!.sourceAttempts !== undefined ? { attempts: item!.sourceAttempts } : {}) })) });
+    }
   }
+  if (failedStories.length) throw new DigestImageNotReadyError(failedStories);
 }
 export function readDigestShadowArtifact(userId: string, artifactId: string) {
   assertDigestV2Enabled();

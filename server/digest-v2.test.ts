@@ -5,6 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import http from 'node:http';
+import https from 'node:https';
+import dns from 'node:dns/promises';
+import { EventEmitter } from 'node:events';
+import { Readable } from 'node:stream';
 import sharp from 'sharp';
 import { validateDigestV2, digestHash, DIGEST_V2_GENERATION, type DigestV2, type DigestSnapshot } from './digest-v2-contract.js';
 import type { ObjectStorage } from './digest-v2-media.js';
@@ -408,7 +412,19 @@ test('automatic photo tool preserves snapshots, enforces account/scope/expiry an
     assert.ok((list as any).result.tools.some((t: any) => t.name === 'daily_report.find_photos_v2'));
     const rejected = illustrated(); rejected.date = '2026-10-30';
     const strictRun = service.createDigestSnapshotRun(userId, { ...snapshot(), date: rejected.date });
-    await assert.rejects(service.publishDigestV2(userId, strictRun.runId, rejected, 'shadow', { storage, rules: [] }), /MEDIA_|IMAGE_/);
+    await assert.rejects(service.publishDigestV2(userId, strictRun.runId, rejected, 'shadow', { storage, rules: [] }), (error: any) => {
+      assert.ok(error instanceof service.DigestImageNotReadyError);
+      assert.equal(error.diagnostics.emailStatus, 'NOT_QUEUED');
+      assert.deepEqual(error.failedStories, [{ storyId: 's1', media: [{ id: 'm1', code: 'LICENSE_NOT_APPROVED', stage: 'license', reason: 'PHOTO_NOT_APPROVED', attempts: 0 }] }]);
+      return true;
+    });
+    const manifest = JSON.parse(activity.getDigestRun(userId, strictRun.runId)!.manifest_json);
+    assert.equal(manifest.code, 'STORY_IMAGE_NOT_READY');
+    assert.equal(manifest.failedStories[0].storyId, 's1');
+    const rpc = await mcp.handleJsonRpc({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'daily_report.publish_v2', arguments: { runId: strictRun.runId, digest: rejected, mode: 'shadow' } } }, { ...auth, scopes: ['daily_report:publish', 'daily_report:media_prepare', 'daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context', 'daily_report:read_history'] });
+    assert.equal((rpc as any).result.isError, true);
+    assert.equal((rpc as any).result.structuredContent.code, 'STORY_IMAGE_NOT_READY');
+    assert.equal((rpc as any).result.structuredContent.failedStories[0].media[0].id, 'm1');
     assert.ok(!activity.exportUserActivity(userId).digestV2Artifacts.some((row: any) => row.report_date === rejected.date));
     process.env.DIGEST_SHADOW_ONLY = 'false';
     await assert.rejects(service.findDigestRunPhotos(userId, run.runId, requests, fake), /DIGEST_PHOTOS_DISABLED/);
@@ -466,6 +482,17 @@ test('media: decode, resize, strip metadata, reject bad or small images, fallbac
     const failed = await prepareDigestMedia(illustrated(), { ...options, fetchOptions: { ...options.fetchOptions, fetcher: async () => new Response('', { status }) } });
     assert.equal(failed[0].fallback, true);
   }
+  let retryCalls = 0;
+  const retried = await prepareDigestMedia(illustrated(), { ...options, allowCommons: true, fetchOptions: { ...options.fetchOptions, fetcher: async () => { retryCalls++; return retryCalls === 1 ? new Response('', { status: 503 }) : fetcher('https://images.example.com/image.jpg'); } } });
+  assert.equal(retryCalls, 2); assert.equal(retried[0].fallback, false); assert.equal(retried[0].sourceAttempts, 2);
+  for (const status of [403, 404, 503]) {
+    let calls = 0;
+    const failed = await prepareDigestMedia(illustrated(), { ...options, allowCommons: true, fetchOptions: { ...options.fetchOptions, fetcher: async () => { calls++; return new Response('', { status }); } } });
+    assert.equal(calls, status === 503 ? 2 : 1);
+    assert.equal(failed[0].failureStage, 'download'); assert.equal(failed[0].failureReason, 'HTTP_ERROR');
+  }
+  const privateError = await prepareDigestMedia(illustrated(), { ...options, allowCommons: true, fetchOptions: { ...options.fetchOptions, fetcher: async () => { throw new Error('upstream-secret-must-not-be-exposed'); } } });
+  assert.equal(privateError[0].failureReason, 'FETCH_ERROR'); assert.ok(!JSON.stringify(privateError).includes('upstream-secret'));
   const restricted = await prepareDigestMedia(illustrated(), { ...options, rules: [], fetchOptions: { fetcher: async () => { throw new Error('MUST_NOT_FETCH'); } } });
   assert.equal(restricted[0].failure, 'LICENSE_NOT_APPROVED'); assert.equal(restricted[0].fallback, true);
   const outage = await prepareDigestMedia(illustrated(), { ...options, storage: { ...storage, put: async () => { throw new Error('outage'); } } });
@@ -700,6 +727,78 @@ test('dedicated Shadow mode refuses both formal contracts and email queueing', a
 });
 
 test.after(() => { /* Keep isolated evidence in OS temp; no production files are touched. */ });
+
+test('production automatic photos require opt-in, preserve exact licence checks and queue at most once', async t => {
+  const keys = ['DIGEST_SHADOW_ONLY', 'DIGEST_V2_COMMONS_ENABLED', 'DIGEST_V2_COMMONS_PRODUCTION_ENABLED', 'DIGEST_PRODUCTION_CONTRACT', 'DIGEST_V2_SOURCES_ENABLED', 'DIGEST_V2_SOURCES_USER_IDS', 'DIGEST_V2_MEDIA_STORE', 'APP_URL', 'DIGEST_MEDIA_PROXY_URL', 'DIGEST_MEDIA_RELAY_URL', 'DIGEST_MEDIA_RELAY_SECRET'];
+  const previous = keys.map(k => process.env[k]);
+  const owner = 'commons-production-owner';
+  const pageUrl = 'https://commons.wikimedia.org/wiki/File:Production_photo.jpg';
+  const imageUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Production_photo.jpg/1200px-Production_photo.jpg';
+  let licence = 'CC BY-SA 4.0', imageCalls = 0;
+  const png = await sharp({ create: { width: 1200, height: 800, channels: 3, background: '#234567' } }).png().toBuffer();
+  t.mock.method(dns, 'lookup', (async () => [{ address: '93.184.216.34', family: 4 }]) as any);
+  t.mock.method(https, 'request', ((url: URL, _options: unknown, callback: (response: unknown) => void) => {
+    assert.equal(url.hostname, 'commons.wikimedia.org'); assert.equal(url.searchParams.get('titles'), 'File:Production photo.jpg');
+    const body = Buffer.from(JSON.stringify({ query: { pages: [{ ns: 6, title: 'File:Production photo.jpg', imageinfo: [{
+      url: imageUrl, descriptionurl: pageUrl, width: 1200, height: 800, mime: 'image/png', mediatype: 'BITMAP',
+      extmetadata: { Artist: { value: 'Synthetic Author' }, LicenseShortName: { value: licence }, LicenseUrl: { value: 'https://creativecommons.org/licenses/by-sa/4.0/' }, DateTimeOriginal: { value: '2025-01-01' } },
+    }] }] } }));
+    const response = Object.assign(Readable.from([body]), { statusCode: 200, headers: { 'content-type': 'application/json' } });
+    return Object.assign(new EventEmitter(), { end() { callback(response); } });
+  }) as any);
+  try {
+    delete process.env.DIGEST_SHADOW_ONLY; delete process.env.DIGEST_V2_COMMONS_PRODUCTION_ENABLED;
+    delete process.env.DIGEST_MEDIA_PROXY_URL; delete process.env.DIGEST_MEDIA_RELAY_URL; delete process.env.DIGEST_MEDIA_RELAY_SECRET;
+    process.env.DIGEST_PRODUCTION_CONTRACT = 'daily-digest.v2'; process.env.DIGEST_V2_COMMONS_ENABLED = 'true';
+    process.env.DIGEST_V2_SOURCES_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_USER_IDS = owner;
+    process.env.DIGEST_V2_MEDIA_STORE = 'local'; process.env.APP_URL = 'https://calendar.example.com';
+    db.createUser({ id: owner, email: 'commons-production@example.com', password_hash: 'test', role: 'user', disabled: 0, created_at: now, updated_at: now });
+    db.upsertReminder({ id: 'commons-reminder', user_id: owner, enabled: 0, hour: 8, minute: 0, report_email_enabled: 1, created_at: now, updated_at: now });
+    policy.setDailyReportDeliveryPolicy(owner, ['cloud']);
+    const d = illustrated(); d.date = '2026-10-08'; d.evidence[0].url = pageUrl; d.media[0].url = imageUrl;
+    const options = { rules: [], mediaRoot: path.join(root, 'daily-report-media'), allowCommons: true, fetchOptions: {
+      lookup: async () => [{ address: '93.184.216.34', family: 4 as const }],
+      fetcher: (async (url: unknown) => { assert.equal(String(url), imageUrl); imageCalls++; return imageCalls === 1 ? new Response('', { status: 503 }) : new Response(png, { headers: { 'content-type': 'image/png' } }); }) as typeof fetch,
+    } };
+    const blocked = service.createDigestSnapshotRun(owner, { ...snapshot(), date: d.date });
+    assert.equal('photoPreparation' in blocked.manifest, false);
+    await assert.rejects(service.publishDigestV2(owner, blocked.runId, d, 'production', options), /STORY_IMAGE_NOT_READY/);
+    assert.equal(imageCalls, 0); assert.equal(activity.getDailyReport(owner, d.date, 'cloud'), null);
+    assert.equal(activity.exportUserActivity(owner).notifications.length, 0);
+    process.env.DIGEST_V2_COMMONS_PRODUCTION_ENABLED = 'true';
+    const run = service.createDigestSnapshotRun(owner, { ...snapshot(), date: d.date });
+    assert.equal('photoPreparation' in run.manifest, true);
+    const mcp = await import('./daily-report-cloud-mcp.js');
+    const auth = { userId: owner, clientId: 'test', resource: 'https://example.com/mcp', scopes: [] };
+    const tools = await mcp.handleJsonRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, auth);
+    assert.ok((tools as any).result.tools.some((tool: any) => tool.name === 'daily_report.find_photos_v2'));
+    const otherTools = await mcp.handleJsonRpc({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, { ...auth, userId: 'other' });
+    assert.ok(!(otherTools as any).result.tools.some((tool: any) => tool.name === 'daily_report.find_photos_v2'));
+    const receipt = await service.publishDigestV2(owner, run.runId, d, 'production', options);
+    assert.equal(receipt.status, 'PUBLISHED'); assert.equal(receipt.emailStatus, 'QUEUED'); assert.equal(imageCalls, 2);
+    const publication = JSON.parse(activity.getDigestArtifact(owner, String(receipt.artifactId))!.payload_json).publication;
+    assert.equal(publication.media[0].visualKind, 'archive_photo'); assert.equal(publication.media[0].sourceAttempts, 2);
+    assert.equal(publication.media[0].fallback, false); assert.equal(publication.media[0].failure, null);
+    assert.equal(publication.media[0].credit.licenseName, 'CC BY-SA 4.0');
+    assert.ok(publication.media[0].publicUrl.startsWith('https://calendar.example.com/daily-report-media/'));
+    const repeated = await service.publishDigestV2(owner, run.runId, d, 'production', options);
+    assert.equal(repeated.artifactId, receipt.artifactId); assert.equal(imageCalls, 2);
+    assert.equal(activity.exportUserActivity(owner).notifications.length, 1);
+    licence = 'All rights reserved'; const rejected = { ...d, date: '2026-10-09' };
+    const rejectedRun = service.createDigestSnapshotRun(owner, { ...snapshot(), date: rejected.date });
+    await assert.rejects(service.publishDigestV2(owner, rejectedRun.runId, rejected, 'production', options), /STORY_IMAGE_NOT_READY/);
+    assert.equal(imageCalls, 2); assert.equal(activity.getDailyReport(owner, rejected.date, 'cloud'), null);
+    assert.equal(activity.exportUserActivity(owner).notifications.length, 1);
+    licence = 'CC BY-SA 4.0'; const revoked = { ...d, date: '2026-10-10' };
+    const revokedRun = service.createDigestSnapshotRun(owner, { ...snapshot(), date: revoked.date });
+    await assert.rejects(service.publishDigestV2(owner, revokedRun.runId, revoked, 'production', { ...options, fetchOptions: { ...options.fetchOptions, fetcher: async () => {
+      process.env.DIGEST_V2_COMMONS_PRODUCTION_ENABLED = 'false'; return new Response(png, { headers: { 'content-type': 'image/png' } });
+    } } }), /DIGEST_PHOTOS_DISABLED/);
+    assert.equal(activity.getDailyReport(owner, revoked.date, 'cloud'), null);
+    assert.ok(!activity.exportUserActivity(owner).digestV2Artifacts.some((row: any) => row.report_date === revoked.date));
+    assert.equal(activity.exportUserActivity(owner).notifications.length, 1);
+  } finally { keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; }); }
+});
 
 test('audited single-image rules retain attribution and reject siblings, redirects and changed copies', async () => {
   const png = await sharp({ create: { width: 320, height: 180, channels: 3, background: '#123456' } }).png().toBuffer();

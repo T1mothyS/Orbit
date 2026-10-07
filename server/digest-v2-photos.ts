@@ -5,7 +5,9 @@ import type { MediaRule } from './digest-v2-media.js';
 export const PHOTO_REQUEST_SCHEMA = { type: 'array', minItems: 1, maxItems: 8, items: { type: 'object', additionalProperties: false, required: ['storyId', 'query'], properties: { storyId: { type: 'string', minLength: 1, maxLength: 80 }, query: { type: 'string', minLength: 2, maxLength: 160 } } } };
 export interface PhotoCandidate { title: string; pageUrl: string; imageUrl: string; originalUrl: string; width: number; height: number; author: string; licenseName: string; licenseUrl: string; description: string; photoDate: string | null }
 export function digestPhotosEnabled(userId: string): boolean {
-  return process.env.DIGEST_SHADOW_ONLY === 'true' && process.env.DIGEST_V2_COMMONS_ENABLED === 'true' && digestSourcesEnabled(userId);
+  return process.env.DIGEST_V2_COMMONS_ENABLED === 'true' && digestSourcesEnabled(userId)
+    && (process.env.DIGEST_SHADOW_ONLY === 'true'
+      || (process.env.DIGEST_V2_COMMONS_PRODUCTION_ENABLED === 'true' && process.env.DIGEST_PRODUCTION_CONTRACT === 'daily-digest.v2'));
 }
 function plain(value: unknown, max = 300): string {
   if (typeof value !== 'string') return '';

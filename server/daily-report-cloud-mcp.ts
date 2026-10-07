@@ -1,5 +1,5 @@
 import express from 'express';
-import { readDigestV2Inputs, readDigestShadowArtifact, validateDigestRun, publishDigestV2, prepareDigestVisuals, prepareDigestSources, findDigestRunPhotos } from './digest-v2-service.js';
+import { readDigestV2Inputs, readDigestShadowArtifact, validateDigestRun, publishDigestV2, prepareDigestVisuals, prepareDigestSources, findDigestRunPhotos, DigestImageNotReadyError } from './digest-v2-service.js';
 import { digestPhotosEnabled, PHOTO_REQUEST_SCHEMA } from './digest-v2-photos.js';
 import { digestSourcesEnabled, NEWSLETTER_INPUT_SCHEMA } from './digest-v2-sources.js';
 import { NEWS_VISUAL_PLAN_SCHEMA } from './digest-v2-visuals.js';
@@ -104,7 +104,7 @@ function oauthSecurity(toolName: string): Array<{ type: 'oauth2'; scopes: string
 }
 
 const toolDefinitions: McpTool[] = [
-  { name: 'daily_report.find_photos_v2', securitySchemes: oauthSecurity('daily_report.find_photos_v2'), description: '仅限已开启的隔离Shadow：按当前账号runId与逐条新闻查询词，只读搜索Commons开放许可资料照候选（每批最多8条新闻，每条最多5图），返回精确图片直链、文件页、署名、许可、描述及已知拍摄日期。只信服务器核对的许可；仍需选择贴题图片。将选中pageUrl加入evidence，media.url使用imageUrl；publish_v2(mode=shadow)会再次逐文件核对并在服务器下载托管。不是今天的现场照片，不改输入、不发布、不发信。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, requests: PHOTO_REQUEST_SCHEMA }, required: ['runId', 'requests'], additionalProperties: false } },
+  { name: 'daily_report.find_photos_v2', securitySchemes: oauthSecurity('daily_report.find_photos_v2'), description: '仅限已启用账号，正式站另需生产照片开关：按当前账号runId与逐条新闻查询词，只读搜索Commons开放许可资料照候选（每批最多8条新闻，每条最多5图），返回精确图片直链、文件页、署名、许可、描述及已知拍摄日期。只信服务器核对的许可；仍需选择贴题图片。将选中pageUrl加入evidence，media.url使用imageUrl；publish_v2会再次逐文件核对并在服务器下载托管，production仍需独立发布授权。不是今天的现场照片，不改输入、不发布、不发信。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, requests: PHOTO_REQUEST_SCHEMA }, required: ['runId', 'requests'], additionalProperties: false } },
   { name: 'daily_report.read_shadow_v2', securitySchemes: oauthSecurity('daily_report.read_shadow_v2'), description: '只读当前OAuth账号指定artifactId的已保存Shadow完整digest、runId及内容哈希，用于修订已有测试稿。不读生产稿、输入快照或邮件原文，不创建run、不修改、不发布、不发信。需要既有个人输入与历史读取权限。', inputSchema: { type: 'object', properties: { artifactId: { type: 'string', format: 'uuid' } }, required: ['artifactId'], additionalProperties: false } },
   { name: 'daily_report.prepare_sources_v2', securitySchemes: oauthSecurity('daily_report.prepare_sources_v2'), description: '汇集AIHOT匿名REST与Work通过当前网页版Gmail只读连接提取的Bloomberg/Polymarket短候选，冻结在当前账号runId的七天快照；Gmail读取结果由Work报告，服务器不读取Gmail。仅结构化短摘录，禁止全文、HTML/MIME、headers、附件、凭据和跟踪链接。同一输入幂等，修改输入需新run。返回来源失败/过旧/截断状态及候选，仍须公开核验和Watchlist独立研究；不发布、不发信、不授权图片。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, newsletters: NEWSLETTER_INPUT_SCHEMA }, required: ['runId', 'newsletters'], additionalProperties: false } },
   { name: 'daily_report.prepare_visuals_v2', securitySchemes: oauthSecurity('daily_report.prepare_visuals_v2'), description: '为具体新闻生成原创事实信息图并保存本站持久媒体；标签必须来自该条标题/摘要，显式标明非现场照片。绑定当前账号、runId、新闻及证据，改稿需重新准备。返回带 media 的 digest；随后 validate_v2 并按授权发布。不批准外站照片、不发布、不发信。', inputSchema: { type: 'object', properties: { runId: { type: 'string' }, digest: DIGEST_V2_SCHEMA, visuals: NEWS_VISUAL_PLAN_SCHEMA }, required: ['runId', 'digest', 'visuals'], additionalProperties: false } },
@@ -711,8 +711,9 @@ async function handleJsonRpc(request: JsonRpcRequest, auth: OAuthBearerContext):
         jsonrpc: '2.0',
         id,
         result: {
-          content: [{ type: 'text', text: message }],
+          content: [{ type: 'text', text: error instanceof DigestImageNotReadyError ? JSON.stringify(error.diagnostics, null, 2) : message }],
           isError: true,
+          ...(error instanceof DigestImageNotReadyError ? { structuredContent: error.diagnostics } : {}),
           ...(error instanceof DailyDigestParseError ? {
             structuredContent: {
               code: 'INVALID_DIGEST_FORMAT',

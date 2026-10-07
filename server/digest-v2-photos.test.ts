@@ -51,9 +51,21 @@ test('photo lookup bounds inputs, distinguishes empty/failed and caps untrusted 
     const result = await findDigestPhotos([{ storyId: 's1', query: 'building' }], fake); assert.equal(result.results[0].status, 'failed'); assert.equal(result.results[0].failure, 'PHOTO_METADATA_FAILED');
   }
 });
-test('automatic photos require dedicated Shadow and existing account feature allowlist', () => {
-  const keys = ['DIGEST_SHADOW_ONLY', 'DIGEST_V2_COMMONS_ENABLED', 'DIGEST_V2_SOURCES_ENABLED', 'DIGEST_V2_SOURCES_USER_IDS']; const previous = keys.map(k => process.env[k]);
-  try { process.env.DIGEST_V2_COMMONS_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_USER_IDS = 'owner'; delete process.env.DIGEST_SHADOW_ONLY; assert.equal(digestPhotosEnabled('owner'), false); process.env.DIGEST_SHADOW_ONLY = 'true'; assert.equal(digestPhotosEnabled('owner'), true); assert.equal(digestPhotosEnabled('other'), false); }
+test('automatic photos retain Shadow isolation and require explicit production opt-in for the allowlisted account', () => {
+  const keys = ['DIGEST_SHADOW_ONLY', 'DIGEST_V2_COMMONS_ENABLED', 'DIGEST_V2_COMMONS_PRODUCTION_ENABLED', 'DIGEST_PRODUCTION_CONTRACT', 'DIGEST_V2_SOURCES_ENABLED', 'DIGEST_V2_SOURCES_USER_IDS']; const previous = keys.map(k => process.env[k]);
+  try {
+    process.env.DIGEST_V2_COMMONS_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_USER_IDS = 'owner';
+    delete process.env.DIGEST_SHADOW_ONLY; delete process.env.DIGEST_V2_COMMONS_PRODUCTION_ENABLED;
+    assert.equal(digestPhotosEnabled('owner'), false);
+    process.env.DIGEST_V2_COMMONS_PRODUCTION_ENABLED = 'true'; delete process.env.DIGEST_PRODUCTION_CONTRACT;
+    assert.equal(digestPhotosEnabled('owner'), false);
+    process.env.DIGEST_PRODUCTION_CONTRACT = 'daily-digest.v1'; assert.equal(digestPhotosEnabled('owner'), false);
+    process.env.DIGEST_PRODUCTION_CONTRACT = 'daily-digest.v2'; assert.equal(digestPhotosEnabled('owner'), true); assert.equal(digestPhotosEnabled('other'), false);
+    process.env.DIGEST_V2_COMMONS_ENABLED = 'false'; assert.equal(digestPhotosEnabled('owner'), false);
+    process.env.DIGEST_V2_COMMONS_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_ENABLED = 'false'; assert.equal(digestPhotosEnabled('owner'), false);
+    process.env.DIGEST_V2_SOURCES_ENABLED = 'true'; process.env.DIGEST_SHADOW_ONLY = 'true'; delete process.env.DIGEST_V2_COMMONS_PRODUCTION_ENABLED;
+    process.env.DIGEST_PRODUCTION_CONTRACT = 'daily-digest.v1'; assert.equal(digestPhotosEnabled('owner'), true); assert.equal(digestPhotosEnabled('other'), false);
+  }
   finally { keys.forEach((k, i) => { if (previous[i] === undefined) delete process.env[k]; else process.env[k] = previous[i]; }); }
 });
 test('proxy configuration is loopback-only, exclusive with relay, and cannot tunnel private targets', async () => {
