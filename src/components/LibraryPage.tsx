@@ -10,6 +10,7 @@ import { DEFAULT_LIBRARY_SORT, formatTime, isLibrarySort, kindLabels, LibraryEnt
 import './library/library.css';
 
 const LibraryDetailPage = lazy(() => import('./library/LibraryDetailPage').then(module => ({ default: module.LibraryDetailPage })));
+const LibraryPreferencesPage = lazy(() => import('./library/LibraryPreferencesPage').then(module => ({ default: module.LibraryPreferencesPage })));
 
 function LibraryHomePage() {
   const { authHeaders, user } = useAuth();
@@ -118,6 +119,7 @@ function LibraryHomePage() {
         </div>
         <div className="library-header-actions">
           <Link className="library-primary-button" to="/library/experience">记录经历</Link>
+          <Link className="library-secondary-button" to="/library/preferences">个人资料与日报偏好</Link>
           <button type="button" className="library-secondary-button mobile-filter-trigger" disabled={!sortPreferenceReady || sortSaving} onClick={() => { setPendingFilters({ kind, type, status, sort }); setFiltersOpen(true); }}><SlidersHorizontal size={16} />筛选{filterCount > 0 && <span className="filter-count">{filterCount}</span>}</button>
         </div>
       </header>
@@ -159,6 +161,7 @@ function LibraryCard({ entry, onOpen }: { entry: LibraryEntry; onOpen: () => voi
 export function LibraryPage() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  if (/^\/library\/preferences\/?$/.test(location.pathname)) return <LibraryPreferencesPage />;
   if (location.pathname.startsWith('/library/experience')) return <ExperiencePage />;
   return id ? <FeatureBoundary key={id} navigation={<Link className="feature-reader-back" to="/library" aria-label="返回知识库">←</Link>}><LibraryDetailPage id={id} /></FeatureBoundary> : <LibraryHomePage />;
 }

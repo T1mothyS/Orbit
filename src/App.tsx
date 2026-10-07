@@ -75,6 +75,7 @@ function App() {
           <Route path="/research" element={<AppContent />} />
           <Route path="/reports/:date" element={<FeatureBoundary key={location.pathname}><DailyReportReaderPage /></FeatureBoundary>} />
           <Route path="/library" element={<AppContent />} />
+          <Route path="/library/preferences" element={<AppContent />} />
           <Route path="/library/experience" element={<AppContent />} />
           <Route path="/library/experience/:sessionId" element={<AppContent />} />
           <Route path="/library/:id" element={<AppContent />} />
@@ -114,7 +115,7 @@ function AppContent() {
       ? 'Orbit - 管理面板 / Admin'
       : activeSection === null
       ? isProjectPage ? (new URLSearchParams(location.search).get('view')==='statistics'?'Orbit - 个人活动报告':'Orbit - 项目成长') : 'Orbit - Tools'
-      : location.pathname.startsWith('/library/experience') ? 'Orbit - 记录经历' : activeSection === 'assistant' ? 'Orbit - 对话' : 'Orbit - 个人事务中心';
+      : location.pathname.startsWith('/library/experience') ? 'Orbit - 记录经历' : /^\/library\/preferences\/?$/.test(location.pathname) ? 'Orbit - 个人资料与日报偏好' : activeSection === 'assistant' ? 'Orbit - 对话' : 'Orbit - 个人事务中心';
   }, [activeSection, showSettings, showAdmin, isProjectPage,location.search,location.pathname]);
 
   return (

@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import * as db from './db.js';
 import * as activityStore from './activity-store.js';
 import { toDailyReportView } from './daily-report-service.js';
+import { withPersistenceTransaction } from './persistence.js';
+import { contextFieldErrors } from '../src/utils/daily-report-context.js';
 
 export const DAILY_REPORT_CLOUD_CONTEXT_MAX_BYTES = 200_000;
 export const DAILY_REPORT_CLOUD_ACTIVITY_MAX_ITEMS = 100;
@@ -41,13 +43,19 @@ export class DailyReportCloudInputError extends Error {
   }
 }
 
+export class DailyReportCloudContextConflict extends DailyReportCloudInputError {
+  constructor(public readonly code: 'CONTEXT_VERSION_CONFLICT' | 'CONTEXT_READ_FAILED') {
+    super(code === 'CONTEXT_READ_FAILED' ? '已保存的资料读取异常，请先恢复资料，不能用空内容覆盖' : '资料已在其他页面更新，请重新加载后核对；当前草稿仍保留');
+  }
+}
+
 const SECRET_KEY_PATTERN = /(?:token|password|secret|authorization|api[_-]?key|auth[_-]?code|private[_-]?key|client[_-]?secret)/i;
 const SECRET_VALUE_PATTERNS = [
   /drr_[A-Za-z0-9_-]{16,}/i,
   /bearer\s+[A-Za-z0-9._~+/=-]{16,}/i,
   /-----BEGIN [A-Z ]+ PRIVATE KEY-----/i,
 ];
-const LOCAL_PATH_PATTERN = /(?:[A-Za-z]:\\|\\\\[^\r\n ]+\\|\/Users\/|\/home\/)/i;
+const LOCAL_PATH_PATTERN = /(?:[A-Za-z]:[\\/]|\\\\[^\r\n ]+\\|\/Users\/|\/home\/)/i;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -73,7 +81,7 @@ function assertSafeJson(value: unknown, path = 'context', depth = 0): void {
   const keys = Object.keys(value);
   if (keys.length > 100) throw new DailyReportCloudInputError(`${path} 字段过多`);
   for (const key of keys) {
-    if (!key || key.length > 100 || SECRET_KEY_PATTERN.test(key)) {
+    if (!key || key.length > 100 || SECRET_KEY_PATTERN.test(key) || ['__proto__', 'constructor', 'prototype'].includes(key)) {
       throw new DailyReportCloudInputError(`${path} 含有不允许的凭据字段`);
     }
     assertSafeJson(value[key], `${path}.${key}`, depth + 1);
@@ -136,8 +144,25 @@ export function getDailyReportCloudContext(userId: string): DailyReportCloudCont
 
 export function replaceDailyReportCloudContext(userId: string, value: unknown): DailyReportCloudContextEnvelope {
   const context = normalizeDailyReportCloudContext(value);
-  const row = db.upsertDailyReportCloudContext(userId, JSON.stringify(context));
-  return parseContext(row);
+  return withPersistenceTransaction(() => parseContext(db.upsertDailyReportCloudContext(userId, JSON.stringify(context))));
+}
+
+/** Login-state editing only. Existing import callers may omit expectedVersion. */
+export function saveDailyReportCloudContext(userId: string, value: unknown, expectedVersion?: unknown): DailyReportCloudContextEnvelope {
+  if (expectedVersion !== undefined && (!Number.isSafeInteger(expectedVersion) || (expectedVersion as number) < 0)) {
+    throw new DailyReportCloudInputError('expectedVersion 必须是非负整数');
+  }
+  const context = normalizeDailyReportCloudContext(value);
+  if (expectedVersion !== undefined) {
+    const errors = contextFieldErrors(context);
+    if (errors.length) throw new DailyReportCloudInputError(errors[0]);
+  }
+  return withPersistenceTransaction(() => {
+    const current = getDailyReportCloudContext(userId);
+    if (current.readFailed) throw new DailyReportCloudContextConflict('CONTEXT_READ_FAILED');
+    if (expectedVersion !== undefined && current.version !== expectedVersion) throw new DailyReportCloudContextConflict('CONTEXT_VERSION_CONFLICT');
+    return parseContext(db.upsertDailyReportCloudContext(userId, JSON.stringify(context)));
+  });
 }
 
 export function listDailyReportCloudActivity(

@@ -12,7 +12,7 @@ import { AdminSettings } from './sections/AdminSettings';
 import { ToolsSettings } from './sections/ToolsSettings';
 import { CaldavSettings } from './sections/CaldavSettings';
 
-export function SettingsPage({ onOpenAdmin, onOpenTools }: { onOpenAdmin?: () => void; onOpenTools?: () => void }) {
+export function SettingsPage({ onOpenAdmin, onOpenTools, onOpenPreferences }: { onOpenAdmin?: () => void; onOpenTools?: () => void; onOpenPreferences?: () => void }) {
   const { user, authHeaders, logout, isLoading } = useAuth();
   if (isLoading) return <p className="settings-empty" role="status">正在加载账号设置…</p>;
   if (!user) return <p className="settings-empty" role="alert">无法读取当前账号，请关闭设置后重新登录。</p>;
@@ -24,8 +24,8 @@ export function SettingsPage({ onOpenAdmin, onOpenTools }: { onOpenAdmin?: () =>
       <IntegrationGuideSettings authHeaders={authHeaders} />
       <CaldavSettings authHeaders={authHeaders} />
       <NotificationSettings authHeaders={authHeaders} userEmail={user.email} />
-      <DailyReportSettings authHeaders={authHeaders} />
-      <LibraryIntegrationSettings authHeaders={authHeaders} />
+      <DailyReportSettings authHeaders={authHeaders} onOpenPreferences={onOpenPreferences} />
+      <LibraryIntegrationSettings authHeaders={authHeaders} onOpenPreferences={onOpenPreferences} />
       <ToolsSettings onOpenTools={onOpenTools} />
       <MailSettings authHeaders={authHeaders} />
       <DataSettings authHeaders={authHeaders} />

@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Source review: 2026-10-06 核对聊天清理及个人菜单入口；版本以 package.json 为准，状态以 docs/TASKS.md 为准。
+- Source review: 2026-10-07 核对知识库个人资料入口及 Cloud Context 编辑；版本以 package.json 为准，状态以 docs/TASKS.md 为准。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -101,6 +101,7 @@ flowchart LR
 | `/api/note-items` | 登录用户 | AI 记事 CRUD、颜色、完成/恢复、原位提示词优化/单步撤回、两步合并和导出所需数据 | JWT 身份与 `user_id` 所有权；优化/撤回必须匹配 `expectedContent + expectedRevision`；正文手动 PATCH 清除当前撤回但不减少累计次数；颜色/完成更新保留状态；合并原子追加正文并清理目标的当前撤回 |
 | `/api/library`、`/library` | 登录用户 | Fragment/Article 列表、搜索、阅读、评论和导出 | 当前账号隔离；正文、类型、标签和关系只读；Markdown 由服务端安全渲染 |
 | `/api/library/experience-sessions`、`/library/experience` | 登录用户 | 独立复盘、联网候选、照片、保存预览与经历管理 | 不混入普通聊天；修订和账号保护；确认后才更新正式条目；[经历合同](docs/LIBRARY.md#经历记忆) |
+| `/api/daily-report/cloud-context`、`/library/preferences` | 登录用户 | 账号个人资料、日报偏好、近期兴趣和关注研究框架的图形化编辑 | 与设置共用原 Cloud Context；版本冲突/读取损坏拒绝覆盖，可靠写回；不生成、发信、改正式观点或跨环境同步；[Cloud 合同](docs/CHATGPT-WORK-CLOUD.md#cloud-context-编辑与导入) |
 | `/api/integrations/library` 及生命周期子路径 | 本地 Markdown 迁移脚本 | 使用独立 Knowledge Publish Token 执行 `publish/retire/restore/purge` | 只保存 token 哈希；`sourceId + user_id` 定位文章；不拥有登录、读取列表、评论、日程或记事权限 |
 | `/api/ai-chat` | 登录用户 | 普通问答、天气和待确认计划 | 普通对话可生成计划，但计划写入仍需用户确认；只有明确提到“知识库”或 `Knowledge Library` 才检索知识库；旧专用 `create_todo` 参数拒绝 |
 | `/api/ai-linkage-guides` | 登录用户 | 读取版本化接入方法、联动规则和示例提示词 | 只读稳定内容；不返回密钥、动态日程上下文或运行时敏感信息 |

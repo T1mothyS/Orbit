@@ -1,8 +1,9 @@
 # Orbit 文档索引
 
-- Status: LIVING；2026-10-06 核对聊天清理、阅读导航、草稿条目删除及设置滚动的使用/架构/验收入口。此索引只负责导航，不复制任务、版本或生产状态。
+- Status: LIVING；2026-10-07 核对知识库个人资料编辑与 Cloud Context 的使用、并发和验收入口。此索引只负责导航，不复制任务、版本或生产状态。
 - 权威次序：源码/实际验证 → 领域合同 → 当前任务状态；历史报告按原日期解释。版本只读 package.json。
 - 知识库的独立经历入口、联网候选和备份边界见 [经历记忆](LIBRARY.md#经历记忆)，本地证据见 [测试矩阵](TEST-MATRIX.md#经历记忆)。
+- 首页与设置共用的 [个人资料与日报偏好](LIBRARY.md#个人资料与日报偏好)、[Cloud 数据合同](CHATGPT-WORK-CLOUD.md#cloud-context-编辑与导入) 和 [本地验收](TEST-MATRIX.md#个人资料与日报偏好) 独立于知识文章与正式研究观点。
 
 ## 路线、更新与任务
 
@@ -41,7 +42,7 @@
 | [Cloud 排障](CLOUD-DIGEST-RECOVERY.md) | Prompt/模板/完整性/媒体分支核对 |
 | [V3 Core](DAILY-DIGEST-V3-CORE-CONTRACT.md) | Event/Revision/Evidence/Analysis、D07、D08 双轴与 D09 本地冻结 |
 | [Research/Thesis](DAILY-DIGEST-RESEARCH-THESIS.md) | Research → Proposal → 确认版本、租约/备份和真实通道限制 |
-| [知识库](LIBRARY.md) | 本地加工/关系/校验/发布、网页只读与生命周期、阅读/引用 |
+| [知识库](LIBRARY.md) | 本地加工/关系/校验/发布、文章只读与生命周期、阅读/引用、个人资料及日报偏好入口 |
 | [知识库首次部署](KNOWLEDGE-LIBRARY-FIRST-DEPLOYMENT.md) | 首次/切目标核对与令牌权限；普通 publish 沿原授权边界 |
 | [CalDAV 桥接](CALDAV-BRIDGE.md) | 单向投影、周期/完成/归并、锁/自动化/恢复 |
 | [CalDAV POC](CALDAV-HONOR-POC.md) | 可行性和隔离操作；真机结果为日期证据 |
