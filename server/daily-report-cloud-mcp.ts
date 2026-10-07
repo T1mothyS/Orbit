@@ -1,5 +1,5 @@
 import express from 'express';
-import { readDigestV2Inputs, readDigestShadowArtifact, validateDigestRun, publishDigestV2, prepareDigestVisuals, prepareDigestSources, findDigestRunPhotos } from './digest-v2-service.js';
+import { readDigestV2Inputs, readDigestShadowArtifact, validateDigestRun, publishDigestV2, prepareDigestVisuals, prepareDigestSources, findDigestRunPhotos, DigestImageNotReadyError } from './digest-v2-service.js';
 import { digestPhotosEnabled, PHOTO_REQUEST_SCHEMA } from './digest-v2-photos.js';
 import { digestSourcesEnabled, NEWSLETTER_INPUT_SCHEMA } from './digest-v2-sources.js';
 import { NEWS_VISUAL_PLAN_SCHEMA } from './digest-v2-visuals.js';
@@ -711,8 +711,9 @@ async function handleJsonRpc(request: JsonRpcRequest, auth: OAuthBearerContext):
         jsonrpc: '2.0',
         id,
         result: {
-          content: [{ type: 'text', text: message }],
+          content: [{ type: 'text', text: error instanceof DigestImageNotReadyError ? JSON.stringify(error.diagnostics, null, 2) : message }],
           isError: true,
+          ...(error instanceof DigestImageNotReadyError ? { structuredContent: error.diagnostics } : {}),
           ...(error instanceof DailyDigestParseError ? {
             structuredContent: {
               code: 'INVALID_DIGEST_FORMAT',

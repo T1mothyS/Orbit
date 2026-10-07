@@ -205,6 +205,7 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 - `DIGEST_MEDIA_PROXY_URL` 只允许无凭据的 `http://127.0.0.1:<端口>`，与 Worker relay 配置互斥。下载器先验证源站所有 DNS 地址，再向代理 CONNECT 已验证的数字 IP，TLS 使用原始主机名并验证证书。请求不转发 Cookie/Authorization。连接/TLS有界超时，失败不静默直连。代理是独立回环服务，使用现有获授权出口，不改变原 OpenAI 分流。
 - 新网络回执 `sourceTransport=http_proxy` 与 `audited_copy/network/cloudflare_worker` 分开。存在 `sourceFile` 的旧规则仍读审核副本；要证明自动下载，须选未绑定副本的新文件或移除精确规则的副本字段并保留备份。工具存在、代理 active、已有图片可访问都不能代替新文件的完整链路验证。
 - 启用此能力的 Shadow 同样执行逐新闻图片完整性硬闸门：缺图、分类占位或下载/托管失败不得保存成成功日报。旧 Shadow 和未启用账号保持原合同；默认关闭的生产不具备自动 Commons 权限。
+- 自动照片的下载遇到超时、连接失败或 HTTP 5xx 时，最多重新执行一次完整的受控下载；不重试拒绝访问、无效图片、许可或 SSRF 失败，不扩大地址权限，不切换为直连。逐图记录 `sourceAttempts`。图片硬闸门失败时 MCP 仍返回 `isError=true`，同时提供 `STORY_IMAGE_NOT_READY`、`NOT_QUEUED` 和每条失败新闻的媒体 ID、失败阶段、固定原因码及尝试次数；运行清单保留同一诊断。没有保存失败日报，也不暴露上游错误正文、私人输入或代理配置。同一 run 和原稿的再次发布须先确认上一请求确实失败，而非响应不确定。
 
 一次性云端验收须在连接 Gmail 与隔离日报插件的网页版账号安排 Work 任务，明确绝对日期、时区和只运行一次。正式任务保持原状态；任务只调用 V2、创建当期新 run、只保存 Shadow、不发信、不读本机、不创建后续任务。配置保存、自然触发、成稿与用户阅读是独立验收层；定时执行结果在实际发生后记录。
 

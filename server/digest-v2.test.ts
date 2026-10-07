@@ -408,7 +408,19 @@ test('automatic photo tool preserves snapshots, enforces account/scope/expiry an
     assert.ok((list as any).result.tools.some((t: any) => t.name === 'daily_report.find_photos_v2'));
     const rejected = illustrated(); rejected.date = '2026-10-30';
     const strictRun = service.createDigestSnapshotRun(userId, { ...snapshot(), date: rejected.date });
-    await assert.rejects(service.publishDigestV2(userId, strictRun.runId, rejected, 'shadow', { storage, rules: [] }), /MEDIA_|IMAGE_/);
+    await assert.rejects(service.publishDigestV2(userId, strictRun.runId, rejected, 'shadow', { storage, rules: [] }), (error: any) => {
+      assert.ok(error instanceof service.DigestImageNotReadyError);
+      assert.equal(error.diagnostics.emailStatus, 'NOT_QUEUED');
+      assert.deepEqual(error.failedStories, [{ storyId: 's1', media: [{ id: 'm1', code: 'LICENSE_NOT_APPROVED', stage: 'license', reason: 'PHOTO_NOT_APPROVED', attempts: 0 }] }]);
+      return true;
+    });
+    const manifest = JSON.parse(activity.getDigestRun(userId, strictRun.runId)!.manifest_json);
+    assert.equal(manifest.code, 'STORY_IMAGE_NOT_READY');
+    assert.equal(manifest.failedStories[0].storyId, 's1');
+    const rpc = await mcp.handleJsonRpc({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'daily_report.publish_v2', arguments: { runId: strictRun.runId, digest: rejected, mode: 'shadow' } } }, { ...auth, scopes: ['daily_report:publish', 'daily_report:media_prepare', 'daily_report:read_calendar', 'daily_report:read_mail', 'daily_report:read_context', 'daily_report:read_history'] });
+    assert.equal((rpc as any).result.isError, true);
+    assert.equal((rpc as any).result.structuredContent.code, 'STORY_IMAGE_NOT_READY');
+    assert.equal((rpc as any).result.structuredContent.failedStories[0].media[0].id, 'm1');
     assert.ok(!activity.exportUserActivity(userId).digestV2Artifacts.some((row: any) => row.report_date === rejected.date));
     process.env.DIGEST_SHADOW_ONLY = 'false';
     await assert.rejects(service.findDigestRunPhotos(userId, run.runId, requests, fake), /DIGEST_PHOTOS_DISABLED/);
@@ -466,6 +478,17 @@ test('media: decode, resize, strip metadata, reject bad or small images, fallbac
     const failed = await prepareDigestMedia(illustrated(), { ...options, fetchOptions: { ...options.fetchOptions, fetcher: async () => new Response('', { status }) } });
     assert.equal(failed[0].fallback, true);
   }
+  let retryCalls = 0;
+  const retried = await prepareDigestMedia(illustrated(), { ...options, allowCommons: true, fetchOptions: { ...options.fetchOptions, fetcher: async () => { retryCalls++; return retryCalls === 1 ? new Response('', { status: 503 }) : fetcher('https://images.example.com/image.jpg'); } } });
+  assert.equal(retryCalls, 2); assert.equal(retried[0].fallback, false); assert.equal(retried[0].sourceAttempts, 2);
+  for (const status of [403, 404, 503]) {
+    let calls = 0;
+    const failed = await prepareDigestMedia(illustrated(), { ...options, allowCommons: true, fetchOptions: { ...options.fetchOptions, fetcher: async () => { calls++; return new Response('', { status }); } } });
+    assert.equal(calls, status === 503 ? 2 : 1);
+    assert.equal(failed[0].failureStage, 'download'); assert.equal(failed[0].failureReason, 'HTTP_ERROR');
+  }
+  const privateError = await prepareDigestMedia(illustrated(), { ...options, allowCommons: true, fetchOptions: { ...options.fetchOptions, fetcher: async () => { throw new Error('upstream-secret-must-not-be-exposed'); } } });
+  assert.equal(privateError[0].failureReason, 'FETCH_ERROR'); assert.ok(!JSON.stringify(privateError).includes('upstream-secret'));
   const restricted = await prepareDigestMedia(illustrated(), { ...options, rules: [], fetchOptions: { fetcher: async () => { throw new Error('MUST_NOT_FETCH'); } } });
   assert.equal(restricted[0].failure, 'LICENSE_NOT_APPROVED'); assert.equal(restricted[0].fallback, true);
   const outage = await prepareDigestMedia(illustrated(), { ...options, storage: { ...storage, put: async () => { throw new Error('outage'); } } });

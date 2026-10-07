@@ -299,20 +299,32 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       };
     } catch (error) {
       // Keep only bounded, non-sensitive stage diagnostics, never provider error messages.
-      try { recordPhase('FAILED', { failedPhase: phase, retryable: true }); } catch { /* Original durable-write failure remains primary. */ }
+      try { recordPhase('FAILED', { failedPhase: phase, retryable: true, ...(error instanceof DigestImageNotReadyError ? error.diagnostics : {}) }); } catch { /* Original durable-write failure remains primary. */ }
       throw error;
     }
   });
   locks.set(key, task);
   try { return await task; } finally { if (locks.get(key) === task) locks.delete(key); }
 }
+export class DigestImageNotReadyError extends Error {
+  readonly diagnostics;
+  constructor(readonly failedStories: Array<{ storyId: string; media: Array<{ id: string; code: string; stage?: string; reason?: string; attempts?: number }> }>) {
+    super('STORY_IMAGE_NOT_READY');
+    this.name = 'DigestImageNotReadyError';
+    this.diagnostics = { code: 'STORY_IMAGE_NOT_READY', status: 'FAILED', emailStatus: 'NOT_QUEUED', retryable: true, failedStories };
+  }
+}
 function assertStoryImagesReady(publication: DigestPublication): void {
   const media = publication.media;
+  const failedStories: DigestImageNotReadyError['failedStories'] = [];
   for (const story of [...publication.digest.market, ...publication.digest.macro, ...publication.digest.stories]) {
-    if (![...story.media_ids.map(id => media.find(item => item.id === id)), ...media.filter(item => item.storyId === story.id)]
-      .some(item => item && item.kind !== 'source_icon' && item.publicUrl && !item.failure && !item.fallback
-        && ['photo', 'archive_photo', 'illustration'].includes(item.visualKind || 'archive_photo'))) throw new Error('STORY_IMAGE_NOT_READY');
+    const images = [...story.media_ids.map(id => media.find(item => item.id === id)), ...media.filter(item => item.storyId === story.id)].filter(item => item && item.kind !== 'source_icon');
+    if (!images.some(item => item && item.publicUrl && !item.failure && !item.fallback
+        && ['photo', 'archive_photo', 'illustration'].includes(item.visualKind || 'archive_photo'))) {
+      failedStories.push({ storyId: story.id, media: images.map(item => ({ id: item!.id, code: item!.failure || (item!.fallback ? 'IMAGE_FALLBACK' : 'IMAGE_MISSING'), ...(item!.failureStage ? { stage: item!.failureStage, reason: item!.failureReason } : {}), ...(item!.sourceAttempts !== undefined ? { attempts: item!.sourceAttempts } : {}) })) });
+    }
   }
+  if (failedStories.length) throw new DigestImageNotReadyError(failedStories);
 }
 export function readDigestShadowArtifact(userId: string, artifactId: string) {
   assertDigestV2Enabled();

@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import sharp from 'sharp';
 import { digestMediaFetcher } from './digest-v2-relay.js';
 import { S3Client, HeadObjectCommand, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { controlledMediaFetch, dailyReportMediaRoot, getDailyReportMediaPublicOrigin, storeProvidedDailyReportMedia, type ControlledDailyReportMediaOptions } from './daily-report-media-service.js';
+import { controlledMediaFetch, dailyReportMediaRoot, getDailyReportMediaPublicOrigin, storeProvidedDailyReportMedia, DailyReportMediaFetchError, type ControlledDailyReportMediaOptions } from './daily-report-media-service.js';
 import { publicDigestUrl, type DigestV2 } from './digest-v2-contract.js';
 import { isValidDateKey } from './date-key.js';
 import { approvedCommonsRule } from './digest-v2-photos.js';
@@ -20,6 +20,9 @@ export interface PreparedImage {
   kind?: 'source_icon';
   sourceHost?: string;
   sourceSha256?: string;
+  sourceAttempts?: number;
+  failureStage?: 'license' | 'download' | 'transform' | 'storage';
+  failureReason?: string;
   storyId?: string;
   visualKind?: 'photo' | 'archive_photo' | 'illustration' | 'placeholder';
 }
@@ -177,14 +180,19 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
     const evidence = d.evidence.find(e => e.id === m.evidence_id)!;
     let rule = rules.find(r => r.kind === m.kind && r.pageHost === new URL(evidence.url).hostname && (!r.pageUrl || r.pageUrl === evidence.url) && r.imageHosts.includes(new URL(m.url).hostname) && (!r.imageUrls || r.imageUrls.includes(m.url)));
     let fallback = false; let failure: string | null = null;
+    let stage: PreparedImage['failureStage'] = 'license';
+    let failureStage: PreparedImage['failureStage']; let failureReason: string | undefined;
+    let sourceAttempts = 0;
     let sourceSha256: string | undefined;
     let transport: PreparedImage['sourceTransport'];
     let result: Awaited<ReturnType<typeof transformDigestImage>>;
     try {
       if (!rule && !m.kind && options.mode === 'shadow' && options.allowCommons) rule = await approvedCommonsRule(evidence.url, m.url);
       if (!rule) throw new Error('LICENSE_NOT_APPROVED');
+      stage = 'download';
       let bytes: Buffer | undefined;
       if (rule.sourceFile) {
+        sourceAttempts = 1;
         // An operator-reviewed copy is bound to exactly one URL and hash; Work cannot supply paths.
         if (!rule.pageUrl || rule.imageUrls?.length !== 1 || !rule.sourceSha256 || !rule.credit) throw new Error('SOURCE_COPY_INVALID');
         const stat = fs.lstatSync(rule.sourceFile);
@@ -194,13 +202,25 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
       } else {
         const approvedRule = rule;
         const relay = digestMediaFetcher(); transport = relay.transport;
-        await controlledMediaFetch(m.url, { fetcher: relay.fetcher, ...options.fetchOptions, authorizeUrl: u => { if (u.protocol !== 'https:' || !approvedRule.imageHosts.includes(u.hostname) || (approvedRule.imageUrls && !approvedRule.imageUrls.includes(u.href))) throw new Error('LICENSE_REDIRECT_BLOCKED'); }, persistMedia: (body, validated) => { bytes = body; return validated; } });
+        const fetchOptions = { fetcher: relay.fetcher, ...options.fetchOptions, authorizeUrl: (u: URL) => { if (u.protocol !== 'https:' || !approvedRule.imageHosts.includes(u.hostname) || (approvedRule.imageUrls && !approvedRule.imageUrls.includes(u.href))) throw new Error('LICENSE_REDIRECT_BLOCKED'); }, persistMedia: (body: Buffer, validated: Parameters<NonNullable<ControlledDailyReportMediaOptions['persistMedia']>>[1]) => { bytes = body; return validated; } };
+        for (;;) {
+          sourceAttempts++;
+          try { await controlledMediaFetch(m.url, fetchOptions); break; }
+          catch (error) {
+            // Only automatic Shadow photos get one fresh, fully checked network attempt.
+            const transient = error instanceof DailyReportMediaFetchError && (['TIMEOUT', 'FETCH_ERROR'].includes(error.code) || (error.code === 'HTTP_ERROR' && (error.httpStatus || 0) >= 500));
+            if (!options.allowCommons || options.mode !== 'shadow' || m.kind || sourceAttempts >= 2 || !transient) throw error;
+          }
+        }
       }
+      stage = 'transform';
       sourceSha256 = crypto.createHash('sha256').update(bytes!).digest('hex');
       result = m.kind === 'source_icon' ? await transformDigestIcon(bytes!) : await transformDigestImage(bytes!);
     } catch (e) {
       fallback = true;
       failure = rule ? 'SOURCE_OR_IMAGE_FAILED' : 'LICENSE_NOT_APPROVED';
+      failureStage = stage;
+      failureReason = e instanceof DailyReportMediaFetchError ? e.code : stage === 'license' ? 'PHOTO_NOT_APPROVED' : stage === 'transform' ? 'IMAGE_INVALID' : 'SOURCE_READ_FAILED';
       const story = [...d.market, ...d.macro, ...d.stories].find(s => s.media_ids.includes(m.id));
       result = await fallbackImage(m.category, story ? `${story.id}:${story.title}` : '');
     }
@@ -221,9 +241,9 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
           publicUrl = storage.origin + '/' + key;
         }
       }
-    } catch { failure = storage ? 'R2_UPLOAD_FAILED' : 'R2_NOT_CONFIGURED'; }
+    } catch { failure = storage ? 'R2_UPLOAD_FAILED' : 'R2_NOT_CONFIGURED'; failureStage = 'storage'; failureReason = failure; }
     failure = configurationFailure || failure;
-    images.push({ ...(m.kind ? { kind: m.kind, sourceHost: new URL(evidence.url).hostname } : {}), id: m.id, evidenceId: m.evidence_id, sourceUrl: m.url, category: m.category, licenseRef: fallback ? 'code-owned-category-art' : rule!.licenseRef, policy: fallback ? 'OWNED_OPEN' : rule!.policy, publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback, failure, ...(fallback ? { visualKind: 'placeholder' as const } : { visualKind: rule!.visualKind || 'archive_photo' as const, sourceTransport: rule?.sourceFile ? 'audited_copy' as const : transport || 'network' as const, sourceSha256, ...(rule?.credit ? { credit: { ...rule.credit } } : {}) }) });
+    images.push({ ...(m.kind ? { kind: m.kind, sourceHost: new URL(evidence.url).hostname } : {}), id: m.id, evidenceId: m.evidence_id, sourceUrl: m.url, category: m.category, licenseRef: fallback ? 'code-owned-category-art' : rule!.licenseRef, policy: fallback ? 'OWNED_OPEN' : rule!.policy, publicUrl, key, filename, sha256, width: result.info.width, height: result.info.height, bytes: result.data.length, mime, fallback, failure, sourceAttempts, ...(failureStage ? { failureStage, failureReason } : {}), ...(fallback ? { visualKind: 'placeholder' as const } : { visualKind: rule!.visualKind || 'archive_photo' as const, sourceTransport: rule?.sourceFile ? 'audited_copy' as const : transport || 'network' as const, sourceSha256, ...(rule?.credit ? { credit: { ...rule.credit } } : {}) }) });
   }
   if (options.storyIllustrations) {
     const stories = [...d.market, ...d.macro, ...d.stories];
