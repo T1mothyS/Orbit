@@ -18,6 +18,7 @@ if (!fs.existsSync(dataDir)) {
 
 // 数据库实例
 let db: SqlJsDatabase;
+let cloneDatabase: (bytes:Uint8Array)=>SqlJsDatabase;
 
 export function assertNoUnreconciledChatWal(databasePath = dbPath): void {
   const walPath = databasePath + '-wal';
@@ -34,6 +35,7 @@ export async function initDb(): Promise<void> {
   assertNoUnreconciledChatWal();
   recoverPersistence(dataDir);
   const SQL = await initSqlJs();
+  cloneDatabase = bytes => new SQL.Database(bytes);
 
   // 尝试加载已有数据库
   if (fs.existsSync(dbPath)) {
@@ -43,9 +45,10 @@ export async function initDb(): Promise<void> {
     db = new SQL.Database();
   }
 
-  registerPersistence(dbPath, () => db.export(), bytes => {
+  registerPersistence(dbPath, snapshotChatDb, bytes => {
     db.close();
     db = new SQL.Database(bytes);
+    db.run('PRAGMA secure_delete=ON');
   });
 
   // Freeze the existing stores before the additive connected-report migration.
@@ -63,6 +66,11 @@ export async function initDb(): Promise<void> {
   }
   if (fs.existsSync(dbPath) && !queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='library_experience_sessions'")) {
     const snapshot = path.join(dataDir, 'migration-backups', `experience-memory-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+    fs.mkdirSync(snapshot, { recursive: true });
+    for (const name of fs.readdirSync(dataDir).filter(name => name.endsWith('.db'))) fs.copyFileSync(path.join(dataDir, name), path.join(snapshot, name), fs.constants.COPYFILE_EXCL);
+  }
+  if (fs.existsSync(dbPath) && !queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='android_push_devices'")) {
+    const snapshot = path.join(dataDir, 'migration-backups', `android-push-${new Date().toISOString().replace(/[:.]/g, '-')}`);
     fs.mkdirSync(snapshot, { recursive: true });
     for (const name of fs.readdirSync(dataDir).filter(name => name.endsWith('.db'))) fs.copyFileSync(path.join(dataDir, name), path.join(snapshot, name), fs.constants.COPYFILE_EXCL);
   }
@@ -129,5 +137,31 @@ export function runTransaction<T>(callback: () => T): T {
 
 export function exportChatDb(): Buffer {
   assertPersistenceReady();
-  return Buffer.from(db.export());
+  return Buffer.from(snapshotChatDb());
+}
+
+function snapshotChatDb(): Uint8Array {
+  // sql.js export closes/reopens its connection, resetting connection-level PRAGMAs.
+  const bytes=db.export();
+  db.run('PRAGMA secure_delete=ON');
+  return bytes;
+}
+
+// Work on a copy: backups and old snapshot restores must not transfer mobile credentials or replay Push.
+export function sanitizeAndroidPushBackup(bytes:Buffer):Buffer {
+  const copy=cloneDatabase(bytes);
+  try {
+    copy.run('PRAGMA secure_delete=ON');
+    let changed=false;
+    for(const table of ['android_push_deliveries','android_push_devices','android_push_preferences']) {
+      const lookup=copy.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='${table}'`);
+      const exists=lookup.step();lookup.free();
+      if(!exists)continue;
+      const counter=copy.prepare(`SELECT COUNT(*) AS count FROM ${table}`);
+      const populated=counter.step()&&Number(counter.getAsObject().count)>0;counter.free();
+      if(populated){copy.run(`DELETE FROM ${table}`);changed=true;}
+    }
+    if(changed)copy.run('VACUUM');
+    return changed?Buffer.from(copy.export()):Buffer.from(bytes);
+  }finally{copy.close();}
 }

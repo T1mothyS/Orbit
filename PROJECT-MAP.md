@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Source review: 2026-10-07 核对知识库个人资料入口及 Cloud Context 编辑；版本以 package.json 为准，状态以 docs/TASKS.md 为准。
+- Source review: 2026-10-07 核对 Android 在线壳、Push 队列与知识库个人资料入口；版本以 package.json 为准，状态以 docs/TASKS.md 为准。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -24,6 +24,7 @@
 flowchart TD
     Browser[Web 浏览器] --> React[src/ React + Vite]
     Electron[Electron 壳] --> React
+    Android[android/ Kotlin WebView 壳] --> React
     React --> API[server/app.ts + application.ts\nExpress API]
     API --> Auth[认证与账号隔离]
     API --> Domains[领域服务]

@@ -14,7 +14,7 @@ const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : pat
 const DB_PATH = path.join(DATA_DIR, 'activity.db');
 
 export type ActionSource = 'schedule' | 'reminder';
-export type NotificationChannel = 'email' | 'in_app' | 'browser';
+export type NotificationChannel = 'email' | 'in_app' | 'browser' | 'push';
 export type NotificationStatus = 'pending' | 'sending' | 'sent' | 'failed' | 'suppressed';
 export type DailyReportSource = 'local' | 'cloud';
 export type DailyReportDeliveryStatus = 'received' | 'candidate';

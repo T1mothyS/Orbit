@@ -205,7 +205,8 @@ export interface NotificationQueueResult {
 
 export async function processNotificationQueue(log?: NotificationLogger): Promise<NotificationQueueResult> {
   const startedAt = Date.now();
-  const dueItems = activityStore.listDueNotifications();
+  // Push has its own durable per-device queue and provider consumer.
+  const dueItems = activityStore.listDueNotifications().filter(item=>item.channel!=='push');
   const result: NotificationQueueResult = {
     scanned: dueItems.length,
     claimed: 0,

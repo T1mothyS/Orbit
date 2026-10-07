@@ -1,6 +1,10 @@
 import { settingKeywords, searchSettings, type SearchableSetting } from './settings-search.js';
 // Stable IDs are shared by the settings UI, search and read-only AI recall. No values or secrets.
 const definitions = [
+  {id:'android-push-enabled',section:'notifications',label:'Android 手机提醒',description:'独立账号开关，默认关闭；普通日程和周期事务通过 FCM 发送标题与时间。',admin:false},
+  {id:'android-notification-permission',section:'notifications',label:'系统权限与注册',description:'Android 通知权限、精确提醒权限与 FCM 设备注册。',admin:false},
+  {id:'android-fcm-test',section:'notifications',label:'FCM 测试',description:'由 Orbit 后端向当前 Android 手机发送测试通知。',admin:false},
+  {id:'android-local-test',section:'notifications',label:'一分钟后本地提醒',description:'Android 本地通知独立试验、精确或可能延迟的定时与取消。',admin:false},
   { id: 'library-full-export', section: 'library', label: '导出全库', description: '下载当前账号的完整知识库 JSON。', admin: false },
   { id: 'library-personal-preferences', section: 'library', label: '个人资料与日报偏好', description: '和日报设置共用同一份资料，直接在网页编辑。', admin: false },
   {

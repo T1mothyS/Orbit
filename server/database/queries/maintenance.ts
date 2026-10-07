@@ -6,6 +6,7 @@ import { deleteUserOperationResults } from './operations.js';
 import { removeSecret } from '../../orbit-credential-vault.js';
 
 function clearOrbitProviderData(userId:string):void {
+  for(const table of ['android_push_deliveries','android_push_devices','android_push_preferences'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
   clearConnected(userId);
   removeSecret('chatgpt',userId);
   for(const table of ['library_experience_images','library_experience_sessions','note_item_images','note_images','orbit_attachments','orbit_message_attachments','orbit_request_steps','orbit_model_capabilities'])run(`DELETE FROM ${table} WHERE user_id=?`,[userId]);

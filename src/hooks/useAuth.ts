@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { clearAccountComposerDrafts } from '../utils/composer-draft';
+import { androidLogout } from '../services/android-bridge';
 
 interface User {
   id: string;
@@ -49,6 +50,7 @@ export function useAuth() {
         const data = await res.json();
         setState({ user: data.user, token, isLoading: false, isAuthenticated: true });
       } else if (res.status === 401 || res.status === 403) {
+        androidLogout();
         localStorage.removeItem(TOKEN_KEY);
         setState({ user: null, token: null, isLoading: false, isAuthenticated: false });
       } else {
@@ -106,6 +108,7 @@ export function useAuth() {
 
   // 登出
   const logout = () => {
+    androidLogout();
     if (state.user?.id) clearAccountComposerDrafts(state.user.id);
     void fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', keepalive: true }).catch(() => undefined);
     localStorage.removeItem(TOKEN_KEY);

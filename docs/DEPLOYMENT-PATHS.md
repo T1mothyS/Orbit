@@ -15,6 +15,8 @@
 
 路径 B 可使用 main 的 CI `orbit-linux-release` artifact 作为兼容 Linux 构建环境产物，流程和校验入口见 [发布流程](RELEASE.md#状态与幂等)。服务器只解包、校验、备份和切换；新依赖随产物进入暂存，旧依赖留在回滚代码目录。
 
+Android 一期新增 `firebase-admin`，后端发布必须走路径 B，不能复用旧线上依赖。Firebase 服务账号文件放在 release 之外的私有目录，`ANDROID_PUSH_ENABLED` 与账号手机开关默认关闭；仅唯一 worker 在另行授权后启用。停写冷备覆盖 chat.db 的附加设备/投递表，回滚保留代码与数据库备份。APK 构建/安装、后端发布、真实 FCM 发送和 GitHub 发布分别授权；详情见 [Android 构建](../android/README.md)。
+
 ## 路径 A：普通预构建升级
 
 项目成长另需服务端资源 `project-evolution/generated.json`；发布清单和暂存检查必须包含它，不得放入匿名静态目录。校验见 [项目成长说明](../project-evolution/README.md)。

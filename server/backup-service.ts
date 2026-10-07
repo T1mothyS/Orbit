@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import zlib from 'zlib';
 import * as db from './db.js';
+import { run as runChatQuery, sanitizeAndroidPushBackup } from './database/connection.js';
 import { exportOrbit, restoreOrbit } from './orbit-store.js';
 import * as scheduleStore from './schedule-store.js';
 import * as reminderStore from './reminder-store.js';
@@ -450,6 +451,8 @@ export function restoreUserBackup(userId: string, buffer: Buffer, password: stri
   const attachmentFailures: Array<{ originalName: string; error: string }> = [];
   const missingMedia = [...new Set((payload.activity.dailyReports || []).flatMap((row: any) => [...String(row.markdown || '').matchAll(/\/daily-report-media\/([a-f0-9]{64}\.(?:jpg|png|webp|ico|svg))/g)].map(match => match[1])))].filter(name => !fs.existsSync(path.join(dailyReportMediaRoot(), name)));
   const result = withPersistenceTransaction(() => {
+    // Restored schedules must never replay mobile delivery or carry over installation credentials.
+    for(const table of ['android_push_deliveries','android_push_devices','android_push_preferences'])runChatQuery(`DELETE FROM ${table} WHERE user_id=?`,[userId]);
     if (mode === 'replace') db.deleteUserOperationResults(userId);
     const schedule = scheduleStore.restoreUserScheduleData(userId, payload.schedule, mode);
     const reminder = reminderStore.restoreUserReminderData(userId, payload.reminder, mode);
@@ -551,7 +554,7 @@ export function createSystemSnapshot(uploadToOss = true): { filename: string; pa
     version: FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
     databases: {
-      'chat.db': db.exportChatDb().toString('base64'),
+      'chat.db': sanitizeAndroidPushBackup(db.exportChatDb()).toString('base64'),
       'schedule.db': scheduleStore.exportScheduleDb().toString('base64'),
       'reminder.db': reminderStore.exportReminderDb().toString('base64'),
       'activity.db': activityStore.exportActivityDb().toString('base64'),
@@ -650,6 +653,7 @@ export function readSystemSnapshot(filename: string): Buffer {
 export function restoreSystemSnapshot(buffer: Buffer, confirmation: string): void {
   if (process.env.MAINTENANCE_MODE !== 'true') throw new Error('全站恢复只允许在 MAINTENANCE_MODE=true 时执行');
   if (process.env.BACKGROUND_JOBS_ENABLED === 'true') throw new Error('全站恢复前必须关闭后台任务并重启到维护模式');
+  if (process.env.ANDROID_PUSH_ENABLED === 'true') throw new Error('全站恢复前必须关闭 Android Push 扫描并重启到维护模式');
   if (confirmation !== 'RESTORE AI CALENDAR') throw new Error('恢复确认文字不正确');
   pauseForRestoreSync();
   const password = process.env.BACKUP_ENCRYPTION_KEY || '';
@@ -661,10 +665,11 @@ export function restoreSystemSnapshot(buffer: Buffer, confirmation: string): voi
   const databaseFiles = databaseNames.map(name => {
     const base64 = payload.databases?.[name];
     if (typeof base64 !== 'string') throw new Error(`系统备份缺少 ${name}`);
-    const restored = Buffer.from(base64, 'base64');
+    let restored:Buffer = Buffer.from(base64, 'base64');
     if (restored.length < 100 || restored.subarray(0, 16).toString('binary') !== 'SQLite format 3\u0000') {
       throw new Error(`系统备份中的 ${name} 不是有效的 SQLite 数据库`);
     }
+    if(name==='chat.db')restored=sanitizeAndroidPushBackup(restored);
     return {
       name,
       restored,

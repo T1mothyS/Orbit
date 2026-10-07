@@ -1,6 +1,6 @@
 # Orbit 文档索引
 
-- Status: LIVING；2026-10-07 核对知识库个人资料编辑与 Cloud Context 的使用、并发和验收入口。此索引只负责导航，不复制任务、版本或生产状态。
+- Status: LIVING；2026-10-07 核对 Android 构建、通知与知识库个人资料的验收入口。此索引只负责导航，不复制任务、版本或生产状态。
 - 权威次序：源码/实际验证 → 领域合同 → 当前任务状态；历史报告按原日期解释。版本只读 package.json。
 - 知识库的独立经历入口、联网候选和备份边界见 [经历记忆](LIBRARY.md#经历记忆)，本地证据见 [测试矩阵](TEST-MATRIX.md#经历记忆)。
 - 首页与设置共用的 [个人资料与日报偏好](LIBRARY.md#个人资料与日报偏好)、[Cloud 数据合同](CHATGPT-WORK-CLOUD.md#cloud-context-编辑与导入) 和 [本地验收](TEST-MATRIX.md#个人资料与日报偏好) 独立于知识文章与正式研究观点。
@@ -21,6 +21,7 @@
 | [AGENTS.md](../AGENTS.md) | 协作、授权、安全、验证与文档维护规则 |
 | [根 README](../README.md) | 产品简介、启动、主要导航 |
 | [用户指南](USER-GUIDE.md) | 配置、日常使用、备份和排障 |
+| [Android 构建](../android/README.md) | 工具链、APK、固定站点、Firebase 配置与原生本地试验入口 |
 | [发布流程](RELEASE.md) | 可复用发布指令、冻结目标、效率与验收层级 |
 | [部署路径](DEPLOYMENT-PATHS.md) | 预构建/依赖变更/特殊路径和回滚判据 |
 | [项目地图](../PROJECT-MAP.md) | 模块/跨项目边界与源码路由 |

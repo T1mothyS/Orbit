@@ -38,3 +38,13 @@ dist-shadow/
 
 # Local-only archived deployment history
 .local-docs/
+# Android local configuration and signing material
+android/.gradle/
+android/.kotlin/
+android/**/build/
+android/local.properties
+android/app/google-services.json
+android/*.local.properties
+android/**/*.jks
+android/**/*.keystore
+.local-secrets/

@@ -14,6 +14,8 @@ interface RuntimeDependencies {
   backgroundJobs: { start(): void; stop(): Promise<void> };
   proactiveJobs?: {start():void;stop():Promise<void>};
   runtimeProactiveEnabled?: boolean;
+  androidPushJobs?: {start():void;stop():Promise<void>};
+  runtimeAndroidPushEnabled?: boolean;
   logServiceStarted: () => void;
 }
 
@@ -47,10 +49,11 @@ export function createRuntime(deps: RuntimeDependencies) {
           });
           if (deps.runtimeConfig.backgroundJobsEnabled) deps.backgroundJobs.start();
           if(deps.runtimeProactiveEnabled)deps.proactiveJobs?.start();
+          if(deps.runtimeAndroidPushEnabled)deps.androidPushJobs?.start();
           deps.logServiceStarted();
           return server;
         } catch (error) {
-          await Promise.allSettled([deps.backgroundJobs.stop(),deps.proactiveJobs?.stop(), closeServer()]);
+          await Promise.allSettled([deps.backgroundJobs.stop(),deps.proactiveJobs?.stop(),deps.androidPushJobs?.stop(), closeServer()]);
           throw error;
         }
       })();
@@ -61,7 +64,7 @@ export function createRuntime(deps: RuntimeDependencies) {
       stopping = (async () => {
         // A signal arriving during initialization still closes the eventual listener.
         if (starting) await starting.catch(() => undefined);
-        const results = await Promise.allSettled([deps.backgroundJobs.stop(),deps.proactiveJobs?.stop(), closeServer()]);
+        const results = await Promise.allSettled([deps.backgroundJobs.stop(),deps.proactiveJobs?.stop(),deps.androidPushJobs?.stop(), closeServer()]);
         const failed = results.find(result => result.status === 'rejected');
         if (failed?.status === 'rejected') throw failed.reason;
       })();

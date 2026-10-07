@@ -5,6 +5,25 @@ import type { Database } from 'sql.js';
 export function applyChatSchema(db: Database, { queryAll, queryOne }: SchemaQueries): void {
   // sql.js 以内存数据库运行并整体导出文件，不能消费原生 SQLite WAL。
   db.run('PRAGMA journal_mode = DELETE');
+  // Mobile registration identities must not survive account/device deletion in SQLite free space.
+  db.run('PRAGMA secure_delete = ON');
+
+  // Installation identities are operational credentials, never included in account exports.
+  db.run(`CREATE TABLE IF NOT EXISTS android_push_preferences (user_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0)`);
+  db.run(`CREATE TABLE IF NOT EXISTS android_push_devices (
+    id TEXT PRIMARY KEY, installation_id TEXT NOT NULL UNIQUE, user_id TEXT NOT NULL,
+    key_hash TEXT NOT NULL, fid TEXT UNIQUE, generation TEXT NOT NULL, auth_version INTEGER NOT NULL,
+    permission INTEGER NOT NULL, label TEXT NOT NULL, version TEXT NOT NULL,
+    revoked INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+  db.run(`CREATE TABLE IF NOT EXISTS android_push_deliveries (
+    id TEXT PRIMARY KEY, user_id TEXT NOT NULL, device_id TEXT NOT NULL, generation TEXT NOT NULL,
+    schedule_id TEXT, expected_state TEXT, trigger_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+    kind TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, target_path TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
+    next_retry_at TEXT, error TEXT, receipt TEXT, created_at TEXT NOT NULL, sent_at TEXT,
+    dedupe_key TEXT NOT NULL UNIQUE)`);
+  db.run('CREATE INDEX IF NOT EXISTS idx_android_push_due ON android_push_deliveries(status,next_retry_at)');
+  db.run("UPDATE android_push_deliveries SET status='failed',error='process_interrupted' WHERE status='sending'");
 
   db.run(`CREATE TABLE IF NOT EXISTS operation_results (
     user_id TEXT NOT NULL, scope TEXT NOT NULL, operation_id TEXT NOT NULL,

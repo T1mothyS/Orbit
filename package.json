@@ -1,6 +1,6 @@
 {
   "name": "smart-schedule-agent",
-  "version": "0.53.1-261007.2033",
+  "version": "0.54.0-261007.2220",
   "description": "Orbit — chat-first personal workspace",
   "author": "Smart Schedule Team",
   "license": "MIT",
@@ -45,6 +45,7 @@
     "dotenv": "^17.4.1",
     "exceljs": "^4.4.0",
     "express": "^4.18.2",
+    "firebase-admin": "14.5.0",
     "imapflow": "^1.4.7",
     "jsonwebtoken": "^9.0.3",
     "katex": "^0.18.7",

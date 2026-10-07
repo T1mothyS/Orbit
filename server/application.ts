@@ -10,6 +10,8 @@ import { createAiProvidersRouter } from './routes/ai-providers.js';
 import {createOrbitAttachmentsRouter} from './routes/orbit-attachments.js';
 import { createOrbitFeatureRouter } from './routes/orbit.js';
 import { createProactiveJobs } from './orbit-proactive.js';
+import { createAndroidPushRouter } from './routes/android-push.js';
+import { createAndroidPushJobs } from './android-push.js';
 
 import { createSchedulesRouter } from './routes/schedules.js';
 import { createCaldavRouter } from './routes/caldav.js';
@@ -123,6 +125,7 @@ app.use(createLibraryRouter({ authenticate }));
 app.use(createSuspendedTodosRouter({ authenticate }));
 
 app.use(createNotificationsRouter({ authenticate }));
+app.use(createAndroidPushRouter({ authenticate }));
 
 app.use(createCompletionsRouter({ authenticate }));
 
@@ -159,6 +162,8 @@ export const initializeServer = createStoreInitializer({
 export const backgroundJobs = createBackgroundJobs({ isReady: () => dbInitialized, resolveAiImportCredential, cleanupAiScheduleHistory });
 export const proactiveJobs=createProactiveJobs(()=>dbInitialized);
 export const runtimeProactiveEnabled=runtimeConfig.proactiveJobsEnabled;
+export const androidPushJobs=createAndroidPushJobs(()=>dbInitialized);
+export const runtimeAndroidPushEnabled=process.env.ANDROID_PUSH_ENABLED==='true';
 export function logServiceStarted() {
   addLog('info', 'system', '启动配置已记录', { event: 'service_started', pid: process.pid, nodeVersion: process.version,
     backgroundJobsEnabled, appTimezone: process.env.APP_TIMEZONE || 'Asia/Shanghai',

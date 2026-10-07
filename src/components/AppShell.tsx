@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AccountAvatar } from './AccountAvatar';
 import { BrowserNotifications } from './BrowserNotifications';
+import { AndroidNotifications } from './AndroidNotifications';
 import '../styles/account-menu.css';
 import { Bot, CalendarDays, CircleArrowRight, Repeat2, BookOpen, Moon, Newspaper, Settings, Sun, UserRound, ChartNoAxesCombined, type LucideIcon } from 'lucide-react';
 import { APP_CONFIG } from '../config';
@@ -99,7 +100,7 @@ export function AppShell({
           </details>
         </div>
       </header>
-      <BrowserNotifications/><main className="app-shell-body">{children}</main>
+      <BrowserNotifications/><AndroidNotifications/><main className="app-shell-body">{children}</main>
     </div>
   );
 }

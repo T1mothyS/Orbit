@@ -2,13 +2,37 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last local verification: 2026-10-06，聊天清理、入口精简及记事链接本地验证；版本源为 package.json，验证入口/结果见 TEST-MATRIX。此轮不包含真实 AI、生产、自然定时与收件箱；其他历史证据按各节日期使用。
+- Last local verification: 2026-10-07，Android 通知试验实现、服务及合成浏览器验证；版本源为 package.json，验证入口/结果见 TEST-MATRIX。不包含真机送达、真实 AI、生产、自然定时与收件箱；其他历史证据按各节日期使用。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
 - Do not use for: 推断当前生产部署、Work 配置或邮件收件箱状态。
 
 本文档记录当前源码和测试能够证明的结构，不记录密钥、真实生产数据、用户邮件或服务器凭据。发生行为变化时，先以源码和测试为准，再更新本文档。
+
+## Android 客户端与 Push
+
+`android/` 是 Kotlin + WebView 在线壳，复用 Web 登录、聊天、路由与账号数据。构建时固定一个 HTTPS 来源，原生 `WebMessageListener` 只允许该来源的主框架和协议版本 1；未知方法拒绝，外部链接打开系统应用，不忽略 TLS 错误，不允许明文/混合内容、文件 URL 和第三方 Cookie。返回、键盘/系统栏安全区、文件选择及通知点击由原生负责。没有业务离线数据库和手机常驻轮询。
+
+客户端缺少 `google-services.json` 时不初始化 Firebase；本地测试仍可用。FCM 注册使用 `register/onRegistered` 的 FID，退出使用 `unregister` 与 Installations `delete`。原生不保存登录 JWT，账号与设备绑定由当前登录网页提交。Android 通知权限共用；拒绝不会阻断 Web 页面。本地 AlarmManager 一分钟试验与 FCM 独立：精确测试检查 `SCHEDULE_EXACT_ALARM`，另提供明确标注可能延迟的非精确测试，每台设备仅保留一个，取消/退出/换账号清理，重启不恢复，不创建服务器 Reminder。
+
+`server/android-push.ts` 在 chat.db 的三个新增表维护独立默认关闭的账号偏好、私有设备/FID 和每设备持久投递。已存在安装 ID 更新要求安装密钥证明；同一物理设备用该证明换账号时轮换 generation 并阻止旧队列。读取接口不返回 FID、安装密钥或密钥 hash；解绑补偿能力仅能撤销匹配 device/generation，不能登录或发送，旧补偿不能解绑新账号。账号禁用、认证版本变化、设备权限关闭或撤销均阻止发送。
+
+| 接口 | 边界 |
+| --- | --- |
+| `GET /api/android-push` | 当前账号开关、发送端配置状态、扫描开关、脱敏设备列表 |
+| `PUT /api/android-push/preferences` | 当前账号独立手机 Push 开关 |
+| `POST /api/android-push/devices` | 认证 + 安装密钥证明，注册/更新/切换绑定 |
+| `DELETE /api/android-push/devices/:id` | 认证 + 当前账号所有权，撤销指定设备 |
+| `POST /api/android-push/revoke` | 仅解绑能力；匹配设备、generation 与安装密钥，供离线退出补偿 |
+| `POST /api/android-push/devices/:id/test` | 认证 + 所有权，30 秒频率限制，只处理该次当前设备测试 |
+| `GET /api/android-push/notifications/:id` | 认证 + 通知所有权，脱敏投递状态及安全对象路由 |
+
+唯一 worker 的 `ANDROID_PUSH_ENABLED=true` 每 15 秒运行独立扫描，不依赖 SMTP、站内开关或 AI 增强。复用 `proactiveCandidates` 与周期投影、逐事项规则和 snooze；待完成、未删除、时间/fingerprint/账号开关/设备状态/免打扰均在发送前复核，最多保留五分钟有效窗口。提前提醒不得在事项已经开始后补发；免打扰期间不推送，超过窗口不追发。消息只包含标题与时间，以及用于当前账号点击定位的通知 ID 和 generation，不带备注、位置或 AI 提示。
+
+每设备独立去重；FID 轮换只重新定位尚未发送的记录，已接受的同一事项/触发时间不重复发送，generation 负责绑定有效性。领取 CAS、持久 attempts、15/30/60/120 秒重试，最大四次；单设备失败不回滚其他设备。`sent` 仅证明 Admin SDK 接受发送，不证明手机展示。FCM 使用 `notification + data`：后台系统展示，前台原生展示；点击由账号/generation 检查后用已认证的目标读取接口定位。已经接受的后台通知可能在退出、改期后出现，无法保证撤回，必须区分此边界与发送前保护。
+
+Push 使用独立表和消费者；旧通知消费者明确排除 `push`，不会替手机渠道提前标 `sent`。没有为正式事项同时安排本地闹钟。设备/投递不进入账号备份，chat.db 启用 secure_delete 以清除已删除身份的空闲页残留；sql.js 导出会重置连接 PRAGMA，因此每次导出及内存恢复后都重新开启。全站备份在副本中安全清理并压缩，旧全站快照恢复也清理手机状态；恢复后重新授权开关并绑定。新增 schema 前保留数据库迁移快照，维护恢复拒绝开启 Push 扫描。构建配置/凭据方式见 [Android 构建](../android/README.md)，真机结论仅见 [验收矩阵](TEST-MATRIX.md#android-一期)。
 
 事项的通俗分类、字段解释及历史占位时间边界见 [日历数据人话版](CALENDAR-DATA-GUIDE.md)；该说明不改变现有数据模型。
 

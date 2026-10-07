@@ -3,6 +3,7 @@ import { Button, MessagePlugin, Switch, Select } from 'tdesign-react';
 import { SettingSection } from '../SettingSection';
 import { SettingRow, SettingInput } from '../SettingRow';
 import { loadNotificationPreferences, saveAndReloadNotificationPreferences } from '../../../services/notification-preferences';
+import {AndroidNotificationSettings} from './AndroidNotificationSettings';
 import type { HomeLocation, SettingsAuthHeaders } from '../types';
 
 export function NotificationSettings({ authHeaders, userEmail }: { authHeaders: SettingsAuthHeaders; userEmail: string }) {
@@ -222,6 +223,7 @@ export function NotificationSettings({ authHeaders, userEmail }: { authHeaders: 
         </SettingRow>
       </fieldset>
       <WeeklySettings/>
+      <AndroidNotificationSettings/>
       <p className="settings-note">高优先级日程邮件是固定规则，不受邮件开关、免打扰和“开启每日提醒”影响。官方发件邮箱：aicalendarofficial@163.com</p>
     </SettingSection>
   );
