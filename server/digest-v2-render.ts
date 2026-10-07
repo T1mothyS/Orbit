@@ -77,7 +77,7 @@ function digestDisplayTitle(p: DigestPublication): string {
   return [...p.digest.stories, ...p.digest.market, ...p.digest.macro].length ? '今日重点新闻' : '今日情报简报';
 }
 const plainEmphasis = (value: string): string => value.replace(/\*\*/g, '');
-const emphasis = (value: string): string => value.split('**').map((part, i) => i % 2 ? `<strong>${esc(part)}</strong>` : esc(part)).join('');
+const emphasis = (value: string, email = false): string => value.split('**').map((part, i) => i % 2 ? `<strong${email ? ' style="font-weight:600"' : ''}>${esc(part)}</strong>` : esc(part)).join('');
 function conciseImageCredit(image: PreparedImage): string {
   if (image.fallback || image.visualKind === 'illustration') return imageCredit(image);
   const c = validImageCredit(image);
@@ -116,8 +116,9 @@ function watchlistReferenceDate(evidence: DigestEvidence, title: string): string
 }
 function renderEditorialDigestV2(p: DigestPublication, email: boolean): string {
   const d = p.digest;
-  const section = (title: string, body: string) => `<section style="margin:28px 0"><h2 style="font-size:18px;border-bottom:1px solid #b9c2ce;padding-bottom:10px">${title}</h2>${body || '<p>本期无新增内容。</p>'}</section>`;
-  const list = (items: string[]) => items.length ? `<ul style="padding-left:24px">${items.map(item => `<li style="margin:8px 0">${emphasis(item)}</li>`).join('')}</ul>` : '';
+  const rich = (value: string) => emphasis(value, email);
+  const section = (title: string, body: string) => `<section style="margin:28px 0"><h2 style="font-size:${email ? '20px;line-height:1.5' : '18px'};border-bottom:1px solid ${email ? '#b9c2ce' : 'var(--td-component-stroke, #b9c2ce)'};padding-bottom:10px">${title}</h2>${body || '<p>本期无新增内容。</p>'}</section>`;
+  const list = (items: string[]) => items.length ? `<ul style="padding-left:24px">${items.map(item => `<li style="margin:8px 0">${rich(item)}</li>`).join('')}</ul>` : '';
   const mediaEvidenceIds = new Set(d.media.map(item => item.evidence_id));
   const sources = new Map<string, { number: number; evidence: DigestEvidence }>();
   const citedIds = (ids: string[]) => {
@@ -147,15 +148,17 @@ function renderEditorialDigestV2(p: DigestPublication, email: boolean): string {
     return items.map(story => {
       const image = imageFor(story);
       const lead = story.id === leadId;
-      const title = `<h3 style="margin:0 0 8px;font-size:${lead ? '24px' : '17px'};line-height:1.4">${esc(story.title)}</h3>`;
+      const title = `<h3 class="digest-v2-story-title" style="margin:0 0 8px;font-size:${lead ? email ? '22px' : '24px' : email ? '18px' : '17px'};line-height:${email ? '1.45' : '1.4'}">${esc(story.title)}</h3>`;
       const paragraphs = story.summary.split(/\r?\n\s*\r?\n/);
-      const summary = paragraphs.map((paragraph, index) => `<p style="margin:8px 0 0">${emphasis(paragraph)}${index === paragraphs.length - 1 ? citations(story.evidence_ids) : ''}</p>`).join('');
-      const frame = `class="digest-v2-story${lead ? ' digest-v2-story--lead' : ' digest-v2-story--compact'}" style="margin:24px 0;padding-top:16px;border-top:1px solid #c9d0d8"`;
-      if (!image) return `<article class="digest-v2-story digest-v2-story--no-image" style="margin:24px 0;padding-top:16px;border-top:1px solid #c9d0d8">${title}<p style="font-size:12px;opacity:.7">此条暂无可用配图</p>${summary}</article>`;
+      const summary = `<div class="digest-v2-story-body">${paragraphs.map((paragraph, index) => `<p style="margin:${email ? '12' : '8'}px 0 0">${rich(paragraph)}${index === paragraphs.length - 1 ? citations(story.evidence_ids) : ''}</p>`).join('')}</div>`;
+      const frame = `class="digest-v2-story${lead ? ' digest-v2-story--lead' : ' digest-v2-story--compact'}" style="margin:24px 0;padding-top:16px;border-top:1px solid ${email ? '#c9d0d8' : 'var(--td-component-stroke, #c9d0d8)'}"`;
+      if (!image) return `<article class="digest-v2-story digest-v2-story--no-image" style="margin:24px 0;padding-top:16px;border-top:1px solid ${email ? '#c9d0d8' : 'var(--td-component-stroke, #c9d0d8)'}">${title}<p style="font-size:12px;opacity:.7">此条暂无可用配图</p>${summary}</article>`;
       if (image === coverImage) return `<article ${frame}>${title}${summary}</article>`;
-      const credit = `<figcaption style="font-size:11px;line-height:1.5;opacity:.75;overflow-wrap:anywhere">${conciseImageCredit(image)}</figcaption>`;
-      if (lead) return `<article ${frame}>${title}<figure style="margin:14px 0"><img src="${esc(image.publicUrl)}" alt="${esc(imageAlt(image, story))}" width="640" style="display:block;width:100%;max-width:640px;height:auto;max-height:360px;object-fit:cover;border-radius:6px"/>${credit}</figure>${summary}</article>`;
-      return `<article ${frame}><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;table-layout:fixed;border-collapse:collapse"><tr><td valign="top" style="min-width:0;padding-right:14px;overflow-wrap:anywhere">${title}${summary}</td><td valign="top" width="116" style="width:116px"><img src="${esc(image.publicUrl)}" alt="${esc(imageAlt(image, story))}" width="116" height="82" style="display:block;width:116px;height:82px;object-fit:cover;border-radius:5px"/></td></tr></table>${credit}</article>`;
+      const creditStyle = `font-size:${email ? '12px;line-height:1.6;color:#536174' : '11px;line-height:1.5;opacity:.75'};overflow-wrap:anywhere`;
+      const credit = `<div class="digest-v2-image-credit" style="${creditStyle}">${conciseImageCredit(image)}</div>`;
+      if (lead) return `<article ${frame}>${title}<figure style="margin:14px 0"><img src="${esc(image.publicUrl)}" alt="${esc(imageAlt(image, story))}" width="640" style="display:block;width:100%;max-width:640px;height:auto;max-height:360px;object-fit:cover;border-radius:6px"/><figcaption class="digest-v2-image-credit" style="${creditStyle}">${conciseImageCredit(image)}</figcaption></figure>${summary}</article>`;
+      if (email) return `<article ${frame}><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;table-layout:fixed;border-collapse:collapse"><tr><td valign="top" style="min-width:0;padding-right:12px;overflow-wrap:anywhere">${title}</td><td valign="top" width="96" style="width:96px"><img src="${esc(image.publicUrl)}" alt="${esc(imageAlt(image, story))}" width="96" height="72" style="display:block;width:96px;height:72px;object-fit:cover;border-radius:5px"/></td></tr></table>${summary}${credit}</article>`;
+      return `<article ${frame}><div class="digest-v2-story-layout">${title}<img class="digest-v2-story-thumb" src="${esc(image.publicUrl)}" alt="${esc(imageAlt(image, story))}" width="116" height="82"/>${summary}</div>${credit}</article>`;
     }).join('');
   };
   const alerts = p.warnings.filter(warning => warnings[warning]).map(warning => `<p>${warnings[warning]}</p>`).join('');
@@ -164,36 +167,36 @@ function renderEditorialDigestV2(p: DigestPublication, email: boolean): string {
     ? 'height:auto;max-height:320px;object-fit:contain'
     : email ? 'height:auto;max-height:440px;aspect-ratio:16/9;object-fit:cover' : 'height:70svh;min-height:360px;max-height:720px;object-fit:cover';
   const cover = coverImage && coverStory ? `<figure class="digest-v2-cover" style="margin:0 0 8px"><img src="${esc(coverImage.publicUrl)}" alt="${esc(imageAlt(coverImage, coverStory))}" width="680" style="display:block;width:100%;${coverStyle};border-radius:6px"/></figure>` : '';
-  const coverCredit = coverImage ? `<p style="font-size:11px;line-height:1.5;opacity:.75;margin:4px 0 0">${conciseImageCredit(coverImage)}</p>` : '';
+  const coverCredit = coverImage ? `<p class="digest-v2-image-credit" style="font-size:${email ? '12px;line-height:1.6;color:#536174' : '11px;line-height:1.5;opacity:.75'};margin:4px 0 0">${conciseImageCredit(coverImage)}</p>` : '';
   const readings = p.renderer === DIGEST_V2_GENERATION ? d.further_reading || [] : [];
   const renderFurtherReading = () => readings.length ? section('拓展阅读', `<ul style="padding-left:24px">${readings.map(item => {
     const source = d.evidence.find(evidence => evidence.id === item.evidence_ids[0]);
     const title = source && publicDigestUrl(source.url) ? `<a href="${esc(source.url)}" rel="noopener noreferrer" style="color:${email ? '#285eaa' : 'var(--td-brand-color, #285eaa)'}">${esc(item.title)}</a>` : esc(item.title);
-    return `<li class="digest-v2-reading" style="margin:16px 0"><strong>${title}</strong><p style="margin:4px 0">${emphasis(item.reason)}${citations(item.evidence_ids)}</p></li>`;
+    return `<li class="digest-v2-reading" style="margin:16px 0"><strong${email ? ' style="font-weight:600"' : ''}>${title}</strong><p style="margin:4px 0">${rich(item.reason)}${citations(item.evidence_ids)}</p></li>`;
   }).join('')}</ul>`) : '';
   const renderWatchlist = (item: DigestV2['watchlist'][number]) => {
     const parts = watchlistReadingParts(item);
-    if (!parts.readable) return `<p>${emphasis(item.summary)}${citations(item.evidence_ids)}<br/><small>${watchlistCheckMessage(item)}</small></p>`;
+    if (!parts.readable) return `<p>${rich(item.summary)}${citations(item.evidence_ids)}<br/><small>${watchlistCheckMessage(item)}</small></p>`;
     const blocks: string[] = [];
     let bullets: string[] = [];
     const flush = () => { if (bullets.length) { blocks.push(list(bullets)); bullets = []; } };
     for (const line of parts.lines) {
       if (/^[•●]\s*\S/.test(line)) bullets.push(line.replace(/^[•●]\s*/, ''));
-      else { flush(); blocks.push(`<p style="margin:8px 0">${emphasis(line)}</p>`); }
+      else { flush(); blocks.push(`<p style="margin:8px 0">${rich(line)}</p>`); }
     }
     flush();
     const references = citedIds(item.evidence_ids).map(id => d.evidence.find(evidence => evidence.id === id)).filter((evidence): evidence is DigestEvidence => !!evidence && publicDigestUrl(evidence.url));
     const links = references.map((evidence, index) => {
       const title = parts.titles.length === references.length ? parts.titles[index] : evidence.source;
-      return `<li style="margin:6px 0"><a href="${esc(evidence.url)}" rel="noopener noreferrer" style="color:${email ? '#285eaa' : 'var(--td-brand-color, #285eaa)'}">${emphasis(title)}</a>${watchlistReferenceDate(evidence, title)}${citations([evidence.id])}</li>`;
+      return `<li style="margin:6px 0"><a href="${esc(evidence.url)}" rel="noopener noreferrer" style="color:${email ? '#285eaa' : 'var(--td-brand-color, #285eaa)'}">${rich(title)}</a>${watchlistReferenceDate(evidence, title)}${citations([evidence.id])}</li>`;
     }).join('');
     const scope = item.check === 'incomplete' ? '<p style="font-size:12px;opacity:.75">资料范围：仅覆盖列出的参考内容，未覆盖全部动态。</p>' : '';
     return `<article class="digest-v2-watchlist" style="margin:20px 0">${blocks.join('')}${links ? `<p style="margin:12px 0 4px"><strong>参考内容：</strong></p><ul style="padding-left:24px">${links}</ul>` : ''}${scope}</article>`;
   };
-  const body = `${section('Executive Signals · 重点信号', list(d.executive_signals) || '<p>在本期检查范围内，没有选出重大信号。</p>')}${section('个人日程', list(d.calendar.map(item => item.text)) || (p.warnings.includes('CALENDAR_INCOMPLETE') ? '<p>未取得可展示的日程内容。</p>' : ''))}${section('邮件简报与行动', d.mail.length ? `<ul style="padding-left:24px">${d.mail.map(item => `<li style="margin:8px 0">${emphasis(item.summary)}${item.action ? `<br/><span>行动：${emphasis(item.action)}</span>` : ''}</li>`).join('')}</ul>` : emptyMailHtml(p))}${section('市场快照', stories(d.market))}${section('Macro Radar · 宏观简报', stories(d.macro))}${section('重要新闻', stories(d.stories, true))}${section('Watchlist · 持续关注', d.watchlist.length ? d.watchlist.map(renderWatchlist).join('') : `<p>${emptyWatchlistMessage(p)}</p>`)}${section('What Matters Next · 后续关注', list(d.what_matters_next))}`;
+  const body = `${section('Executive Signals · 重点信号', list(d.executive_signals) || '<p>在本期检查范围内，没有选出重大信号。</p>')}${section('个人日程', list(d.calendar.map(item => item.text)) || (p.warnings.includes('CALENDAR_INCOMPLETE') ? '<p>未取得可展示的日程内容。</p>' : ''))}${section('邮件简报与行动', d.mail.length ? `<ul style="padding-left:24px">${d.mail.map(item => `<li style="margin:8px 0">${rich(item.summary)}${item.action ? `<br/><span>行动：${rich(item.action)}</span>` : ''}</li>`).join('')}</ul>` : emptyMailHtml(p))}${section('市场快照', stories(d.market))}${section('Macro Radar · 宏观简报', stories(d.macro))}${section('重要新闻', stories(d.stories, true))}${section('Watchlist · 持续关注', d.watchlist.length ? d.watchlist.map(renderWatchlist).join('') : `<p>${emptyWatchlistMessage(p)}</p>`)}${section('What Matters Next · 后续关注', list(d.what_matters_next))}`;
   const furtherReading = renderFurtherReading();
-  const references = sources.size ? section('来源', `<ol style="padding-left:24px">${[...sources.values()].map(({ number, evidence }) => `<li id="digest-source-${number}" style="margin:10px 0;font-size:13px;scroll-margin-top:20px">${sourceIcon(evidence)}${esc(evidence.source)} · 发布时间：${evidenceTime(evidence.published_at)} · <a href="${esc(evidence.url)}" rel="noopener noreferrer" style="color:${email ? '#285eaa' : 'var(--td-brand-color, #285eaa)'}">原文链接</a></li>`).join('')}</ol>`) : '';
-  return `<div class="digest-v2" style="max-width:680px;margin:0 auto;overflow-wrap:anywhere;line-height:1.8;${email ? 'color:#253247;background:#fff;font-family:Arial,sans-serif;padding:20px' : 'color:inherit'}">${cover}<header><h1 style="font-size:26px;line-height:1.4;margin:12px 0 2px">${esc(digestDisplayTitle(p))}</h1><p style="font-size:12px;letter-spacing:.08em;margin:0">DAILY DIGEST · ${esc(d.date)}</p></header>${coverCredit}${alerts ? `<aside role="status" style="border-left:4px solid #bd830e;padding:4px 16px"><strong>${p.renderer === DIGEST_V2_GENERATION && p.warnings.some(warning => warning.startsWith('SOURCE_')) ? '本期来源与输入说明' : '本期信息不完整'}</strong>${alerts}</aside>` : ''}${body}${furtherReading}${references}</div>`;
+  const references = sources.size ? section('来源', `<ol style="padding-left:24px">${[...sources.values()].map(({ number, evidence }) => `<li id="digest-source-${number}" style="margin:10px 0;font-size:13px;line-height:1.65;scroll-margin-top:20px">${sourceIcon(evidence)}${esc(evidence.source)} · 发布时间：${evidenceTime(evidence.published_at)} · <a href="${esc(evidence.url)}" rel="noopener noreferrer" style="color:${email ? '#285eaa' : 'var(--td-brand-color, #285eaa)'}">原文链接</a></li>`).join('')}</ol>`) : '';
+  return `<div class="digest-v2 digest-v2--editorial" style="width:100%;max-width:680px;box-sizing:border-box;margin:0 auto;overflow-wrap:anywhere;line-height:${email ? '1.75' : '1.8'};${email ? 'font-size:16px;color:#253247;background:#fff;font-family:Arial,sans-serif;padding:16px' : 'color:inherit'}">${cover}<header><h1 style="font-size:26px;line-height:1.4;margin:12px 0 2px">${esc(digestDisplayTitle(p))}</h1><p style="font-size:12px;letter-spacing:.08em;margin:0">DAILY DIGEST · ${esc(d.date)}</p></header>${coverCredit}${alerts ? `<aside role="status" style="border-left:4px solid #bd830e;padding:4px 16px"><strong>${p.renderer === DIGEST_V2_GENERATION && p.warnings.some(warning => warning.startsWith('SOURCE_')) ? '本期来源与输入说明' : '本期信息不完整'}</strong>${alerts}</aside>` : ''}${body}${furtherReading}${references}</div>`;
 }
 export function renderDigestV2(p: DigestPublication, email = false): string {
   if (DIGEST_V2_EDITORIAL_GENERATIONS.includes(p.renderer)) return renderEditorialDigestV2(p, email);

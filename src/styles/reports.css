@@ -248,6 +248,12 @@
 .daily-report-markdown th { background: var(--td-bg-color-component); font-weight: 700; }
 .daily-report-markdown .digest-v2-story table { min-width: 0; font-size: inherit; }
 .daily-report-markdown .digest-v2-story td { padding: 0; border: 0; }
+.daily-report-markdown .digest-v2-story-layout { display: grid; grid-template-columns: minmax(0, 1fr) 116px; grid-template-areas: "title image" "body image"; column-gap: 14px; align-items: start; }
+.daily-report-markdown .digest-v2-story-layout > .digest-v2-story-title { grid-area: title; min-width: 0; }
+.daily-report-markdown .digest-v2-story-layout > .digest-v2-story-body { grid-area: body; }
+.daily-report-markdown .digest-v2-story-body { min-width: 0; }
+.daily-report-markdown .digest-v2-story-body > p:first-child { margin-top: 0 !important; }
+.daily-report-markdown .digest-v2-story-thumb { grid-area: image; display: block; width: 116px; height: 82px; max-width: 100%; object-fit: cover; border-radius: 5px; }
 .daily-report-markdown .daily-report-unsafe-link { color: var(--td-text-color-secondary); text-decoration: line-through; }
 .daily-report-markdown .daily-report-card-grid { width: 100%; }
 .daily-report-markdown .daily-report-card-grid > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
@@ -293,4 +299,19 @@
   .daily-report-markdown .daily-newsletter .story-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 7px; letter-spacing: .01em; }
   .daily-report-markdown .daily-newsletter .digest-item-layout.with-image { grid-template-columns: minmax(0, 1fr) 94px !important; gap: 10px; }
   .daily-report-markdown .daily-newsletter .digest-thumb { width: 94px !important; height: 68px !important; }
+}
+
+@media (max-width: 640px) {
+  /* Editorial HTML has email-compatible inline defaults; override only its mobile reading presentation. */
+  .daily-report-markdown .digest-v2--editorial { font-size: 16px; line-height: 1.75 !important; }
+  .daily-report-markdown .digest-v2--editorial strong { font-weight: 600; }
+  .daily-report-markdown .digest-v2--editorial > section > h2 { font-size: 20px !important; line-height: 1.5; }
+  .daily-report-markdown .digest-v2--editorial .digest-v2-story-title { font-size: 18px !important; line-height: 1.45 !important; }
+  .daily-report-markdown .digest-v2--editorial .digest-v2-story--lead > .digest-v2-story-title { font-size: 22px !important; }
+  .daily-report-markdown .digest-v2--editorial .digest-v2-story-layout { grid-template-columns: minmax(0, 1fr) 96px; grid-template-areas: "title image" "body body"; gap: 12px; }
+  .daily-report-markdown .digest-v2--editorial .digest-v2-story-layout > .digest-v2-story-title { margin-bottom: 0 !important; }
+  .daily-report-markdown .digest-v2--editorial .digest-v2-story-thumb { width: 96px; height: 72px; }
+  .daily-report-markdown .digest-v2--editorial .digest-v2-story-body > p { margin-top: 12px !important; }
+  .daily-report-markdown .digest-v2--editorial .digest-v2-story-body > p:first-child { margin-top: 0 !important; }
+  .daily-report-markdown .digest-v2--editorial .digest-v2-image-credit { margin-top: 8px !important; font-size: 12px !important; line-height: 1.6 !important; color: var(--td-text-color-secondary); opacity: 1 !important; }
 }

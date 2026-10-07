@@ -127,7 +127,7 @@ test('watchlist reader layout keeps facts, dated source links, and coverage sepa
   for (const email of [false, true]) {
     const html = renderDigestV2(p, email);
     const article = html.match(/<article class="digest-v2-watchlist"[\s\S]*?<\/article>/)?.[0] || '';
-    assert.match(article, /<li[^>]*>公司发布<strong>季度公告<\/strong>。<\/li>/);
+    assert.match(article, /<li[^>]*>公司发布<strong(?: style="font-weight:600")?>季度公告<\/strong>。<\/li>/);
     assert.match(article, /href="https:\/\/example.com\/disclosure"[^>]*>季度公告（10月5日）<\/a>/);
     assert.ok(article.includes('10月6日 13:25（北京时间）'));
     assert.ok(!article.includes('时间未知'));
@@ -209,13 +209,47 @@ test('new digest layout gives the lead a large image, other stories side images,
     assert.equal((html.match(/digest-v2-story--no-image/g) || []).length, 1);
     assert.ok(html.includes('class="digest-v2-cover"'));
     assert.ok(html.includes('width="680"'));
-    assert.ok(html.includes('width="116"'));
+    assert.ok(html.includes(`width="${email ? '96' : '116'}"`));
     assert.ok(html.includes('此条暂无可用配图'));
   }
   const legacy = renderDigestV2({ ...publication, renderer: '2026-09-24.1' });
   assert.ok(!legacy.includes('digest-v2-story--lead'));
   assert.ok(!legacy.includes('此条暂无可用配图'));
   assert.ok(digestV2Text({ ...publication, renderer: '2026-09-24.1' }).includes('本期无新增内容。'));
+});
+
+test('editorial deep reads preserve paragraphs and citations outside the email thumbnail column', () => {
+  const d = illustrated();
+  d.evidence.push({ id: 'e2', url: 'https://example.com/deep-read', source: '第二来源', published_at: '' });
+  d.media.push({ id: 'm2', evidence_id: 'e2', url: 'https://images.example.com/portrait.jpg', category: 'AI' });
+  const paragraphs = Array.from({ length: 5 }, (_, i) => `第${i + 1}段解释**关键事实**与背景，保留原文 <script> 和 & 字符。`);
+  d.stories.push({ id: 's2', title: '很长的新闻标题：<资料>与后续观察', summary: paragraphs.join('\n\n'), evidence_ids: ['e2'], media_ids: ['m2'], verification: 'partial' });
+  const media = d.media.map(m => ({ id: m.id, publicUrl: m.url, fallback: false, credit: { caption: '资料照', author: 'Test', sourcePage: 'https://example.com/photo', licenseName: 'CC BY', licenseUrl: 'https://example.com/license' } })) as any;
+  const publication = { digest: d, media, warnings: [], renderer: DIGEST_V2_GENERATION };
+  const before = encodeDigestPublication(publication);
+  const beforeText = digestV2Text(publication);
+  for (const email of [false, true]) {
+    const html = renderDigestV2(publication, email);
+    const article = html.match(/<article class="digest-v2-story digest-v2-story--compact"[^>]*>([\s\S]*?)<\/article>/)![1];
+    assert.equal((article.match(/<p /g) || []).length, 5);
+    assert.ok(article.includes('&lt;script&gt; 和 &amp; 字符'));
+    assert.ok(article.includes('href="#digest-source-2"'));
+    assert.ok(html.includes('id="digest-source-2"'));
+    assert.ok(article.includes('图片来源') && article.includes('CC BY'));
+    if (email) {
+      const header = article.match(/<table[^>]*>[\s\S]*?<\/table>/)![0];
+      assert.ok(header.includes('&lt;资料&gt;'));
+      assert.ok(!header.includes('第1段'));
+      assert.ok(article.indexOf('第1段') > article.indexOf('</table>'));
+      assert.ok(!article.includes('display:grid'));
+      assert.ok(article.includes('<strong style="font-weight:600">关键事实</strong>'));
+    } else {
+      assert.ok(article.includes('class="digest-v2-story-layout"'));
+      assert.ok(!article.includes('<table'));
+    }
+  }
+  assert.equal(encodeDigestPublication(publication), before);
+  assert.equal(digestV2Text(publication), beforeText);
 });
 
 test('report list uses the lead news title and image instead of the draft title or a source icon', () => {
@@ -259,7 +293,7 @@ test('editorial digest renders selective emphasis, one opening cover, numbered s
     const html = renderDigestV2(p, email);
     assert.ok(html.indexOf('class="digest-v2-cover"') < html.indexOf('>今日重点新闻</h1>'));
     assert.equal((html.match(/lead\.jpg/g) || []).length, 1);
-    assert.ok(html.includes('<strong>长端国债收益率</strong>'));
+    assert.match(html, /<strong(?: style="font-weight:600")?>长端国债收益率<\/strong>/);
     assert.ok(html.includes('href="#digest-source-1"'));
     assert.ok(html.includes('id="digest-source-1"'));
     assert.equal((html.match(/id="digest-source-1"/g) || []).length, 1);
