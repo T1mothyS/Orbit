@@ -2,24 +2,28 @@ import { Router, type RequestHandler } from 'express';
 import * as dailyReportCloudStore from '../daily-report-cloud-store.js';
 import { getDailyReportDeliveryPolicy, normalizeDailyReportDeliverySources, setDailyReportDeliveryPolicy } from '../daily-report-delivery-policy.js';
 import { addLog } from '../log-service.js';
+import { contextInputWarnings } from '../../src/utils/daily-report-context.js';
 
 export function createReportsPolicyRouter({ authenticate }: { authenticate: RequestHandler }) {
   const app = Router();
   app.get('/api/daily-report/cloud-context', authenticate, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ context: dailyReportCloudStore.getDailyReportCloudContext((req as any).user.userId) });
+    const context = dailyReportCloudStore.getDailyReportCloudContext((req as any).user.userId);
+    res.json({ context, inputWarnings: context.readFailed ? ['已保存资料读取异常'] : contextInputWarnings(context.context) });
   });
 
   app.put('/api/daily-report/cloud-context', authenticate, (req, res) => {
-    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || Object.keys(req.body).some(key => key !== 'context')) {
-      return res.status(400).json({ error: '请求正文只允许包含 context 字段' });
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || Object.keys(req.body).some(key => !['context', 'expectedVersion'].includes(key))) {
+      return res.status(400).json({ error: '请求正文只允许包含 context、expectedVersion 字段' });
     }
     try {
-      const context = dailyReportCloudStore.replaceDailyReportCloudContext((req as any).user.userId, req.body.context);
+      const context = dailyReportCloudStore.saveDailyReportCloudContext((req as any).user.userId, req.body.context, req.body.expectedVersion);
       res.setHeader('Cache-Control', 'no-store');
-      res.json({ context });
+      res.json({ context, inputWarnings: contextInputWarnings(context.context) });
     } catch (error: any) {
-      res.status(400).json({ error: error?.message || '保存日报云端 Context 失败' });
+      if (error instanceof dailyReportCloudStore.DailyReportCloudContextConflict) return res.status(409).json({ error: error.message, code: error.code });
+      if (error instanceof dailyReportCloudStore.DailyReportCloudInputError) return res.status(400).json({ error: error.message });
+      res.status(500).json({ error: '保存资料失败，请稍后重试；当前草稿仍保留' });
     }
   });
 

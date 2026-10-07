@@ -1,0 +1,42 @@
+.context-shell { width: min(100%, 900px); margin-inline: auto; min-width: 0; }
+.context-heading { margin: 12px 0 20px; }
+.context-heading h1 { margin: 0 0 6px; font-size: clamp(24px, 3vw, 32px); }
+.context-heading p, .context-help { color: var(--td-text-color-secondary); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.context-savebar { position: sticky; top: -1px; z-index: 4; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 0; background: rgb(var(--color-background)); border-bottom: 1px solid var(--td-component-stroke); }
+.context-savebar > span { min-width: 0; font-size: 13px; }
+.context-buttons { display: flex; gap: 8px; flex-shrink: 0; }
+.context-form { border: 0; padding: 0; margin: 0; min-width: 0; }
+.context-section { margin: 16px 0; padding: 16px; border: 1px solid var(--td-component-stroke); border-radius: 12px; background: var(--td-bg-color-container); }
+.context-section > summary { font-weight: 600; font-size: 16px; cursor: pointer; padding: 2px 0; min-height: 32px; }
+.context-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding-top: 14px; }
+.context-field { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.context-field label { color: var(--td-text-color-secondary); font-size: 13px; }
+.context-field textarea, .context-field input, .context-field select, .context-text-item textarea { width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid var(--td-component-stroke); border-radius: 8px; color: var(--td-text-color-primary); background: var(--td-bg-color-container); font: inherit; font-size: 14px; }
+.context-field textarea, .context-text-item textarea { resize: vertical; line-height: 1.6; }
+.context-field input[type="checkbox"] { width: 22px; min-height: 22px; padding: 0; }
+.context-field :is(textarea,input,select):focus, .context-text-item textarea:focus { outline: 2px solid var(--td-brand-color); outline-offset: 1px; }
+.context-subgroup, .context-list { grid-column: 1 / -1; min-width: 0; }
+.context-subgroup h3, .context-list h3, .context-item h3, .context-item h4 { margin: 0 0 8px; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.context-item { padding: 12px; margin: 10px 0; border: 1px solid var(--td-component-stroke); border-radius: 9px; min-width: 0; }
+.context-item:focus { outline: 2px solid var(--td-brand-color); outline-offset: 2px; }
+.context-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.context-item-head h4 { margin: 0; }
+.context-text-item { display: flex; align-items: start; gap: 8px; margin-bottom: 8px; min-width: 0; }
+.context-text-item textarea { flex: 1; }
+.context-text-item button { flex-shrink: 0; }
+.context-target-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 14px; font-size: 13px; color: var(--td-text-color-secondary); }
+.context-notice { margin: 12px 0; padding: 12px; border-radius: 8px; background: var(--td-brand-color-light); color: var(--td-text-color-primary); font-size: 13px; overflow-wrap: anywhere; }
+.context-notice p { margin: 0 0 8px; }
+.context-notice.error { color: var(--td-error-color); background: var(--td-error-color-1); }
+.context-warnings { margin: 14px 0; color: var(--td-text-color-secondary); font-size: 13px; line-height: 1.7; }
+.context-warnings summary { cursor: pointer; min-height: 32px; }
+.context-related { display: flex; flex-wrap: wrap; gap: 12px 20px; margin: 24px 0; font-size: 13px; color: var(--td-brand-color); }
+.context-page :is(button, a):focus-visible, .context-page summary:focus-visible { outline: 2px solid var(--td-brand-color); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .context-page { padding: 12px 12px 40px; }
+  .context-fields { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .context-section { padding: 12px; }
+  .context-page :is(input, textarea, select) { font-size: 16px; }
+  .context-page :is(button, a), .context-page summary { min-height: 44px; }
+  .context-heading { margin-top: 4px; }
+}

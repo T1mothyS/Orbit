@@ -1,10 +1,12 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { Dialog } from 'tdesign-react';
+import { useNavigate } from 'react-router-dom';
 import { SettingsPage } from './SettingsPage';
 import './settings.css';
 
 export function SettingsDialog({ onClose, onOpenAdmin, onOpenTools, restoreFocusTo }: { onClose: () => void; onOpenAdmin: () => void; onOpenTools?: () => void; restoreFocusTo?: HTMLElement | null }) {
+  const navigate = useNavigate();
   const triggerRef = useRef(restoreFocusTo ?? document.activeElement as HTMLElement | null);
   const frameRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -56,7 +58,7 @@ export function SettingsDialog({ onClose, onOpenAdmin, onOpenTools, restoreFocus
             <X size={20} aria-hidden="true" />
           </button>
         </div>
-        <SettingsPage onOpenAdmin={onOpenAdmin} onOpenTools={onOpenTools} />
+        <SettingsPage onOpenAdmin={onOpenAdmin} onOpenTools={onOpenTools} onOpenPreferences={() => { onClose(); navigate('/library/preferences'); }} />
       </div>
     </Dialog>
   );

@@ -2,6 +2,7 @@ import { settingKeywords, searchSettings, type SearchableSetting } from './setti
 // Stable IDs are shared by the settings UI, search and read-only AI recall. No values or secrets.
 const definitions = [
   { id: 'library-full-export', section: 'library', label: '导出全库', description: '下载当前账号的完整知识库 JSON。', admin: false },
+  { id: 'library-personal-preferences', section: 'library', label: '个人资料与日报偏好', description: '和日报设置共用同一份资料，直接在网页编辑。', admin: false },
   {
     "id": "setting-account-m2enu0",
     "section": "account",
@@ -131,8 +132,8 @@ const definitions = [
   {
     "id": "setting-daily-report-17lgo36",
     "section": "daily-report",
-    "label": "云端 Context",
-    "description": "上传日报 V2 导出的脱敏 JSON，供 ChatGPT Work 的 Shadow 或正式任务读取。服务端会再次拒绝凭据、令牌、本地路径和过大内容。",
+    "label": "个人资料与日报偏好",
+    "description": "直接在网页编辑当前账号的个人资料、阅读偏好、兴趣、关注名单和研究框架，供 Cloud 日报读取。",
     "admin": false
   },
   {

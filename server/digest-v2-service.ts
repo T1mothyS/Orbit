@@ -5,6 +5,7 @@ import { getAllSchedules } from './schedule-store.js';
 import { scheduleDateInTimezone } from './schedule-time.js';
 import { readUserMail } from './user-mail-service.js';
 import { getDailyReportCloudContext } from './daily-report-cloud-store.js';
+import { stockContextDetail } from '../src/utils/daily-report-context.js';
 import { isValidDateKey } from './date-key.js';
 import { DIGEST_V2_VERSION, DIGEST_V2_GENERATION, DIGEST_V2_ILLUSTRATED_GENERATIONS, DIGEST_V2_SCHEMA, digestHash, digestSnapshotWarnings, validateDigestV2, type DigestSnapshot, type DigestV2, type InputSection } from './digest-v2-contract.js';
 import { prepareDigestMedia, configuredMediaRules } from './digest-v2-media.js';
@@ -44,26 +45,9 @@ export function digestWatchlistInput(context: ReturnType<typeof getDailyReportCl
     const name = typeof stock.name === 'string' ? stock.name.trim() : '';
     const symbol = typeof stock.symbol === 'string' ? stock.symbol.trim() : '';
     if (!name && !symbol) return [];
-    const thesisFile = typeof stock.thesis_file === 'string' ? /^theses\/([A-Za-z0-9_-]+)\.ya?ml$/.exec(stock.thesis_file) : null;
-    const theses = context.context.theses;
-    const referencedThesis = thesisFile && theses && typeof theses === 'object' && !Array.isArray(theses)
-      ? (theses as Record<string, unknown>)[thesisFile[1]] : null;
-    const matchedThesis = referencedThesis && typeof referencedThesis === 'object' && !Array.isArray(referencedThesis)
-      && typeof (referencedThesis as Record<string, unknown>).symbol === 'string'
-      && ((referencedThesis as Record<string, unknown>).symbol as string).toLowerCase() === symbol.toLowerCase()
-      ? referencedThesis as Record<string, unknown> : null;
-    const thesis = stock.thesis && typeof stock.thesis === 'object' && !Array.isArray(stock.thesis)
-      ? stock.thesis as Record<string, unknown> : matchedThesis;
-    const complete = !!name && !!symbol && typeof stock.priority === 'string' && !!stock.priority.trim()
-      && Array.isArray(stock.sectors) && stock.sectors.every(sector => typeof sector === 'string' && !!sector.trim())
-      && thesis && typeof thesis.status === 'string' && !!thesis.status.trim()
-      && typeof thesis.priority === 'string' && !!thesis.priority.trim()
-      && thesis.thesis && typeof thesis.thesis === 'object' && !Array.isArray(thesis.thesis)
-      && thesis.monitor && typeof thesis.monitor === 'object' && !Array.isArray(thesis.monitor);
-    const detail = complete ? JSON.stringify({ priority: stock.priority, sectors: stock.sectors,
-      thesis: { status: thesis!.status, priority: thesis!.priority, thesis: thesis!.thesis, monitor: thesis!.monitor } }) : '';
-    if (!detail || detail.length > 4000) incomplete = true;
-    return [{ id: `watch-${index}-${digestHash(value).slice(0, 12)}`, title: [name, symbol].filter(Boolean).join(' '), detail: detail.length <= 4000 ? detail : '' }];
+    const { detail, issue } = stockContextDetail(context.context, stock);
+    if (issue) incomplete = true;
+    return [{ id: `watch-${index}-${digestHash(value).slice(0, 12)}`, title: [name, symbol].filter(Boolean).join(' '), detail }];
   });
   return { status: !items.length ? 'failed' : incomplete || items.length !== stocks.length || stocks.length > 100 ? 'partial' : 'complete', items: items.slice(0, 100) };
 }

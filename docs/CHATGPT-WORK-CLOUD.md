@@ -85,9 +85,19 @@ OAuth 令牌只保存在数据库的 SHA-256 哈希；人工登录/权限审阅�
 
 网页设置只保留“接收并转发本地日报”和“接收并转发 Cloud 日报”两个开关。它不暂停本地或 Work 任务，不删除候选或历史，也不追溯发送；下一次正式发布时，两个来源都仍先写生产记录，再根据开关标记为 `RECEIVED` 或 `CANDIDATE`。同日 Local/Cloud 按来源和内容哈希分别保存，邮件去重键也包含来源。
 
-## Cloud Context 导入
+## Cloud Context 编辑与导入
 
-V2 本地 Context 仍是当前本地链路的编辑源。一次性迁移时：
+日常修改从知识库首页或设置中的“个人资料与日报偏好”进入 `/library/preferences`，无需配置文件或上传。页面和原设置共用当前账号的 `daily_report_cloud_context`，不会创建第二份资料；原加密账号备份/恢复仍覆盖该数据。编辑页提交完整原数据，保留未展示的字段、旧式股票数组、内嵌框架及 `thesis_file` 引用。
+
+- `GET /api/daily-report/cloud-context`：返回 `{ context: { version, context, createdAt, updatedAt, readFailed }, inputWarnings }`；账号从登录认证确定，响应 `Cache-Control: no-store`。
+- `PUT /api/daily-report/cloud-context`：接受 `{ context, expectedVersion }`。新编辑页必须传非负整数版本，旧导入调用可继续只传 `{ context }`。版本检查与可靠磁盘写回在同一事务内完成，失败回滚内存和文件。
+- 版本不符返回 `409 CONTEXT_VERSION_CONFLICT`，损坏资料返回 `409 CONTEXT_READ_FAILED`，不允许空配置覆盖。网页保留当前草稿，重新加载前明确询问；重新加载后需核对再保存。
+- 服务端拒绝凭据、本地路径、无效 JSON、超过 200,000 字节的整体内容、超过 20,000 字符的单段文本和超过 200 项的数组；版本化编辑额外校验已知字段类型和资料时区，扩展字段保留。输入错误返回400，写回失败返回500，不泄露原始资料或内部路径。
+- 股票研究缺少必要字段、失效引用、空研究内容或超过4,000字符的关注 detail 时显示“输入不完整”；超过100项明确提示现有 Cloud 快照覆盖上限。允许保存尚未完成的研究资料，失败项不会伪装成完整。原始 Context 不被截断；V2.5 股票快照继续遵守既有读取规则。
+
+保存后下一次 Cloud 读取取得新版本；保存本身不触发生成、发布、邮件或正式观点变更。行业、公司及个人偏好随完整 Context 提供，V2.5 逐项股票关注快照由 `watchlist.stocks`（或旧式数组）及对应框架生成。Context 的资料时区不更改实际日报日期和调度时区；偏好不能绕过完整性、安全或媒体闸门。普通对话、经历复盘、本地 YAML、独立 Shadow 和其他账号不自动接入或同步。`/research` 正式观点保持现有确认流程。
+
+V2 本地 Context 仍是本地链路的编辑源。必要的一次性迁移仍可沿用旧入口：
 
 1. 在 V2 分支运行 `python scripts/export_cloud_context.py --output <temporary-json>`。
 2. 人工核对 JSON 只含 `profile`、`preferences`、`recent_interests`、`watchlist`、`theses` 等最小信息，没有凭据、本地路径、邮箱原文或无关身份资料。

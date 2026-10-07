@@ -1,22 +1,15 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button, MessagePlugin, Switch } from 'tdesign-react';
 import { SettingSection } from '../SettingSection';
 import { SettingRow } from '../SettingRow';
 import type { DailyReportTokenStatus, SettingsAuthHeaders } from '../types';
-
-const DAILY_REPORT_CLOUD_CONTEXT_MAX_BYTES = 200_000;
 
 interface DailyReportCloudContextEnvelope {
   version: number;
   context: Record<string, unknown>;
   createdAt: string | null;
   updatedAt: string | null;
-}
-
-interface SelectedCloudContextFile {
-  name: string;
-  size: number;
-  keys: string[];
+  readFailed: boolean;
 }
 
 type DailyReportSource = 'local' | 'cloud';
@@ -26,29 +19,17 @@ interface DailyReportDeliveryPolicy {
   updatedAt: string | null;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function formatBytes(bytes: number): string {
-  return `${(bytes / 1024).toFixed(bytes < 1024 ? 0 : 1)} KB`;
-}
-
-export function DailyReportSettings({ authHeaders }: { authHeaders: SettingsAuthHeaders }) {
+export function DailyReportSettings({ authHeaders, onOpenPreferences }: { authHeaders: SettingsAuthHeaders; onOpenPreferences?: () => void }) {
   const [dailyReportStatus, setDailyReportStatus] = useState<DailyReportTokenStatus | null>(null);
   const [dailyReportToken, setDailyReportToken] = useState('');
   const [dailyReportBusy, setDailyReportBusy] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [cloudContext, setCloudContext] = useState<DailyReportCloudContextEnvelope | null>(null);
-  const [cloudContextFile, setCloudContextFile] = useState<SelectedCloudContextFile | null>(null);
-  const [cloudContextValue, setCloudContextValue] = useState<Record<string, unknown> | null>(null);
-  const [cloudContextBusy, setCloudContextBusy] = useState(false);
   const [cloudContextError, setCloudContextError] = useState('');
   const [deliveryPolicy, setDeliveryPolicy] = useState<DailyReportDeliveryPolicy | null>(null);
   const [deliverySources, setDeliverySources] = useState<DailyReportSource[]>(['local']);
   const [deliveryPolicyBusy, setDeliveryPolicyBusy] = useState(false);
   const [deliveryPolicyError, setDeliveryPolicyError] = useState('');
-  const cloudContextFileInputRef = useRef<HTMLInputElement>(null);
   const loadDailyReportStatus = useCallback(async () => {
     setLoadError('');
     try {
@@ -118,54 +99,6 @@ export function DailyReportSettings({ authHeaders }: { authHeaders: SettingsAuth
       MessagePlugin.error(error?.message || '撤销令牌失败');
     } finally {
       setDailyReportBusy(false);
-    }
-  };
-
-  const selectCloudContextFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
-    setCloudContextFile(null);
-    setCloudContextValue(null);
-    setCloudContextError('');
-    if (!file) return;
-    if (file.size > DAILY_REPORT_CLOUD_CONTEXT_MAX_BYTES) {
-      setCloudContextError(`文件不能超过 ${DAILY_REPORT_CLOUD_CONTEXT_MAX_BYTES.toLocaleString()} 字节。`);
-      return;
-    }
-    try {
-      const parsed: unknown = JSON.parse(await file.text());
-      if (!isObject(parsed)) throw new Error('文件内容必须是 JSON 对象。');
-      const encoded = JSON.stringify(parsed);
-      if (new TextEncoder().encode(encoded).byteLength > DAILY_REPORT_CLOUD_CONTEXT_MAX_BYTES) {
-        throw new Error(`Context 不能超过 ${DAILY_REPORT_CLOUD_CONTEXT_MAX_BYTES.toLocaleString()} 字节。`);
-      }
-      setCloudContextValue(parsed);
-      setCloudContextFile({ name: file.name, size: file.size, keys: Object.keys(parsed) });
-    } catch (error: any) {
-      setCloudContextError(error?.message || '无法读取 JSON 文件。');
-    }
-  };
-
-  const uploadCloudContext = async () => {
-    if (!cloudContextValue) return;
-    setCloudContextBusy(true);
-    setCloudContextError('');
-    try {
-      const response = await fetch('/api/daily-report/cloud-context', {
-        method: 'PUT',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context: cloudContextValue }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result?.error || '上传云端 Context 失败');
-      setCloudContext(result.context as DailyReportCloudContextEnvelope);
-      setCloudContextFile(null);
-      setCloudContextValue(null);
-      if (cloudContextFileInputRef.current) cloudContextFileInputRef.current.value = '';
-      MessagePlugin.success('脱敏 Context 已上传到云端');
-    } catch (error: any) {
-      setCloudContextError(error?.message || '上传云端 Context 失败，请重试。');
-    } finally {
-      setCloudContextBusy(false);
     }
   };
 
@@ -250,31 +183,21 @@ export function DailyReportSettings({ authHeaders }: { authHeaders: SettingsAuth
           </div>
         </div>
       </SettingRow>
-      <SettingRow label="云端 Context" description="上传日报 V2 导出的脱敏 JSON，供 ChatGPT Work 的 Shadow 或正式任务读取。服务端会再次拒绝凭据、令牌、本地路径和过大内容。">
+      <SettingRow id="setting-daily-report-17lgo36" label="个人资料与日报偏好" description="直接在网页编辑当前账号的个人资料、阅读偏好、兴趣、关注名单和研究框架，供 Cloud 日报读取。">
         <div className="settings-stack">
           <div className="settings-status" role="status">
             {cloudContextError && <strong className="settings-error-text">{cloudContextError}</strong>}
             {!cloudContextError && !cloudContext && <strong>加载状态中…</strong>}
             {!cloudContextError && cloudContext && <>
-              <strong>{cloudContext.version > 0 ? `已同步版本 v${cloudContext.version}` : '尚未上传'}</strong>
-              <span>已保存顶层键：{Object.keys(cloudContext.context).join('、') || '无'}</span>
-              {cloudContext.updatedAt && <span>最近更新：{new Date(cloudContext.updatedAt).toLocaleString('zh-CN')}</span>}
+              <strong>{cloudContext.readFailed ? '资料读取异常，请先恢复' : cloudContext.version > 0 ? `已保存版本 v${cloudContext.version}` : '尚未配置'}</strong>
+              {cloudContext.updatedAt && <span>最近保存：{new Date(cloudContext.updatedAt).toLocaleString('zh-CN')}</span>}
             </>}
           </div>
-          <input
-            ref={cloudContextFileInputRef}
-            className="settings-file-input"
-            type="file"
-            accept="application/json,.json"
-            aria-label="选择脱敏 Context JSON"
-            onChange={event => { void selectCloudContextFile(event); }}
-          />
-          {cloudContextFile && <p className="settings-help">已读取 {cloudContextFile.name} · {formatBytes(cloudContextFile.size)} · 顶层键：{cloudContextFile.keys.join('、') || '无'}。页面不会展示文件正文。</p>}
           <div className="settings-actions">
-            <Button tag="button" loading={cloudContextBusy} disabled={!cloudContextValue || cloudContextBusy} onClick={() => void uploadCloudContext()}>上传脱敏 Context</Button>
-            <Button tag="button" variant="outline" loading={!cloudContext && !cloudContextError} disabled={cloudContextBusy} onClick={() => void loadCloudContext()}>刷新云端状态</Button>
+            <Button tag="button" onClick={onOpenPreferences}>编辑个人资料与日报偏好</Button>
+            <Button tag="button" variant="outline" loading={!cloudContext && !cloudContextError} onClick={() => void loadCloudContext()}>刷新保存状态</Button>
           </div>
-          <p className="settings-note">仅上传一次性脱敏 Context；Calendar、邮箱和动态运行状态仍由服务端按权限实时读取。本操作不会改变本地日报链路。</p>
+          <p className="settings-note">与知识库首页共用同一编辑页。保存后供下一次 Cloud 日报读取；不自动同步本地日报或其他环境。</p>
         </div>
       </SettingRow>
     </SettingSection>
