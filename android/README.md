@@ -27,9 +27,10 @@ $env:JAVA_HOME = 'C:\path\to\jdk-17'
 
 - 用户自建 Firebase 项目，注册上述包名、开启 Cloud Messaging，下载配置到被忽略的 `android/app/google-services.json`。
 - `google-services.json` 存在时构建才启用 Google Services 插件；没有它时移除自动初始化 Provider，不调用 Firebase。改动配置后重新构建 APK。
-- 服务端使用仅具备 Cloud Messaging 发送权限的服务账号文件，放在服务器 release 目录之外的私有安全目录，通过 `FIREBASE_SERVICE_ACCOUNT_FILE` 指向绝对路径。开发时可放在被忽略的 `.local-secrets/firebase-service-account.json`。不要上传到 APK、对话、Git 或日志。
+- 服务端使用专用服务账号，只授予 `roles/firebasecloudmessaging.admin`（FCM 发送及订阅管理，不授予数据库或存储权限）。账号 JSON 放在服务器 release 目录之外的私有安全目录，目录 700、文件 600，通过 `FIREBASE_SERVICE_ACCOUNT_FILE` 指向绝对路径。开发时可放在被忽略的 `.local-secrets/firebase-service-account.json`。不要上传到 APK、对话、Git 或日志。
 - `ANDROID_PUSH_ENABLED=true` 仅在唯一 worker 启动独立扫描；默认 `false`。不需要启用 SMTP 或 AI 任务。账号的“Android 手机提醒”也默认关闭。
 - 发送端必须能访问 Google 的认证与 FCM 服务。配置路径存在不证明凭据权限和网络有效；点击测试的结果与真机后台观察分别记录。
+- 若复用既有选择性出网代理，仅将 `oauth2.googleapis.com` 和 `fcm.googleapis.com` 两个发送端域名加入已验证线路；备份并校验代理配置，保留其他分流与 TLS 验证。Node 22 原生环境代理必须在进程启动前设置，单独 SSH 探针不会自动继承应用的 PM2 环境。先验证凭据交换及 `dryRun` 请求，明确记录没有投递，再接入扫描；这些结果不证明手机的 Google 长连接可达。
 
 退出或换账号会取消本地测试、清理系统通知、解绑当前设备并撤销 FCM 注册/FID。离线时保留仅能解绑的补偿凭据，下次启动或回到前台联网时自动重试，不把登录 JWT 交给原生存储。已经发送的后台系统通知无法保证撤回。
 
@@ -41,4 +42,14 @@ APK 顶部的“本地通知试验”可直接查看权限、授权通知、开�
 
 实际展示、声音、锁屏、划掉 App、强行停止、国内无代理网络及键盘仍按 [真机矩阵](../docs/TEST-MATRIX.md#android-一期) 验证。构建或 JVM 测试不证明手机送达。
 
-官方资料：[FID 注册](https://firebase.google.com/docs/cloud-messaging/android/get-started)、[Admin 发送](https://firebase.google.com/docs/cloud-messaging/send/admin-sdk)、[前后台行为](https://firebase.google.com/docs/cloud-messaging/android/receive-messages)、[网络要求](https://firebase.google.com/docs/cloud-messaging/network-configuration)、[系统定时](https://developer.android.com/develop/background-work/services/alarms)。
+### 后台与延迟排查
+
+本地试验由系统 `AlarmManager` 和清单注册的 `LocalTestReceiver` 触发，不依赖 WebView 的计时器；`onResume` 不补发本地通知，回桌面和 Activity 销毁也不取消预约。退出账号、换账号、点击取消或再次安排测试会清理或替换原预约，每次只测试一种模式。
+
+非精确测试使用 `setAndAllowWhileIdle`，系统可批处理和延后；一次实测延迟不能当作固定等待时间。Android 12 起，在没有省电限制时官方允许预约时间后一小时内触发，Doze/省电限制另有边界。精确测试使用 `setExactAndAllowWhileIdle`，仍需单独验证设备后台策略。
+
+安排精确测试后先只按 Home 回桌面或锁屏，不划掉任务、不退出账号、不强行停止。到时先看系统通知栏，再打开试验面板对照触发时间、延迟与预约状态：面板显示“已提交系统展示”只证明接收器调用了系统通知，实际展示/声音/点击须另记；如果仍待触发，继续排查闹钟权限与后台唤醒。正常回桌面、最近任务划掉、系统回收与强行停止分别记录，不能统称“关闭”。Android 15 的强行停止会撤销 PendingIntent，本轮不绕过系统停止语义。
+
+FCM 是独立的联网推送链路，配置成功也不证明本地后台问题已解决；设备仍需要兼容的 Google Play 服务和可达的 Google 推送网络。网页正常联网不能替代 FCM 长连接证据。客户端配置与服务端私钥分开存储；改配置后生成新的试验 APK并记录文件 hash，不能仅凭相同应用版本推断是否已带 Firebase 配置。
+
+官方资料：[FID 注册](https://firebase.google.com/docs/cloud-messaging/android/get-started)、[Admin 发送](https://firebase.google.com/docs/cloud-messaging/send/admin-sdk)、[前后台行为](https://firebase.google.com/docs/cloud-messaging/android/receive-messages)、[网络要求](https://firebase.google.com/docs/cloud-messaging/network-configuration)、[系统定时](https://developer.android.com/develop/background-work/services/alarms)、[Android 15 强行停止](https://developer.android.com/about/versions/15/behavior-changes-all#enhanced-stop-states)。
