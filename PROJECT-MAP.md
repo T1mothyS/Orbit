@@ -177,3 +177,5 @@ pwsh -NoProfile -File scripts/run_daily.ps1 -Date YYYY-MM-DD -NoSend
 ## 文档任务路由
 
 路线与阶段顺序见 [route.md](route.md)，具体版本见 [CHANGELOG](CHANGELOG.md)，完成/待修复/待验收见 [TASKS](docs/TASKS.md)，发布见 [RELEASE](docs/RELEASE.md)，历史证据见 [archive](docs/archive/README.md)。模块地图不复制它们的状态。
+
+长期产品人群、目的和原则见 [PRODUCT.md](PRODUCT.md)，供 impeccable 与产品设计任务读取；现有视觉与交互规则继续由 [UI 规范](docs/UI-GUIDELINES.md)维护。

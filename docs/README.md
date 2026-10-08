@@ -20,6 +20,7 @@
 | 文档 | 唯一职责 |
 | --- | --- |
 | [AGENTS.md](../AGENTS.md) | 协作、授权、安全、验证与文档维护规则 |
+| [产品上下文](../PRODUCT.md) | 长期人群、目的、工作流和产品原则；供 impeccable 使用，不维护视觉方案或验收状态 |
 | [根 README](../README.md) | 产品简介、启动、主要导航 |
 | [用户指南](USER-GUIDE.md) | 配置、日常使用、备份和排障 |
 | [Android 构建](../android/README.md) | 工具链、APK、固定站点、Firebase 配置与原生本地试验入口 |
