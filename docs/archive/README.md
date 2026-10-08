@@ -45,3 +45,4 @@
 ## 专项审计快照
 
 - [Orbit Interaction & Motion Audit（2026-10-03）](engineering/ORBIT-INTERACTION-MOTION-AUDIT-20261003.md)：基于当日源码与隔离页面检查的全站 UI / UX / Motion 提升计划，待确认，未实施。当前规范和实施状态仍见 UI-GUIDELINES 与 TASKS。
+- [Orbit UI/UX Audit（2026-10-08）](engineering/ORBIT-UI-UX-AUDIT-20261008.md)：impeccable 双独立评估与四尺寸明暗浏览器证据；记录时间取消、键盘、主题和触控的具体问题，仅审计，未修复。源码、生产、外部服务与设备验收边界分别说明，不替代当前规范或任务清单。
