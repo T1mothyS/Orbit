@@ -12,7 +12,7 @@ fs.mkdirSync(output,{recursive:true});
     assert.equal((await context.request.put(base+'/api/android-push/preferences',{headers:{Authorization:'Bearer '+token},data:{enabled:false}})).status(),200);
     await context.addInitScript(token=>{
       localStorage.setItem('aicalendar_token',token);
-      const state={version:'synthetic',installationId:'11111111-1111-4111-8111-111111111111',installationKey:'synthetic-installation-proof-1111111111111',fid:null,notificationPermission:false,exactAlarmPermission:false,fcmConfigured:false,fcmState:'未配置',binding:null,pendingLocal:null,localResult:'尚未安排本地测试',fcmResult:'未记录',pendingNotification:null,pendingRevocations:0};
+      const state={version:'synthetic',developerTools:false,installationId:'11111111-1111-4111-8111-111111111111',installationKey:'synthetic-installation-proof-1111111111111',fid:null,notificationPermission:false,exactAlarmPermission:false,fcmConfigured:false,fcmState:'未配置',binding:null,pendingLocal:null,localResult:'尚未安排本地测试',fcmResult:'未记录',pendingNotification:null,pendingRevocations:0};
       window.__androidState=state;window.__androidCalls=JSON.parse(sessionStorage.getItem('synthetic-android-calls')||'[]');
       window.OrbitNative={postMessage(raw){const request=JSON.parse(raw);window.__androidCalls.push(request.method);sessionStorage.setItem('synthetic-android-calls',JSON.stringify(window.__androidCalls));
         const params=request.params||{};let error;
@@ -29,17 +29,21 @@ fs.mkdirSync(output,{recursive:true});
     await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
     await context.route('**/api/orbit/providers',route=>route.fulfill({json:{providers:[]}}));
     const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
-    const open=async()=>{await page.goto(base+'/assistant?settings=android-push-enabled');await page.getByLabel('Android 通知试验',{exact:true}).waitFor();};
+    const open=async()=>{await page.goto(base+'/assistant?settings=android-push-enabled');await page.getByLabel('Android 手机提醒设置',{exact:true}).waitFor();};
     for(const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]])for(const theme of ['light','dark']){
       await page.setViewportSize({width,height});await page.addInitScript(t=>localStorage.setItem('theme',t),theme);await open();
-      const area=page.getByLabel('Android 通知试验',{exact:true});await area.getByText('客户端未配置',{exact:false}).waitFor();
-      assert.equal(await area.getByRole('button',{name:'一分钟后本地提醒',exact:true}).isDisabled(),true);
-      assert.equal(await area.getByRole('button',{name:'发送 FCM 测试',exact:true}).isDisabled(),true);
+      const area=page.getByLabel('Android 手机提醒设置',{exact:true});await area.getByText('客户端未配置',{exact:false}).waitFor();
+      assert.equal(await area.getByRole('button',{name:'一分钟后本地提醒',exact:true}).count(),0);
+      assert.equal(await area.getByRole('button',{name:'发送 FCM 测试',exact:true}).count(),0);
+      assert.equal(await area.getByText('尚未发起服务端测试',{exact:false}).count(),0);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
       const oversized=await area.locator('*').evaluateAll(elements=>elements.filter(e=>e.getBoundingClientRect().width>innerWidth+1).map(e=>e.tagName));assert.deepEqual(oversized,[]);
       await area.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,`settings-${width}-${theme}.png`)});checks.push(`permissions/missing config/layout ${width} ${theme}`);
     }
-    const area=page.getByLabel('Android 通知试验',{exact:true});
+    const area=page.getByLabel('Android 手机提醒设置',{exact:true});
+    await page.evaluate(()=>{window.__androidState.developerTools=true;window.dispatchEvent(new Event('focus'));});
+    await area.getByRole('button',{name:'一分钟后本地提醒',exact:true}).waitFor();
+    assert.equal(await area.getByRole('button',{name:'一分钟后本地提醒',exact:true}).isDisabled(),true);
     await area.getByRole('button',{name:'授权系统通知',exact:true}).click();
     await area.getByRole('button',{name:'非精确测试（可能延迟）',exact:true}).click();await area.getByText('合成测试已安排',{exact:false}).waitFor();
     assert.equal(await page.evaluate(()=>window.__androidState.pendingLocal.exact),false);

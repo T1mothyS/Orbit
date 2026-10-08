@@ -1,6 +1,6 @@
 {
   "name": "smart-schedule-agent",
-  "version": "0.55.0-261008.1923",
+  "version": "0.56.0-261008.2256",
   "description": "Orbit — chat-first personal workspace",
   "author": "Smart Schedule Team",
   "license": "MIT",
@@ -16,7 +16,7 @@
     "dev:electron": "npm run electron:dev",
     "dev:electron:client": "vite",
     "build": "npm run build:client && npm run build:electron",
-    "build:client": "npm run tools:check && npm run evolution:check && vite build",
+    "build:client": "npm run tools:check && npm run evolution:check && vite build && node scripts/build-product-help.mjs",
     "build:electron:code": "tsc -p tsconfig.electron.json",
     "build:electron": "npm run build:electron:code && node scripts/prepare-electron-config.mjs",
     "preview": "vite preview",

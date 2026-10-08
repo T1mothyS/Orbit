@@ -25,7 +25,7 @@ object NativeSession {
         initialize(c)
         val p = NotificationSupport.prefs(c)
         val binding = p.getString("device", null)?.let { JSONObject().put("id", it).put("accountId", p.getString("account", null)).put("generation", p.getString("generation", null)) } ?: JSONObject.NULL
-        return JSONObject().put("version", BuildConfig.VERSION_NAME).put("installationId", p.getString("installation", ""))
+        return JSONObject().put("developerTools", BuildConfig.DEVELOPER_TOOLS).put("version", BuildConfig.VERSION_NAME).put("installationId", p.getString("installation", ""))
             .put("installationKey", p.getString("key", "")).put("fid", p.getString("fid", null) ?: JSONObject.NULL)
             .put("notificationPermission", NotificationSupport.permission(c)).put("exactAlarmPermission", NotificationSupport.exactPermission(c))
             .put("fcmConfigured", BuildConfig.FCM_CONFIGURED).put("fcmState", p.getString("fcm_state", if (BuildConfig.FCM_CONFIGURED) "尚未注册" else "未配置"))

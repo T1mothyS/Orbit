@@ -53,6 +53,7 @@ jobs:
           git archive --prefix=smart-schedule-agent/ HEAD | tar -x -C "$stage"
           rm "$stage/smart-schedule-agent/AGENTS.md"
           cp -a dist node_modules "$stage/smart-schedule-agent/"
+          cp server/.product-help.json "$stage/smart-schedule-agent/server/"
           node scripts/prepare-linux-release.mjs "$stage/smart-schedule-agent" "$GITHUB_SHA"
           tar -czf "$RUNNER_TEMP/orbit-linux-release.tgz" -C "$stage" smart-schedule-agent
           sha256sum "$RUNNER_TEMP/orbit-linux-release.tgz" > "$RUNNER_TEMP/orbit-linux-release.sha256"

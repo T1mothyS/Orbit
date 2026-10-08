@@ -164,4 +164,4 @@ export async function processPushQueue(now=new Date(),onlyId?:string) {
   }finally{processing=false;}
   return {sent,failed};
 }
-export function createAndroidPushJobs(isReady:()=>boolean){let ticking=false;return createJobRunner([{name:'android-push',expression:'*/15 * * * * *',run:async()=>{if(!isReady()||ticking||!pushConfigured())return;ticking=true;try{await scanPushReminders();await processPushQueue();}finally{ticking=false;}}}],()=>addLog('error','system','Android Push 扫描失败',{event:'android_push_tick_failed'}));}
+export function createAndroidPushJobs(isReady:()=>boolean){let ticking=false;return createJobRunner([{name:'android-push',expression:'*/15 * * * * *',run:async()=>{if(!isReady()||ticking||!pushConfigured())return {status:'skipped',reason:!isReady()?'DATABASE_NOT_READY':ticking?'ALREADY_RUNNING':'PUSH_NOT_CONFIGURED'};ticking=true;try{await scanPushReminders();const result=await processPushQueue();if(result.failed)return {status:'failed',reason:'ANDROID_PUSH_DELIVERY_FAILED'};}finally{ticking=false;}}}],()=>addLog('error','system','Android Push 扫描失败',{event:'android_push_tick_failed'}));}

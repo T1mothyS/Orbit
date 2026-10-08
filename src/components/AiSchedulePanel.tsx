@@ -19,6 +19,7 @@ import {useChatAttachments,type ChatFile} from '../hooks/useChatAttachments';
 import {ChatAttachmentCard,ChatAttachmentComposer} from './ChatAttachments';
 import { SCHEDULE_CATEGORY_COLORS, SCHEDULE_CATEGORY_LABELS } from '../utils/scheduleCategories';
 import {scheduleItemsForPlan} from '../utils/plan-schedule-items';
+import { navigationHref, settingAction } from '../utils/navigation-actions';
 
 // ==================== 类型 ====================
 
@@ -412,7 +413,10 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
   savingPlanOperationKey?: string | null;
 }) {
   const isUser = msg.role === 'user';
-  const {authHeaders}=useAuth();
+  const {authHeaders,user}=useAuth();
+  const navigation = [...(msg.orbitMeta?.actions || []), ...(msg.orbitMeta?.settingRefs || []).flatMap(item => {
+    const action = settingAction(item.id, user?.role === 'admin'); return action ? [action] : [];
+  })].filter((action,index,rows) => navigationHref(action,user?.role === 'admin') && rows.findIndex(a=>a.settingId===action.settingId)===index);
   const [editingOperationKey, setEditingOperationKey] = useState<string | null>(null);
   const [reminderBusy,setReminderBusy]=useState(false),[reminderError,setReminderError]=useState('');
   const timestamp = parseMessageTimestamp(msg.timestamp);
@@ -544,7 +548,7 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
               </div>
             )}
             {msg.orbitMeta?.origin==='notification'&&<OrbitNotificationCard meta={msg.orbitMeta} title={(msg.text||'Orbit 通知').split('\n')[0]} onRefresh={onNotificationRefresh}/>}
-            {msg.orbitMeta?.settingRefs?.map(item=><Link className="orbit-setting-card" key={item.id} to={'/assistant?settings='+encodeURIComponent(item.id)}>{item.label} →</Link>)}
+            {navigation.map(action=><Link className="orbit-setting-card" key={action.settingId} to={navigationHref(action,user?.role === 'admin')!}>{settingAction(action.settingId,user?.role === 'admin')!.label} →</Link>)}
             {msg.orbitMeta?.origin==='proactive' && <div className={`orbit-reminder-actions ${msg.orbitMeta.state==='handled'?'is-handled':''}`}><small>{msg.orbitMeta.enhanced?'Orbit 主动提醒':'Orbit 主动提醒 · 基于事项信息'}</small>{msg.orbitMeta.state==='sent' && <div>{[['complete','完成'],['snooze','15 分钟后'],['tomorrow','明天 09:00 再提醒']].map(([action,label])=><button type="button" key={action} disabled={reminderBusy} onClick={()=>{setReminderBusy(true);setReminderError('');void onReminderAction?.(msg.orbitMeta!.eventId!,action).catch(e=>setReminderError(e.message)).finally(()=>setReminderBusy(false));}}>{label}</button>)}</div>}{msg.orbitMeta.state==='handled'&&<span>{msg.orbitMeta.handledAction==='complete'?'✓ 已完成':msg.orbitMeta.nextReminderAt?`已延后 · ${new Date(msg.orbitMeta.nextReminderAt).toLocaleString()}`:'已处理'}{msg.orbitMeta.handledAt&&<small> · {new Date(msg.orbitMeta.handledAt).toLocaleString()}</small>}</span>}{msg.orbitMeta.state==='discarded'&&<span>提醒已失效，请查看当前事项</span>}{reminderError&&<p role="alert">{reminderError}</p>}</div>}
             {!!(msg.orbitMeta as any)?.sources?.length&&<details className="orbit-message-sources"><summary>联网来源 · {(msg.orbitMeta as any).sources.length}</summary>{(msg.orbitMeta as any).sources.map((source:any)=><a key={source.url} href={safeChatHref(source.url)} target="_blank" rel="noopener noreferrer"><strong>{source.title}</strong><small>{source.source} · {source.publishedAt?new Date(source.publishedAt).toLocaleString():'发布时间未知'} · 获取 {new Date(source.retrievedAt).toLocaleString()}</small></a>)}</details>}
             {!!(msg.orbitMeta as any)?.steps?.length&&<details className="orbit-message-steps"><summary>处理步骤</summary>{(msg.orbitMeta as any).steps.map((s:any)=><p key={s.id}>{s.state==='completed'?'✓':s.state==='failed'?'!':'…'} {s.label} · {s.query}</p>)}</details>}

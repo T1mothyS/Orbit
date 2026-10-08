@@ -9,6 +9,9 @@ if(!/^[a-f0-9]{40}$/.test(commit||''))throw new Error('A frozen commit is requir
 for(const name of ['.env','data','.git','AGENTS.md','AGENTS.local.md','DEPLOY.md','CONTINUOUS-REQUIREMENTS.md'])if(fs.existsSync(path.join(root,name)))throw new Error('Local/runtime data must not enter release: '+name);
 for(const name of ['package.json','package-lock.json','server/index.ts','server/file-parser-worker.mjs','server/archive-validation.mjs','dist/index.html','protected-tools/manifest.json','project-evolution/generated.json','node_modules/tsx/dist/cli.mjs'])fs.accessSync(path.join(root,name));
 const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'))),lock=JSON.parse(fs.readFileSync(path.join(root,'package-lock.json')));
+const help=JSON.parse(fs.readFileSync(path.join(root,'server/.product-help.json')));
+if(help.formatVersion!==1||help.version!==pkg.version)throw new Error('Product help must match release version');
+for(const source of new Set(help.chunks.map(chunk=>chunk.source)))if(help.chunks.find(chunk=>chunk.source===source).sourceHash!==createHash('sha256').update(fs.readFileSync(path.join(root,source))).digest('hex'))throw new Error('Product help source changed: '+source);
 if(pkg.version!==lock.version||pkg.version!==lock.packages[''].version)throw new Error('Release versions do not agree');
 const require=createRequire(path.join(root,'package.json'));
 const sharp=require('sharp');await sharp({create:{width:1,height:1,channels:3,background:'red'}}).png().toBuffer();

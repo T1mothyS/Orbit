@@ -136,4 +136,5 @@ export function proactiveEventView(userId:string,id:string){
   if(e?.state==='sent'){const s=getSchedule(e.schedule_id);if(!s||s.user_id!==userId||s.is_completed||scheduleFingerprint(s)!==e.expected_state){run("UPDATE orbit_proactive_events SET state='discarded' WHERE user_id=? AND id=?",[userId,id]);e.state='discarded';}}
   return {state:e?.state||'discarded',handledAction:e?.handled_action,handledAt:e?.handled_at,nextReminderAt:e?.next_reminder_at};
 }
-export function createProactiveJobs(isReady:()=>boolean) {return createJobRunner([{name:'orbit-proactive',expression:'*/30 * * * * *',run:async()=>{if(isReady()){await runOrbitProactiveTick();processInAppNotifications();await (await import('./activity-reports.js')).runWeeklyReports();}}}],()=>addLog('warn','ai','Orbit 通知与周期报告扫描失败'));}
+export function createProactiveJobs(isReady:()=>boolean) {return createJobRunner([{name:'orbit-proactive',expression:'*/30 * * * * *',run:async()=>{if(!isReady())return {status:'skipped',reason:'DATABASE_NOT_READY'};await runOrbitProactiveTick();processInAppNotifications();await (await import('./activity-reports.js')).runWeeklyReports();}}],()=>addLog('warn','ai','Orbit 通知与周期报告扫描失败'));
+}

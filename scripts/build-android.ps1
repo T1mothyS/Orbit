@@ -1,7 +1,8 @@
 param(
   [string]$JavaHome = $env:JAVA_HOME,
   [string]$BuildRoot = (Join-Path $env:LOCALAPPDATA 'OrbitAndroidToolchain/builds'),
-  [switch]$Offline
+  [switch]$Offline,
+  [switch]$DeveloperTools
 )
 $ErrorActionPreference = 'Stop'
 $sourceRoot = Split-Path $PSScriptRoot -Parent
@@ -29,10 +30,12 @@ Copy-Item -LiteralPath (Join-Path $sourceRoot 'package.json') -Destination (Join
 $arguments = @('-classpath', (Join-Path $mirror 'gradle/wrapper/gradle-wrapper.jar'), 'org.gradle.wrapper.GradleWrapperMain',
   '-p', $mirror, ':app:assembleDebug', ':app:lintDebug', ':app:testDebugUnitTest', '--no-daemon')
 if ($Offline) { $arguments += '--offline' }
+if ($DeveloperTools) { $arguments += '-PorbitDeveloperTools=true' }
 & (Join-Path $JavaHome 'bin/java.exe') @arguments
 if ($LASTEXITCODE -ne 0) { throw "Android verification failed; evidence retained at $workspace" }
 $output = Join-Path $sourceRoot 'android/app/build/outputs/apk/debug'
 New-Item -ItemType Directory -Path $output -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $mirror 'app/build/outputs/apk/debug/app-debug.apk') -Destination (Join-Path $output 'app-debug.apk') -Force
-Write-Output "APK: $(Join-Path $output 'app-debug.apk')"
+$apkName = if ($DeveloperTools) { 'app-debug-developer.apk' } else { 'app-debug.apk' }
+Copy-Item -LiteralPath (Join-Path $mirror 'app/build/outputs/apk/debug/app-debug.apk') -Destination (Join-Path $output $apkName) -Force
+Write-Output "APK: $(Join-Path $output $apkName)"
 Write-Output "Build and verification evidence: $workspace"

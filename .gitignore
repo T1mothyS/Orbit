@@ -19,6 +19,7 @@ data/daily-report-media/
 data/backups/
 data/caldav-bridge/
 data/.orbit-secrets/
+data/operations/
 data/migration-backups/
 data/pre-fix-backups/
 *.log
@@ -48,3 +49,4 @@ android/*.local.properties
 android/**/*.jks
 android/**/*.keystore
 .local-secrets/
+server/.product-help.json

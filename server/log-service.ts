@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { observeJobLog } from './runtime/job-status.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -180,6 +181,7 @@ function timestampNow(date = new Date()): string {
 }
 
 export function addLog(level: LogLevel, category: LogCategory, message: string, data?: unknown): LogEntry {
+  observeJobLog(level, data || {});
   ensureLoaded();
   const entry: LogEntry = {
     timestamp: timestampNow(),

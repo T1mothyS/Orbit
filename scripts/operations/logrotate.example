@@ -1,0 +1,12 @@
+# Replace ONLY the exact console paths from the reviewed inventory.
+# Application's existing 5 MiB / 3-backup rotation remains its owner.
+/var/log/orbit/main-out.log /var/log/orbit/main-error.log /var/log/orbit/shadow-out.log /var/log/orbit/worker-error.log {
+    daily
+    maxsize 20M
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+}

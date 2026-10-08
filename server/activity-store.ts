@@ -980,6 +980,9 @@ export function getDigestRun(userId: string, id: string): DigestRunRow | null {
   const row = queryOne<DigestRunRow>('SELECT * FROM digest_v2_runs WHERE user_id = ? AND id = ?', [userId, id]);
   return row ? { ...row, snapshot_json: row.expires_at > nowIso() ? row.snapshot_json : null } : null;
 }
+export function listDigestRuns(userId: string, date: string): DigestRunRow[] {
+  return queryAll<DigestRunRow>('SELECT id,user_id,report_date,NULL AS snapshot_json,manifest_json,created_at,expires_at FROM digest_v2_runs WHERE user_id=? AND report_date=? ORDER BY created_at DESC LIMIT 20', [userId, date]);
+}
 export function expireDigestSnapshots(): number {
   return run('UPDATE digest_v2_runs SET snapshot_json = NULL WHERE expires_at <= ? AND snapshot_json IS NOT NULL', [nowIso()]);
 }

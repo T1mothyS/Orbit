@@ -16,7 +16,7 @@ export function createBackgroundJobs({ isReady, resolveAiImportCredential, clean
   cleanupAiScheduleHistory: () => number;
 }) {
   return createJobRunner([
-    { name: 'caldav', expression: '*/5 * * * *', run: async () => { if (isReady()) await runCaldavTick(); } },
+    { name: 'caldav', expression: '*/5 * * * *', run: async () => { if (!isReady()) return {status:'skipped',reason:'DATABASE_NOT_READY'}; if(process.env.CALDAV_BRIDGE_ENABLED!=='true')return {status:'skipped',reason:'CALDAV_DISABLED'}; await runCaldavTick(); } },
     { name: 'reminders', expression: '* * * * *', run: async () => {
       const tickStartedAt = Date.now();
       if (!isReady()) {
@@ -24,7 +24,7 @@ export function createBackgroundJobs({ isReady, resolveAiImportCredential, clean
           event: 'reminder_cron_skipped',
           dbInitialized: isReady(),
         });
-        return;
+        return {status:'skipped',reason:'DATABASE_NOT_READY'};
       }
       const now = new Date();
       try {
@@ -89,7 +89,7 @@ export function createBackgroundJobs({ isReady, resolveAiImportCredential, clean
     }},
 
     { name: 'daily-backup', expression: '30 3 * * *', timezone: process.env.APP_TIMEZONE || 'Asia/Shanghai', run: async () => {
-      if (!isReady() || !process.env.BACKUP_ENCRYPTION_KEY) return;
+      if (!isReady() || !process.env.BACKUP_ENCRYPTION_KEY) return {status:'skipped',reason:!isReady()?'DATABASE_NOT_READY':'BACKUP_DISABLED'};
       try {
         const backup = await withBridgeSnapshot(() => backupService.createSystemSnapshot(true));
         const oss = await backupService.uploadPendingSystemSnapshots();
@@ -100,15 +100,16 @@ export function createBackgroundJobs({ isReady, resolveAiImportCredential, clean
     }},
 
     { name: 'backup-upload', expression: '*/30 * * * *', run: async () => {
-      if (!isReady()) return;
+      if (!isReady()) return {status:'skipped',reason:'DATABASE_NOT_READY'};
       const result = await backupService.uploadPendingSystemSnapshots();
       if (result.uploaded || result.failed) {
         addLog(result.failed ? 'warn' : 'info', 'system', 'OSS 备份重试完成', result);
       }
+      if (result.failed) return {status:'failed',reason:'BACKUP_UPLOAD_FAILED'};
     }},
 
     { name: 'email-import', expression: '*/5 * * * *', run: async () => {
-      if (!isReady() || !process.env.IMAP_PASS) return;
+      if (!isReady() || !process.env.IMAP_PASS) return {status:'skipped',reason:!isReady()?'DATABASE_NOT_READY':'EMAIL_IMPORT_DISABLED'};
       await pollEmailImports({
         resolveCredential: resolveAiImportCredential,
         log: (message, error) => error
@@ -119,7 +120,7 @@ export function createBackgroundJobs({ isReady, resolveAiImportCredential, clean
 
     // 每小时逐条清理超过 3 天的 AI 助手历史，避免只在用户打开页面时才清理。
     { name: 'ai-history', expression: '0 * * * *', run: () => {
-      if (!isReady()) return;
+      if (!isReady()) return {status:'skipped',reason:'DATABASE_NOT_READY'};
       try {
         const deleted = cleanupAiScheduleHistory();
         if (deleted > 0) addLog('info', 'ai', `清理 AI 助手过期历史: ${deleted} 条`);

@@ -32,6 +32,8 @@ Luna 上次为何慢，需要对应执行记录才能确认。当前可确认的
 
 ## 状态与幂等
 
+前端构建同时从现有 canonical 文档生成 `server/.product-help.json`；它不属于公共 `dist`，也不提交 Git。CI 暂存明确复制此产物；其他预构建打包入口也必须复制到包内同一位置。Linux release 准备核对索引版本和原文 hash，缺失或过期直接阻止发布。运维的 running/success/failed 记录、十个旧版与日志保留、配置/恢复引用见 [部署路径](DEPLOYMENT-PATHS.md#受控运维记录与保留)。成功前不得启动旧版删除；首轮服务器配置、timer 与 Shadow 日志切换需要单独上线验收。
+
 依赖变化且本机为 Windows 时，main 的 CI 使用 Ubuntu 24.04/Node 22.23.2，完整校验通过后生成 `orbit-linux-release` 短期 artifact：冻结源码、前端构建和同一轮安装的 Linux `node_modules`（包含 PM2 使用的 tsx）。构建机验证 sharp/PDF/Office 加载；manifest 记录 commit/version/源文件哈希，完整包另有 SHA-256。下载后核对 workflow head、成功状态、包 hash 与 manifest，再按路径 B 在生产暂存并做运行时探针。该 CI 不保存生产凭据，也不自动部署；生产旧依赖保留用于回滚。
 
 如果变化仅限可证明的纯JavaScript补丁，可以采用[路径B受控暂存条件](DEPLOYMENT-PATHS.md#路径-b依赖或环境变更升级)，复用未变化的Linux原生运行时；完整锁定差异、SRI、无安装脚本、平台及实际版本/运行探针必须同时通过。不把Windows依赖复制到Linux，也不因部署授权自动执行GitHub push。
@@ -39,5 +41,5 @@ Luna 上次为何慢，需要对应执行记录才能确认。当前可确认的
 - main/tag 已同步且服务器目标 commit/包/配置相同且验收有效时，只做复核，不再切换重启。
 - 没有对应 Release 时创建；已有同 tag 时核对/更新说明，不新建重复 Release。
 - GitHub Actions 是可移植的独立检查；其状态单列，不能替代本次本地/服务器证据。
-- 不删除旧目录、失败现场或备份；不替换用户运行中的 Work Prompt/时间/收件人。
+- 未经审核的保留策略不删除旧目录、失败现场或备份；当前保留机制见部署路径，冷备和业务数据始终排除。不替换用户运行中的 Work Prompt/时间/收件人。
 - 生产业务验收与部署是不同结果，具体判据见 [部署路径](DEPLOYMENT-PATHS.md)和 [测试矩阵](TEST-MATRIX.md)。

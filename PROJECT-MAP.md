@@ -3,6 +3,7 @@
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
 - Source review: 2026-10-07 核对 Android 在线壳、Push 队列与知识库个人资料入口；版本以 package.json 为准，状态以 docs/TASKS.md 为准。
+- 2026-10-08 增量：产品帮助/只读诊断为 server/product-help.ts、system-query.ts、routes/system.ts；共享 action 为 src/utils/navigation-actions.ts；运维 CLI/config/timer 位于 scripts/orbit-operations.py 与 scripts/operations，合同见 [架构](docs/ARCHITECTURE.md#产品助手与受控运行诊断)及 [部署路径](docs/DEPLOYMENT-PATHS.md#受控运维记录与保留)。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。

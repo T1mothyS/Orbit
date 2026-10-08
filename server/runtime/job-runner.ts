@@ -1,10 +1,11 @@
 import cron from 'node-cron';
+import { observeJob, type JobOutcome } from './job-status.js';
 
 export interface JobDefinition {
   name: string;
   expression: string;
   timezone?: string;
-  run: () => void | Promise<void>;
+  run: () => void | JobOutcome | Promise<void | JobOutcome>;
 }
 type Task = { stop(): void | Promise<void>; destroy(): void | Promise<void> };
 export type ScheduleJob = (job: JobDefinition, run: () => Promise<void>) => Task;
@@ -45,7 +46,7 @@ export function createJobRunner(
       try {
         for (const job of definitions) tasks.push(schedule(job, () => {
           if (!running) return Promise.resolve();
-          const work = Promise.resolve().then(job.run).catch(error => onError(job.name, error));
+          const work = Promise.resolve().then(() => observeJob(job.name, job.run)).catch(error => onError(job.name, error));
           active.add(work);
           void work.then(() => active.delete(work), () => active.delete(work));
           return work;

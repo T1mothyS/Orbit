@@ -103,6 +103,7 @@ pwsh -NoProfile -File scripts/prepare-protected-tool-release.ps1 `
 
 - 单独目录、系统用户、数据目录、端口、HTTPS 子域名及服务进程；禁止复用生产 `.env`、数据库、JWT 或邮件凭据。只配置专用测试 R2。
 - 本地执行 `npx tsc -p tsconfig.shadow.json` 与客户端构建，打包编译后的 `server/`、关联 `src/`、`dist/`、`package.json`、`package-lock.json`。不打包本机依赖、配置、数据库或测试数据。
+- 产品帮助索引由客户端构建生成于源码的 `server/.product-help.json`，另复制到 Shadow 发布包编译后的 `server/.product-help.json`；不得移入公共 `dist`。版本和原文 hash 与正式服务采用同一校验规则。
 - 目标 Linux 独立目录按锁文件安装生产依赖，验证 sharp 解码与格式转换后，以 `node server/digest-shadow-server.js` 运行。安装与服务使用资源限制，不能在生产目录构建或安装。
 - 独立 Nginx 站点只代理测试回环端口；单独证书，不替换原站点。语法检查后平滑 reload，前后检查原站点 health 与进程，测试账号验证登录及 OAuth/MCP。
 - 回退只停用测试服务及其 Nginx 站点，保留数据与媒体恢复证据；不重启生产应用。配置、地址及部署快照只写被忽略的本机 runbook。
@@ -136,3 +137,24 @@ pwsh -NoProfile -File scripts/prepare-protected-tool-release.ps1 `
 统一发布指令和效率原则见 [RELEASE](RELEASE.md)。旧 deploy.sh/deploy-continue.sh 默认拒绝安装路径，只有 --bootstrap / --server-install 的首次/明确资源例外且已获授权才运行。兼容新增表列不自动触发依赖重装，但须按下述附加迁移规则备份/验证。
 
 本文件只说明路径和判据，不执行部署、不发送邮件、不创建或切换 Cloud 任务，也不保存任何凭据或生产数据。
+
+## 受控运维记录与保留
+
+`scripts/orbit-operations.py` 是运维 CLI，Python 标准库实现，不向 AI/HTTP 暴露执行入口；安装与服务修改仍需部署授权。示例配置、logrotate 和五分钟 systemd timer 位于 `scripts/operations/`，只含占位路径。实际文件名、当前路径、PM2 日志路径以及服务用户在被忽略的 DEPLOY.md 按盘点配置，不直接使用示例上线。
+
+1. 将工具与配置放在 release 外，stateDir 同样必须在 releaseRoot 外。给应用设置 `ORBIT_OPERATIONS_DIR` 以读取 deployments/status/jobs JSON；stateDir 仅运维与应用身份可访问。主站负责共享 status/deployments，Shadow 使用自己的 job 状态目录，避免两个进程覆盖 jobs.json；不复制业务数据。启用后台任务的唯一写进程仍遵守原约束。
+2. 部署前 `record --evidence <固定证据 JSON>` 写入 running，部署、保留操作共用非阻塞 operations.lock；存在 running 时跳过清理。中断的 running 必须核对实际进程/目录后人工记录 failed 或 rolled_back，不按时间猜测成功。record 输入只接受 main/shadow；配置不授予模型权限。
+3. 验收完才 record success。checks 的 packageHash、backup、deploymentMetadata、process、health、homepage、today、staticAssets、rollbackMaterials、protectedTools 必须全部为 true，沿用本文件现有代码部署判据；登录/AI/Cloud/邮件验收独立。记录版本、commit、时间、恢复路径。旧目录搬移后以相同 attempt ID 更新 path 和恢复引用；未知历史仅记 unverified，不凭目录存在导入成功。
+4. 成功 record 自动给出 retention dry-run。人工核对后可带 `--apply-retention` 执行；定时 `maintain --apply` 同样应用已审核配置。只执行 `maintain` 不删除任何文件。上线前保存 dry-run 清单，再启用 timer；首次导入旧目录逐个核验。
+
+**成功旧版本：** main/shadow 各最多十个成功且可恢复旧版本，当前 resolve 后的运行路径始终排除。恢复资格包括完整 server/dist、版本匹配、依赖 hash 匹配的 Linux x64 runtime，以及仍存在的配置引用 configRef 和数据兼容恢复说明 dataRecoveryRef。配置和恢复说明只检查存在性，不读取凭据或业务数据库。失败、rolled_back、running、unverified 不占 slot；未核验目录留存，输出 RECOVERY_UNVERIFIED。清理只接受登记的 releaseRoot 直接子目录和固定前缀，拒绝符号链接、活动进程/打开文件、含数据库/数据/附件/媒体/配置的目录。进程可见性不足时保护目录。
+
+共享 runtime 的 owning release 不可直接删除。`freeze-runtime --service main|shadow --source <已核验旧目录>` 仅打包 node_modules 到 stateDir/runtimes/<依赖 hash>.tar.gz，检查 Linux manifest 和内部链接边界，记录 archive SHA-256，并更新所有依赖该来源的恢复引用。恢复时先核 archive hash、依赖 hash 与 manifest，再在暂存目录恢复 node_modules 并跑既有运行探针；不要恢复到业务数据路径。档案不属于日志，也不被日志预算删除；无引用 runtime 暂不自动删，需以后只读核对。冷备、数据库、附件、媒体与用户文件均不在 release 清理范围。共享/活动/未核验保护可能暂时使目录总数超过十个，清单会明确原因，不能突破保护强凑数量。
+
+**失败历史：** history API 按服务隐藏最近一次 success 之前的 failed，保留其他服务失败及后续失败。诊断层保留失败阶段与受控错误码七天，管理员 errors 查询仍可解释；过期维护只清失败诊断字段，保留最小审计元数据。人工删除且无剩余证据的旧事故不还原、不编造。
+
+**受管日志：** application 保持现有 5 MiB × 四文件轮转。PM2、worker、部署和 diagnostics 只登记准确 active 文件名和已关闭 archive basename pattern，日志目录中的脚本/manifest/hash/recovery 证据不删除。Shadow 切换至专用 console 文件须在授权上线窗口配置 `StandardOutput=append:` / `StandardError=append:` 并受控重启；全机共享 journal 独立管理。PM2 原生 logrotate 配置参考 [官方说明](https://pm2.keymetrics.io/docs/usage/log-management/)，无需安装 PM2 插件。
+
+五分钟维护调用固定 logrotate 配置（daily/maxsize/压缩/有限代数），再检查所有登记日志总量。超过 300 MiB 时先轮转正在写的 console 文件，按修改时间删除最老的已关闭日志至不超过 225 MiB；活跃/打开文件保留，降不到目标时记录 capacityWarning，不扩展删除范围。copytruncate 有短暂丢行窗口，关键部署结论/job 状态另有结构化记录，详见 [logrotate 文档](https://github.com/logrotate/logrotate/blob/main/logrotate.8.in)。application 仍由应用自管轮转，不同时被两个轮转器操作。运维调用同一 lock 和同一 logrotate state 文件，避免并发；不要把同一配置重复加入全机另一个 timer。
+
+安装后验证：固定采集 status 能区分 main/shadow/worker；真实新部署 running→success 的记录与目录引用准确；dry-run 未列出活动目录/唯一依赖来源/业务文件；logrotate 继续写入且总量下降；诊断过期/容量告警可见。应用读取权限、Linux `/proc`、压缩与任务继续运行必须在生产另验，本地合成测试不能代替。

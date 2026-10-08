@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last local verification: 2026-10-08，设置归属、显式通知上下文、知识库阅读与 Android 试验面板；版本源为 package.json，验证入口/结果见 TEST-MATRIX。不包含真机送达、真实 AI、生产、自然定时与收件箱；其他历史证据按各节日期使用。
+- Last local verification: 2026-10-08，产品助手查询/action、账号隔离、运维保留和 Android 入口收口；版本源为 package.json，验证入口/结果见 TEST-MATRIX。本轮本地验证不含真实 AI、生产、自然定时与收件箱；用户手机反馈和历史证据按对应日期独立使用。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -11,6 +11,8 @@
 本文档记录当前源码和测试能够证明的结构，不记录密钥、真实生产数据、用户邮件或服务器凭据。发生行为变化时，先以源码和测试为准，再更新本文档。
 
 ## Android 客户端与 Push
+
+常规构建仅提供正式账号开关、通知权限与注册/投递状态；原生顶部、离线和网页测试入口只有 debug 且显式开启 DEVELOPER_TOOLS 才显示。release 始终关闭；本地桥接测试同样检查该标记。下面的 AlarmManager 排错能力保留，正式 FCM、Receiver、渠道和绑定/解绑行为不变。后续用户真实手机已确认精准/非精准触发及后台系统展示通过，见 [新增实机证据](TEST-MATRIX.md#2026-10-08-产品助手运行诊断与保留)。
 
 `android/` 是 Kotlin + WebView 在线壳，复用 Web 登录、聊天、路由与账号数据。构建时固定一个 HTTPS 来源，原生 `WebMessageListener` 只允许该来源的主框架和协议版本 1；未知方法拒绝，外部链接打开系统应用，不忽略 TLS 错误，不允许明文/混合内容、文件 URL 和第三方 Cookie。返回、键盘/系统栏安全区、文件选择及通知点击由原生负责。没有业务离线数据库和手机常驻轮询。
 
@@ -39,6 +41,30 @@ Push 使用独立表和消费者；旧通知消费者明确排除 `push`，不�
 2026-09-19 本地 0.27.2 增量：活动库 `daily_reports.media_receipt_json` 是可空的媒体诊断扩展列，初始化幂等添加；旧记录保持空值，无正文重写。该字段随原子数据库写回及导出/恢复保存，旧程序可忽略额外列。字段合同见 [Cloud 日报](CHATGPT-WORK-CLOUD.md#markdown-合同与解析诊断)。
 
 ## 1. 运行时边界
+
+### 产品助手与受控运行诊断
+
+`server/product-help.ts` 查询构建产物 `server/.product-help.json`。`scripts/build-product-help.mjs` 只从已有 USER-GUIDE、LIBRARY、ARCHITECTURE、CHATGPT-WORK-CLOUD、RELEASE、DEPLOYMENT-PATHS 的章节生成词法索引；来源列表是构建声明，不是另一套人工知识库。记录章节来源、source/content SHA-256 与 package 版本，发布检查同时核对原文 hash。索引位于公共静态目录之外，CI 明确复制到发布包的 server 目录；HTTP 只能经认证检索接口读取。代码块和机器路径行排除，发布/运维文档仅管理员召回。私人 runbook、运行数据和凭据不入索引。个人文章继续由既有 knowledge 工具按账号与检索偏好查询。
+
+`server/system-query.ts` 是 HTTP 和 AI 共用的只读服务，身份与权限在服务层复核，不依赖 Prompt。查询入口均要求登录：
+
+| 接口 | 权限与内容 |
+| --- | --- |
+| `GET /api/orbit/product-help?q=` | 产品说明/规则/FAQ，至多五段，查询最长 300 字符 |
+| `GET /api/system/status` | 版本、部署 commit 与有观测时间的脱敏健康；管理员另见容量告警 |
+| `GET /api/system/deployments` | 同服务成功之前失败项不返回；失败阶段/码仅管理员 |
+| `GET /api/system/errors` | 管理员的有界错误码/受控原因摘要，无原始日志或 stack |
+| `GET /api/system/tasks` | 自己的聊天任务；管理员另见最近后台 job 与固定 worker 快照 |
+| `GET /api/system/daily-report-status?date=&source=` | 自己的 Run、输入/校验/媒体/保存阶段、artifact、已发布日报及通知 |
+| `GET /api/system/reminder-status?id=` | 自己的事项/周期归属检查、渠道偏好、入队/重试、Android 开关/注册计数及发送结果 |
+
+`limit` 为 1–100（默认 20），`date` 必须是真实日期，`source` 为 local/cloud/shadow；未知或复合参数拒绝，不接收文件、命令或用户 ID。响应带 runtime/product 来源域与观测时间，不返回邮箱正文、输入快照、设备 FID/安装证明、配置路径或原始错误文本。主站与 Shadow 业务数据由各自服务认证；共享快照只反映运维摘要，不连接另一服务数据库。
+
+产品/诊断意图先于“打开今天日报”捷径。服务端为产品问题预读真实资料，即使 Provider 未调工具也有引用依据；此类回复不生成业务写入计划。Provider 沿用六次调用/四轮的工具预算，新增只读 product_help、system_status、deployment_status、task_status、daily_report_status、reminder_status，recent_errors 仅管理员。未观测的外部 Work 调度/模型和本地加工原因不能推断；默认不把产品配置问题送入个人文章检索，显式知识范围/文章续问保留。
+
+设置返回 `{type:'navigate',target,settingId,label}`，由共享 `src/utils/navigation-actions.ts` 的设置注册表与 module 路由映射生成并校验。语义 target 为 settings.dailyReport/knowledge/notifications/profile/general。模型不能提供执行 URL；前端再次检查 ID、target 与管理员权限，未知 action 不执行。action 保存 orbit_meta；旧 settingRefs 经同一映射兼容。Android 在线壳直接复用 Web 入口，不新增原生路由体系。
+
+后台 runner 通过 AsyncLocalStorage 记录最近开始/结束/成功/跳过/失败时点；已在内部捕获并记录的错误不能被外层记成成功，跳过原因和队列失败单独表达。持久位置为 `ORBIT_OPERATIONS_DIR`，本地默认 DATA_DIR/operations。生产须指向 release 外受控目录；运维快照最多读取 2 MB、拒绝符号链接，固定采集器只运行白名单服务/loopback health 检查。采样周期五分钟，超过七分钟显示 stale。AI 不调用该 CLI，不获得 Shell 或变更能力。运维安装及恢复保留的权威说明见 [部署路径](DEPLOYMENT-PATHS.md#受控运维记录与保留)。
 
 浏览器或 Electron renderer 进入 React/Vite 前端。前端通过同源的 /api 请求访问 Express 服务；开发环境由 Vite 代理到 Node 服务，生产环境由 HTTPS/Nginx 转发到 Node 服务。
 

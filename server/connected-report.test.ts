@@ -84,7 +84,8 @@ test('AI provider instructions include the selected notification beyond twenty m
   try {
     const id=randomUUID(),base=`http://127.0.0.1:${(server.address() as {port:number}).port}`;
     const response=await fetch(base+'/api/orbit/requests',{method:'POST',headers:{Authorization:'Bearer '+api.signUserToken(db.getUserById(owner)!),'Content-Type':'application/json'},body:JSON.stringify({requestId:id,conversationId:cid,text:'请解释这条通知',notificationId:n.id})});assert.equal(response.status,202);
-    for(let i=0;i<200&&['queued','running'].includes(orbit.getRequest(owner,id)?.state||'');i++)await new Promise(resolve=>setTimeout(resolve,10));
+    const deadline=Date.now()+15000;
+    while(Date.now()<deadline&&['queued','running'].includes(orbit.getRequest(owner,id)?.state||''))await new Promise(resolve=>setTimeout(resolve,25));
     assert.equal(orbit.getRequest(owner,id)?.state,'completed');assert.match(instructions,/唯一关联通知标题/);assert.match(instructions,/唯一关联通知正文/);assert.match(instructions,/scheduledAt/);assert.match(instructions,/sourceType/);assert.doesNotMatch(instructions,/不可加入普通AI的个人资料/);
   } finally {workBuddyProvider.generate=original;db.deleteUserApiKey(owner);await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
@@ -96,6 +97,25 @@ test('weekly defaults, DST-aware consecutive cutoffs, snapshot idempotency, owne
   try{const insights=await reports.generateReportInsights(owner,report.id);assert.equal(insights.insights.length,1);reports.setReportInsightGenerator(async()=>{throw new Error('synthetic model failure');});const failed=await reports.generateReportInsights(owner,report.id);assert.equal(failed.snapshotHash,report.snapshotHash);assert.match(failed.insightError!,/synthetic/);assert.equal(reports.getWeeklyPreferences(owner).enabled,false);}finally{reports.setReportInsightGenerator(old);}
   item('new evidence');assert.equal(reports.activityReportFreshness(owner,report.id).changed,true);assert.equal(reports.getActivityReport(owner,report.id).snapshot.activity.created,report.snapshot.activity.created);
   const first=reports.deliverActivityReport(owner,report.id);const second=reports.deliverActivityReport(owner,report.id);assert.equal(first[0].notification.id,second[0].notification.id);assert.equal(reports.reportDeliveryStatus(owner,report.id).length,first.length);
+});
+test('product questions preload real evidence, persist navigation and reject model write plans',async()=>{
+  const {workBuddyProvider}=await import('./ai-provider-workbuddy.js'),original=workBuddyProvider.generate;
+  db.upsertUserApiKey({id:randomUUID(),user_id:owner,api_key:'synthetic-product-only',base_url:null,created_at:stamp,updated_at:stamp});
+  const cid=orbit.ensureDefaultConversation(owner);let inputs='';
+  workBuddyProvider.generate=async request=>{inputs=JSON.stringify(request.input);return JSON.stringify({intent:'create',reply:'合成产品解释',operations:[{type:'create',data:{title:'不允许的模型写入',type:'event',startTime:stamp}}]});};
+  const server=api.app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));
+  try{
+    const base=`http://127.0.0.1:${(server.address() as {port:number}).port}`,before=schedules.getAllSchedules(owner).length;
+    for(const text of ['日报怎么修改关注行业？','今天日报为什么没生成？']){
+      const id=randomUUID();assert.equal((await fetch(base+'/api/orbit/requests',{method:'POST',headers:{Authorization:'Bearer '+api.signUserToken(db.getUserById(owner)!),'Content-Type':'application/json'},body:JSON.stringify({requestId:id,conversationId:cid,text})})).status,202);
+      const deadline=Date.now()+15000;while(Date.now()<deadline&&['queued','running'].includes(orbit.getRequest(owner,id)?.state||''))await new Promise(resolve=>setTimeout(resolve,25));
+      const request=orbit.getRequest(owner,id)!;assert.equal(request.state,'completed');const response=JSON.parse(request.result!);assert.notEqual(response.requiresConfirmation,true);assert.equal(response.intent,'query');assert.equal(response.reply,'合成产品解释');assert.deepEqual(response.scheduleItems,[]);
+      assert.match(inputs,/服务端已查询/);
+      if(text.includes('为什么')){assert.match(inputs,/externalScheduler/);assert.match(inputs,/unobserved/);}
+      else {const row=queryOne<any>('SELECT orbit_meta FROM ai_schedule_messages WHERE user_id=? AND id=?',[owner,response.historyMessageId]);assert(JSON.parse(row.orbit_meta).actions.some((a:any)=>a.target==='settings.dailyReport'));}
+    }
+    assert.equal(schedules.getAllSchedules(owner).length,before);
+  }finally{workBuddyProvider.generate=original;db.deleteUserApiKey(owner);server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 test('scheduler fills only most recent missed cutoff, no replay after restart, disabled remains disabled',async()=>{
   const old=reports.setReportInsightGenerator(async()=>{throw new Error('offline');});try{

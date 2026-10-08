@@ -1,0 +1,12 @@
+{
+  "stateDir": "/var/lib/orbit/operations",
+  "services": {
+    "main": { "releaseRoot": "/srv/orbit/releases", "releasePrefix": "orbit-", "currentPath": "/srv/orbit/current", "pm2Process": "smart-schedule", "healthUrl": "http://127.0.0.1:3001/api/health" },
+    "shadow": { "releaseRoot": "/srv/digest-shadow/releases", "releasePrefix": "orbit-", "currentPath": "/srv/digest-shadow/current", "systemdUnit": "digest-shadow.service", "healthUrl": "http://127.0.0.1:3002/api/health" }
+  },
+  "workers": {"openai-proxy": {"expectedActive": true}, "media-proxy": {"expectedActive": false}},
+  "logs": [
+    { "root": "/var/log/orbit", "active": ["application.log", "main-out.log", "main-error.log", "shadow-out.log", "worker-error.log"], "archives": ["application.[1-3].log", "main-out.log.*", "main-error.log.*", "shadow-out.log.*", "worker-error.log.*", "deployment-*.log", "diagnostic-*.log"] }
+  ],
+  "logrotateConfig": "/etc/logrotate.d/orbit"
+}

@@ -847,6 +847,11 @@ export function claimDelivery(id: string): boolean {
   return changed > 0;
 }
 
+/** Pure, owner-scoped diagnostic read; never creates cycles or delivery records. */
+export function readReminderDeliveries(userId:string,taskId:string|undefined,limit=20) {
+  return queryAll<any>(`SELECT d.id,d.task_id,d.cycle_id,d.status,d.attempts,d.scheduled_date,d.next_retry_at,d.sent_at,d.last_error FROM reminder_deliveries d JOIN reminder_tasks t ON t.id=d.task_id WHERE t.user_id=? AND (? IS NULL OR d.task_id=?) ORDER BY d.created_at DESC LIMIT ?`,[userId,taskId||null,taskId||null,Math.min(Math.max(limit,1),100)]);
+}
+
 export function markDeliverySent(id: string): void {
   run(`UPDATE reminder_deliveries SET status = 'sent', sent_at = ?, updated_at = ? WHERE id = ?`, [nowIso(), nowIso(), id]);
 }

@@ -57,12 +57,12 @@ class MainActivity : ComponentActivity() {
         NativeSession.initialize(this)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        root.addView(Button(this).apply { text = "本地通知试验"; setOnClickListener { localDialog() } })
+        if (BuildConfig.DEVELOPER_TOOLS) root.addView(Button(this).apply { text = "本地通知试验"; setOnClickListener { localDialog() } })
         offline = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; visibility = View.GONE; setPadding(24, 20, 24, 20)
-            addView(TextView(this@MainActivity).apply { text = "Orbit 暂时无法连接。检查网络后重试；本地通知试验仍可独立使用。" })
+            addView(TextView(this@MainActivity).apply { text = "Orbit 暂时无法连接。检查网络后重试。" })
             addView(Button(this@MainActivity).apply { text = "重试 Orbit"; setOnClickListener { web.loadUrl(BuildConfig.APP_URL) } })
-            addView(Button(this@MainActivity).apply { text = "本地通知试验"; setOnClickListener { localDialog() } })
+            if (BuildConfig.DEVELOPER_TOOLS) addView(Button(this@MainActivity).apply { text = "本地通知试验"; setOnClickListener { localDialog() } })
         }
         root.addView(offline)
         web = WebView(this)
@@ -134,9 +134,9 @@ class MainActivity : ComponentActivity() {
                         "webAuth" -> NativeSession.observeWebAccount(this, if (params.isNull("accountId")) null else params.getString("accountId"))
                         "abandonBinding" -> NativeSession.abandon(this, params)
                         "permission" -> askPermission()
-                        "exactPermission" -> if (Build.VERSION.SDK_INT >= 31) startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName")))
-                        "scheduleLocal" -> NotificationSupport.schedule(this, params.getBoolean("exact"))
-                        "cancelLocal" -> NotificationSupport.cancel(this)
+                        "exactPermission" -> { require(BuildConfig.DEVELOPER_TOOLS) { "通知试验仅在开发者构建中开放" }; if (Build.VERSION.SDK_INT >= 31) startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName"))) }
+                        "scheduleLocal" -> { require(BuildConfig.DEVELOPER_TOOLS) { "通知试验仅在开发者构建中开放" }; NotificationSupport.schedule(this, params.getBoolean("exact")) }
+                        "cancelLocal" -> { require(BuildConfig.DEVELOPER_TOOLS) { "通知试验仅在开发者构建中开放" }; NotificationSupport.cancel(this) }
                         "consumeNotification" -> if (params.optString("id") == NotificationSupport.prefs(this).getString("pending_notification", null)) NotificationSupport.prefs(this).edit().remove("pending_notification").apply()
                         else -> error("未知 Android 操作")
                     }
@@ -145,8 +145,8 @@ class MainActivity : ComponentActivity() {
                 reply.postMessage(response.toString())
             }
         } else {
-            AlertDialog.Builder(this).setMessage("请更新 Android System WebView 以启用网页通知设置；本地测试仍可通过原生入口操作。")
-                .setPositiveButton("本地通知试验") { _, _ -> localDialog() }.setNegativeButton("继续", null).show()
+            AlertDialog.Builder(this).setMessage("请更新 Android System WebView 以启用网页通知设置。" + if (BuildConfig.DEVELOPER_TOOLS) "本地测试仍可通过原生入口操作。" else "")
+                .setPositiveButton("继续", null).show()
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() { if (web.canGoBack()) web.goBack() else finish() }
@@ -168,6 +168,7 @@ class MainActivity : ComponentActivity() {
         localStatus?.text = "通知权限：${NotificationSupport.permission(this)}\n精确权限：${NotificationSupport.exactPermission(this)}\n${p.getString("local_result", "尚未安排") }"
     }
     private fun localDialog() {
+        if (!BuildConfig.DEVELOPER_TOOLS) return
         val padding = (16 * resources.displayMetrics.density).toInt()
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(padding, padding, padding, padding)

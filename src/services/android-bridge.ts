@@ -1,4 +1,5 @@
 export interface AndroidStatus {
+  developerTools?:boolean;
   version:string; installationId:string; installationKey:string; fid:string|null;
   notificationPermission:boolean; exactAlarmPermission:boolean; fcmConfigured:boolean;
   fcmState:string; binding:{accountId:string;id:string;generation:string}|null;

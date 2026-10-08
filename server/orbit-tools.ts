@@ -7,9 +7,15 @@ import { listDailyReportViews } from './daily-report-service.js';
 import { queryAll } from './database/connection.js';
 import { getUserById } from './db.js';
 import { findSettings } from '../src/utils/settings-registry.js';
+import { settingAction, settingsActions, type NavigationAction } from '../src/utils/navigation-actions.js';
+import { searchProductHelp } from './product-help.js';
+import { querySystem } from './system-query.js';
 export function createOrbitTools(input:{userId:string;timezone:string;allowKnowledge:boolean;allowHistory:boolean;onStep?:(step:AiStep)=>void;onSchedules?:(items:any[])=>void}) {
   let calls=0,searches=0;
   const sources:WebSource[]=[];const settingRefs:Array<{id:string;label:string}>=[];
+  const admin=getUserById(input.userId)?.role==='admin';
+  const actions:NavigationAction[]=[];
+  const collectActions=(items:NavigationAction[])=>{for(const item of items)if(!actions.some(a=>a.settingId===item.settingId))actions.push(item);return items;};
   const schema=(key:string)=>({type:'object',properties:{[key]:{type:'string'}},required:[key],additionalProperties:false});
   const make=(name:string,label:string,key:string,execute:(value:string,signal?:AbortSignal)=>Promise<unknown>):OrbitTool=>({name,description:label,schema:schema(key),async execute(args,signal){
     signal?.throwIfAborted();
@@ -21,13 +27,20 @@ export function createOrbitTools(input:{userId:string;timezone:string;allowKnowl
     catch(e){input.onStep?.({...step,state:'failed'});throw e;}
   }});
   const tools=[
-    make('settings','查找设置入口（只读）','query',async(q)=>{const items=findSettings(q,getUserById(input.userId)?.role==='admin').slice(0,4);for(const i of items)if(!settingRefs.some(r=>r.id===i.id))settingRefs.push({id:i.id,label:i.label});return items.map(i=>({id:i.id,label:i.label,description:i.description,path:`/assistant?settings=${encodeURIComponent(i.id)}`}));}),
+    make('settings','查找设置入口（只读语义 action，不提供 URL）','query',async(q)=>collectActions([...settingsActions(q,admin),...findSettings(q,admin).slice(0,4).flatMap(i=>{const action=settingAction(i.id,admin);return action?[action]:[];})])),
+    make('product_help','查询 Orbit 产品说明与规则；与个人知识库分离','query',async(q)=>{collectActions(settingsActions(q,admin));return searchProductHelp(q,admin);}),
+    make('system_status','查询应用版本、部署 commit 与服务健康（只读）','query',async()=>querySystem(input.userId,'status')),
+    make('deployment_status','查询真实部署记录（只读）','query',async()=>querySystem(input.userId,'deployments')),
+    make('task_status','查询当前账号任务；query 为编号或“最近”，管理员可用 job 名称（只读）','query',async(q)=>querySystem(input.userId,'tasks',q==='最近'?{}:{id:q})),
+    make('daily_report_status','查询日报失败阶段、保存与通知；date 为 YYYY-MM-DD','date',async(date)=>querySystem(input.userId,'daily-report-status',{date})),
+    make('reminder_status','查询提醒规则和发送结果；query 可为事项编号或“最近”','query',async(q)=>querySystem(input.userId,'reminder-status',q==='最近'?{}:{id:q})),
     make('search','联网搜索','query',async(q,signal)=>{if(++searches>2)throw new Error('本轮最多两次搜索');const found=await searchWeb(q,signal);for(const s of found)if(!sources.some(x=>x.url===s.url))sources.push(s);return found;}),
     make('read_url','读取公开网页','url',(url,signal)=>readWebPage(url,signal)),
     make('calendar','查询日历','date',async(date)=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error('请提供 YYYY-MM-DD');const items=schedulesForQuery(input.userId,date,input.timezone).slice(0,50);input.onSchedules?.(items);return items;}),
     make('reports','读取已发布日报','date',async(date)=>listDailyReportViews(input.userId).filter(r=>r.date===date).slice(0,2)),
   ];
+  if(admin)tools.push(make('recent_errors','管理员查询脱敏错误及近期失败部署（只读）','query',async()=>querySystem(input.userId,'errors')));
   if(input.allowKnowledge)tools.push(make('knowledge','检索知识库','query',async(q)=>searchLibraryForAi(input.userId,q,5)));
   if(input.allowHistory)tools.push(make('history','检索聊天历史','query',async(q)=>queryAll<any>('SELECT id,conversation_id,created_at,content FROM ai_schedule_messages WHERE user_id=? AND instr(content,?)>0 ORDER BY created_at DESC LIMIT 6',[input.userId,q]).map(m=>({...m,content:m.content.slice(0,1000)}))));
-  return {tools,sources,settingRefs};
+  return {tools,sources,settingRefs,actions};
 }

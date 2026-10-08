@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Link2, Reply } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-export interface NotificationMeta {origin:string;sourceLabel?:string;eventId?:string;notificationId?:string;enhanced?:boolean;state?:string;canContinue?:boolean;readAt?:string|null;href?:string|null;actionable?:boolean;handledAction?:string;handledAt?:string;nextReminderAt?:string;settingRefs?:Array<{id:string;label:string}>}
+import type { NavigationAction } from '../utils/navigation-actions';
+export interface NotificationMeta {origin:string;sourceLabel?:string;eventId?:string;notificationId?:string;enhanced?:boolean;state?:string;canContinue?:boolean;readAt?:string|null;href?:string|null;actionable?:boolean;handledAction?:string;handledAt?:string;nextReminderAt?:string;settingRefs?:Array<{id:string;label:string}>;actions?:NavigationAction[]}
 export function OrbitNotificationCard({meta,title,onRefresh}:{meta:NotificationMeta;title:string;onRefresh?:()=>void}) {
   const {authHeaders}=useAuth();const ref=useRef<HTMLDivElement>(null);const [busy,setBusy]=useState(false),[error,setError]=useState(''),[read,setRead]=useState(!!meta.readAt);
   useEffect(()=>{if(read||!meta.notificationId||!ref.current)return;const c=new AbortController();const observer=new IntersectionObserver(entries=>{if(!entries.some(e=>e.isIntersecting)||document.visibilityState!=='visible')return;observer.disconnect();void fetch(`/api/notifications/${encodeURIComponent(meta.notificationId!)}/read`,{method:'POST',headers:authHeaders(),signal:c.signal}).then(r=>{if(r.ok)setRead(true);}).catch(()=>undefined);},{threshold:0.5});observer.observe(ref.current);return()=>{observer.disconnect();c.abort();};},[meta.notificationId,read,authHeaders]);

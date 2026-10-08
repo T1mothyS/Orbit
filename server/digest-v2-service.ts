@@ -24,7 +24,9 @@ export function createDigestSnapshotRun(userId: string, snapshot: DigestSnapshot
   if (!isValidDateKey(snapshot.date)) throw new Error('INVALID_DATE');
   store.expireDigestSnapshots();
   const id = crypto.randomUUID(); const now = new Date();
-  const manifest = { date: snapshot.date, timezone: snapshot.timezone, cutoff: snapshot.cutoff, contextVersion: snapshot.contextVersion, contractVersion: DIGEST_V2_VERSION, generationVersion: DIGEST_V2_GENERATION, modelVersion: 'unknown', status: 'INPUTS_SNAPSHOTTED', inputCounts: { calendar: snapshot.calendar.items.length, mail: snapshot.mail.items.length, watchlist: snapshot.watchlist.items.length }, warnings: digestSnapshotWarnings(snapshot) };
+  const inputSections = ['calendar','mail','watchlist'].map(key=>({section:key,status:snapshot[key as 'calendar'].status}));
+  const inputFailed = inputSections.some(section=>section.status==='failed');
+  const manifest = { date: snapshot.date, timezone: snapshot.timezone, cutoff: snapshot.cutoff, contextVersion: snapshot.contextVersion, contractVersion: DIGEST_V2_VERSION, generationVersion: DIGEST_V2_GENERATION, modelVersion: 'unknown', status: 'INPUTS_SNAPSHOTTED', inputSections, events:[{status:inputFailed?'INPUTS_FAILED':'INPUTS_PREPARED',code:inputFailed?'INPUTS_FAILED':undefined,at:now.toISOString(),inputSections}], inputCounts: { calendar: snapshot.calendar.items.length, mail: snapshot.mail.items.length, watchlist: snapshot.watchlist.items.length }, warnings: digestSnapshotWarnings(snapshot) };
   Object.assign(manifest, { visualPreparation: { tool: 'daily_report.prepare_visuals_v2', schema: NEWS_VISUAL_PLAN_SCHEMA, guidance: '照片仍需已有许可；无已审核贴题图时，可提交仅使用本条标题/摘要连续原文短语的新闻信息图方案。返回的 digest 已绑定本站持久媒体；使用它重新校验。信息图明确标为原创、非现场。更改新闻或来源后须重新准备，不复用旧图。' } });
   if (digestSourcesEnabled(userId)) Object.assign(manifest, { sourcePreparation: { tool: 'daily_report.prepare_sources_v2', schema: NEWSLETTER_INPUT_SCHEMA, guidance: DIGEST_SOURCE_GUIDANCE } });
   if (digestPhotosEnabled(userId)) Object.assign(manifest, { photoPreparation: { tool: 'daily_report.find_photos_v2', schema: PHOTO_REQUEST_SCHEMA, guidance: '为每条新闻用具体人物、地点、设施或产品名称找资料照。候选来自 Commons 的文件级开放许可核对，服务端经代理自动下载并托管。把选中图片 pageUrl 加入 evidence，media.url 使用 imageUrl。此能力限已启用账号，正式发布另需生产开关；日期未知不猜，不把资料照称为现场。逐条配图完整性为硬闸门，不能用类别占位图掩盖失败。' } });
@@ -133,6 +135,8 @@ export function validateDigestRun(userId: string, runId: string, digest: unknown
       validation.errors.push({ path: '$.media', code: error instanceof Error && error.message.startsWith('VISUAL_') ? error.message : 'VISUAL_FILE_INVALID' });
     }
   }
+  // Validation/dry-run retain their pure business-database contract; telemetry is bounded log data.
+  addLog(validation.valid?'debug':'warn','daily-report','日报内容校验完成',{event:'digest_validation_result',userId,runId,status:validation.valid?'VALIDATED':'VALIDATION_FAILED',errorCode:validation.valid?undefined:'VALIDATION_FAILED',errors:validation.errors.slice(0,10).map(e=>({code:e.code}))});
   return validation;
 }
 function preparedVisuals(userId: string, runId: string): PreparedNewsVisual[] {
@@ -286,7 +290,7 @@ export async function publishDigestV2(userId: string, runId: string, value: unkn
       };
     } catch (error) {
       // Keep only bounded, non-sensitive stage diagnostics, never provider error messages.
-      try { recordPhase('FAILED', { failedPhase: phase, retryable: true, ...(error instanceof DigestImageNotReadyError ? error.diagnostics : {}) }); } catch { /* Original durable-write failure remains primary. */ }
+      try { recordPhase('FAILED', { failedPhase: phase, code:error instanceof DigestImageNotReadyError?'STORY_IMAGE_NOT_READY':phase==='REPORT_SAVED'?'NOTIFICATION_QUEUE_FAILED':'PUBLICATION_FAILED', retryable: true, ...(error instanceof DigestImageNotReadyError ? error.diagnostics : {}) }); } catch { /* Original durable-write failure remains primary. */ }
       throw error;
     }
   });

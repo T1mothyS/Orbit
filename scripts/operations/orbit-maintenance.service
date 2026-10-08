@@ -1,0 +1,9 @@
+[Unit]
+Description=Orbit bounded operations snapshot and retention
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 /usr/local/lib/orbit/orbit-operations.py --config /etc/orbit/operations.json maintain --apply
+TimeoutStartSec=180
+UMask=0077

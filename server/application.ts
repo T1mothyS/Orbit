@@ -12,6 +12,7 @@ import { createOrbitFeatureRouter } from './routes/orbit.js';
 import { createProactiveJobs } from './orbit-proactive.js';
 import { createAndroidPushRouter } from './routes/android-push.js';
 import { createAndroidPushJobs } from './android-push.js';
+import { createSystemRouter } from './routes/system.js';
 
 import { createSchedulesRouter } from './routes/schedules.js';
 import { createCaldavRouter } from './routes/caldav.js';
@@ -82,6 +83,7 @@ export const app = createApp({
 
 // 日志 API
 app.use(createLogsRouter({ authenticate, requireAdmin }));
+app.use(createSystemRouter({ authenticate }));
 
 app.use(createSearchRouter({ authenticate }));
 app.use(createResearchRouter({ authenticate }));

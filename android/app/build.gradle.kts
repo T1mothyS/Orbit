@@ -21,14 +21,18 @@ android {
         applicationId = "io.github.t1mothys.orbit"
         minSdk = 26
         targetSdk = 36
-        versionCode = 55000
+        versionCode = 56000
         versionName = orbitVersion["version"] as String
         buildConfigField("String", "APP_URL", "\"${appUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigured.toString())
+        buildConfigField("boolean", "DEVELOPER_TOOLS", "false")
     }
     buildFeatures { buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-    buildTypes { getByName("release") { isMinifyEnabled = false } }
+    buildTypes {
+        getByName("debug") { buildConfigField("boolean", "DEVELOPER_TOOLS", (providers.gradleProperty("orbitDeveloperTools").orNull == "true").toString()) }
+        getByName("release") { isMinifyEnabled = false }
+    }
 }
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
 dependencies {
