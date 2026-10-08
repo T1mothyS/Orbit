@@ -19,7 +19,7 @@ interface DailyReportDeliveryPolicy {
   updatedAt: string | null;
 }
 
-export function DailyReportSettings({ authHeaders, onOpenPreferences }: { authHeaders: SettingsAuthHeaders; onOpenPreferences?: () => void }) {
+export function DailyReportSettings({ authHeaders, onOpenPreferences, showContext = true }: { authHeaders: SettingsAuthHeaders; onOpenPreferences?: () => void; showContext?: boolean }) {
   const [dailyReportStatus, setDailyReportStatus] = useState<DailyReportTokenStatus | null>(null);
   const [dailyReportToken, setDailyReportToken] = useState('');
   const [dailyReportBusy, setDailyReportBusy] = useState(false);
@@ -135,7 +135,7 @@ export function DailyReportSettings({ authHeaders, onOpenPreferences }: { authHe
     }
   };
 
-  useEffect(() => { void loadDailyReportStatus(); void loadCloudContext(); void loadDeliveryPolicy(); }, [loadDailyReportStatus, loadCloudContext, loadDeliveryPolicy]);
+  useEffect(() => { void loadDailyReportStatus(); if (showContext) void loadCloudContext(); void loadDeliveryPolicy(); }, [loadDailyReportStatus, loadCloudContext, loadDeliveryPolicy, showContext]);
   const deliveryPolicyDirty = deliveryPolicy
     ? deliverySources.join(',') !== deliveryPolicy.sources.join(',')
     : false;
@@ -183,7 +183,7 @@ export function DailyReportSettings({ authHeaders, onOpenPreferences }: { authHe
           </div>
         </div>
       </SettingRow>
-      <SettingRow id="setting-daily-report-17lgo36" label="个人资料与日报偏好" description="直接在网页编辑当前账号的个人资料、阅读偏好、兴趣、关注名单和研究框架，供 Cloud 日报读取。">
+      {showContext && <SettingRow id="setting-daily-report-17lgo36" label="日报个性化" description="编辑阅读偏好、近期关注、Watchlist 与 Cloud 研究框架。">
         <div className="settings-stack">
           <div className="settings-status" role="status">
             {cloudContextError && <strong className="settings-error-text">{cloudContextError}</strong>}
@@ -194,12 +194,12 @@ export function DailyReportSettings({ authHeaders, onOpenPreferences }: { authHe
             </>}
           </div>
           <div className="settings-actions">
-            <Button tag="button" onClick={onOpenPreferences}>编辑个人资料与日报偏好</Button>
+            <Button tag="button" onClick={onOpenPreferences}>编辑日报个性化</Button>
             <Button tag="button" variant="outline" loading={!cloudContext && !cloudContextError} onClick={() => void loadCloudContext()}>刷新保存状态</Button>
           </div>
-          <p className="settings-note">与知识库首页共用同一编辑页。保存后供下一次 Cloud 日报读取；不自动同步本地日报或其他环境。</p>
+          <p className="settings-note">个人资料从账号入口单独编辑；当前仅用于 Cloud 日报。保存不触发生成，不自动同步本地日报或其他环境。</p>
         </div>
-      </SettingRow>
+      </SettingRow>}
     </SettingSection>
   );
 }

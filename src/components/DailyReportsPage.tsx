@@ -210,6 +210,7 @@ export function DailyReportsPage() {
           {viewMode !== 'received' && <span className="report-view-status">{viewMode === 'shadow' ? '新版预览 · 非正式' : '候选对照 · 非正式'}</span>}
         </div>
         <div className="daily-report-toolbar-actions">
+          <Link className="daily-report-toolbar-button" to="/reports/settings">日报设置</Link>
           <button type="button" className="daily-report-toolbar-button mobile-filter-trigger" onClick={() => { setPendingView(viewMode); setFiltersOpen(true); }}><SlidersHorizontal size={16} />筛选{viewMode !== 'received' && <span className="filter-count">1</span>}</button>
           <div className="daily-report-view-toggle desktop-filters" role="tablist" aria-label="日报查看范围">
             <button type="button" role="tab" aria-selected={viewMode === 'received'} className={viewMode === 'received' ? 'active' : undefined} onClick={() => switchView('received')}>正式日报</button>

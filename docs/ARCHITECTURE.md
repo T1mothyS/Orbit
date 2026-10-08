@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last local verification: 2026-10-07，Android 通知试验实现、服务及合成浏览器验证；版本源为 package.json，验证入口/结果见 TEST-MATRIX。不包含真机送达、真实 AI、生产、自然定时与收件箱；其他历史证据按各节日期使用。
+- Last local verification: 2026-10-08，设置归属、显式通知上下文、知识库阅读与 Android 试验面板；版本源为 package.json，验证入口/结果见 TEST-MATRIX。不包含真机送达、真实 AI、生产、自然定时与收件箱；其他历史证据按各节日期使用。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -280,6 +280,9 @@ Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓�
 
 
 ### 交互连接与个人活动报告合同
+
+- 通知“查看原对象 / 就此继续聊”只出现在通知消息。历史读取重新确认归属及对象状态；缺失或失效时返回 `canContinue:false` 并清除旧 `href/object`，已处理通知仍可继续讨论。每日行动提醒指向 `/today`。继续聊天在输入框显示可清除的关联，不改原输入；关联与草稿按账号和会话保存，发送成功仅消费提交版本。
+- `notificationId` 纳入请求幂等比较。AI 请求重新检查当前账号归属与可继续状态，显式加入完整标题、正文、来源、时间及状态，不依赖最近 20 条历史。通知文字作为引用资料，业务变更仍走现有明确确认；普通 AI 不因个人资料入口调整而读取 Cloud context。
 
 - Status: CONTRACT；2026-10-04 增量实现。权威来源：`notification-chat.ts`、`activity-statistics.ts`、`activity-reports.ts`、`connected-backup.ts`、`orbit-profile.ts` 与相关路由/测试。行为、表结构、过滤或投递规则变更时同步本节。
 - `reminders.in_app_enabled` 是站内及主动聊天的唯一账号开关。旧 `proactiveEnabled` GET/PATCH 仅为兼容别名，旧字段不再存第二份启用状态。逐事项提前/停用规则保持独立。

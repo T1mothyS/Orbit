@@ -2,7 +2,7 @@
 
 - Status: CONTRACT（末尾为历史快照）
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verified commit/version: `0.52.1-261007.1349`（2026-10-07，自动资料照的正式账号显式开关及瞬时下载恢复；逐新闻失败诊断、账号白名单与 Shadow 发信禁止保留。工程/运行验证分层记录在测试矩阵；正式自然触发与收件箱按真实时点记录）。
+- Last local verification: 2026-10-08，个人资料与日报设置入口归属；Cloud 完整 context 和版本保护合同不变。自动资料照的正式账号开关及瞬时下载恢复仍按 2026-10-07 的 `0.52.1-261007.1349` 验证时点使用；工程/运行分层结果见测试矩阵，正式自然触发与收件箱按真实时点记录。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -87,7 +87,7 @@ OAuth 令牌只保存在数据库的 SHA-256 哈希；人工登录/权限审阅�
 
 ## Cloud Context 编辑与导入
 
-日常修改从知识库首页或设置中的“个人资料与日报偏好”进入 `/library/preferences`，无需配置文件或上传。页面和原设置共用当前账号的 `daily_report_cloud_context`，不会创建第二份资料；原加密账号备份/恢复仍覆盖该数据。编辑页提交完整原数据，保留未展示的字段、旧式股票数组、内嵌框架及 `thesis_file` 引用。
+个人资料从账号入口进入 `/settings/profile`；日报偏好、近期关注、Watchlist 与 Cloud 研究框架从 `/reports/settings` 编辑。`/library/preferences` 默认兼容转到日报个性化，旧发布/导出深链接转到 `/library/settings`。字段归属与入口详见 [个人资料与日报偏好](LIBRARY.md#个人资料与日报偏好)。所有编辑继续共用当前账号的 `daily_report_cloud_context`，不创建第二份资料；原加密账号备份/恢复仍覆盖该数据。每次先读取完整 context，只修改当前页面字段，再提交完整原数据与 `expectedVersion`，保留未知、旧式股票数组、内嵌框架及 `thesis_file` 引用。普通 AI 仍不消费个人资料。
 
 - `GET /api/daily-report/cloud-context`：返回 `{ context: { version, context, createdAt, updatedAt, readFailed }, inputWarnings }`；账号从登录认证确定，响应 `Cache-Control: no-store`。
 - `PUT /api/daily-report/cloud-context`：接受 `{ context, expectedVersion }`。新编辑页必须传非负整数版本，旧导入调用可继续只传 `{ context }`。版本检查与可靠磁盘写回在同一事务内完成，失败回滚内存和文件。

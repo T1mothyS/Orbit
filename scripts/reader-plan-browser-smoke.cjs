@@ -62,6 +62,17 @@ fs.mkdirSync(output,{recursive:true});
     await page.getByLabel('删除待创建条目 合成待办甲',{exact:true}).click();await page.waitForFunction(()=>document.querySelector('.orbit-plan')?.textContent.includes('· 1 项'));
     await page.getByLabel('删除待创建条目 合成待办丙已编辑',{exact:true}).click();await page.waitForFunction(()=>document.querySelector('.orbit-plan')?.textContent.includes('已取消执行计划 · 0 项'));
     await page.reload();await page.waitForFunction(()=>document.querySelector('.orbit-plan')?.textContent.includes('已取消执行计划 · 0 项'));assert.equal(await page.getByRole('button',{name:'确认并执行',exact:true}).count(),0);checks.push('last removal remains cancelled after reload');
+    if(process.argv.includes('--iteration'))for(const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]])for(const theme of ['light','dark']) {
+      await page.setViewportSize({width,height});await page.addInitScript(t=>localStorage.setItem('theme',t),theme);
+      await page.goto(base+'/library/iteration-reader');await page.locator('.library-markdown').waitFor();
+      await page.locator('.library-mermaid-rendered svg').waitFor();await page.locator('.library-math .katex').first().waitFor();
+      await page.waitForFunction(()=>document.querySelector('.library-markdown img')?.naturalWidth>0);
+      const sizes=await page.evaluate(()=>{const root=document.querySelector('.library-markdown'),style=getComputedStyle(root);return {width:innerWidth,scrollWidth:document.documentElement.scrollWidth,font:style.fontSize,lineHeight:style.lineHeight,padding:getComputedStyle(document.querySelector('.library-document')).padding,heading:getComputedStyle(root.querySelector('h1')).fontSize,metadata:root.innerText.includes('sourceId:')};});
+      assert.equal(sizes.font,'16px');assert.equal(sizes.lineHeight,'28px');assert.equal(sizes.heading,width<=640?'24px':'28px');assert.equal(sizes.metadata,false);assert.ok(sizes.scrollWidth<=width+1);if(width<=640)assert.equal(sizes.padding,'12px');
+      await page.getByRole('button',{name:'代码与表格',exact:true}).click();
+      await page.getByRole('button',{name:'复制代码',exact:true}).click();await page.locator('.library-code-copy').filter({hasText:'已复制'}).waitFor();
+      await page.screenshot({path:path.join(output,'rich-reader-'+width+'-'+theme+'.png')});metrics.push({theme,...sizes});checks.push('rich reader '+width+' '+theme);
+    }
     assert.deepEqual(errors,[]);fs.writeFileSync(path.join(output,'reader-plan-results.json'),JSON.stringify({checks,metrics,errors},null,2));console.log(JSON.stringify({passed:checks.length,errors,output}));
   } catch(error) {console.error(error);throw error;} finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

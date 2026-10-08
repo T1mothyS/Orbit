@@ -14,7 +14,7 @@ interface LibraryTokenStatus {
   revokedAt: string | null;
 }
 
-export function LibraryIntegrationSettings({ authHeaders, onOpenPreferences }: { authHeaders: SettingsAuthHeaders; onOpenPreferences?: () => void }) {
+export function LibraryIntegrationSettings({ authHeaders }: { authHeaders: SettingsAuthHeaders }) {
   const [status, setStatus] = useState<LibraryTokenStatus | null>(null);
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
@@ -77,7 +77,6 @@ export function LibraryIntegrationSettings({ authHeaders, onOpenPreferences }: {
 
   return (
     <SettingSection id="library" title="知识库" description="导出与本地知识库发布集成。">
-      <SettingRow id="library-personal-preferences" label="个人资料与日报偏好" description="和日报设置共用同一份资料，直接在网页编辑。"><Button tag="button" onClick={onOpenPreferences}>编辑个人资料与日报偏好</Button></SettingRow>
       <SettingRow id="library-full-export" label="导出全库" description="下载当前账号的完整知识库 JSON。"><Button tag="button" loading={exportBusy} disabled={exportBusy} onClick={exportLibrary}>导出全库</Button>{exportError && <p role="alert" className="orbit-inline-error">{exportError}</p>}</SettingRow>
       <SettingRow label="知识库发布令牌">
         <p className="settings-help">令牌仅用于本地知识库 V2 发布和更新；不能登录或访问其他账号及功能。服务器只保存哈希。</p>

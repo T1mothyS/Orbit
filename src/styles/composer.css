@@ -87,3 +87,8 @@
   .orbit-composer-menu { animation:none; }
   .orbit-segmented-indicator { transition:none; }
 }
+.orbit-notification-reply { display: flex; align-items: center; gap: 8px; padding: 6px 10px; margin-bottom: 6px; color: var(--td-text-color-secondary); font-size: 13px; border-left: 2px solid var(--td-brand-color); }
+.orbit-notification-reply span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.orbit-notification-reply button { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; }
+.orbit-notification-reply button:focus-visible { outline: 2px solid var(--td-brand-color); outline-offset: 2px; }
+@media (max-width: 640px) { .orbit-notification-reply button { min-width: 44px; min-height: 44px; } }

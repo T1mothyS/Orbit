@@ -51,7 +51,7 @@ export function deliverInApp(item:activity.NotificationDelivery,eventId?:string,
   });
 }
 export function notificationView(userId:string,id:string) {
-  const item=activity.getNotification(id,userId);if(!item)return {state:'discarded'};
+  const item=activity.getNotification(id,userId);if(!item)return {state:'discarded',canContinue:false,href:null,object:null,actionable:false};
   const ref=notificationObject(item);
   let state='sent';
   if(['schedule','reminder','activity_report'].includes(item.sourceType)&&!ref)state='discarded';
@@ -61,7 +61,19 @@ export function notificationView(userId:string,id:string) {
   const meta=message?JSON.parse(message.orbit_meta):{};
   const linked=ref?.type==='schedule'?getSchedule(ref.id):ref?.type==='reminder'&&ref.instanceId?getSchedule(`reminder-cycle:${ref.instanceId}`):null;
   if(linked&&meta.expectedState&&scheduleFingerprint(linked)!==meta.expectedState&&state==='sent')state='discarded';
-  return {state,readAt:item.readAt,href:item.sourceType==='digest'?'/today':ref?orbitObjectPath(ref):undefined,object:ref,actionable:!!linked&&!!meta.expectedState&&state==='sent'};
+  return {state,canContinue:state!=='discarded',readAt:item.readAt,href:state==='discarded'?null:item.sourceType==='digest'?'/today':ref?orbitObjectPath(ref):null,object:state==='discarded'?null:ref,actionable:!!linked&&!!meta.expectedState&&state==='sent'};
+}
+/** Resolve explicitly selected notifications independently of the recent chat window. */
+export function notificationContinuation(userId:string,id:string) {
+  const item=activity.getNotification(id,userId);
+  if(!item)throw new Error('通知不存在或无权访问');
+  const view=notificationView(userId,id);
+  if(!view.canContinue)throw new Error('通知已失效，不能继续关联');
+  return {
+    notificationId:item.id,title:item.title,body:item.body,
+    sourceType:item.sourceType,sourceId:item.sourceId,
+    scheduledAt:item.scheduledAt,sentAt:item.sentAt,createdAt:item.createdAt,state:view.state,object:view.object,
+  };
 }
 export function eventForNotification(userId:string,id:string):string {
   const item=activity.getNotification(id,userId),view=notificationView(userId,id);if(!item||!view.actionable)throw new Error('通知已失效或不支持事项操作');

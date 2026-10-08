@@ -4,7 +4,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('nod
 const base=process.env.ORBIT_PREVIEW_URL||'http://127.0.0.1:4183';
 assert.equal(new URL(base).hostname,'127.0.0.1');
 const output=process.env.ORBIT_UI_QA_DIR||fs.mkdtempSync(path.join(os.tmpdir(),'orbit-chat-controls-'));
-const baseline=process.argv.includes('--baseline');fs.mkdirSync(output,{recursive:true});
+const baseline=process.argv.includes('--baseline'),regression=process.argv.includes('--regression');fs.mkdirSync(output,{recursive:true});
 (async()=>{
   const browser=await chromium.launch({channel:process.env.ORBIT_BROWSER_CHANNEL||'msedge',headless:true}),checks=[],metrics=[],errors=[];
   let page;
@@ -41,8 +41,9 @@ const baseline=process.argv.includes('--baseline');fs.mkdirSync(output,{recursiv
       }
     }
     fs.writeFileSync(path.join(output,baseline?'baseline.json':'matrix.json'),JSON.stringify({checks,metrics,errors},null,2));if(baseline){console.log(JSON.stringify({baseline:true,views:metrics.length,output}));return;}
-    const oldMetrics=JSON.parse(fs.readFileSync(path.join(output,'baseline.json'))).metrics;
-    for(const row of metrics.filter(row=>row.width<=768)) {const before=oldMetrics.find(b=>b.width===row.width&&b.theme===row.theme);assert.ok(row.noteBody-before.noteBody>=23,`note body grows ${row.width}`);}checks.push('mobile note body gains 24px');
+    // Later regressions verify controls without asserting a new gain over the original feature baseline.
+    if(!regression){const oldMetrics=JSON.parse(fs.readFileSync(path.join(output,'baseline.json'))).metrics;
+      for(const row of metrics.filter(row=>row.width<=768)) {const before=oldMetrics.find(b=>b.width===row.width&&b.theme===row.theme);assert.ok(row.noteBody-before.noteBody>=23,`note body grows ${row.width}`);}checks.push('mobile note body gains 24px');}
     await page.setViewportSize({width:390,height:844});await page.goto(base+'/assistant');const input=page.getByLabel('AI 助手输入框',{exact:true});await input.waitFor();await page.waitForURL('**/assistant?conversation=*');
     const cid=new URL(page.url()).searchParams.get('conversation'),clear=()=>page.locator(`[data-confirm-action="clear:${cid}"]`);
     const openHistory=async()=>{await page.getByLabel('更多功能',{exact:true}).click();await page.getByRole('button',{name:/^历史对话/}).click();};

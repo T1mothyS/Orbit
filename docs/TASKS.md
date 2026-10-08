@@ -1,12 +1,21 @@
 # Orbit 已完成与待完成任务
 
-- Status: LIVING；源码核对日期：2026-10-07；版本来源为 package.json。
+- Status: LIVING；源码核对日期：2026-10-08；版本来源为 package.json。
 - 职责：所有领域的任务状态与结束条件。路线顺序见 [route.md](../route.md)，版本变更见 [更新日志](../CHANGELOG.md)。
 - “本地完成”只表示列明的源码、测试与合成浏览器证据；上线、自然定时、真实模型、手机和邮箱单独验收。生产运行结果以当次 Release 与本机连续记录为准。
 
+## 2026-10-08 下一轮迭代（本地）
+
+- 个人资料、日报设置、知识库设置及旧深链接已整理，保持完整 context 与版本冲突保护，普通 AI 不消费个人资料；具体合同见 [知识库与设置归属](LIBRARY.md#个人资料与日报偏好)。
+- 通知操作、草稿关联与显式 AI 通知上下文已实现，失效链接及跨账号拒绝、不同通知幂等冲突有自动测试；业务确认边界保持不变。
+- 知识库阅读节奏与标准导入元数据隐藏已实现，原文导出与 hash 保持不变。日报邮件合同未改。
+- Android 自定义试验面板已通过构建、lint 和 JVM 测试；真机权限、锁屏/离线/点击及 Firebase/FCM 闭环仍待设备与配置。没有部署 Android 服务端功能。
+- [Research 可行性评估](DAILY-DIGEST-RESEARCH-THESIS.md#深入分析可行性评估2026-10-08)已形成，完整 Agent 暂缓。本轮没有新增执行入口或自动 Thesis/知识库写入。
+- 日报事故已按原阶段、保存和发送记录只读核对；运维时点证据与恢复限制留在本机连续记录，不重跑或补发。排障方法见 [Run 发布核对](CLOUD-DIGEST-RECOVERY.md#v2-run-发布错误与部分成功核对)。本轮未 push、合并 main、部署或真实发信。
+
 ## Android 一期
 
-Android 一期代码已接入：在线壳、原生本地测试、网页状态与操作、FID 设备注册/解绑、独立持久 Push 扫描和安全补偿。构建与 Firebase 操作见 [Android 构建](../android/README.md)，API 与保护见 [架构](ARCHITECTURE.md#android-客户端与-push)。**一期通知试验尚未验收完成**：用户尚未准备 Firebase，真机安装、登录/真实聊天/键盘、本地锁屏与离线、FCM Google 可达后台闭环和无代理 Wi-Fi/移动网络结论均待验证，详见 [矩阵](TEST-MATRIX.md#android-一期)。未部署、未真实发送、未发布到 GitHub。
+Android 一期代码已接入：在线壳、原生本地测试、网页状态与操作、FID 设备注册/解绑、独立持久 Push 扫描和安全补偿。构建与 Firebase 操作见 [Android 构建](../android/README.md)，API 与保护见 [架构](ARCHITECTURE.md#android-客户端与-push)。**一期通知试验尚未验收完成**：旧 APK 已收到真机安装、登录成功反馈；修复后的 APK 尚未连接真机验收。Firebase 未准备，真实聊天/键盘、本地锁屏与离线、FCM Google 可达后台闭环和无代理 Wi-Fi/移动网络结论均待验证，详见 [矩阵](TEST-MATRIX.md#android-一期)。未部署、未真实发送、未发布到 GitHub。
 
 ## 已完成的修复
 

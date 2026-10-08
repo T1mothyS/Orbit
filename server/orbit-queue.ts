@@ -41,7 +41,7 @@ export function submitOrbitRequest(userId: string, body: any) {
     const old = getRequest(userId, id);
     if (old) {
         const frozen=JSON.parse(old.body);
-        if (old.conversation_id !== cid || frozen.text !== text || (body.provider!==undefined&&frozen.provider!==body.provider) || (body.model!==undefined&&frozen.model!==body.model) || JSON.stringify(frozen.attachmentIds||[])!==JSON.stringify(attachmentIds))
+        if (old.conversation_id !== cid || frozen.text !== text || (frozen.notificationId || null) !== (body.notificationId || null) || (body.provider!==undefined&&frozen.provider!==body.provider) || (body.model!==undefined&&frozen.model!==body.model) || JSON.stringify(frozen.attachmentIds||[])!==JSON.stringify(attachmentIds))
             throw new Error('请求编号已用于其他内容');
         return old;
     }

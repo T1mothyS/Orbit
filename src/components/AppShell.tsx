@@ -87,6 +87,7 @@ export function AppShell({
             <div className="account-menu-panel"><strong>{user?.email}</strong>
               <button type="button" onClick={()=>{close();onOpenSettings();}}><Settings size={16}/> 设置</button>
               <button type="button" onClick={()=>{close();window.dispatchEvent(new CustomEvent('orbit:open-settings',{detail:'account'}));}}><UserRound size={16} />账户与头像</button>
+              <Link to="/settings/profile" onClick={close}><UserRound size={16} />个人资料</Link>
               <Link to="/project?view=statistics" onClick={close}><ChartNoAxesCombined size={16} />使用统计</Link>
               <button type="button" onClick={()=>{close();onToggleTheme();}}>{theme==='light'?<Moon size={16}/>:<Sun size={16}/>} 切换主题</button>
               <hr />

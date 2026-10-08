@@ -1,4 +1,5 @@
 /* Animation communicates a real state or spatial relationship. No decorative page motion. */
+:root { --orbit-reader-font-size:16px; --orbit-reader-line-height:1.75; --orbit-reader-paragraph-gap:12px; }
 :root { --orbit-motion-press:80ms; --orbit-motion-feedback:120ms; --orbit-motion-overlay:160ms; --orbit-motion-panel:220ms; --orbit-ease:cubic-bezier(.2,0,0,1); --orbit-ease-exit:cubic-bezier(.4,0,1,1); --orbit-radius-control:6px; --orbit-radius-card:8px; --orbit-radius-panel:12px; }
 button,input,select,textarea { transition-property:color,background-color,border-color; transition-duration:var(--orbit-motion-press); transition-timing-function:var(--orbit-ease); }
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline:2px solid var(--td-brand-color); outline-offset:2px; }
@@ -127,7 +128,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .app-shell .library-kind-badge { background:none; padding:0; font-weight:500; }
 .app-shell .library-kind-badge.article,.app-shell .library-kind-badge.fragment { color:var(--td-text-color-secondary); background:none; }
 .app-shell .library-detail-head h1 { font-weight:650; line-height:1.4; }
-.app-shell .library-markdown { font-size:16px; line-height:1.85; }
+.app-shell .library-markdown { font-size:var(--orbit-reader-font-size); line-height:var(--orbit-reader-line-height); }
 .app-shell .library-toc { box-shadow:none; border-radius:8px; }
 .app-shell .library-technical summary,.app-shell .library-versions > summary,.app-shell .library-relation-id summary { cursor:pointer; padding:8px 0; font-size:13px; color:var(--td-text-color-secondary); }
 .app-shell .library-relation-id { margin-top:8px; }

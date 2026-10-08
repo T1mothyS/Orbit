@@ -7,11 +7,11 @@ import { CONTEXT_GROUPS, THESIS_FIELDS, contextAt, contextFieldErrors, contextIn
   createContextThesis, isContextObject, resolveContextThesis, updateContextField, type ContextField, type ContextObject, type ContextPath } from '../../utils/daily-report-context';
 import './preferences.css';
 
-export function LibraryPreferencesPage() {
+export function LibraryPreferencesPage({ mode = 'report', embedded = false }: { mode?: 'profile' | 'report'; embedded?: boolean }) {
   const { user, authHeaders } = useAuth();
-  return <PreferencesEditor key={user?.id || 'loading'} authHeaders={authHeaders} />;
+  return <PreferencesEditor key={`${user?.id || 'loading'}:${mode}`} authHeaders={authHeaders} mode={mode} embedded={embedded} />;
 }
-function PreferencesEditor({ authHeaders }: { authHeaders: () => Record<string, string> }) {
+function PreferencesEditor({ authHeaders, mode, embedded }: { authHeaders: () => Record<string, string>; mode: 'profile' | 'report'; embedded: boolean }) {
   const [saved, setSaved] = useState<CloudContextEnvelope | null>(null);
   const [draft, setDraft] = useState<ContextObject>({});
   const [loading, setLoading] = useState(true), [saving, setSaving] = useState(false);
@@ -35,6 +35,8 @@ function PreferencesEditor({ authHeaders }: { authHeaders: () => Record<string, 
   }, [authHeaders]);
   useEffect(() => { active.current = true; void load(); return () => { active.current = false; generation.current++; request.current?.abort(); }; }, [load]);
   const fieldsErrors = contextFieldErrors(draft), warnings = contextInputWarnings(draft);
+  const background = contextAt(draft, ['profile', 'background', 'career_context']);
+  const profileSummary = typeof background === 'string' && background.trim() ? background.trim().slice(0, 80) : '尚未填写背景';
   const change = (path: ContextPath, value: unknown) => { setDraft(current => updateContextField(current, path, value)); setNotice(''); };
   const reload = () => { if (!dirty || window.confirm('重新加载会丢弃当前未保存修改。是否重新加载？')) void load(); };
   const save = async () => {
@@ -81,8 +83,8 @@ function PreferencesEditor({ authHeaders }: { authHeaders: () => Record<string, 
   };
   return <div className="library-page context-page" aria-busy={loading}>
     <div className="context-shell">
-      <Link className="library-back-button" to="/library">← 返回知识库</Link>
-      <header className="context-heading"><h1>个人资料与日报偏好</h1><p>在这里修改，供你的 Cloud 日报选择和解释内容。</p></header>
+      {!embedded && <Link className="library-back-button" to={mode === 'profile' ? '/assistant' : '/reports'}>← 返回{mode === 'profile' ? '对话' : '日报'}</Link>}
+      <header className="context-heading">{!embedded && <h1>{mode === 'profile' ? '个人资料' : '日报个性化'}</h1>}<p>{mode === 'profile' ? '身份、背景、专业兴趣与表达偏好。目前仅用于 Cloud 日报，普通 Orbit AI 尚未使用。' : '阅读偏好、近期关注、Watchlist 与 Cloud 研究框架。保存后供下一次 Cloud 日报读取。'}</p></header>
       <div className="context-savebar">
         <span role="status">{loading ? '正在读取资料…' : saved ? dirty ? '有未保存修改' : saved.version ? `已保存 · v${saved.version}` : '尚未配置' : '资料读取失败'}{saving && ' · 正在保存…'}</span>
         <div className="context-buttons"><button type="button" className="library-secondary-button" disabled={loading || saving || !saved || !dirty} onClick={() => { setDraft(structuredClone(saved!.context)); setNotice('已取消当前修改'); }}>取消</button>
@@ -93,17 +95,19 @@ function PreferencesEditor({ authHeaders }: { authHeaders: () => Record<string, 
       {saved && <p className="context-help">{saved.updatedAt && `最近保存：${new Date(saved.updatedAt).toLocaleString('zh-CN')}。`}保存不触发日报生成或邮件发送。资料时区不改变实际任务时间。</p>}
       {saved && !loading && <>
         {!!fieldsErrors.length && <div className="context-notice error" role="alert">{fieldsErrors.map((message, i) => <p key={i}>{message}</p>)}</div>}
+        {mode === 'report' && <><p className="context-help">个人资料：{profileSummary} · 仅用于 Cloud 日报。<Link to="/settings/profile">编辑个人资料</Link></p>
         <details className="context-warnings"><summary>Cloud 关注输入状态{warnings.length ? ` · ${warnings.length} 项提示` : ' · 完整'}</summary>
           {warnings.length ? warnings.map((message, i) => <p key={i}>{message}</p>) : <p>股票资料和研究框架满足输入规则；实际研究结果以日报运行记录为准。</p>}</details>
+        </>}
         <fieldset className="context-form" disabled={saving}>
-          {CONTEXT_GROUPS.map(group => <details key={group.key} className="context-section" open={!!openGroups[group.key]} onToggle={event => {
+          {CONTEXT_GROUPS.filter(group => mode === 'profile' ? group.key === 'profile' : group.key !== 'profile').map(group => <details key={group.key} className="context-section" open={!!openGroups[group.key]} onToggle={event => {
             const open = event.currentTarget.open; setOpenGroups(current => current[group.key] === open ? current : { ...current, [group.key]: open });
           }}><summary>{group.label}</summary>
             {group.key === 'watchlist' && Array.isArray(draft.watchlist)
               ? <ContextFieldView field={{ key: 'watchlist', label: '股票', kind: 'objects', fields: CONTEXT_GROUPS[3].fields![1].fields }} path={['watchlist']} context={draft} onChange={change} targetActions={targetActions} />
               : <ObjectFields fields={group.fields || []} path={[group.key]} context={draft} onChange={change} targetActions={targetActions} />}
           </details>)}
-          <details className="context-section" open={!!openGroups.theses} onToggle={event => {
+          {mode === 'report' && <details className="context-section" open={!!openGroups.theses} onToggle={event => {
             const open = event.currentTarget.open; setOpenGroups(current => current.theses === open ? current : { ...current, theses: open });
           }}><summary>研究框架</summary><p className="context-help">从关注对象建立或编辑研究框架。这里的修改用于日报参考；正式研究观点仍在“研究与观点”中确认。</p>
             {frameworks.length ? frameworks.map(({ path, value, target }, i) => <section className="context-item" tabIndex={-1} id={fieldId(path)} key={JSON.stringify(path)} aria-label={`研究框架第${i + 1}项`}>
@@ -115,9 +119,9 @@ function PreferencesEditor({ authHeaders }: { authHeaders: () => Record<string, 
                 else change(fieldPath, value);
               }} />
             </section>) : <p className="context-help">还没有研究框架，可在关注对象下建立。</p>}
-          </details>
+          </details>}
         </fieldset>
-        <nav className="context-related" aria-label="相关设置"><Link to="/library/preferences?settings=library-full-export">知识库导出</Link><Link to="/library/preferences?settings=setting-library-16152wn">知识库发布设置</Link><Link to="/library/preferences?settings=setting-daily-report-16vp9eg">日报接收设置</Link></nav>
+        <nav className="context-related" aria-label="相关设置"><Link to="/library/settings?settings=library-full-export">知识库导出</Link><Link to="/library/settings?settings=setting-library-16152wn">知识库发布设置</Link><Link to="/reports/settings?settings=setting-daily-report-16vp9eg">日报接收设置</Link></nav>
       </>}
     </div>
   </div>;

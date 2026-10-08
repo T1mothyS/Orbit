@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Button, MessagePlugin, Switch, Select } from 'tdesign-react';
 import { SettingSection } from '../SettingSection';
 import { SettingRow, SettingInput } from '../SettingRow';
@@ -13,7 +14,6 @@ export function NotificationSettings({ authHeaders, userEmail }: { authHeaders: 
   const [reminderMinute, setReminderMinute] = useState(0);
   const [reminderEmail, setReminderEmail] = useState('');
   const [emailEnabled, setEmailEnabled] = useState(true);
-  const [reportEmailEnabled, setReportEmailEnabled] = useState(false);
   const [inAppEnabled, setInAppEnabled] = useState(true);
   const [browserEnabled, setBrowserEnabled] = useState(true);
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
@@ -33,7 +33,6 @@ export function NotificationSettings({ authHeaders, userEmail }: { authHeaders: 
     setReminderMinute(preference.minute ?? 0);
     setReminderEmail(preference.reminderEmail || userEmail || '');
     setEmailEnabled(preference.emailEnabled !== false);
-    setReportEmailEnabled(preference.reportEmailEnabled === true);
     setInAppEnabled(preference.inAppEnabled !== false);
     setBrowserEnabled(preference.browserEnabled !== false);
     setQuietHoursEnabled(!!preference.quietHoursEnabled);
@@ -87,7 +86,6 @@ export function NotificationSettings({ authHeaders, userEmail }: { authHeaders: 
     minute: reminderMinute,
     reminderEmail: reminderEmail.trim(),
     emailEnabled,
-    reportEmailEnabled,
     inAppEnabled,
     browserEnabled,
     quietHoursEnabled,
@@ -166,12 +164,12 @@ export function NotificationSettings({ authHeaders, userEmail }: { authHeaders: 
 
   useEffect(() => { void loadReminder(); }, [loadReminder]);
   const disabled = initialLoading || !!loadError || loadingReminder || locationSaving;
-  const saveToggle = async (field: 'enabled' | 'reportEmailEnabled', value: boolean) => {
-    if (field === 'enabled') setReminderEnabled(value); else setReportEmailEnabled(value);
+  const saveToggle = async (field: 'enabled', value: boolean) => {
+    setReminderEnabled(value);
     setLoadingReminder(true);
     try {
       await saveAndConfirmNotificationPreferences(notificationPayload({ [field]: value }));
-      MessagePlugin.success(`${field === 'enabled' ? '每日提醒' : '日报邮件'}已${value ? '开启' : '关闭'}`);
+      MessagePlugin.success(`每日提醒已${value ? '开启' : '关闭'}`);
     } catch (error: any) {
       MessagePlugin.error(error?.message || '设置失败');
       await loadReminder();
@@ -198,8 +196,8 @@ export function NotificationSettings({ authHeaders, userEmail }: { authHeaders: 
           </div>
           <div className="settings-actions"><Button tag="button" loading={loadingReminder} disabled={disabled||!reminderEnabled} onClick={saveReminderEmail}>保存提醒时间</Button></div>
         </SettingRow>
-        <SettingRow label="日报邮件" description="与每日摘要、提醒渠道和免打扰独立。开启后，新发布或更新的内容版本会入队，同一版本不会重复发送。切换后立即保存。">
-          <Switch aria-label="日报邮件" aria-checked={reportEmailEnabled} value={reportEmailEnabled} disabled={disabled} onChange={v => void saveToggle('reportEmailEnabled', Boolean(v))} />
+        <SettingRow label="日报设置入口" description="日报邮件开关、来源接收与个性化在日报设置中管理；收件邮箱仍在这里统一编辑。">
+          <Link to="/reports/settings?settings=setting-notifications-1ov9hhr">打开日报邮件设置</Link>
         </SettingRow>
         <SettingRow label="常驻城市或区县" htmlFor="settings-home-location" description="用于每日邮件天气和未指定地点的天气提问。只保存地点名称与坐标。">
           {homeLocation && <div className="settings-location-selected"><div><strong>{homeLocation.name}</strong><span>{[homeLocation.admin1, homeLocation.country].filter(Boolean).join(' · ')}</span></div><Button tag="button" variant="text" disabled={disabled} loading={locationSaving} onClick={() => void saveHomeLocation(null)}>清除</Button></div>}

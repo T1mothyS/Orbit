@@ -1,4 +1,4 @@
-import { composerDraftKey, readComposerDraft, updateComposerDraft, snapshotComposerDraft, consumeComposerDraft, subscribeComposerDraft } from '../utils/composer-draft';
+import { composerDraftKey, readComposerDraft, updateComposerDraft, snapshotComposerDraft, consumeComposerDraft, subscribeComposerDraft, type NotificationContext } from '../utils/composer-draft';
 import type { NoteImage } from '../utils/note-images';
 import { NoteImageGallery, NoteImageInput, useNoteImageUpload } from './NoteImages';
 import { OrbitNotificationCard, type NotificationMeta } from './OrbitNotificationCard';
@@ -599,7 +599,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const [renameTitle, setRenameTitle] = useState<string | null>(null);
   const [targetConversation, setTargetConversation] = useState('');
   const location=useLocation();
-  const notificationContext=useRef<string|undefined>();
+  const [notificationContext, setNotificationContext] = useState<NotificationContext>();
   const draftKey = composerDraftKey(user?.id || '', orbit.cid);
   const activeDraftKey = useRef(draftKey); activeDraftKey.current = draftKey;
   const changeText = useCallback((text: string) => { updateComposerDraft(draftKey, { text }); }, [draftKey]);
@@ -611,11 +611,20 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const clearDisabled = !draftReady || destructiveBlocked || isLoading || mutationBusy;
   const cannotSend = !draftReady || orbit.creating || orbit.submitting || savingNotes || mutationBusy || (noteMode ? imageUpload.busy || (!inputText.trim() && !noteImages.length) : (!inputText.trim() && !attachments.files.length) || !attachments.ready || !ai.ready);
   useEffect(() => {
-    const sync = (key: string) => { if (key === draftKey) { const draft = readComposerDraft(key); setInputText(draft.text); setNoteImages(draft.images); } };
+    const sync = (key: string) => { if (key === draftKey) { const draft = readComposerDraft(key); setInputText(draft.text); setNoteImages(draft.images); setNotificationContext(draft.notificationContext); } };
     sync(draftKey); return subscribeComposerDraft(sync);
   }, [draftKey]);
-  useEffect(()=>{const continueChat=(e:Event)=>{const detail=(e as CustomEvent<{notificationId:string;title:string}>).detail;notificationContext.current=detail.notificationId;const previous=readComposerDraft(draftKey).text;changeText(previous+(previous?'\n\n':'')+'关于“'+detail.title+'”：');textareaRef.current?.focus();};window.addEventListener('orbit:continue-notification',continueChat);return()=>window.removeEventListener('orbit:continue-notification',continueChat);},[draftKey,changeText]);
-  useEffect(()=>{notificationContext.current=undefined;setRenameTitle(null);followBottom.current=true;seenMessages.current.clear();setHasNewReply(false);},[orbit.cid,user?.id]);
+  useEffect(() => {
+    const continueChat = (event: Event) => {
+      const detail = (event as CustomEvent<NotificationContext>).detail;
+      if (typeof detail?.notificationId !== 'string' || !detail.notificationId || detail.notificationId.length > 200 || typeof detail.title !== 'string') return;
+      updateComposerDraft(draftKey, { notificationContext: { notificationId: detail.notificationId, title: detail.title.slice(0, 200) } });
+      setNoteMode(false); textareaRef.current?.focus();
+    };
+    window.addEventListener('orbit:continue-notification', continueChat);
+    return () => window.removeEventListener('orbit:continue-notification', continueChat);
+  }, [draftKey]);
+  useEffect(()=>{setRenameTitle(null);followBottom.current=true;seenMessages.current.clear();setHasNewReply(false);},[orbit.cid,user?.id]);
 
   useEffect(() => {
     onChatStateChange?.({ hasMessages: messages.length > 0, busy: isLoading, clearDisabled });
@@ -624,7 +633,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const clearConversation = useCallback(async (id: string) => {
     if (destructiveBlocked || (id === orbit.cid && isLoading)) throw new Error('请等待当前操作结束后再清空对话');
     await orbit.clear(id);
-    if (id === activeConversation.current) { attachments.clear(); notificationContext.current = undefined; setHasNewReply(false); }
+    if (id === activeConversation.current) { attachments.clear(); updateComposerDraft(activeDraftKey.current, { notificationContext: undefined }); setHasNewReply(false); }
   }, [destructiveBlocked, isLoading, orbit.cid, orbit.clear, attachments.clear]);
   const closeComposerMenu = () => { confirmation.reset(); setComposerMenuOpen(false); };
 
@@ -685,9 +694,9 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     const text = rawText.trim()||(attachments.files.length?'请阅读附件并说明主要内容':'');if(!text||!attachments.ready||!ai.ready) return;
     const submitted = snapshotComposerDraft(draftKey);
     try {
-      const accepted = await orbit.send(text,{calendarId:'personal',...aiConnection,notificationId:notificationContext.current,attachmentIds:attachments.files.map(f=>f.id)});
+      const accepted = await orbit.send(text,{calendarId:'personal',...aiConnection,notificationId:submitted.notificationContext?.notificationId,attachmentIds:attachments.files.map(f=>f.id)});
       if(accepted && activeDraftKey.current === submitted.key) attachments.clear();
-      if(accepted && options.clearComposer !== false) { consumeComposerDraft(submitted, false); if(activeDraftKey.current === submitted.key) notificationContext.current=undefined; }
+      if(accepted && options.clearComposer !== false) consumeComposerDraft(submitted, false);
     } catch(error) {orbit.setError(error instanceof Error?error.message:'发送失败，请重试');}
   }, [orbit.send,orbit.setError,ai.provider,ai.model,ai.ready,attachments,draftKey]);
 
@@ -902,6 +911,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
             style={{ borderTop: '1px solid var(--td-component-stroke)' }}
           >
             <div className="orbit-composer-content">
+              {!noteMode && notificationContext && <div className="orbit-notification-reply" role="status"><span>回复：{notificationContext.title}</span><button type="button" aria-label="清除关联通知" onClick={() => updateComposerDraft(draftKey, { notificationContext: undefined })}><X size={16} aria-hidden="true" /></button></div>}
             {!noteMode && orbit.autoKnowledge&&<button type="button" className="orbit-knowledge-chip" onClick={()=>void orbit.preference(false).catch(e=>orbit.setError(e.message))}>知识库已开启 ×</button>}
             <div className="orbit-composer-controls">
               <OrbitSegmentedControl label="发送方式" value={noteMode ? 'note' : 'command'} options={[{ value: 'command', label: '指令' }, { value: 'note', label: '记事' }]}

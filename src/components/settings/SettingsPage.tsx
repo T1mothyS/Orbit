@@ -11,6 +11,7 @@ import { DataSettings } from './sections/DataSettings';
 import { AdminSettings } from './sections/AdminSettings';
 import { ToolsSettings } from './sections/ToolsSettings';
 import { CaldavSettings } from './sections/CaldavSettings';
+import { ReportEmailSettings } from './sections/ReportEmailSettings';
 
 export function SettingsPage({ onOpenAdmin, onOpenTools, onOpenPreferences }: { onOpenAdmin?: () => void; onOpenTools?: () => void; onOpenPreferences?: () => void }) {
   const { user, authHeaders, logout, isLoading } = useAuth();
@@ -25,7 +26,8 @@ export function SettingsPage({ onOpenAdmin, onOpenTools, onOpenPreferences }: { 
       <CaldavSettings authHeaders={authHeaders} />
       <NotificationSettings authHeaders={authHeaders} userEmail={user.email} />
       <DailyReportSettings authHeaders={authHeaders} onOpenPreferences={onOpenPreferences} />
-      <LibraryIntegrationSettings authHeaders={authHeaders} onOpenPreferences={onOpenPreferences} />
+      <ReportEmailSettings authHeaders={authHeaders} />
+      <LibraryIntegrationSettings authHeaders={authHeaders} />
       <ToolsSettings onOpenTools={onOpenTools} />
       <MailSettings authHeaders={authHeaders} />
       <DataSettings authHeaders={authHeaders} />

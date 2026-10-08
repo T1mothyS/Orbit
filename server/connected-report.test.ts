@@ -37,6 +37,28 @@ test('disabled channel, stale object and quiet time do not deliver actionable ca
   chat.setInAppEnabled(owner,false);const off=notification(item('off').id);chat.processInAppNotifications(new Date(Date.now()+1000));assert.equal(activity.getNotification(off.id)!.status,'suppressed');chat.setInAppEnabled(owner,true);
   const pref=db.getReminder(owner)!;db.upsertReminder({...pref,quiet_hours_enabled:1,quiet_start:'00:00',quiet_end:'23:59'});const quiet=notification(item('quiet').id);chat.processInAppNotifications(new Date());assert.equal(activity.getNotification(quiet.id)!.status,'pending');assert.ok(activity.getNotification(quiet.id)!.nextRetryAt);db.upsertReminder({...pref,quiet_hours_enabled:0});
 });
+test('selected notification context is owner scoped, survives recent history limits, and clears stale links', async () => {
+  chat.setInAppEnabled(owner,true);
+  const task=item('context source'),n=notification(task.id);chat.deliverInApp(n);
+  const cid=orbit.ensureDefaultConversation(owner);
+  for(let i=0;i<25;i++)db.createAiScheduleMessage({id:randomUUID(),user_id:owner,conversation_id:cid,role:'user',type:'text',content:`later ${i}`,intent:null,schedule_items:null,plan:null,created_at:new Date(Date.now()+i+1000).toISOString()});
+  const selected=chat.notificationContinuation(owner,n.id);
+  assert.equal(selected.title,'提醒');assert.equal(selected.body,'请查看当前事项');assert.equal(selected.sourceId,task.id);assert.equal(selected.state,'sent');assert.ok(selected.createdAt);
+  assert.throws(()=>chat.notificationContinuation(other,n.id),/不存在或无权/);
+  schedules.updateSchedule(task.id,{is_completed:true});assert.equal(chat.notificationContinuation(owner,n.id).state,'handled');
+  const queue=await import('./orbit-queue.js'),previous=queue.setOrbitWorker(async(_req,res)=>{res.json({success:true,reply:'synthetic'});});
+  try {
+    const id=randomUUID(),body={requestId:id,conversationId:cid,text:'同样问题',notificationId:n.id};
+    queue.submitOrbitRequest(owner,body);queue.submitOrbitRequest(owner,body);
+    const second=notification(item('second context').id);
+    assert.throws(()=>queue.submitOrbitRequest(owner,{...body,notificationId:second.id}),/其他内容/);
+    assert.throws(()=>queue.submitOrbitRequest(owner,{...body,notificationId:undefined}),/其他内容/);
+    assert.throws(()=>queue.submitOrbitRequest(other,{...body,requestId:randomUUID(),conversationId:orbit.ensureDefaultConversation(other)}),/不存在或无权/);
+    for(let i=0;i<100&&orbit.getRequest(owner,id)?.state==='running';i++)await new Promise(resolve=>setTimeout(resolve,5));
+  } finally {queue.setOrbitWorker(previous);}
+  schedules.deleteSchedule(task.id);const view=chat.notificationView(owner,n.id);assert.equal(view.href,null);assert.equal(view.canContinue,false);assert.throws(()=>chat.notificationContinuation(owner,n.id),/失效/);
+  assert.deepEqual(chat.notificationView(owner,'missing'),{state:'discarded',canContinue:false,href:null,object:null,actionable:false});
+});
 test('half-open statistics include undated todos, exclude reopened completion and distinguish rescheduling',()=>{
   run('UPDATE orbit_metrics_meta SET value=? WHERE key=?',[range.from,'activity_tracking_since']);const todo=item('undated',{type:'todo',is_unscheduled:true});
   const before=data();assert.ok(before.activity.metricDetails.created.some(d=>d.id===todo.id));assert.ok(before.activity.metricDetails.backlog.some(d=>d.id===todo.id));
@@ -48,6 +70,23 @@ test('half-open statistics include undated todos, exclude reopened completion an
   assert.equal(stats.getOrbitStatistics(other,'custom',undefined,new Date(),range).activity.created,0);
   assert.throws(()=>stats.getOrbitStatistics(owner,'custom',undefined,new Date(),{from:'2026-10-01',to:'2026-10-02'}),/时区/);
   run('UPDATE orbit_metrics_meta SET value=? WHERE key=?',[range.to,'activity_tracking_since']);assert.equal(data().activity.rescheduled,null);run('UPDATE orbit_metrics_meta SET value=? WHERE key=?',[range.from,'activity_tracking_since']);
+});
+test('AI provider instructions include the selected notification beyond twenty messages without profile input',async()=>{
+  const task=item('prompt context'),n=activity.enqueueNotificationDetailed({userId:owner,sourceType:'schedule',sourceId:task.id,channel:'in_app',kind:'due',title:'唯一关联通知标题',body:'唯一关联通知正文',scheduledAt:stamp,dedupeKey:randomUUID()}).notification;
+  chat.deliverInApp(n);const cid=orbit.ensureDefaultConversation(owner);
+  for(let i=0;i<25;i++)db.createAiScheduleMessage({id:randomUUID(),user_id:owner,conversation_id:cid,role:'user',type:'text',content:`prompt later ${i}`,intent:null,schedule_items:null,plan:null,created_at:new Date(Date.now()+i+1000).toISOString()});
+  assert.doesNotMatch(orbit.historyContext(owner,cid),/唯一关联通知正文/);
+  db.upsertUserApiKey({id:randomUUID(),user_id:owner,api_key:'synthetic-only',base_url:null,created_at:stamp,updated_at:stamp});
+  const cloud=await import('./daily-report-cloud-store.js');cloud.saveDailyReportCloudContext(owner,{profile:{background:{career_context:'不可加入普通AI的个人资料'}}},0);
+  const {workBuddyProvider}=await import('./ai-provider-workbuddy.js'),original=workBuddyProvider.generate;
+  let instructions='';workBuddyProvider.generate=async request=>{instructions=request.instructions;return JSON.stringify({intent:'chat',reply:'合成回应',operations:[]});};
+  const server=api.app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));
+  try {
+    const id=randomUUID(),base=`http://127.0.0.1:${(server.address() as {port:number}).port}`;
+    const response=await fetch(base+'/api/orbit/requests',{method:'POST',headers:{Authorization:'Bearer '+api.signUserToken(db.getUserById(owner)!),'Content-Type':'application/json'},body:JSON.stringify({requestId:id,conversationId:cid,text:'请解释这条通知',notificationId:n.id})});assert.equal(response.status,202);
+    for(let i=0;i<200&&['queued','running'].includes(orbit.getRequest(owner,id)?.state||'');i++)await new Promise(resolve=>setTimeout(resolve,10));
+    assert.equal(orbit.getRequest(owner,id)?.state,'completed');assert.match(instructions,/唯一关联通知标题/);assert.match(instructions,/唯一关联通知正文/);assert.match(instructions,/scheduledAt/);assert.match(instructions,/sourceType/);assert.doesNotMatch(instructions,/不可加入普通AI的个人资料/);
+  } finally {workBuddyProvider.generate=original;db.deleteUserApiKey(owner);await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 test('weekly defaults, DST-aware consecutive cutoffs, snapshot idempotency, ownership and bounded insights',async()=>{
   assert.equal(reports.getWeeklyPreferences(owner).enabled,false);assert.equal(reports.getWeeklyPreferences(owner).hour,20);assert.throws(()=>reports.setWeeklyPreferences(owner,{enabled:true,weekday:9,hour:20,minute:0}),/格式/);

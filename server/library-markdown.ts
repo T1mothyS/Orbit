@@ -112,6 +112,14 @@ function renderList(lines: string[], ordered: boolean, linkTargets: LibraryLinkT
 
 export function renderLibraryMarkdown(markdown: string, linkTargets: LibraryLinkTargets = new Map()): string {
   const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+  // Hide the known import header only in the reading projection, preserving the source.
+  if (lines[0]?.replace(/^\uFEFF/, '').trim() === '---') {
+    const end = lines.findIndex((line, index) => index > 0 && line.trim() === '---');
+    if (end > 0) {
+      const header = lines.slice(1, end);
+      if (header.some(line => /^sourceId\s*:\s*\S/.test(line)) && header.some(line => /^title\s*:\s*\S/.test(line))) lines.splice(0, end + 1);
+    }
+  }
   const blocks: string[] = [];
   let index = 0;
   while (index < lines.length) {

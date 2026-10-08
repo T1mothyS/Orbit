@@ -58,7 +58,7 @@ export function SettingsDialog({ onClose, onOpenAdmin, onOpenTools, restoreFocus
             <X size={20} aria-hidden="true" />
           </button>
         </div>
-        <SettingsPage onOpenAdmin={onOpenAdmin} onOpenTools={onOpenTools} onOpenPreferences={() => { onClose(); navigate('/library/preferences'); }} />
+        <SettingsPage onOpenAdmin={onOpenAdmin} onOpenTools={onOpenTools} onOpenPreferences={() => { onClose(); navigate('/reports/settings'); }} />
       </div>
     </Dialog>
   );

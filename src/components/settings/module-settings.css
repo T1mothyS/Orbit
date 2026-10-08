@@ -1,0 +1,23 @@
+.module-settings-page { width: min(100%, 1240px); padding: 24px; margin-inline: auto; min-width: 0; }
+.module-settings-page > h1 { margin: 12px 0 20px; font-size: 28px; }
+.module-settings-page .setting-row, .module-settings-page .setting-control { min-width: 0; }
+.module-settings-page .setting-row { grid-template-columns: minmax(0, 1fr); }
+.module-settings-page .context-page { padding: 0; }
+.reports-settings-page #setting-daily-report-17lgo36 > .setting-row-label { display: none; }
+.module-settings-page .context-heading h1 { font-size: 22px; }
+.module-settings-page .setting-section-header { padding-inline: 16px; }
+.module-settings-tabs { display: flex; gap: 8px; margin: 16px 0; }
+.module-settings-tabs button { padding: 10px 16px; min-height: 44px; border: 1px solid var(--td-component-stroke); border-radius: 8px; }
+.module-settings-tabs button[aria-selected="true"] { color: var(--td-brand-color); background: var(--td-brand-color-light); }
+.module-settings-panel { display: none; }
+.module-settings-panel.selected { display: block; }
+.module-settings-page :is(a,button):focus-visible { outline: 2px solid var(--td-brand-color); outline-offset: 2px; }
+@media (min-width: 1100px) {
+  .module-settings-tabs { display: none; }
+  .module-settings-columns { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .module-settings-panel { display: block; }
+}
+@media (max-width: 640px) {
+  .module-settings-page { padding: 12px 12px 40px; }
+  .module-settings-page .setting-section-body { padding-inline: 12px; }
+}

@@ -24,6 +24,26 @@ test('慢响应保留新文字与新图片，只消费已提交图片；账号�
 test('富文本复制转义文字和属性，不把用户输入当 HTML', () => {
   assert.equal(escapeClipboardHtml('<img onerror="x"> & \'text\''), '&lt;img onerror=&quot;x&quot;&gt; &amp; &#39;text&#39;');
 });
+test('通知关联随账号和会话保存；只消费提交版本，慢响应保留后来选择的通知', () => {
+  const key = composerDraftKey('reply-owner', 'first'), other = composerDraftKey('reply-owner', 'second');
+  saved.set(key, JSON.stringify({ format: 2, text: '已有文字', images: [], revision: 'restored', notificationContext: { notificationId: 'original', title: '原通知' } }));
+  assert.equal(readComposerDraft(key).notificationContext?.notificationId, 'original');
+  assert.equal(readComposerDraft(key).text, '已有文字');
+  assert.equal(readComposerDraft(other).notificationContext, undefined);
+  const submitted = snapshotComposerDraft(key);
+  updateComposerDraft(key, { notificationContext: { notificationId: 'new', title: '新通知' } });
+  assert.equal(consumeComposerDraft(submitted, false), false);
+  assert.equal(readComposerDraft(key).notificationContext?.notificationId, 'new');
+  assert.equal(readComposerDraft(key).text, '已有文字');
+  updateComposerDraft(key, { notificationContext: undefined });
+  assert.equal(readComposerDraft(key).text, '已有文字');
+  updateComposerDraft(key, { notificationContext: { notificationId: 'new', title: '新通知' } });
+  assert.equal(consumeComposerDraft(snapshotComposerDraft(key), false), true);
+  assert.equal(readComposerDraft(key).notificationContext, undefined);
+  assert.equal(saved.has(key), false);
+  updateComposerDraft(other, { notificationContext: { notificationId: 'context-only', title: '关联草稿' } });
+  assert.ok(saved.has(other)); clearAccountComposerDrafts('reply-owner'); assert.equal(saved.has(other), false);
+});
 test('退出账号清理在活动监听器读取缓存时仍能结束，并清空输入', () => {
   const key = composerDraftKey('observed-account', 'conversation');
   updateComposerDraft(key, { text: '退出前草稿' });

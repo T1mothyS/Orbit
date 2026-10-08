@@ -22,6 +22,7 @@ import android.net.http.SslError
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ScrollView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,9 +43,10 @@ class MainActivity : ComponentActivity() {
     private val appUri = URI(BuildConfig.APP_URL)
     private val policy = WebOriginPolicy(BuildConfig.APP_URL)
     private val origin = "${appUri.scheme}://${appUri.host}"
+    private var localStatus: TextView? = null
     // ComponentActivity only: there are no Fragment classes or an old Fragment dependency to upgrade.
     @SuppressLint("InvalidFragmentVersionForActivityResult")
-    private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { NativeSession.register(this); notifyWebStatus() }
+    private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { NativeSession.register(this); refreshLocalStatus(); notifyWebStatus() }
     @SuppressLint("InvalidFragmentVersionForActivityResult")
     private val files = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val value = if (result.resultCode == RESULT_OK) WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data) else null
@@ -161,19 +163,37 @@ class MainActivity : ComponentActivity() {
         }
         else if (!NotificationSupport.permission(this)) startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
     }
-    private fun localDialog() {
+    private fun refreshLocalStatus() {
         val p = NotificationSupport.prefs(this)
-        AlertDialog.Builder(this).setTitle("Orbit 本地通知试验")
-            .setMessage("通知权限：${NotificationSupport.permission(this)}\n精确权限：${NotificationSupport.exactPermission(this)}\n${p.getString("local_result", "尚未安排")}")
-            .setItems(arrayOf("授权系统通知", "开启闹钟和提醒", "一分钟后精确测试", "非精确测试（可能延迟）", "取消本地测试")) { _, index ->
+        localStatus?.text = "通知权限：${NotificationSupport.permission(this)}\n精确权限：${NotificationSupport.exactPermission(this)}\n${p.getString("local_result", "尚未安排") }"
+    }
+    private fun localDialog() {
+        val padding = (16 * resources.displayMetrics.density).toInt()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(padding, padding, padding, padding)
+        }
+        localStatus = TextView(this).also { content.addView(it); it.setPadding(0, 0, 0, padding) }
+        refreshLocalStatus()
+        arrayOf("授权系统通知", "开启闹钟和提醒", "一分钟后精确测试", "非精确测试（可能延迟）", "取消本地测试").forEachIndexed { index, label ->
+            content.addView(Button(this).apply {
+                text = label; minHeight = (48 * resources.displayMetrics.density).toInt()
+                setOnClickListener {
                 try { when (index) {
                     0 -> askPermission()
                     1 -> if (Build.VERSION.SDK_INT >= 31) startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName")))
-                    2 -> NotificationSupport.schedule(this, true)
-                    3 -> NotificationSupport.schedule(this, false)
-                    4 -> NotificationSupport.cancel(this)
-                } } catch (e: Exception) { AlertDialog.Builder(this).setMessage(e.message).setPositiveButton("确定", null).show() }
-            }.setNegativeButton("关闭", null).show()
+                    2 -> NotificationSupport.schedule(this@MainActivity, true)
+                    3 -> NotificationSupport.schedule(this@MainActivity, false)
+                    4 -> NotificationSupport.cancel(this@MainActivity)
+                } } catch (e: Exception) { AlertDialog.Builder(this@MainActivity).setMessage(e.message).setPositiveButton("确定", null).show() }
+                refreshLocalStatus()
+                }
+            })
+        }
+        AlertDialog.Builder(this).setTitle("Orbit 本地通知试验")
+            .setView(ScrollView(this).apply { addView(content) })
+            .setNegativeButton("关闭", null).create().apply {
+                setOnDismissListener { localStatus = null }; show()
+            }
     }
     private fun handleNotification(intent: Intent?) {
         val p = NotificationSupport.prefs(this)
@@ -186,6 +206,6 @@ class MainActivity : ComponentActivity() {
     private fun notifyWebStatus() {
         if (::web.isInitialized && trusted(Uri.parse(web.url ?: ""))) web.evaluateJavascript("window.dispatchEvent(new Event('orbit:android-state'))", null)
     }
-    override fun onResume() { super.onResume(); NativeSession.compensate(this); NativeSession.retryReset(this); NativeSession.register(this, true); NotificationSupport.clearObsoleteTest(this); notifyWebStatus() }
+    override fun onResume() { super.onResume(); NativeSession.compensate(this); NativeSession.retryReset(this); NativeSession.register(this, true); NotificationSupport.clearObsoleteTest(this); refreshLocalStatus(); notifyWebStatus() }
     override fun onDestroy() { chooser?.onReceiveValue(null); web.destroy(); super.onDestroy() }
 }

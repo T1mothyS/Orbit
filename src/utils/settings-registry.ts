@@ -6,7 +6,7 @@ const definitions = [
   {id:'android-fcm-test',section:'notifications',label:'FCM 测试',description:'由 Orbit 后端向当前 Android 手机发送测试通知。',admin:false},
   {id:'android-local-test',section:'notifications',label:'一分钟后本地提醒',description:'Android 本地通知独立试验、精确或可能延迟的定时与取消。',admin:false},
   { id: 'library-full-export', section: 'library', label: '导出全库', description: '下载当前账号的完整知识库 JSON。', admin: false },
-  { id: 'library-personal-preferences', section: 'library', label: '个人资料与日报偏好', description: '和日报设置共用同一份资料，直接在网页编辑。', admin: false },
+  { id: 'library-personal-preferences', section: 'account', label: '个人资料', description: '身份、背景、专业兴趣与表达偏好。目前仅用于 Cloud 日报。', admin: false },
   {
     "id": "setting-account-m2enu0",
     "section": "account",
@@ -93,7 +93,7 @@ const definitions = [
   },
   {
     "id": "setting-notifications-1ov9hhr",
-    "section": "notifications",
+    "section": "report-email",
     "label": "日报邮件",
     "description": "与每日摘要、提醒渠道和免打扰独立。开启后，新发布或更新的内容版本会入队，同一版本不会重复发送。切换后立即保存。",
     "admin": false
@@ -136,8 +136,8 @@ const definitions = [
   {
     "id": "setting-daily-report-17lgo36",
     "section": "daily-report",
-    "label": "个人资料与日报偏好",
-    "description": "直接在网页编辑当前账号的个人资料、阅读偏好、兴趣、关注名单和研究框架，供 Cloud 日报读取。",
+    "label": "日报个性化",
+    "description": "编辑阅读偏好、近期关注、Watchlist 与 Cloud 研究框架。",
     "admin": false
   },
   {

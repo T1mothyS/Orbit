@@ -303,7 +303,7 @@
 
 @media (max-width: 640px) {
   /* Editorial HTML has email-compatible inline defaults; override only its mobile reading presentation. */
-  .daily-report-markdown .digest-v2--editorial { font-size: 16px; line-height: 1.75 !important; }
+  .daily-report-markdown .digest-v2--editorial { font-size: var(--orbit-reader-font-size, 16px); line-height: var(--orbit-reader-line-height, 1.75) !important; }
   .daily-report-markdown .digest-v2--editorial strong { font-weight: 600; }
   .daily-report-markdown .digest-v2--editorial > section > h2 { font-size: 20px !important; line-height: 1.5; }
   .daily-report-markdown .digest-v2--editorial .digest-v2-story-title { font-size: 18px !important; line-height: 1.45 !important; }
@@ -311,7 +311,7 @@
   .daily-report-markdown .digest-v2--editorial .digest-v2-story-layout { grid-template-columns: minmax(0, 1fr) 96px; grid-template-areas: "title image" "body body"; gap: 12px; }
   .daily-report-markdown .digest-v2--editorial .digest-v2-story-layout > .digest-v2-story-title { margin-bottom: 0 !important; }
   .daily-report-markdown .digest-v2--editorial .digest-v2-story-thumb { width: 96px; height: 72px; }
-  .daily-report-markdown .digest-v2--editorial .digest-v2-story-body > p { margin-top: 12px !important; }
+  .daily-report-markdown .digest-v2--editorial .digest-v2-story-body > p { margin-top: var(--orbit-reader-paragraph-gap, 12px) !important; }
   .daily-report-markdown .digest-v2--editorial .digest-v2-story-body > p:first-child { margin-top: 0 !important; }
   .daily-report-markdown .digest-v2--editorial .digest-v2-image-credit { margin-top: 8px !important; font-size: 12px !important; line-height: 1.6 !important; color: var(--td-text-color-secondary); opacity: 1 !important; }
 }

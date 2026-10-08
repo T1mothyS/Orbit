@@ -8,7 +8,7 @@ export function SettingsLayout({ isAdmin, children }: { isAdmin: boolean; childr
   useEffect(()=>{const set=(e:Event)=>{const id=(e as CustomEvent<string>).detail;setActive(id);if((e as CustomEvent).type==='orbit:settings-open-section')contentRef.current?.querySelector<HTMLElement>(`#settings-${id}`)?.scrollIntoView({block:'start'});};document.addEventListener('orbit:settings-section',set);document.addEventListener('orbit:settings-open-section',set);return()=>{document.removeEventListener('orbit:settings-section',set);document.removeEventListener('orbit:settings-open-section',set);};},[]);
   const sections = [
     ['account', '账户'], ['ai', 'AI'], ['guides', '接入指南'], ['notifications', '通知'],
-    ['caldav', '荣耀日历'], ['daily-report', '日报'], ['library', '知识库'], ['tools', '挂载工具'], ['mail', '邮箱'], ['data', '数据'],
+    ['caldav', '荣耀日历'], ['daily-report', '日报'], ['report-email', '日报邮件'], ['library', '知识库'], ['tools', '挂载工具'], ['mail', '邮箱'], ['data', '数据'],
     ...(isAdmin ? [['admin', '管理']] : []),
   ];
 

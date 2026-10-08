@@ -52,7 +52,7 @@ test('知识库网页只读、评论隔离并可导出原始 Markdown 与关系'
     const generated = await request('/api/library/publish-token', userToken, { method: 'POST' });
     assert.equal(generated.status, 200);
     const publishToken = (await generated.json()).token as string;
-    const markdown = '---\nsourceId: kb:readonly\n---\n\n# 只读样本\n\n正文保留原样。\n';
+    const markdown = '---\nsourceId: kb:readonly\ntitle: 只读样本\n---\n\n# 只读样本\n\n正文保留原样。\n';
     const publishBody = {
       sourceId: 'kb:readonly',
       type: 'insight',
@@ -85,6 +85,8 @@ test('知识库网页只读、评论隔离并可导出原始 Markdown 与关系'
     const detail = await request(`/api/library/${entryId}`, userToken);
     assert.equal(detail.status, 200);
     const detailPayload = await detail.json();
+    assert.doesNotMatch(detailPayload.entry.html, /sourceId:|kb:readonly/);
+    assert.equal(detailPayload.entry.contentHash, createdPayload.entry.contentHash);
     assert.equal(detailPayload.relations.items[0].status, 'unresolved');
     assert.equal(detailPayload.relations.items[0].targetSourceId, 'kb:missing');
     assert.equal(detailPayload.relations.items[0].targetEntryId, undefined);

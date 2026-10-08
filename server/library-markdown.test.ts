@@ -2,6 +2,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { renderLibraryMarkdown } from './library-markdown.js';
 
+test('阅读隐藏标准导入元数据并保留普通正文分隔线', () => {
+  const source = '\uFEFF---\r\nsourceId: synthetic-import\r\ntitle: 合成资料\r\ntags: [test]\r\n---\r\n# 正文\r\n\r\n内容\r\n---\r\n尾段';
+  const rendered = renderLibraryMarkdown(source);
+  assert.doesNotMatch(rendered, /synthetic-import|sourceId:|tags:/);
+  assert.match(rendered, /正文/);
+  assert.match(rendered, /---/);
+  for (const [ordinary, retained] of [['---\n普通正文\n---\n后文', '普通正文'], ['---\ntitle: 正文内容\n---', '正文内容'], ['---\nsourceId: 保留\ntitle: 未闭合', '未闭合']]) {
+    assert.ok(renderLibraryMarkdown(ordinary).includes(retained));
+  }
+});
+
 test('知识库 Markdown 输出公式和 Mermaid 占位符', () => {
   const rendered = renderLibraryMarkdown([
     '# 渲染测试',

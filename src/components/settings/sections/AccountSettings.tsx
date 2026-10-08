@@ -3,11 +3,13 @@ import { SettingSection } from '../SettingSection';
 import { SettingRow } from '../SettingRow';
 import type { SettingsUser } from '../types';
 import { AvatarSettings } from './AvatarSettings';
+import { Link } from 'react-router-dom';
 
 export function AccountSettings({ user, onLogout }: { user: SettingsUser; onLogout: () => void }) {
   return (
     <SettingSection id="account" title="当前账号" description="此处的设置仅用于当前登录账号。">
       <AvatarSettings email={user.email}/>
+      <SettingRow id="library-personal-preferences" label="个人资料" description="身份、背景、专业兴趣与表达偏好。目前仅用于 Cloud 日报。"><Link to="/settings/profile">编辑个人资料</Link></SettingRow>
       <SettingRow label="登录邮箱">
         <div className="settings-account">
           <strong>{user.email}</strong>

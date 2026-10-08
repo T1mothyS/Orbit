@@ -37,6 +37,8 @@ $env:JAVA_HOME = 'C:\path\to\jdk-17'
 
 APK 顶部的“本地通知试验”可直接查看权限、授权通知、开启“闹钟和提醒”、安排精确/非精确一分钟测试或取消。这样在旧网页、断网和 Firebase 未配置时仍可试验。每台设备仅一个待触发测试；非精确按钮明确标注可能延迟；重启后不恢复。网页更新后，设置 → 通知与提醒显示完整 Android 状态和 FCM 测试按钮。
 
+试验对话框使用可滚动的自定义视图，状态文字、五项操作和关闭按钮同时显示；权限回调、操作后和回到前台均刷新状态，不再组合平台的 message/items 内容分支。Web UI 通过线上页面进入现有 WebView，网页变更无需重新打包；原生、桥接、Firebase 配置或安装版本变化时重建 APK。部署 Android 服务端代码前，须按依赖变更流程准备 Linux 运行依赖，不复用缺少 firebase-admin 的旧 node_modules。
+
 实际展示、声音、锁屏、划掉 App、强行停止、国内无代理网络及键盘仍按 [真机矩阵](../docs/TEST-MATRIX.md#android-一期) 验证。构建或 JVM 测试不证明手机送达。
 
 官方资料：[FID 注册](https://firebase.google.com/docs/cloud-messaging/android/get-started)、[Admin 发送](https://firebase.google.com/docs/cloud-messaging/send/admin-sdk)、[前后台行为](https://firebase.google.com/docs/cloud-messaging/android/receive-messages)、[网络要求](https://firebase.google.com/docs/cloud-messaging/network-configuration)、[系统定时](https://developer.android.com/develop/background-work/services/alarms)。

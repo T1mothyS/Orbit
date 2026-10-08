@@ -6,3 +6,11 @@
 .account-menu-version { padding:8px 10px 4px; font-size:11px; color:var(--td-text-color-placeholder); overflow-wrap:anywhere; }
 .account-menu-panel :is(button,a):focus-visible { outline:2px solid var(--td-brand-color); outline-offset:-2px; }
 @media(max-width:767px) { .account-menu-panel :is(button,a) { min-height:44px; padding-block:8px; } }
+.app-shell .orbit-notification-actions { gap: 4px; padding-top: 8px; margin-top: 10px; }
+.orbit-notification-actions .orbit-notification-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 32px; min-height: 32px; color: var(--td-brand-color); }
+.notification-action-label { display: none; }
+.orbit-notification-actions :is(a,button):focus-visible { outline: 2px solid var(--td-brand-color); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .orbit-notification-actions .orbit-notification-action { min-width: 44px; min-height: 44px; padding: 8px; }
+  .notification-action-label { display: inline; }
+}
