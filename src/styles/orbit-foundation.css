@@ -27,6 +27,25 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .orbit-message-body pre code { padding:0; background:none; }
 .orbit-message-body a,.orbit-message-sources a,.settings-stack > a { color:var(--td-brand-color); text-decoration:underline; text-underline-offset:3px; }
 .dark .orbit-message-body a,.dark .orbit-message-sources a,.dark .settings-stack > a { color:var(--td-brand-color-9,var(--td-brand-color-active)); }
+/* Small text links use the darker existing brand token in light mode. */
+:root { --orbit-link-color:var(--td-brand-color-active); --orbit-link-hover-color:var(--td-text-color-primary); --orbit-touch-target:44px; }
+.dark { --orbit-link-color:var(--td-brand-color-9,var(--td-brand-color-active)); }
+:is(.setting-control,.settings-note,.settings-help,.context-help,.note-board-content) a:not([class*="button"]),
+.settings-stack > a:not([class*="button"]) {
+  color:var(--orbit-link-color); text-decoration:underline; text-underline-offset:3px;
+}
+:is(.setting-control,.settings-note,.settings-help,.context-help,.note-board-content) a:not([class*="button"]):visited,
+.settings-stack > a:not([class*="button"]):visited { color:var(--orbit-link-color); }
+:is(.setting-control,.settings-note,.settings-help,.context-help,.note-board-content) a:not([class*="button"]):is(:hover,:active),
+.settings-stack > a:not([class*="button"]):is(:hover,:active) { color:var(--orbit-link-hover-color); text-decoration-thickness:2px; }
+:is(.setting-control,.settings-note,.settings-help,.context-help,.note-board-content) a:not([class*="button"]):focus-visible,
+.settings-stack > a:not([class*="button"]):focus-visible { outline-color:var(--orbit-link-color); }
+.smart-time-panel { max-width:calc(100vw - 32px); }
+.smart-time-picker:nth-of-type(2) .smart-time-panel { left:auto; right:0; }
+.smart-time-list { display:block; width:100%; height:128px; padding:0; border:0; border-radius:0; background:var(--td-bg-color-container); color:var(--td-text-color-primary); font-size:14px; }
+.smart-time-list option { padding:6px 12px; text-align:center; }
+.smart-time-list option:checked { background:var(--td-brand-color-light); color:var(--td-text-color-primary); font-weight:600; }
+.smart-time-list:focus-visible { outline:2px solid var(--td-brand-color); outline-offset:-2px; }
 .orbit-message[data-new=true] { animation:orbit-message-arrive var(--orbit-motion-feedback) var(--orbit-ease); }
 @keyframes orbit-message-arrive { from {opacity:0;} to {opacity:1;} }
 .orbit-message-sources,.orbit-message-steps { font-size:12px; margin-top:12px; padding-top:8px; border-top:1px solid var(--td-component-stroke); color:var(--td-text-color-secondary); }
@@ -225,6 +244,19 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   .note-board-row-toolbar { gap:0; flex-wrap:wrap; }
   .note-board-action,.note-board-select { width:44px; min-width:44px; height:44px; min-height:44px; }
   .app-shell :is(.primary-button,.secondary-button,.complete-button,.library-secondary-button,.daily-report-toolbar-button,.research-button) { min-height:44px; }
+  .app-shell :is(.library-primary-button,.calendar-toolbar-primary > button,.agenda-complete-button,.card-actions .icon-button.small),
+  :is(.module-settings-page,.settings-dialog) :is(.t-button,.settings-dialog-close,.settings-actions > button,.setting-control > button,.avatar-upload),
+  .daily-report-reader-page :is(.daily-report-back,.daily-report-more-button,.daily-report-more-menu button),
+  .library-markdown .library-code-copy,
+  .smart-time-panel button { min-width:var(--orbit-touch-target); min-height:var(--orbit-touch-target); }
+  .app-shell :is(.agenda-complete-button,.card-actions .icon-button.small) { width:var(--orbit-touch-target); height:var(--orbit-touch-target); flex-shrink:0; }
+  .app-shell .card-actions .icon-button.small { flex-basis:var(--orbit-touch-target); }
+  .app-shell .agenda-status-slot { width:var(--orbit-touch-target); height:var(--orbit-touch-target); flex-basis:var(--orbit-touch-target); }
+  .app-shell .agenda-schedule-card { grid-template-columns:var(--orbit-touch-target) 78px minmax(0,1fr); }
+  @container calendar-shell (max-width:420px) {
+    .app-shell .agenda-schedule-card { grid-template-columns:var(--orbit-touch-target) 58px minmax(0,1fr); }
+  }
+  .library-markdown pre { padding-top:60px; }
   .app-shell :is(input,textarea,select),.orbit-dialog-content :is(input,textarea,select),.orbit-composer-models select { font-size:16px; }
   .app-shell .stats-grid { gap:8px; }
   .app-shell .stat-card { padding:12px; min-height:60px; }

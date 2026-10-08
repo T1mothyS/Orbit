@@ -1466,21 +1466,23 @@ export function CalendarView({
           </button>
           <button 
             onClick={navigatePrev} 
+            aria-label={viewMode === 'week' ? '上一周' : viewMode === 'month' ? '上一月' : '上一天'}
             className="p-1.5 rounded-lg transition-colors"
             style={{ color: 'var(--td-text-color-secondary)' }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--td-bg-color-component)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft aria-hidden="true" className="w-4 h-4" />
           </button>
           <button 
             onClick={navigateNext} 
+            aria-label={viewMode === 'week' ? '下一周' : viewMode === 'month' ? '下一月' : '下一天'}
             className="p-1.5 rounded-lg transition-colors"
             style={{ color: 'var(--td-text-color-secondary)' }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--td-bg-color-component)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight aria-hidden="true" className="w-4 h-4" />
           </button>
           <span className="calendar-toolbar-date calendar-toolbar-date-full" style={{ color: 'var(--td-text-color-primary)' }}>
             {headerTitle()}

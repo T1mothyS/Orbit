@@ -175,7 +175,7 @@ function NoteRow({
             type="checkbox"
             checked={selected}
             onChange={onToggleSelected}
-            aria-label={`${selected ? '取消选择' : '选择'}记事：${note.content}`}
+            aria-label={`${selected ? '取消选择' : '选择'}记事 ${displayIndex}`}
           />
           <span aria-hidden="true" />
         </label>
@@ -185,7 +185,7 @@ function NoteRow({
           onClick={editing ? onSaveEdit : onStartEdit}
           disabled={disabled}
           title={editing ? '确认保存' : '编辑记事'}
-          aria-label={editing ? `保存记事：${note.content}` : `编辑记事：${note.content}`}
+          aria-label={`${editing ? '保存' : '编辑'}记事 ${displayIndex}`}
         >
           {editing ? <Check size={15} /> : <Pencil size={15} />}
         </button>
@@ -197,17 +197,17 @@ function NoteRow({
           aria-busy={optimizing}
           title={optimizing ? '正在处理…' : note.isOptimized ? `撤回第 ${note.optimizationCount} 次优化` : 'AI 优化'}
           aria-label={optimizing
-            ? `正在处理：${note.content}`
+            ? `正在处理记事 ${displayIndex}`
             : note.isOptimized
-              ? `撤回第 ${note.optimizationCount} 次优化：${note.content}`
-              : `AI 优化：${note.content}`}
+              ? `撤回记事 ${displayIndex} 第 ${note.optimizationCount} 次优化`
+              : `AI 优化记事 ${displayIndex}`}
         >
           {note.isOptimized ? <RotateCcw size={15} /> : <Sparkles size={15} />}
         </button>
-        <button type="button" className="note-board-action" onClick={onCopy} title={copyFeedback === 'success' ? '已复制' : copyFeedback === 'error' ? '复制失败' : '复制正文'} aria-label={`复制记事：${note.content}`}>
+        <button type="button" className="note-board-action" onClick={onCopy} title={copyFeedback === 'success' ? '已复制' : copyFeedback === 'error' ? '复制失败' : '复制正文'} aria-label={`复制记事 ${displayIndex}`}>
           {copyFeedback === 'success' ? <Check size={15} /> : copyFeedback === 'error' ? <CircleX size={15} /> : <Copy size={15} />}
         </button>
-        <button type="button" className="note-board-action" onClick={onToggleCompleted} disabled={disabled} title={note.completed ? '恢复到进行中' : '移入废纸篓'} aria-label={note.completed ? `恢复记事：${note.content}` : `完成记事并移入废纸篓：${note.content}`}>
+        <button type="button" className="note-board-action" onClick={onToggleCompleted} disabled={disabled} title={note.completed ? '恢复到进行中' : '移入废纸篓'} aria-label={`${note.completed ? '恢复记事' : '完成记事并移入废纸篓'} ${displayIndex}`}>
           {note.completed ? <RotateCcw size={15} /> : <Forward size={15} />}
         </button>
         <button
@@ -216,7 +216,7 @@ function NoteRow({
           onClick={onMerge}
           disabled={disabled}
           title={mergeTitle}
-          aria-label={`${mergeTitle}：${note.content}`}
+          aria-label={`${mergeTitle}：记事 ${displayIndex}`}
           aria-pressed={mergeSourceSelected}
         >
           <GitMerge size={15} />

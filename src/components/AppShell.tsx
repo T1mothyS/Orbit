@@ -47,6 +47,7 @@ export function AppShell({
 }: AppShellProps) {
   const menu=useRef<HTMLDetailsElement>(null);
   const close=()=>{if(menu.current)menu.current.open=false;};
+  const settingsEntry = () => { const trigger = menu.current?.querySelector('summary'); close(); trigger?.focus({ preventScroll: true }); };
   useEffect(() => { const outside = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node)) close(); }; window.addEventListener('pointerdown', outside); return () => window.removeEventListener('pointerdown', outside); }, []);
   return (
     <div className={`app-shell${mobileReader ? ' app-shell-mobile-reader' : ''}`}>
@@ -85,8 +86,8 @@ export function AppShell({
           }}>
             <summary aria-label="个人菜单" title={user?.email}><AccountAvatar email={user?.email||'O'}/></summary>
             <div className="account-menu-panel"><strong>{user?.email}</strong>
-              <button type="button" onClick={()=>{close();onOpenSettings();}}><Settings size={16}/> 设置</button>
-              <button type="button" onClick={()=>{close();window.dispatchEvent(new CustomEvent('orbit:open-settings',{detail:'account'}));}}><UserRound size={16} />账户与头像</button>
+              <button type="button" onClick={()=>{settingsEntry();onOpenSettings();}}><Settings size={16}/> 设置</button>
+              <button type="button" onClick={()=>{settingsEntry();window.dispatchEvent(new CustomEvent('orbit:open-settings',{detail:'account'}));}}><UserRound size={16} />账户与头像</button>
               <Link to="/settings/profile" onClick={close}><UserRound size={16} />个人资料</Link>
               <Link to="/project?view=statistics" onClick={close}><ChartNoAxesCombined size={16} />使用统计</Link>
               <button type="button" onClick={()=>{close();onToggleTheme();}}>{theme==='light'?<Moon size={16}/>:<Sun size={16}/>} 切换主题</button>

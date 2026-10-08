@@ -25,6 +25,20 @@ export function parseDateKey(value: string): Date | null {
   return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
 }
 
+/** Date-only arithmetic preserves calendar days across timezone/DST boundaries. */
+export function shiftDateKey(value: string, days: number): string {
+  const date = new Date(`${value}T12:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || !Number.isFinite(days)) return value;
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+export function linkedEndTime(date: string, startTime: string, endDate: string, endTime: string) {
+  if (`${endDate}T${endTime}` > `${date}T${startTime}`) return { endDate, endTime };
+  const [hour, minute] = startTime.split(':').map(Number);
+  return { endDate: shiftDateKey(date, hour === 23 ? 1 : 0), endTime: `${String((hour + 1) % 24).padStart(2, '0')}:${String(minute).padStart(2, '0')}` };
+}
+
 export function formatScheduleDate(value: string): { date: string; weekday: string; isToday: boolean } {
   const parsed = parseDateKey(value);
   if (!parsed) return { date: '选择日期', weekday: '', isToday: false };

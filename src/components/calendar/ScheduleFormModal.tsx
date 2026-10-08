@@ -1,19 +1,17 @@
 import { Bell, Calendar, CheckCircle2, Clock, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { SCHEDULE_CATEGORIES } from '../../utils/scheduleCategories';
-import { CATEGORY_COLORS, formatScheduleDate, formatTime, PRIORITY_COLORS, toDateKey } from './schedule-presentation';
+import { CATEGORY_COLORS, formatScheduleDate, formatTime, PRIORITY_COLORS, toDateKey, shiftDateKey, linkedEndTime } from './schedule-presentation';
 import type { Schedule } from './schedule-types';
 import { useDialogLifecycle } from '../../hooks/useDialogLifecycle';
 
 function SmartTimePicker({
   value,
   onChange,
-  minTime,
   label,
 }: {
   value: string;
   onChange: (v: string) => void;
-  minTime?: string;
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -24,45 +22,32 @@ function SmartTimePicker({
   const currentMinute = parseInt(value?.split(':')[1] || '0');
   const [selHour, setSelHour] = useState(currentHour);
   const [selMinute, setSelMinute] = useState(currentMinute);
-  const hourRef = useRef<HTMLDivElement>(null);
-  const minRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setSelHour(currentHour);
-    setSelMinute(currentMinute);
-  }, [value]);
-
-  // 滚动到选中项
-  useEffect(() => {
-    if (open) {
-      const hourItem = hourRef.current?.querySelector(`[data-hour="${selHour}"]`);
-      const minItem = minRef.current?.querySelector(`[data-minute="${selMinute}"]`);
-      hourItem?.scrollIntoView({ block: 'center' });
-      minItem?.scrollIntoView({ block: 'center' });
-    }
-  }, [open, selHour, selMinute]);
-
-  const handleHourChange = (h: number) => {
-    setSelHour(h);
-    // 更改小时时预览更新，但不关闭选择器
-    onChange(`${String(h).padStart(2, '0')}:${String(selMinute).padStart(2, '0')}`);
-  };
-
-  const handleMinuteChange = (m: number) => {
-    setSelMinute(m);
-    onChange(`${String(selHour).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-  };
+  const hourRef = useRef<HTMLSelectElement>(null);
+  const minRef = useRef<HTMLSelectElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => { if (open) hourRef.current?.focus(); }, [open]);
+  const dismiss = () => { setOpen(false); triggerRef.current?.focus({ preventScroll: true }); };
 
   const handleConfirm = () => {
     onChange(`${String(selHour).padStart(2, '0')}:${String(selMinute).padStart(2, '0')}`);
-    setOpen(false);
+    dismiss();
   };
 
   return (
-    <div className="relative flex-1" ref={useRef(null)} onKeyDown={event => { if (open && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); event.currentTarget.querySelector<HTMLButtonElement>('button')?.focus(); } }}>
+    <div className="smart-time-picker relative flex-1" onBlur={event => {
+      if (open && event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+    }} onKeyDown={event => {
+      if (open && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismiss(); }
+    }}>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        ref={triggerRef}
+        aria-expanded={open}
+        onClick={() => {
+          if (open) dismiss();
+          else { setSelHour(currentHour); setSelMinute(currentMinute); setOpen(true); }
+        }}
         className="w-full px-3 py-2 rounded-lg text-sm text-left flex items-center justify-between transition-all"
         style={{
           backgroundColor: 'var(--td-bg-color-component)',
@@ -74,12 +59,14 @@ function SmartTimePicker({
           {label && <span className="text-xs" style={{ color: 'var(--td-text-color-secondary)' }}>{label}</span>}
           <span className="font-mono">{value || '00:00'}</span>
         </div>
-        <Clock className="w-4 h-4" style={{ color: 'var(--td-text-color-secondary)' }} />
+        <Clock aria-hidden="true" className="w-4 h-4" style={{ color: 'var(--td-text-color-secondary)' }} />
       </button>
 
       {open && (
         <div
-          className="absolute top-full left-0 mt-1 z-50 rounded-xl shadow-2xl overflow-hidden"
+          role="group"
+          aria-label={`${label || ''}时间选择`}
+          className="smart-time-panel absolute top-full left-0 mt-1 z-50 rounded-xl shadow-2xl overflow-hidden"
           style={{
             backgroundColor: 'var(--td-bg-color-container)',
             border: '1px solid var(--td-component-stroke)',
@@ -92,63 +79,41 @@ function SmartTimePicker({
               <div className="px-2 py-1.5 text-xs text-center font-medium" style={{ color: 'var(--td-text-color-secondary)', borderBottom: '1px solid var(--td-component-stroke)' }}>
                 时
               </div>
-              <div ref={hourRef} className="h-32 overflow-y-auto scrollbar-hide" style={{ scrollBehavior: 'auto' }}>
+              <select ref={hourRef} size={5} aria-label={`${label || ''}时间：小时`} value={selHour}
+                className="smart-time-list" onChange={event => setSelHour(Number(event.target.value))}
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); minRef.current?.focus(); } }}>
                 {hours.map(h => (
-                  <div
-                    key={h}
-                    data-hour={h}
-                    onClick={() => handleHourChange(h)}
-                    className="px-3 py-1.5 text-center text-sm cursor-pointer transition-all"
-                    style={{
-                      backgroundColor: selHour === h ? 'var(--td-brand-color)' : 'transparent',
-                      color: selHour === h ? '#fff' : 'var(--td-text-color-primary)',
-                      fontWeight: selHour === h ? 600 : 400,
-                    }}
-                  >
-                    {String(h).padStart(2, '0')}
-                  </div>
+                  <option key={h} value={h}>{String(h).padStart(2, '0')}</option>
                 ))}
-              </div>
+              </select>
             </div>
             {/* 分钟滚轮 */}
             <div className="flex-1">
               <div className="px-2 py-1.5 text-xs text-center font-medium" style={{ color: 'var(--td-text-color-secondary)', borderBottom: '1px solid var(--td-component-stroke)' }}>
                 分
               </div>
-              <div ref={minRef} className="h-32 overflow-y-auto scrollbar-hide" style={{ scrollBehavior: 'auto' }}>
+              <select ref={minRef} size={5} aria-label={`${label || ''}时间：分钟`} value={selMinute}
+                className="smart-time-list" onChange={event => setSelMinute(Number(event.target.value))}
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); confirmRef.current?.focus(); } }}>
                 {minutes.map(m => (
-                  <div
-                    key={m}
-                    data-minute={m}
-                    onClick={() => handleMinuteChange(m)}
-                    className="px-3 py-1.5 text-center text-sm cursor-pointer transition-all"
-                    style={{
-                      backgroundColor: selMinute === m ? 'var(--td-brand-color)' : 'transparent',
-                      color: selMinute === m ? '#fff' : 'var(--td-text-color-primary)',
-                      fontWeight: selMinute === m ? 600 : 400,
-                    }}
-                  >
-                    {String(m).padStart(2, '0')}
-                  </div>
+                  <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
                 ))}
-              </div>
+              </select>
             </div>
           </div>
           {/* 确认按钮 */}
           <div className="px-3 py-2 border-t flex gap-2" style={{ borderColor: 'var(--td-component-stroke)' }}>
             <button
-              onClick={() => {
-                // 取消，恢复原始值
-                setSelHour(currentHour);
-                setSelMinute(currentMinute);
-                setOpen(false);
-              }}
+              type="button"
+              onClick={dismiss}
               className="flex-1 py-1.5 rounded-lg text-xs font-medium"
               style={{ backgroundColor: 'var(--td-bg-color-component)', color: 'var(--td-text-color-secondary)' }}
             >
               取消
             </button>
             <button
+              type="button"
+              ref={confirmRef}
               onClick={handleConfirm}
               className="flex-1 py-1.5 rounded-lg text-xs font-medium"
               style={{ backgroundColor: 'var(--td-brand-color)', color: '#fff' }}
@@ -320,6 +285,9 @@ export function ScheduleFormModal({
     endTime: editingSchedule?.type === 'event' && editingSchedule.end_time && !editingSchedule.all_day
       ? formatTime(editingSchedule.end_time)
       : '10:00',
+    endDate: editingSchedule?.end_time && !editingSchedule.all_day
+      ? toDateKey(new Date(editingSchedule.end_time))
+      : editingSchedule ? editingSchedule.start_time.split('T')[0] : toDateKey(defaultDate),
     all_day: editingSchedule?.all_day || false,
     location: editingSchedule?.location || '',
     category: editingSchedule?.category || (SCHEDULE_CATEGORIES.some(category => category.id === defaultCategory) ? defaultCategory! : 'other'),
@@ -339,7 +307,12 @@ export function ScheduleFormModal({
     if (confirmDiscard && initialForm.current !== JSON.stringify(form) && !window.confirm('放弃本次未保存的编辑？')) return;
     onClose();
   };
-  const set = (k: string, v: any) => { setError(''); setForm(prev => ({ ...prev, [k]: v })); };
+  const set = (k: string, v: any) => {
+    setError('');
+    setForm(prev => ({ ...prev, [k]: v, ...(k === 'date' ? {
+      endDate: shiftDateKey(v, Math.max(0, Math.round((Date.parse(`${prev.endDate}T12:00Z`) - Date.parse(`${prev.date}T12:00Z`)) / 86400000) || 0)),
+    } : {}) }));
+  };
   const selectedDate = formatScheduleDate(form.date);
   const isUnscheduled = form.type === 'todo' && form.isUnscheduled;
 
@@ -359,7 +332,7 @@ export function ScheduleFormModal({
     // 待办是时间点；结束时间只属于有持续时长的事件。
     const endTime = form.type === 'todo' || isUnscheduled || form.all_day
       ? undefined
-      : `${form.date}T${form.endTime}:00`;
+      : `${form.endDate || form.date}T${form.endTime}:00`;
 
     savingRef.current = true;
     saveFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -538,13 +511,8 @@ export function ScheduleFormModal({
                   <SmartTimePicker
                     value={form.startTime}
                     onChange={v => {
-                      set('startTime', v);
-                      // 自动设置结束时间为开始时间+1小时
-                      const [h, m] = v.split(':').map(Number);
-                      const endH = (h + 1) % 24;
-                      if (form.endTime <= v) {
-                        set('endTime', `${String(endH).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
-                      }
+                      setError('');
+                      setForm(prev => ({ ...prev, startTime: v, ...linkedEndTime(prev.date, v, prev.endDate, prev.endTime) }));
                     }}
                     label="开始"
                   />
@@ -552,13 +520,14 @@ export function ScheduleFormModal({
                   <SmartTimePicker
                     value={form.endTime}
                     onChange={v => set('endTime', v)}
-                    minTime={form.startTime}
                     label="结束"
                   />
                 </div>
               )}
             </div>
           )}
+
+          {form.type === 'event' && !form.all_day && form.endDate && form.endDate !== form.date && <p className="text-xs" style={{ color: 'var(--td-text-color-secondary)' }}>结束日期：{form.endDate}</p>}
 
           {/* 待办时间点选择器，不设置持续时长 */}
           {form.type === 'todo' && !isUnscheduled && (

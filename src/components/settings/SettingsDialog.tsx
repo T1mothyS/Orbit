@@ -43,7 +43,10 @@ export function SettingsDialog({ onClose, onOpenAdmin, onOpenTools, restoreFocus
     return () => {
       document.removeEventListener('keydown', trapFocus, true);
       if (appRoot) appRoot.inert = wasInert;
-      triggerRef.current?.focus();
+      const visible = (element: HTMLElement | null | undefined) => element?.isConnected && element.getClientRects().length > 0 && !element.closest('[inert]') && getComputedStyle(element).visibility !== 'hidden' && !element.matches(':disabled');
+      const trigger = triggerRef.current;
+      const focusTarget = [trigger, document.querySelector<HTMLElement>('.account-menu > summary'), document.querySelector<HTMLElement>('.global-search-trigger')].find(visible);
+      focusTarget?.focus({ preventScroll: true });
     };
   }, []);
 

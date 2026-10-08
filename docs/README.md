@@ -1,6 +1,6 @@
 # Orbit 文档索引
 
-- Status: LIVING；2026-10-08 核对设置归属、通知上下文、阅读与 Android 的验收入口。此索引只负责导航，不复制任务、版本或生产状态。
+- Status: LIVING；2026-10-09 核对 UI/UX 八项加固与定向回归入口。此索引只负责导航，不复制任务、版本或生产状态。
 - 权威次序：源码/实际验证 → 领域合同 → 当前任务状态；历史报告按原日期解释。版本只读 package.json。
 - 知识库的独立经历入口、联网候选和备份边界见 [经历记忆](LIBRARY.md#经历记忆)，本地证据见 [测试矩阵](TEST-MATRIX.md#经历记忆)。
 - 账号个人资料、日报设置与知识库设置的 [字段归属与兼容入口](LIBRARY.md#个人资料与日报偏好)、[Cloud 数据合同](CHATGPT-WORK-CLOUD.md#cloud-context-编辑与导入) 和 [本地验收](TEST-MATRIX.md#2026-10-08-设置通知上下文与阅读迭代) 独立于知识文章与正式研究观点。
@@ -31,6 +31,7 @@
 | [测试矩阵](TEST-MATRIX.md) | 验证入口、风险范围和 UI/生产/业务证据边界 |
 | [UI 规范](UI-GUIDELINES.md) | 布局、主题、响应式、聊天/Motion 与体验升级实施规则；逐块状态见 TASKS |
 | [UI / Interaction / Motion 专项审计（2026-10-03）](archive/engineering/ORBIT-INTERACTION-MOTION-AUDIT-20261003.md) | 原审计时点的日期快照与方案；当前逐批实施状态见 [TASKS](TASKS.md#uiuxmotion-体验升级执行清单)，不改写历史结论 |
+| [UI/UX 八项加固定向回归（2026-10-09）](archive/engineering/ORBIT-UI-UX-HARDEN-REGRESSION-20261009.md) | 针对前次八项问题的修复、独立复审和本地证据；不重新评分全站，不代表部署或真机验收 |
 
 本机 AGENTS.local.md、DEPLOY.md、CONTINUOUS-REQUIREMENTS.md 保持忽略。DEPLOY.md 的执行地址/细节和本机记录不复制到仓库或发布包；连续记录按末尾追加，不归并重写历史。
 
