@@ -38,13 +38,16 @@ export function useUnsavedContext(dirty: boolean) {
         window.history.go(index - nextIndex);
       } else index = nextIndex;
     };
-    const unload = (event: BeforeUnloadEvent) => { if (dirtyRef.current) { event.preventDefault(); event.returnValue = ''; } };
     activePopGuard = pop;
-    window.addEventListener('beforeunload', unload);
     return () => {
       navigator.push = originalPush; navigator.replace = originalReplace;
       if (activePopGuard === pop) activePopGuard = undefined;
-      window.removeEventListener('beforeunload', unload);
     };
   }, [navigator]);
+  useEffect(() => {
+    if (!dirty) return;
+    const unload = (event: BeforeUnloadEvent) => { if (dirtyRef.current) { event.preventDefault(); event.returnValue = ''; } };
+    window.addEventListener('beforeunload', unload);
+    return () => window.removeEventListener('beforeunload', unload);
+  }, [dirty]);
 }

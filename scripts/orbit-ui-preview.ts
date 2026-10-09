@@ -6,7 +6,9 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import {randomUUID} from 'node:crypto';
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-ui-preview-'));
+const browserAudit=process.argv.includes('--browser-audit');
 Object.assign(process.env,{DATA_DIR:root,NODE_ENV:'test',APP_ENV:'development',JWT_SECRET:'isolated-preview-only-no-production',BACKGROUND_JOBS_ENABLED:'false',ORBIT_PROACTIVE_ENABLED:'false'});
+if(browserAudit) Object.assign(process.env,{ANDROID_PUSH_ENABLED:'false',DIGEST_V2_ENABLED:'false',SMTP_USER:'',SMTP_PASS:'',IMAP_PASS:'',CODEBUDDY_API_KEY:'',BACKUP_ENCRYPTION_KEY:''});
 const api=await import('../server/index.js');await api.initializeServer();
 const db=await import('../server/db.js'),orbit=await import('../server/orbit-store.js'),state=await import('../server/ai-chat-state.js');
 const {buildAiPlanSnapshot}=await import('../server/ai-plan.js');
@@ -65,6 +67,11 @@ if(process.argv.includes('--iteration')) {
   });
 }
 const app=express();
+if(browserAudit) {
+  // Read-only synthetic integration displays, never SDK/model/CalDAV calls.
+  app.get('/api/models',(_req,res)=>res.json({models:[],defaultModel:'glm-5.1'}));
+  app.get('/api/integrations/caldav/status',(_req,res)=>res.json({enabled:false,writeEnabled:false,automationAvailable:false,mode:'full-one-way',includeCompleted:true}));
+}
 if(process.argv.includes('--iteration')) {
   // Synthetic readiness must not cause SDK login/model discovery on this preview.
   app.get('/api/models',(_req,res)=>res.json({models:[{modelId:'glm-5.1',displayName:'合成 WorkBuddy 模型'}],defaultModel:'glm-5.1'}));
@@ -72,4 +79,8 @@ if(process.argv.includes('--iteration')) {
 }
 app.use(api.app);app.use(express.static(path.resolve('dist')));app.get('*',(_req,res)=>res.sendFile(path.resolve('dist/index.html')));
 const port=Number(process.argv[2]||4183),server=app.listen(port,'127.0.0.1',()=>console.log(`Isolated preview: http://127.0.0.1:${port}; synthetic login preview@example.invalid / OrbitPreview123!`));
-process.on('SIGINT',()=>{server.closeAllConnections();server.close(()=>process.exit(0));});
+if(browserAudit) Object.assign(process.env,{ORBIT_UI_AUDIT_SYNTHETIC:'true',API_PROXY_TARGET:`http://127.0.0.1:${port}`});
+const auditFrontend=browserAudit ? await (await import('vite')).createServer({mode:'ui-audit',server:{host:'127.0.0.1',port:port+1,strictPort:true}}) : undefined;
+if(auditFrontend) { await auditFrontend.listen(); console.log(`Synthetic browser audit: http://127.0.0.1:${port+1}`); }
+async function stop(){await auditFrontend?.close();server.closeAllConnections();server.close(()=>process.exit(0));}
+process.on('SIGINT',stop);process.on('SIGTERM',stop);

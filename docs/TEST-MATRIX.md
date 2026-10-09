@@ -6,6 +6,39 @@
 
 ## 本地验证
 
+### 2026-10-09 原生确认框与浏览器自动化
+
+**来源与边界。** 上轮阻塞点是 `ScheduleFormModal.tsx` 关闭 dirty 日程时的 `window.confirm('放弃本次未保存的编辑？')`，属于 JavaScript dialog；本轮在正常浏览器模式实际捕获 confirm 的取消/确认，并确认取消保留草稿。个人资料/日报偏好还通过 `useUnsavedContext` 保护导航及刷新；实际捕获 dirty 刷新的 beforeunload，取消后草稿仍在。没有复现密码管理器、通知/定位权限或其他 Browser Chrome 提示，不能把这些猜测当根因。
+
+旧 IAB 的 `getJsDialog` / CDP 应答受同一浏览器焦点准备超时影响；本轮检查发现 raw CDP 不支持新文档预注入。因此不用 Agent 等原生弹窗出现后点击，改为外部 Playwright 预注册应答与 IAB 合成预览预注入。工具限制不算产品 UI 失败。正常页面原先通过 dirty ref 判断是否提示，并非 clean 页面也无条件弹窗；本轮只把 beforeunload 注册生命周期收窄到 dirty，保存、取消和卸载后移除，导航与用户取消保护保留。
+
+**统一入口。** `scripts/browser-automation.cjs` 在创建页面前注册原生 dialog、console/pageerror、失败请求与 HTTP 错误日志。调用方须在动作前通过 `expectDialog({type,message,action}, action)` 明确选择 accept/dismiss；未知或不匹配的 dialog 默认 dismiss 并标为失败。权限默认为空，只接受显式请求的通知/剪贴板权限，并限定测试 origin；context 要求显式合成标志与 loopback，页面请求限制同源。没有修改浏览器全局 profile、launch flags 或安全策略，也没有新增依赖。既有 smoke 没有共用 fixture，本轮共享 helper 与原有 `orbit-ui-preview.ts` 隔离预览入口，不迁移无关 smoke。
+
+**IAB 模式。** `scripts/browser-audit-bootstrap.cjs` 由 Vite 在 React 之前注入，仅在 `serve --mode ui-audit`、`ORBIT_UI_AUDIT_SYNTHETIC=true`、loopback API target 与绑定地址同时满足时启用。普通 dev、preview 与 build 均没有注入；即使 build 指定 ui-audit 也不启用。此模式的原生 JS dialog 改为测试预设应答，beforeunload 在应用监听器前截断。网页底部“UI 自动化（仅合成预览）”提供日程、资料离开和周期编辑的单次取消/确认：按消息及当前路径/POP 目标匹配，五分钟过期，每次消耗；未知、不匹配或未预设的确认拒绝并记异常，alert/prompt 同样记失败。它只允许在合成资料上使用，测试刷新/关闭会丢弃未保存草稿，不构成生产的数据保护。改变 bootstrap 后重启 Vite，避免 CommonJS 配置缓存沿用旧 prelude。
+
+复用步骤（先构建 Web；两个终端，均在仓库根目录）：
+
+```powershell
+node --import tsx scripts/orbit-ui-preview.ts 4183 --browser-audit
+```
+
+该入口创建临时 DATA_DIR、合成账号与 loopback 正常预览，并在下一端口启动 ui-audit；后台任务、Push 和发信禁用，模型目录/CalDAV 状态只是只读合成响应。正常预览读取当前 dist，所以源码变化后先重新构建。无需模型登录、真实配置或生产数据库。
+
+```powershell
+$env:ORBIT_UI_AUDIT_SYNTHETIC='true'
+$env:ORBIT_PREVIEW_URL='http://127.0.0.1:4183'
+$env:ORBIT_AUDIT_URL='http://127.0.0.1:4184'
+node scripts/native-dialog-browser-smoke.cjs
+```
+
+Playwright 沿用既有 smoke 的可选外部 `PLAYWRIGHT_MODULE`，不加入应用依赖；默认 synthetic 登录与隔离预览一致，可通过 `ORBIT_UI_QA_EMAIL` / `ORBIT_UI_QA_PASSWORD` 指定另一隔离 fixture。证据默认写系统临时目录，可用 `ORBIT_UI_QA_DIR` 指定忽略目录。IAB 直接打开 ui-audit 地址，通过 UI 先预设应答，再打开 modal（原生 dialog 打开后，外部测试控件不可操作）；每次导航前检查异常计数或保存 console 日志，不能只依据“不再卡住”判通过。
+
+**本轮真实回归。** 正常模式检查无修改关闭、dirty confirm 取消/确认、beforeunload clean=0/dirty=1/取消或保存=0、取消刷新保留、保存刷新与返回。Playwright 四尺寸 390×844、430×932、768×1024、1440×900 检查设置 Escape/回焦、时间键盘、日程取消/保存/放弃、资料链接与浏览器 POP 取消/确认、窄屏侧栏、页面切换、刷新与 dirty 页面关闭，共六组通过，自动化原生 dialog 0，未知应答及应用错误 0；正常模式保留实际原生保护。
+
+IAB 390×844 连续完成同类核心流程及 dirty 页面关闭；补验前次未完成的浅色偏好链接（下划线、2px 焦点轮廓、`#2563eb`）、热图展开与键盘横向滚动（表格容器312px/内容1412px，根节点无溢出），控制台 error 0。初轮测试修正了取消刷新等待、空字段恢复方式、重复保存值、about:blank 的 storage 初始化、合成头像及两个未接入外部服务的 fixture 响应；未把这些测试准备错误算作应用回归。具体截图和日志只保留在本机忽略目录。
+
+冻结版本 `0.56.2-261009.0830`：528/528 服务测试、前端/Node/Electron 类型检查、Web/Electron 构建与 diff 检查通过，既有大 chunk 提示保留；实际扫描 Web 产物没有 prelude/测试控件/旁路标记。随后用仓库内 `orbit-ui-preview.ts --browser-audit` 重新跑完整六组，正常端读取正式 Web 构建、自动化端使用 ui-audit，同样原生 dialog 0、应用错误 0。没有生产部署、真实 AI/CalDAV、发信、实体手机、读屏或任意 Browser Chrome 提示的通用自动处理保证；这些不属于本次已复现的 JS dialog/beforeunload 问题。
+
 ### 2026-10-09 UI/UX 审计八项加固
 
 基于 `codex/orbit-system-assistant / 4a6a7bd` 的干净工作区重新定位前次八项问题，应用由 `0.56.0-261008.2256` 按代码变更规则更新 PATCH。只修改确认的取消、键盘、链接、命名、热图、设置焦点、移动触控与记事名称；不改导航、字体、配色体系或数据合同。完整逐项结论见 [定向回归快照](archive/engineering/ORBIT-UI-UX-HARDEN-REGRESSION-20261009.md)，前次全站审计按原时点保留。
