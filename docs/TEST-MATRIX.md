@@ -430,3 +430,11 @@ Python 运维回归 13 项中 12 项通过、1 项因 Windows 缺少符号链接
 普通版和显式开发者版 Android 均通过 assembleDebug、lintDebug、testDebugUnitTest：各 JVM 2/2，lint 0 errors/33 warnings。生成的 BuildConfig 分别为 DEVELOPER_TOOLS=false/true，FCM_CONFIGURED=true，版本一致；release 固定关闭开发者工具。APK 分别保存，避免开发者版覆盖普通 APK。AlarmManager、Receiver、通知渠道、FCM 展示及设备绑定/解绑核心实现保持原样。
 
 未验证：真实 Provider 的产品/诊断回答、生产查询接口及运行快照权限、Linux 发布包及恢复归档实际恢复、服务器定时清理/logrotate 与并发部署、历史版本资格导入、Shadow console 日志切换、新 APK 实机入口。手机强行停止/系统回收/国内无代理等细分条件及每条通知展示仍与已通过的普通后台结论分开。没有 push、部署、安装服务器 timer、清理真实历史目录/日志或真实发信；SMTP 接受、收件箱和外部 Work 调度/模型回执没有新增证据。
+
+## 2026-10-09 全分支统一发布与增量验收
+
+发布目标版本 `0.56.3-261009.0848`。所有当前本地/远端分支在 main 的祖先检查通过；两个旧日报分支的代码已被后续提交继承，合并保留当前 generation、正式照片、下载恢复、移动阅读及诊断合同，不重复注册 Shadow 路由。
+
+本地三组 typecheck、528/528 服务测试、Web/Electron staging build、diff 检查通过。产品助手导航 10 项与 Android bridge 12 项通过，覆盖四尺寸明暗主题，无横向溢出及 pageerror。运维回归 13 项中 12 通过、1 因 Windows 符号链接权限跳过。原生确认框检查首次因资源加载异常失败，共享实例复测触发限流；失败现场保留，独立实例复核与生产结果在后续日期记录补充。
+
+普通 Android APK assembleDebug、lintDebug、testDebugUnitTest 通过：JVM 2/2，lint 0 errors/33 warnings；versionCode=56003，versionName 跟随应用，DEVELOPER_TOOLS=false、FCM_CONFIGURED=true。此包沿用现有 debug 签名供安装验证，独立正式 release 签名尚未建立；不改变 AlarmManager、Receiver 或 FCM 核心。生产部署、真实模型及手机新包安装结果分别记录；既有用户已确认的通知能力保持有效。没有主动重发日报、SMTP/IMAP 发信或启用破坏性 retention。

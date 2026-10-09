@@ -163,7 +163,7 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 
 隔离测试账号的两项关注迁移仅开放 `PATCH /api/daily-report/cloud-context/shadow-watchlist`：要求登录、`expectedVersion` 与恰好两项唯一标的，标的只接受 `name/symbol/priority/sectors/thesis`，其中 `thesis` 只接受 `status/priority/thesis/monitor`。写入仅合并当前账号的 `watchlist.stocks`，保留 Context 其他字段；版本不符或现有 Context 损坏即拒绝。相同路径的 `DELETE` 要求当前版本，供撤回迁入的 stocks，其他 Context 字段仍保留。此路由仅在独立 Shadow 进程注册；完整 Context PUT 仍被其写入屏障阻止。为容纳现有 Thesis 的一层嵌套，Context 安全校验深度上限为 9，字节与敏感字段/值限制不变。迁移前后应分别备份并回读，不复制其他个人数据。
 
-`read_inputs_v2` 的 Watchlist 快照逐项投影 `priority/sectors` 与 `thesis.status/priority/thesis/monitor` 到 `detail`，只把已授权的研究范围交给 Work，不透传 Context 的其他字段。缺名称、标的代码、任一研究字段，或单项投影超过 4000 字符时，保留对象标题但把 Watchlist 标为 `partial`；Work 不得将此状态写成“无新增”。
+`read_inputs_v2` 的 Watchlist 快照通过共用 Context 字段解析投影研究范围到 `detail`，兼容内嵌 Thesis、引用 Thesis 与旧格式，不透传 Context 的其他字段。缺失、损坏或超过 4000 字符的研究输入保留对象标题并标为 `partial`；Work 不得将此状态写成“无新增”。字段归属与兼容规则见 [知识库合同](LIBRARY.md#个人资料与日报偏好)。
 
 网页、邮件 HTML 和纯文本由 JSON 确定性生成；模型不提交完整 Markdown。自 `2026-09-27.1` 生成规则起，正文字符串用成对 `**` 标出每句一到两处短重点（对象、关键数字、结论或行动），服务端校验标记并安全转成加粗；标题不加标记，长正文缺重点或标记不成对会拒绝。纯文本与列表摘要去掉标记。旧 run/产物仍按冻结的 `renderer` 校验与展示，不补写旧正文。媒体全部失败仍保留完整文字；输入失败在顶部显示明确提示。V1 的历史解析和展示继续保留。新版内部发布快照使用带 V2 标记的 JSON envelope，旧发布接口拒绝该标记。
 

@@ -21,7 +21,7 @@ android {
         applicationId = "io.github.t1mothys.orbit"
         minSdk = 26
         targetSdk = 36
-        versionCode = 56000
+        versionCode = 56003
         versionName = orbitVersion["version"] as String
         buildConfigField("String", "APP_URL", "\"${appUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigured.toString())
