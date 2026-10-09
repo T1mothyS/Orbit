@@ -161,6 +161,10 @@ dry-run 返回 `VALIDATED_NOT_PUBLISHED` 才能进行同正文正式发布。兼
 
 Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，复用登录保护与阅读页面，但不进入正式列表、旧 History 或候选来源切换。对应 GET 接口仍检查账号和日期。未登录的日报链接登录后保留查询参数。
 
+隔离测试账号的两项关注迁移仅开放 `PATCH /api/daily-report/cloud-context/shadow-watchlist`：要求登录、`expectedVersion` 与恰好两项唯一标的，标的只接受 `name/symbol/priority/sectors/thesis`，其中 `thesis` 只接受 `status/priority/thesis/monitor`。写入仅合并当前账号的 `watchlist.stocks`，保留 Context 其他字段；版本不符或现有 Context 损坏即拒绝。相同路径的 `DELETE` 要求当前版本，供撤回迁入的 stocks，其他 Context 字段仍保留。此路由仅在独立 Shadow 进程注册；完整 Context PUT 仍被其写入屏障阻止。为容纳现有 Thesis 的一层嵌套，Context 安全校验深度上限为 9，字节与敏感字段/值限制不变。迁移前后应分别备份并回读，不复制其他个人数据。
+
+`read_inputs_v2` 的 Watchlist 快照逐项投影 `priority/sectors` 与 `thesis.status/priority/thesis/monitor` 到 `detail`，只把已授权的研究范围交给 Work，不透传 Context 的其他字段。缺名称、标的代码、任一研究字段，或单项投影超过 4000 字符时，保留对象标题但把 Watchlist 标为 `partial`；Work 不得将此状态写成“无新增”。
+
 网页、邮件 HTML 和纯文本由 JSON 确定性生成；模型不提交完整 Markdown。自 `2026-09-27.1` 生成规则起，正文字符串用成对 `**` 标出每句一到两处短重点（对象、关键数字、结论或行动），服务端校验标记并安全转成加粗；标题不加标记，长正文缺重点或标记不成对会拒绝。纯文本与列表摘要去掉标记。旧 run/产物仍按冻结的 `renderer` 校验与展示，不补写旧正文。媒体全部失败仍保留完整文字；输入失败在顶部显示明确提示。V1 的历史解析和展示继续保留。新版内部发布快照使用带 V2 标记的 JSON envelope，旧发布接口拒绝该标记。
 
 网页、邮件 HTML 和纯文本由 JSON 确定性生成；模型不提交 Markdown。Shadow 可在媒体失败时保留完整文字并明确分类；正式 V2.5 在图片缺失时停在发布前，避免把占位图当作获认可的图文版。输入失败在顶部显示明确提示。V1 的历史解析和展示继续保留。新版内部发布快照使用带 V2 标记的 JSON envelope，旧发布接口拒绝该标记。
@@ -189,7 +193,7 @@ Shadow 使用 `/reports?view=shadow` 和 `/reports/:date?shadow=<artifactId>`，
 
 - 开启V2且配置合法R2公开域名时，网页CSP的 `img-src` 只追加这个精确HTTPS origin；不允许通配域名、带路径/凭据的地址或生产 `r2.dev`，脚本和连接策略不扩大。验收必须检查浏览器图片实际加载，不能用R2 HTTP 200代替网页显示。
 
-- 单图审核可增加 `pageUrl`、`imageUrls` 精确地址限制；重定向也必须命中审核地址，不能用同域其他文件替换。`credit` 包含 `caption`、`author`、`sourcePage`、`licenseName`、`licenseUrl`，只能由服务器审核配置提供。旧产物继续保留原署名行；`2026-09-27.1` 起网页、邮件HTML与纯文本以简短图注保留作者、来源、许可链接和“已编辑”，不再向读者展示 JPEG/元数据处理细节。历史资料图必须注明拍摄日期及非当日现场，不算分类默认图，也不能声称是当日现场图。
+- 单图审核可增加 `pageUrl`、`imageUrls` 精确地址限制；重定向也必须命中审核地址，不能用同域其他文件替换。`credit` 包含 `caption`、`author`、`sourcePage`、`licenseName`、`licenseUrl`，只能由服务器审核配置提供；项目自有插画以空 `licenseUrl` 和“项目原创”标识，图注标明非新闻现场。旧产物继续保留原署名行；`2026-09-27.1` 起网页、邮件HTML与纯文本以简短图注保留作者、来源、许可和“已编辑”，不再向读者展示 JPEG/元数据处理细节。历史资料图必须注明拍摄日期及非当日现场，不算分类默认图，也不能声称是当日现场图。
 - 源站在服务器侧不可达时，操作者可提供私有 `sourceFile` 与原始 `sourceSha256`，仅允许绑定一个精确图片URL且具有完整署名的规则。读取前验证普通文件、大小和SHA-256，再执行相同解码/缩放/R2流程；Work不能提交本机路径。回执 `sourceTransport=audited_copy` 与 `network` 分开，审核副本成功不算服务器直连源站成功。原始URL及哈希随产物保留，私有路径不进入产物。回退旧代码前先禁用新增规则，避免旧实现忽略精确限制。
 
 - 服务端许可文件为 JSON 数组：`[{"pageHost":"publisher.example.com","imageHosts":["images.example.com"],"policy":"OWNED_OPEN","licenseRef":"审核证据或授权说明"}]`。支持 `OWNED_OPEN`、`LICENSED`、`EXTERNAL_ALLOWED`，只由操作者配置；Work 的许可声明不能授权。未知或受限来源不抓取，转分类图。需要公开的新闻图片才能进入此流程，私人邮件图片、附件和敏感预览不得加入许可名单。
