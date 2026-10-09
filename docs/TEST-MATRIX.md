@@ -438,3 +438,13 @@ Python 运维回归 13 项中 12 项通过、1 项因 Windows 缺少符号链接
 本地三组 typecheck、528/528 服务测试、Web/Electron staging build、diff 检查通过。产品助手导航 10 项与 Android bridge 12 项通过，覆盖四尺寸明暗主题，无横向溢出及 pageerror。运维回归 13 项中 12 通过、1 因 Windows 符号链接权限跳过。原生确认框检查首次因资源加载异常失败，共享实例复测触发限流；失败现场保留，独立实例复核与生产结果在后续日期记录补充。
 
 普通 Android APK assembleDebug、lintDebug、testDebugUnitTest 通过：JVM 2/2，lint 0 errors/33 warnings；versionCode=56003，versionName 跟随应用，DEVELOPER_TOOLS=false、FCM_CONFIGURED=true。此包沿用现有 debug 签名供安装验证，独立正式 release 签名尚未建立；不改变 AlarmManager、Receiver 或 FCM 核心。生产部署、真实模型及手机新包安装结果分别记录；既有用户已确认的通知能力保持有效。没有主动重发日报、SMTP/IMAP 发信或启用破坏性 retention。
+
+### 2026-10-09 统一发布后复核
+
+源码目标 `91ece284886da0967adeaaeb390f16de4fe055aa` / `0.56.3-261009.0848` 已部署。预构建包双端 SHA-256、859 文件清单、冻结文档对应的服务端帮助索引 hash、停写冷备与恢复材料、PM2、回环/公网 health、页面、JS/CSS MIME/hash 和九项匿名认证门禁通过。生产依赖声明及完整锁文件不变，未在生产安装依赖、构建或运行全量测试；配置 hash 和既有 Shadow/代理进程保持不变。
+
+服务器以独立临时合成库运行 18 项新增/关联回归全部通过，包含身份/角色/账号隔离、恶意参数、只读诊断、产品索引、导航、任务观测、时间边界及自动化隔离。运维 Linux 合成测试 13/13 通过，补足 Windows 跳过的符号链接场景；实际服务器服务采集与 dry-run 通过、删除数为零，主服务/Shadow/两代理均 active。未安装生产 maintenance timer、logrotate 或自动删除，不把临时快照写成应用已持续采集。
+
+本地原生确认框独立实例最终六组通过：正常确认/未保存保护及四尺寸自动化交互，自动原生 dialog=0、未知应答=0、console/pageerror=0；仅导航取消请求 ERR_ABORTED。此前 ERR_FILE_NOT_FOUND 与限流失败保留，资源异常根因未确认，最终严格断言未放宽。Linux 首轮测试的工作目录导致 Python 相对路径失败，修正临时测试入口后18/18通过；dry-run 断言误用字段修正后通过，均未修改产品代码。
+
+真实生产 WorkBuddy 只读问答成功，正确读出当前版本/提交及三个 job 的成功观测；无宿主机快照、独立部署台账、worker/手机展示及 retention 观测时明确说明未知，不产生事项计划。四种生产 viewport 长回复无根横向溢出。ChatGPT 产品帮助请求实际失败，提示“ChatGPT 返回失败，请检查额度或授权后重试”；该提示不能确定底层原因，不将此 Provider 标为通过。生产资料完整回填；仅填写临时内存草稿后离开确认确实触发，浏览器控制工具应答原生框超时，已请用户取消，未保存资料。新 APK 安装、实体 WebView/读屏、自然 Cloud、收件箱及完整恢复仍另验；本轮未主动发信或重发日报。
