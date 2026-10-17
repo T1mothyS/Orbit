@@ -1,0 +1,16 @@
+:root {
+  --orbit-font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --orbit-font-code: 'SF Mono', Consolas, 'Liberation Mono', monospace;
+  --orbit-type-caption: 12px;
+  --orbit-type-secondary: 13px;
+  --orbit-type-body: 14px;
+  --orbit-type-input: 16px;
+  --orbit-type-card-title: 16px;
+  --orbit-type-section-title: 18px;
+  --orbit-type-page-title: 28px;
+  --orbit-type-mobile-title: 24px;
+  --orbit-leading-ui: 1.5;
+  --orbit-reader-font-size: 16px;
+  --orbit-reader-line-height: 1.75;
+  --orbit-reader-paragraph-gap: 12px;
+}

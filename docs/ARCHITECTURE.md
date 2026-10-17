@@ -10,6 +10,14 @@
 
 本文档记录当前源码和测试能够证明的结构，不记录密钥、真实生产数据、用户邮件或服务器凭据。发生行为变化时，先以源码和测试为准，再更新本文档。
 
+## Orbit UI 基础层（迁移中）
+
+`src/design` 定义唯一 token 值，`src/ui` 暴露 Orbit API，Base UI 只作为内部交互基础。旧变量映射与使用方退出条件见 [迁移台账](FRONTEND-DEBT.md)。设置路由/状态与改密尚未实现，不能用 Gallery 推定业务迁移完成。
+
+main 用编译期 DEV 条件加载 `/dev/ui`，不渲染 App/认证 hooks。`dev:ui` 使用独立 ui-gallery mode 并关闭 envDir，不读 `.env`、不启动 Express/业务数据库；示例只操作组件内存。Gallery 与 Portal 使用同一 token。修改方法见 [UI Playbook](UI-GUIDELINES.md#orbit-ui-统一迁移与-agent-change-playbook)。
+
+Calendar 使用的 date-fns 现显式声明，避免依赖开发工具间接安装；已有日期函数边界有专项回归。无数据库/API 迁移。
+
 ## Android 客户端与 Push
 
 常规构建仅提供正式账号开关、通知权限与注册/投递状态；原生顶部、离线和网页测试入口只有 debug 且显式开启 DEVELOPER_TOOLS 才显示。release 始终关闭；本地桥接测试同样检查该标记。下面的 AlarmManager 排错能力保留，正式 FCM、Receiver、渠道和绑定/解绑行为不变。后续用户真实手机已确认精准/非精准触发及后台系统展示通过，见 [新增实机证据](TEST-MATRIX.md#2026-10-08-产品助手运行诊断与保留)。

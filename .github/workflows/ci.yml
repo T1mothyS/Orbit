@@ -31,6 +31,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: UI boundaries
+        run: npm run ui:lint
+
       - name: Verify project history
         run: npm run evolution:history
 
@@ -42,6 +45,25 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Verify Gallery stays development-only
+        run: node scripts/verify-ui-build.mjs
+
+      - name: Install UI test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: UI interactions and layout
+        env:
+          ORBIT_UI_QA_DIR: ${{ runner.temp }}/orbit-ui-tests
+        run: npm run test:ui
+
+      - name: Upload UI failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-ui-failures
+          path: ${{ runner.temp }}/orbit-ui-tests
+          retention-days: 7
 
       # A dependency-changing release is assembled on Linux; production only
       # receives this verified artifact and never installs or builds in place.

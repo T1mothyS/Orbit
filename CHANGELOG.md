@@ -2,6 +2,14 @@
 
 本文件记录具体版本变更；版本唯一来源为 package.json。历史生产结果属于当次记录，不代表当前上线状态。任务状态见 [TASKS](docs/TASKS.md)，未来目标见 [route.md](route.md)。
 
+## 0.58.0-261017.2348 — Orbit UI 基础体系与开发 Gallery
+
+- 建立 design 语义 token、Orbit 自身基础控件 API、实际可交互的开发 Gallery；旧主题值收口为临时映射，业务页面依次迁移后退出旧实现。
+- 提供表单、状态、Dialog/Sheet/Menu、反馈及明暗/手机样例；基础视觉待用户 Checkpoint A 确认，不代表 Settings V3 或改密已完成。
+- 新增 UI 边界检查、历史例外递减台账及本仓库 Playwright 四尺寸明暗/键盘/焦点/减动/对比度/低高度验证；CI 接入功能门槛，截图批准前仅采集候选，正式产物排除 Gallery。
+- Calendar 已使用的 date-fns 从间接开发依赖改为显式兼容依赖，并覆盖既有函数的日期边界；没有数据库或 API 迁移。
+- 同步迁移地图、退出条件、Agent Change Playbook、测试矩阵与路线；本地验证边界见测试矩阵，未 push/部署或发信。
+
 ## 0.57.2-261017.2020 — Tools 强度进化与用量看板更新
 
 - 新增强度进化静态工具，完整保留视频、31张关键帧、字体和许可文件；复用现有账号门禁与 inline CSP。

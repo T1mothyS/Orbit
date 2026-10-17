@@ -64,9 +64,11 @@ git diff --check
 
 build:client 已包含 Tools 和项目成长检查。涉及外部日报合同才在本机配置 DAILY_REPORT_V2_ROOT 并执行 npm run test:cross-project；CI 不读取个人路径。UI 改动按 [测试矩阵](docs/TEST-MATRIX.md)验收，不以构建替代实际渲染。
 
+Orbit UI 迁移中的基础控件从 `src/ui` 引用；先读 [Agent Change Playbook](docs/UI-GUIDELINES.md#orbit-ui-统一迁移与-agent-change-playbook)。`npm run dev:ui` 打开本机 `/dev/ui`，使用合成组件示例、不加载 `.env` 或启动业务服务；`npm run ui:lint` 与 `npm run test:ui` 检查代码边界和实际交互。浏览器安装和截图候选/批准基线流程见测试矩阵。
+
 ## 数据与发布
 
-沿用 React/TypeScript/Vite/TDesign/Tailwind、Express/sql.js/npm；四个运行数据库及附件/媒体属于 data/，不提交或从生产回填。密码、令牌和授权码只在安全配置/账号存储，不写文档或 Git。
+沿用 React/TypeScript/Vite/Tailwind、Express/sql.js/npm；前端逐步迁入 Orbit UI，TDesign 仅保留尚未迁移调用方。四个运行数据库及附件/媒体属于 data/，不提交或从生产回填。密码、令牌和授权码只在安全配置/账号存储，不写文档或 Git。
 
 2 GB 服务器采用本地预构建、双端哈希、停写备份、原子切换、PM2/health/页面/静态资源验收与可恢复回滚。日常升级不运行 deploy.sh 或 deploy-continue.sh 的首次安装流程；发布、代码部署、Work 和发信权限分别判断。
 

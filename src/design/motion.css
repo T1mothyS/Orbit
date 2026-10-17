@@ -1,0 +1,18 @@
+:root {
+  --orbit-motion-press: 80ms;
+  --orbit-motion-feedback: 120ms;
+  --orbit-motion-overlay: 160ms;
+  --orbit-motion-panel: 220ms;
+  --orbit-ease: cubic-bezier(.2, 0, 0, 1);
+  --orbit-ease-exit: cubic-bezier(.4, 0, 1, 1);
+}
+
+@keyframes orbit-ui-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .oui-root *, .oui-overlay, .oui-popup, .oui-toast, .oui-menu, .oui-tooltip {
+    animation: none !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}

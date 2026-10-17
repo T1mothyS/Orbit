@@ -1,0 +1,107 @@
+/* Orbit owns the values. Components consume semantic roles, never library tokens. */
+:root {
+  color-scheme: light;
+  --orbit-background-rgb: 255 255 255;
+  --orbit-foreground-rgb: 23 23 23;
+  --orbit-muted-rgb: 245 245 245;
+  --orbit-muted-text-rgb: 100 100 100;
+  --orbit-border-rgb: 229 229 229;
+  --orbit-input-rgb: 250 250 250;
+  --orbit-surface-rgb: 250 250 250;
+  --orbit-brand-rgb: 37 99 235;
+  --orbit-on-brand-rgb: 255 255 255;
+  --orbit-background: rgb(var(--orbit-background-rgb));
+  --orbit-text: rgb(var(--orbit-foreground-rgb));
+  --orbit-surface: rgb(var(--orbit-surface-rgb));
+  --orbit-elevated: var(--orbit-background);
+  --orbit-muted: rgb(var(--orbit-muted-rgb));
+  --orbit-hover: #eeeeee;
+  --orbit-pressed: #e5e5e5;
+  --orbit-text-secondary: rgb(var(--orbit-muted-text-rgb));
+  --orbit-text-muted: #686868;
+  --orbit-text-disabled: #929292;
+  --orbit-border: rgb(var(--orbit-border-rgb));
+  --orbit-border-strong: #b5b5b5;
+  --orbit-input-border: #949494;
+  --orbit-brand: rgb(var(--orbit-brand-rgb));
+  --orbit-brand-hover: #1d4ed8;
+  --orbit-brand-active: #1e40af;
+  --orbit-brand-soft: #eff4ff;
+  --orbit-on-brand: rgb(var(--orbit-on-brand-rgb));
+  --orbit-destructive: #b42318;
+  --orbit-destructive-hover: #912018;
+  --orbit-destructive-soft: #fff0ee;
+  --orbit-success: #207245;
+  --orbit-success-soft: #edf8f0;
+  --orbit-warning: #8b570a;
+  --orbit-warning-soft: #fff7e7;
+  --orbit-mask: rgb(15 20 30 / .48);
+  --orbit-mask-disabled: rgb(255 255 255 / .6);
+  --orbit-shadow-overlay: 0 12px 40px rgb(0 0 0 / .12);
+  --orbit-shadow-tooltip: 0 4px 12px rgb(0 0 0 / .12);
+  --orbit-space-1: 4px;
+  --orbit-space-2: 8px;
+  --orbit-space-3: 12px;
+  --orbit-space-4: 16px;
+  --orbit-space-5: 20px;
+  --orbit-space-6: 24px;
+  --orbit-space-8: 32px;
+  --orbit-space-10: 40px;
+  --orbit-space-12: 48px;
+  --orbit-radius-control: 6px;
+  --orbit-radius-card: 8px;
+  --orbit-radius-panel: 12px;
+  --orbit-radius-full: 9999px;
+  --orbit-control-height: 36px;
+  --orbit-touch-target: 44px;
+  --orbit-content-max: 1200px;
+  --orbit-dialog-max: 480px;
+  --orbit-sheet-max: 440px;
+  --orbit-z-sticky: 10;
+  --orbit-z-popover: 100;
+  --orbit-z-overlay: 200;
+  --orbit-z-nested: 300;
+  --orbit-z-toast: 400;
+  --orbit-link-color: var(--orbit-brand);
+  --orbit-link-hover-color: var(--orbit-text);
+}
+
+#root { isolation: isolate; }
+
+.dark {
+  color-scheme: dark;
+  --orbit-background-rgb: 18 18 18;
+  --orbit-foreground-rgb: 245 245 245;
+  --orbit-muted-rgb: 38 38 38;
+  --orbit-muted-text-rgb: 175 175 175;
+  --orbit-border-rgb: 58 58 58;
+  --orbit-input-rgb: 28 28 28;
+  --orbit-surface-rgb: 28 28 28;
+  --orbit-brand-rgb: 147 183 255;
+  --orbit-on-brand-rgb: 18 30 54;
+  --orbit-elevated: #222222;
+  --orbit-hover: #303030;
+  --orbit-pressed: #383838;
+  --orbit-text-muted: #aaaaaa;
+  --orbit-text-disabled: #777777;
+  --orbit-border-strong: #747474;
+  --orbit-input-border: #858585;
+  --orbit-brand-hover: #b5ceff;
+  --orbit-brand-active: #76a3fb;
+  --orbit-brand-soft: #202d46;
+  --orbit-destructive: #ffaaa3;
+  --orbit-destructive-hover: #ffc3bd;
+  --orbit-destructive-soft: #3c2423;
+  --orbit-success: #8bd5a6;
+  --orbit-success-soft: #203329;
+  --orbit-warning: #f2c879;
+  --orbit-warning-soft: #382f21;
+  --orbit-mask: rgb(0 0 0 / .66);
+  --orbit-mask-disabled: rgb(38 38 38 / .6);
+  --orbit-shadow-overlay: 0 12px 40px rgb(0 0 0 / .38);
+  --orbit-shadow-tooltip: 0 4px 12px rgb(0 0 0 / .32);
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  :root { --orbit-control-height: var(--orbit-touch-target); }
+}

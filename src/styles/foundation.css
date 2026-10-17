@@ -16,38 +16,7 @@ button {
 .feature-status-content { padding: 24px; max-width: calc(100vw - 32px); border-radius: 12px; color: var(--td-text-color-primary); background: var(--td-bg-color-container); }
 .feature-status-content button { min-height: 44px; margin: 8px; padding: 8px 16px; border-radius: 8px; background: var(--td-bg-color-component); }
 
-/* ===== 主题变量 ===== */
-:root {
-  /* Light Theme */
-  --color-primary: 23 23 23;
-  --color-primary-foreground: 255 255 255;
-  --color-background: 255 255 255;
-  --color-foreground: 23 23 23;
-  --color-muted: 245 245 245;
-  --color-muted-foreground: 115 115 115;
-  --color-border: 229 229 229;
-  --color-input: 250 250 250;
-  --color-card: 250 250 250;
-  --color-card-foreground: 23 23 23;
-  --color-accent: 59 130 246;
-  --color-accent-foreground: 255 255 255;
-}
-
-.dark {
-  /* Dark Theme */
-  --color-primary: 255 255 255;
-  --color-primary-foreground: 23 23 23;
-  --color-background: 18 18 18;
-  --color-foreground: 250 250 250;
-  --color-muted: 38 38 38;
-  --color-muted-foreground: 163 163 163;
-  --color-border: 64 64 64;
-  --color-input: 38 38 38;
-  --color-card: 28 28 28;
-  --color-card-foreground: 250 250 250;
-  --color-accent: 96 165 250;
-  --color-accent-foreground: 23 23 23;
-}
+/* Theme authority: src/design/tokens.css; legacy aliases: src/design/legacy.css. */
 
 /* ===== 基础样式 ===== */
 * {
@@ -94,98 +63,6 @@ button:focus-visible {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--color-muted-foreground));
-}
-
-/* ===== TDesign 全局 CSS 变量覆盖 ===== */
-:root {
-  /* 品牌色 */
-  --td-brand-color: #3b82f6;
-  --td-brand-color-hover: #60a5fa;
-  --td-brand-color-active: #2563eb;
-  --td-brand-color-light: rgba(59, 130, 246, 0.1);
-
-  /* 背景色 - 浅色模式 */
-  --td-bg-color-page: #ffffff;
-  --td-bg-color-container: #fafafa;
-  --td-bg-color-container-hover: #f5f5f5;
-  --td-bg-color-container-active: #eeeeee;
-  --td-bg-color-secondarycontainer: #f5f5f5;
-  --td-bg-color-secondarycontainer-hover: #eeeeee;
-  --td-bg-color-component: #f5f5f5;
-  --td-bg-color-component-hover: #eeeeee;
-  --td-bg-color-component-disabled: #f5f5f5;
-
-  /* 文字色 - 浅色模式 */
-  --td-text-color-primary: #171717;
-  --td-text-color-secondary: #737373;
-  --td-text-color-placeholder: #a3a3a3;
-  --td-text-color-disabled: #d4d4d4;
-  --td-text-color-anti: #ffffff;
-
-  /* 边框色 - 浅色模式 */
-  --td-border-level-1-color: #e5e5e5;
-  --td-border-level-2-color: #d4d4d4;
-  --td-component-stroke: #e5e5e5;
-  --td-component-border: #e5e5e5;
-
-  /* 遮罩 */
-  --td-mask-active: rgba(0, 0, 0, 0.6);
-  --td-mask-disabled: rgba(255, 255, 255, 0.6);
-
-  /* 阴影 */
-  --td-shadow-1: 0 1px 10px rgba(0, 0, 0, 0.05), 0 4px 5px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.12);
-  --td-shadow-2: 0 3px 14px 2px rgba(0, 0, 0, 0.05), 0 8px 10px 1px rgba(0, 0, 0, 0.06), 0 5px 5px -3px rgba(0, 0, 0, 0.1);
-  --td-shadow-3: 0 6px 30px 5px rgba(0, 0, 0, 0.05), 0 16px 24px 2px rgba(0, 0, 0, 0.04), 0 8px 10px -5px rgba(0, 0, 0, 0.08);
-
-  /* 圆角 */
-  --td-radius-small: 4px;
-  --td-radius-default: 6px;
-  --td-radius-medium: 8px;
-  --td-radius-large: 12px;
-  --td-radius-extraLarge: 16px;
-}
-
-/* 深色模式 TDesign 变量 */
-.dark {
-  /* 品牌色 */
-  --td-brand-color: #60a5fa;
-  --td-brand-color-hover: #93c5fd;
-  --td-brand-color-active: #3b82f6;
-  --td-brand-color-light: rgba(96, 165, 250, 0.15);
-
-  /* 背景色 - 深色模式 */
-  --td-bg-color-page: #121212;
-  --td-bg-color-container: #1c1c1c;
-  --td-bg-color-container-hover: #262626;
-  --td-bg-color-container-active: #303030;
-  --td-bg-color-secondarycontainer: #262626;
-  --td-bg-color-secondarycontainer-hover: #303030;
-  --td-bg-color-component: #262626;
-  --td-bg-color-component-hover: #303030;
-  --td-bg-color-component-disabled: #262626;
-
-  /* 文字色 - 深色模式 */
-  --td-text-color-primary: #fafafa;
-  --td-text-color-secondary: #a3a3a3;
-  --td-text-color-placeholder: #737373;
-  --td-text-color-disabled: #525252;
-  --td-text-color-anti: #171717;
-
-  /* 边框色 - 深色模式 */
-  --td-border-level-1-color: #404040;
-  --td-border-level-2-color: #525252;
-  --td-component-stroke: #404040;
-  --td-component-border: #404040;
-
-  /* 遮罩 - 深色模式 */
-  --td-mask-active: rgba(0, 0, 0, 0.8);
-  --td-mask-disabled: rgba(38, 38, 38, 0.6);
-
-  /* 阴影 - 深色模式 */
-  --td-shadow-1: 0 1px 10px rgba(0, 0, 0, 0.3), 0 4px 5px rgba(0, 0, 0, 0.35), 0 2px 4px -1px rgba(0, 0, 0, 0.4);
-  --td-shadow-2: 0 3px 14px 2px rgba(0, 0, 0, 0.3), 0 8px 10px 1px rgba(0, 0, 0, 0.32), 0 5px 5px -3px rgba(0, 0, 0, 0.38);
-  --td-shadow-3: 0 6px 30px 5px rgba(0, 0, 0, 0.3), 0 16px 24px 2px rgba(0, 0, 0, 0.28), 0 8px 10px -5px rgba(0, 0, 0, 0.35);
-
 }
 
 /* ===== TDesign Select 选择器 ===== */

@@ -30,6 +30,7 @@
 | [项目地图](../PROJECT-MAP.md) | 模块/跨项目边界与源码路由 |
 | [测试矩阵](TEST-MATRIX.md) | 验证入口、风险范围和 UI/生产/业务证据边界 |
 | [UI 规范](UI-GUIDELINES.md) | 布局、主题、响应式、聊天/Motion 与体验升级实施规则；逐块状态见 TASKS |
+| [前端迁移台账](FRONTEND-DEBT.md) | 入口、迁移目标、风险、优先级和旧实现退出条件；开发方法见 UI 规范的 Agent Change Playbook |
 | [UI / Interaction / Motion 专项审计（2026-10-03）](archive/engineering/ORBIT-INTERACTION-MOTION-AUDIT-20261003.md) | 原审计时点的日期快照与方案；当前逐批实施状态见 [TASKS](TASKS.md#uiuxmotion-体验升级执行清单)，不改写历史结论 |
 | [UI/UX 八项加固定向回归（2026-10-09）](archive/engineering/ORBIT-UI-UX-HARDEN-REGRESSION-20261009.md) | 针对前次八项问题的修复、独立复审和本地证据；不重新评分全站，不代表部署或真机验收 |
 

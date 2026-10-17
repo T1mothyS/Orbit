@@ -1,6 +1,4 @@
 /* Animation communicates a real state or spatial relationship. No decorative page motion. */
-:root { --orbit-reader-font-size:16px; --orbit-reader-line-height:1.75; --orbit-reader-paragraph-gap:12px; }
-:root { --orbit-motion-press:80ms; --orbit-motion-feedback:120ms; --orbit-motion-overlay:160ms; --orbit-motion-panel:220ms; --orbit-ease:cubic-bezier(.2,0,0,1); --orbit-ease-exit:cubic-bezier(.4,0,1,1); --orbit-radius-control:6px; --orbit-radius-card:8px; --orbit-radius-panel:12px; }
 button,input,select,textarea { transition-property:color,background-color,border-color; transition-duration:var(--orbit-motion-press); transition-timing-function:var(--orbit-ease); }
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline:2px solid var(--td-brand-color); outline-offset:2px; }
 .primary-button { background:var(--td-brand-color); box-shadow:none; }
@@ -28,8 +26,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .orbit-message-body a,.orbit-message-sources a,.settings-stack > a { color:var(--td-brand-color); text-decoration:underline; text-underline-offset:3px; }
 .dark .orbit-message-body a,.dark .orbit-message-sources a,.dark .settings-stack > a { color:var(--td-brand-color-9,var(--td-brand-color-active)); }
 /* Small text links use the darker existing brand token in light mode. */
-:root { --orbit-link-color:var(--td-brand-color-active); --orbit-link-hover-color:var(--td-text-color-primary); --orbit-touch-target:44px; }
-.dark { --orbit-link-color:var(--td-brand-color-9,var(--td-brand-color-active)); }
 :is(.setting-control,.settings-note,.settings-help,.context-help,.note-board-content) a:not([class*="button"]),
 .settings-stack > a:not([class*="button"]) {
   color:var(--orbit-link-color); text-decoration:underline; text-underline-offset:3px;
@@ -98,7 +94,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .orbit-user-message{font-size:14px;line-height:1.65}
 @media(max-width:767px){.orbit-user-message{font-size:15px}}
 /* Shared, quiet surfaces. The brand color marks selection and the next action. */
-:root { --orbit-space-1:4px; --orbit-space-2:8px; --orbit-space-3:12px; --orbit-space-4:16px; --orbit-space-6:24px; --orbit-space-8:32px; --orbit-shadow-overlay:0 12px 40px rgb(0 0 0 / .12); }
 .app-shell .app-topbar { flex-basis:60px; padding-block:8px; box-shadow:none; }
 .app-shell .brand-mark { width:32px; height:32px; border-radius:8px; box-shadow:none; }
 .app-shell .brand-name { font-size:18px; font-weight:650; letter-spacing:-.02em; }

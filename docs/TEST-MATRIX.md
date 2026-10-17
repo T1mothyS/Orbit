@@ -6,6 +6,22 @@
 
 ## 本地验证
 
+### Orbit UI 基础体系与 Checkpoint A
+
+`npm run dev:ui` 在 loopback 的 4196 端口提供 `/dev/ui`；独立 mode 关闭 envDir，示例不渲染认证 hooks、不启动业务服务。`npm run test:ui` 自行启动这个前端，用本仓库锁定的 Playwright 检查四尺寸明暗、密码显示、选择器/开关、焦点循环/返回、菜单、Tabs、Toast、减动、关键文字对比度和 390×480 Sheet 操作可达性；要求没有 API 请求、页面/console 错误或页面横向溢出。
+
+首次本机运行可用 `npx playwright install chromium`；如已有 Edge，可在 PowerShell 进程级设置 `$env:ORBIT_BROWSER_CHANNEL='msedge'`。CI 固定安装锁定版本 Chromium，远端 CI 结果必须在 push 后另行核对，不能由本机通过推定。
+
+截图/trace 默认写系统临时目录，可用 ORBIT_UI_QA_DIR 指定。`tests/ui/visual-policy.json` 当前明确 A 尚未批准，故截图是候选，不称为视觉回归通过。A 确认后审阅并建立对应平台的黄金图，将批准标记切为 true；此后普通 `test:ui` 和 CI 都强制比较，缺图也失败。更新必须显式 `--update-snapshots=all` 并审阅差异；CI 不自动更新。Windows/Linux 基线分开，阈值在 Playwright 配置中维护，不能调大来掩盖漂移。
+
+`npm run ui:lint` 检查绕过组件入口、裸基础控件、硬编码颜色/圆角/层级、inline 视觉和页面覆盖。历史基线按文件/规则/代码指纹/次数限制；新增副本和改写不能借用旧配额，ui/design/dev/features 不接受历史例外，CI 拒绝更新基线。`server/ui-lint.test.ts` 验证负向阻断；Calendar 显式 date-fns 依赖的本地日期边界单独回归。
+
+生产构建后运行 `node scripts/verify-ui-build.mjs` 检查 Gallery 代码与样式未进入公开产物。UI lint、Gallery 交互和生产隔离已接入 CI。全局 token/旧变量映射仍需业务页隔离回归；Gallery 本身不证明 Settings V3、改密、真实 AI、通知、邮件、实体手机、Electron 安装运行或生产登录通过。
+
+2026-10-17 本地 Checkpoint A 候选：554/554 服务/规则测试、13/13 浏览器测试通过；截图覆盖四尺寸/明暗的三类 Gallery。typecheck、Web/Electron build 和产物隔离检查通过。初次测试发现并修正 Toast 关闭入口的 aria-hidden、Tabs 激活方式；焦点循环断言改为等待实际落定，测试加载 JSON 使用明确的文件读取。实际截图供用户确认，A/B/C 不由自动测试代签。
+
+全局 token 兼容补验复用隔离预览：`mobile-compact-browser-smoke.cjs --baseline` 的 56 项六业务入口/搜索、四尺寸明暗检查通过（此模式只采集当前状态，不代表前后像素比较）；`native-dialog-browser-smoke.cjs` 的 6 组原生/自动化确认、资料草稿和焦点保护通过。较早 `browser-smoke.cjs` 因缺头像 fixture、仍定位旧的直接入口而失败，不计通过；没有修改产品来适配旧脚本。上述均为临时合成数据库与 loopback，后台任务/外部服务关闭，不能替代真实业务和生产验收。
+
 ### 2026-10-09 原生确认框与浏览器自动化
 
 **来源与边界。** 上轮阻塞点是 `ScheduleFormModal.tsx` 关闭 dirty 日程时的 `window.confirm('放弃本次未保存的编辑？')`，属于 JavaScript dialog；本轮在正常浏览器模式实际捕获 confirm 的取消/确认，并确认取消保留草稿。个人资料/日报偏好还通过 `useUnsavedContext` 保护导航及刷新；实际捕获 dirty 刷新的 beforeunload，取消后草稿仍在。没有复现密码管理器、通知/定位权限或其他 Browser Chrome 提示，不能把这些猜测当根因。

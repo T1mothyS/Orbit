@@ -7,6 +7,7 @@ const devHost = process.env.VITE_DEV_HOST?.trim() || '127.0.0.1';
 const extraAllowedHost = process.env.VITE_ALLOWED_HOST?.trim();
 
 export default defineConfig(({ command, mode }) => ({
+  envDir: mode === 'ui-gallery' ? false : undefined,
   plugins: [react(), createAuditVitePlugin({ command, mode, synthetic: process.env.ORBIT_UI_AUDIT_SYNTHETIC, apiTarget: process.env.API_PROXY_TARGET })],
   server: {
     host: devHost,

@@ -8,31 +8,31 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: 'var(--td-bg-color-page)',
-        foreground: 'var(--td-text-color-primary)',
+        background: 'var(--orbit-background)',
+        foreground: 'var(--orbit-text)',
         muted: {
-          DEFAULT: 'var(--td-bg-color-component)',
-          foreground: 'var(--td-text-color-secondary)',
+          DEFAULT: 'var(--orbit-muted)',
+          foreground: 'var(--orbit-text-secondary)',
         },
-        border: 'var(--td-component-stroke)',
-        input: 'var(--td-bg-color-component)',
+        border: 'var(--orbit-border)',
+        input: 'var(--orbit-muted)',
         card: {
-          DEFAULT: 'var(--td-bg-color-container)',
-          foreground: 'var(--td-text-color-primary)',
+          DEFAULT: 'var(--orbit-surface)',
+          foreground: 'var(--orbit-text)',
         },
         accent: {
-          DEFAULT: 'var(--td-brand-color)',
-          foreground: 'var(--td-text-color-anti)',
-          light: 'var(--td-brand-color-light)',
+          DEFAULT: 'var(--orbit-brand)',
+          foreground: 'var(--orbit-on-brand)',
+          light: 'var(--orbit-brand-soft)',
         },
         primary: {
-          DEFAULT: 'var(--td-text-color-primary)',
-          foreground: 'var(--td-bg-color-page)',
+          DEFAULT: 'var(--orbit-text)',
+          foreground: 'var(--orbit-background)',
         }
       },
       borderRadius: {
-        'xl': '16px',
-        '2xl': '20px',
+        'xl': 'var(--orbit-space-4)',
+        '2xl': 'var(--orbit-space-5)',
       },
       animation: {
         'cursor-blink': 'blink 1s infinite',

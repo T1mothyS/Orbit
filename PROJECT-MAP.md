@@ -21,6 +21,8 @@
 
 ### 1.1 主仓库结构
 
+前端统一重构入口：`src/design` 管语义 token，`src/ui` 管基础控件，`src/dev/UiGallery.tsx` 为仅开发的 `/dev/ui`。设置将迁入 features/settings；已有业务目录保留至对应批次。当前边界见 [迁移台账](docs/FRONTEND-DEBT.md)，修改入口与验证见 [Agent Change Playbook](docs/UI-GUIDELINES.md#orbit-ui-统一迁移与-agent-change-playbook)，不据目标目录推定迁移完成。
+
 ```mermaid
 flowchart TD
     Browser[Web 浏览器] --> React[src/ React + Vite]
