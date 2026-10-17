@@ -18,7 +18,7 @@ body{min-height:100vh}
 button,input,select,textarea{font:inherit}
 button{color:inherit}
 .app{max-width:1480px;margin:0 auto;padding:18px}
-.topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:15px}
+.topbar{display:flex;align-items:flex-start;justify-content:flex-start;gap:18px;margin-bottom:15px}
 .brand{display:flex;gap:12px;align-items:center}
 .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--green));box-shadow:0 8px 28px rgba(131,160,255,.22)}
 .title{font-size:20px;font-weight:800}.subtitle{font-size:12px;color:var(--muted);margin-top:2px}.version-badge{display:inline-flex;align-items:center;margin-left:7px;padding:2px 6px;border:1px solid #344d7f;border-radius:999px;background:#18243a;color:#b9c9ff;font-size:9px;font-weight:800;letter-spacing:.06em;vertical-align:1px}
@@ -45,7 +45,11 @@ button{color:inherit}
 .help::after{content:attr(data-help);position:absolute;right:0;top:calc(100% + 9px);bottom:auto;width:max-content;max-width:310px;padding:8px 10px;border:1px solid #3a485d;border-radius:9px;background:#0b111a;color:#d7e0ed;font-size:11px;font-weight:500;line-height:1.45;white-space:normal;box-shadow:0 12px 30px rgba(0,0,0,.4);opacity:0;transform:translateY(-4px);pointer-events:none;transition:.15s;z-index:100}
 .help::before{content:"";position:absolute;right:18px;top:calc(100% + 4px);bottom:auto;border:5px solid transparent;border-bottom-color:#3a485d;opacity:0;transition:.15s;z-index:101}
 .help:hover::after,.help:hover::before,.help:focus-visible::after,.help:focus-visible::before{opacity:1;transform:translateY(0)}
-.quick{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#111824,#0e141e);padding:13px 14px;margin-bottom:12px}
+.quick{display:block;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#111824,#0e141e);padding:13px 14px;margin-bottom:12px}
+.quick-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.quick-copy{min-width:260px}
+.quick .cmd-actions{display:grid;grid-template-columns:repeat(4,minmax(128px,1fr));gap:8px;min-width:min(690px,66vw)}
+.quick .cmd-actions .btn{white-space:nowrap;text-align:center}
 .quick-title{font-size:13px;font-weight:700}.quick-sub{font-size:11px;color:var(--muted);margin-top:3px}
 .cmd{margin-top:8px;display:flex;align-items:center;gap:8px;background:#090e16;border:1px solid var(--line2);border-radius:9px;padding:8px 10px;min-width:0}
 .cmd code{font-family:"Cascadia Code","SFMono-Regular",Consolas,monospace;font-size:11px;color:#cbd6e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -66,24 +70,28 @@ button{color:inherit}
 .stats-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}.stat{padding:10px;border:1px solid var(--line2);border-radius:10px;background:#0e151f}.stat b{font-size:14px}.stat span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:5px}
 .heatmap-wrap{overflow-x:auto}.heatmap{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,12px);grid-auto-columns:12px;gap:3px;padding:4px 0}.heatcell{width:12px;height:12px;border-radius:2px;background:#151d28;cursor:crosshair}.heatlabels{display:flex;justify-content:space-between;margin-top:5px;color:var(--subtle);font-size:10px}
 .insights{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.insight{padding:11px;border:1px solid var(--line2);border-radius:11px;background:#0f1620}.insight b{font-size:12px}.insight p{font-size:11px;color:var(--muted);line-height:1.5;margin:5px 0 0}
-.rangebox{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;margin-bottom:11px;color:var(--muted);font-size:10px}.rangebox input{width:100%}
+.rangebox{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:11px;color:var(--muted);font-size:10px}
+.dual-range{position:relative;height:28px;min-width:0}
+.range-track,.range-fill{position:absolute;top:50%;height:4px;transform:translateY(-50%);border-radius:999px;pointer-events:none}
+.range-track{left:0;right:0;background:#202a39;border:1px solid #2c394b}
+.range-fill{left:0;width:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));box-shadow:0 0 12px rgba(98,214,238,.16)}
+.dual-range input[type="range"]{position:absolute;inset:0;width:100%;height:28px;margin:0;background:transparent;-webkit-appearance:none;appearance:none;pointer-events:none}
+.dual-range input[type="range"]::-webkit-slider-runnable-track{height:4px;background:transparent}
+.dual-range input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;margin-top:-6px;border-radius:50%;border:2px solid #dce6ff;background:#18243a;box-shadow:0 0 0 3px rgba(131,160,255,.16);pointer-events:auto;cursor:grab}
+.dual-range input[type="range"]::-moz-range-track{height:4px;background:transparent;border:0}
+.dual-range input[type="range"]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;border:2px solid #dce6ff;background:#18243a;box-shadow:0 0 0 3px rgba(131,160,255,.16);pointer-events:auto;cursor:grab}
 .note{font-size:10px;color:var(--subtle);line-height:1.55}.empty{padding:28px;text-align:center;color:var(--muted)}
 .tooltip{position:fixed;z-index:20;display:none;pointer-events:none;background:#0c121b;border:1px solid #35445a;border-radius:9px;padding:8px 9px;box-shadow:0 12px 35px rgba(0,0,0,.35);font-size:10px;line-height:1.55;max-width:260px}
 .toast{position:fixed;right:17px;bottom:17px;opacity:0;transform:translateY(8px);transition:.2s;background:#111a27;border:1px solid #35445a;border-radius:9px;padding:9px 11px;font-size:11px;pointer-events:none}.toast.show{opacity:1;transform:none}
 @media(max-width:1100px){.grid6{grid-template-columns:repeat(3,1fr)}.two,.two.equal{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(4,1fr)}}
-@media(max-width:680px){.app{padding:11px}.topbar{flex-direction:column}.actions{justify-content:flex-start}.quick{grid-template-columns:1fr}.grid6{grid-template-columns:repeat(2,1fr)}.stats-grid{grid-template-columns:repeat(2,1fr)}.insights{grid-template-columns:1fr}.model-row{grid-template-columns:1fr auto}.model-row .bar{grid-column:1/-1}.chart{height:260px}}
+@media(max-width:900px){.quick-head{flex-direction:column}.quick .cmd-actions{min-width:0;width:100%;grid-template-columns:repeat(2,1fr)}}
+@media(max-width:680px){.app{padding:11px}.topbar{flex-direction:column}.actions{justify-content:flex-start}.quick .cmd-actions{grid-template-columns:1fr}.grid6{grid-template-columns:repeat(2,1fr)}.stats-grid{grid-template-columns:repeat(2,1fr)}.insights{grid-template-columns:1fr}.model-row{grid-template-columns:1fr auto}.model-row .bar{grid-column:1/-1}.chart{height:260px}}
 </style>
 </head>
 <body>
 <div class="app">
   <div class="topbar">
-    <div class="brand"><div class="logo"></div><div><div class="title">Codex Usage Dashboard <span class="version-badge">V5</span></div><div class="subtitle">纯前端 · 本地解析 · AI Calendar Tools</div></div></div>
-    <div class="actions">
-      <label class="btn primary help" data-help="选择 ccusage 导出的本地 JSON 文件。文件只在浏览器内解析，不会上传。" for="fileInput" tabindex="0">导入 JSON</label><input id="fileInput" class="input" type="file" accept=".json,application/json">
-      <button class="btn help" data-help="读取剪贴板里的 ccusage JSON 并立即分析。推荐先复制下方 Daily 命令到 PowerShell 执行。" id="pasteBtn">粘贴 JSON</button>
-      <button class="btn help" data-help="切换到内置演示数据，仅用于预览界面；不是你的真实 Codex 使用记录。" id="sampleBtn">示例数据</button>
-      <button class="btn help" data-help="把当前筛选范围的统计摘要复制成 Markdown，方便粘到 ChatGPT、知识库或笔记中；不是复制原始 JSON。" id="copyMdBtn">复制 Markdown</button>
-    </div>
+    <div class="brand"><div class="logo"></div><div><div class="title">Codex Usage Dashboard <span class="version-badge">V6.1</span></div><div class="subtitle">纯前端 · 本地解析 · AI Calendar Tools</div></div></div>
   </div>
 
   <div class="statusbar sample" id="statusBar">
@@ -98,15 +106,19 @@ button{color:inherit}
   </div>
 
   <section class="quick">
-    <div>
-      <div class="quick-title">最快取数：PowerShell → Clipboard → 本页粘贴</div>
-      <div class="quick-sub">点击复制命令，去终端直接粘贴执行；完成后回到这里点“粘贴 JSON”。</div>
-      <div class="cmd"><code id="dailyCmd">npx ccusage@latest codex daily --json --breakdown | Set-Clipboard</code></div>
+    <div class="quick-head">
+      <div class="quick-copy">
+        <div class="quick-title">最快取数：PowerShell → Clipboard → 本页粘贴</div>
+        <div class="quick-sub">先复制并运行 Daily / Session 命令，再回到这里粘贴 JSON。页面不会上传数据。</div>
+      </div>
+      <div class="cmd-actions">
+        <button class="btn good help" data-help="复制按天统计命令。使用 ccusage 统一报告并按 Agent 拆分；页面只读取 Codex，这样模型级成本可直接取 ccusage 的计算结果。运行后 JSON 会进入剪贴板。" id="copyDailyCmd">复制 Daily 命令</button>
+        <button class="btn help" data-help="复制按会话统计命令。粘贴后只补充 Sessions，不覆盖已有 Daily 数据。" id="copySessionCmd">复制 Session 命令</button>
+        <button class="btn primary help" data-help="读取剪贴板里的 ccusage JSON 并立即分析。" id="pasteBtn">粘贴 JSON</button>
+        <button class="btn help" data-help="静态网页不能直接运行 PowerShell。点击会复制 ccusage 更新命令，请粘贴到 PowerShell 执行。使用 npx ccusage@latest 时通常已会直接取最新版。" id="updateCcusageBtn">更新 ccusage</button>
+      </div>
     </div>
-    <div class="cmd-actions">
-      <button class="btn good help" data-help="复制“按天统计”的 PowerShell 命令。运行后，Daily JSON 会直接进入剪贴板；它负责趋势图、模型占比、成本、缓存率等主体分析。" id="copyDailyCmd">复制 Daily 命令</button>
-      <button class="btn help" data-help="复制“按会话统计”的 PowerShell 命令。只有想看下方 Sessions 会话排行时才需要运行；粘贴后会补充会话数据，并保留已载入的 Daily 数据。" id="copySessionCmd">复制 Session 命令</button>
-    </div>
+    <div class="cmd"><code id="dailyCmd">npx ccusage@latest daily --by-agent --json --breakdown | Set-Clipboard</code></div>
   </section>
 
   <div class="dropzone" id="dropzone"><b>把 ccusage JSON 拖进来</b><div class="note" style="margin-top:4px">支持 daily / weekly / monthly / sessions。数据只在当前浏览器内解析。</div></div>
@@ -122,10 +134,10 @@ button{color:inherit}
 
   <section class="card panel">
     <div class="head">
-      <div><div class="head-title">Time Range</div><div class="head-sub">快捷范围 + 细粒度范围滑块</div></div>
+      <div><div class="head-title">Time Range</div><div class="head-sub">快捷范围 + 双端时间范围滑块</div></div>
       <div class="seg" id="rangeSeg"><button data-r="7">7D</button><button data-r="30" class="active">30D</button><button data-r="90">90D</button><button data-r="all">All</button></div>
     </div>
-    <div class="rangebox"><span id="rangeStartLabel">—</span><input id="rangeSlider" type="range" min="1" max="30" value="30"><span id="rangeEndLabel">—</span></div>
+    <div class="rangebox"><span id="rangeStartLabel">—</span><div class="dual-range" aria-label="时间范围"><div class="range-track"></div><div class="range-fill" id="rangeFill"></div><input id="rangeStartSlider" type="range" min="0" max="0" value="0" aria-label="起始日期"><input id="rangeEndSlider" type="range" min="0" max="0" value="0" aria-label="结束日期"></div><span id="rangeEndLabel">—</span></div>
   </section>
 
   <section class="card panel">
@@ -208,7 +220,7 @@ button{color:inherit}
     <div class="insights" id="insights"></div>
   </section>
 
-  <div class="note">V5 仍然是单文件前端：没有后端、没有数据库、没有上传。成本优先使用 ccusage JSON 返回值；仅在缺失时使用内置价格表兜底。遇到新模型且 ccusage 未提供成本、内置表也无法识别时，明确显示 N/A，不用 $0 或部分成本冒充完整成本。模型排序按 GPT 版本号自动降序，同版本再按 Astra → Sol → Terra → Luna 排序，因此未来多数新版本无需修改 HTML。Cache Read Rate = Cache Read / (Input + Cache Write + Cache Read)。</div>
+  <div class="note">V6.1 仍然是单文件前端：没有后端、没有数据库、没有上传。成本优先使用 ccusage JSON 返回值；Daily 推荐使用统一 --by-agent JSON，页面只提取 Codex，并直接读取模型级 cost；仅在模型级成本缺失时使用内置价格表兜底。遇到新模型且 ccusage 未提供成本、内置表也无法识别时，明确显示 N/A，不用 $0 或部分成本冒充完整成本。模型排序按 GPT 版本号自动降序，同版本再按 Astra → Sol → Terra → Luna 排序，因此未来多数新版本无需修改 HTML。Cache Read Rate = Cache Read / (Input + Cache Write + Cache Read)。</div>
 </div>
 <div class="tooltip" id="tooltip"></div><div class="toast" id="toast"></div>
 
@@ -228,7 +240,8 @@ const FALLBACK_PRICING={
 };
 const MODEL_TIER_ORDER=["astra","sol","terra","luna"];
 const sessionCmd="npx ccusage@latest codex session --json | Set-Clipboard";
-let state={daily:[],sessions:[]}, baseRange=30, windowCount=30, hiddenModels=new Set(), loadedAt=new Date();
+const updateCcusageCmd="npm install -g ccusage@latest";
+let state={daily:[],sessions:[]}, rangeStartIdx=0, rangeEndIdx=0, hiddenModels=new Set(), loadedAt=new Date();
 
 const num=v=>Number.isFinite(+v)?+v:0;
 const sum=(a,f)=>a.reduce((s,x)=>s+num(f(x)),0);
@@ -327,9 +340,17 @@ function normalize(raw){
  const hasSessions=Array.isArray(raw.sessions);
 
  // Time-series reports: only these are allowed to update the Daily/time-series slot.
+ // Unified --by-agent JSON contains all agents in each period. Keep Codex only, but
+ // retain the period/date from the parent row. Older focused Codex JSON still works.
  const arr=hasDaily?raw.daily:hasWeekly?raw.weekly:hasMonthly?raw.monthly:hasHourly?raw.hourly:null;
  if(Array.isArray(arr)){
-   out.daily=arr.map(normEntry);
+   const codexOnly=arr.map(row=>{
+     if(!Array.isArray(row.agents))return row;
+     const codex=row.agents.find(a=>String(a.agent||a.source||"").toLowerCase()==="codex");
+     if(!codex)return null;
+     return {...codex,date:codex.date||row.date||row.period||row.label||"",period:codex.period||row.period||row.date||row.label||""};
+   }).filter(Boolean);
+   out.daily=codexOnly.map(normEntry);
    out.reportKinds.push(hasDaily?"daily":hasWeekly?"weekly":hasMonthly?"monthly":"hourly");
  }
 
@@ -362,11 +383,14 @@ function normalize(raw){
 function normEntry(e){
  let b=[];
  const normalizeModel=(name,m)=>{
-   const inputTokens=num(m.inputTokens),outputTokens=num(m.outputTokens),cacheReadTokens=num(m.cacheReadTokens),cacheCreationTokens=num(m.cacheCreationTokens);
-   const rc=resolveModelCost(m.cost??m.costUSD,name,inputTokens,cacheReadTokens,cacheCreationTokens,outputTokens);
+   const inputTokens=num(m.inputTokens),outputTokens=num(m.outputTokens),cacheReadTokens=num(m.cacheReadTokens),cacheCreationTokens=num(m.cacheCreationTokens??m.cacheCreationInputTokens);
+   // Current unified ccusage JSON uses modelBreakdowns[].cost. Older/report-specific
+   // serializers may use costUSD or totalCost, so accept all three.
+   const rc=resolveModelCost(m.cost??m.costUSD??m.totalCost,name,inputTokens,cacheReadTokens,cacheCreationTokens,outputTokens);
    return {modelName:name||"Unknown",inputTokens,outputTokens,cacheReadTokens,cacheCreationTokens,cost:rc.value,costKnown:rc.known,costSource:rc.source};
  };
  if(Array.isArray(e.modelBreakdowns))b=e.modelBreakdowns.map(m=>normalizeModel(m.modelName||m.model||"Unknown",m));
+ else if(e.breakdown&&typeof e.breakdown==="object"&&!Array.isArray(e.breakdown))b=Object.entries(e.breakdown).map(([name,m])=>normalizeModel(name,m));
  else if(e.models&&typeof e.models==="object"&&!Array.isArray(e.models))b=Object.entries(e.models).map(([name,m])=>normalizeModel(name,m));
  const inputTokens=num(e.inputTokens),outputTokens=num(e.outputTokens),cacheReadTokens=num(e.cacheReadTokens),cacheCreationTokens=num(e.cacheCreationTokens);
  const totalTokens=num(e.totalTokens)||inputTokens+cacheReadTokens+cacheCreationTokens+outputTokens;
@@ -380,7 +404,11 @@ function normEntry(e){
  }
  return {date:e.date||e.period||e.label||"",inputTokens,outputTokens,cacheReadTokens,cacheCreationTokens,totalTokens,costUSD,costKnown,costSource,modelBreakdowns:b};
 }
-function activeEntries(){let d=state.daily;if(baseRange==="all")return d.slice(Math.max(0,d.length-windowCount));let n=Math.min(num(baseRange),d.length);return d.slice(Math.max(0,d.length-Math.min(windowCount,n)));}
+function activeEntries(){
+ const d=state.daily;if(!d.length)return [];
+ const start=Math.max(0,Math.min(rangeStartIdx,d.length-1)),end=Math.max(start,Math.min(rangeEndIdx,d.length-1));
+ return d.slice(start,end+1);
+}
 function models(entries){
  let m=new Map();
  for(let d of entries){
@@ -524,8 +552,7 @@ async function loadText(t,label){
 
    // Only reset the time-range controls when a time-series report was actually imported.
    if(n.daily.length){
-     baseRange=30;
-     windowCount=Math.min(30,state.daily.length||30);
+     setRangePreset(30,false);
      $("#rangeSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x.dataset.r==="30"));
      syncRange();
    }
@@ -533,19 +560,39 @@ async function loadText(t,label){
    toast(updated.length===1&&updated[0]==="session"?"Session 已合并，Daily 已保留":"JSON 解析成功");
  }catch(err){console.error(err);toast("解析失败："+err.message)}
 }
-function syncRange(){
- let max=baseRange==="all"?Math.max(1,state.daily.length):Math.max(1,Math.min(num(baseRange),state.daily.length));$("#rangeSlider").max=max;windowCount=Math.max(1,Math.min(windowCount,max));$("#rangeSlider").value=windowCount;
+function setRangePreset(days,doRender=true){
+ const n=state.daily.length;
+ if(!n){rangeStartIdx=0;rangeEndIdx=0;syncRange();if(doRender)render();return}
+ rangeEndIdx=n-1;
+ rangeStartIdx=days==="all"?0:Math.max(0,n-Math.max(1,num(days)));
+ syncRange();
+ if(doRender)render();
 }
-$("#copyDailyCmd").onclick=()=>copy($("#dailyCmd").textContent);$("#copySessionCmd").onclick=()=>copy(sessionCmd);$("#copyMdBtn").onclick=()=>copy(markdown());
+function updateRangeFill(){
+ const n=state.daily.length,max=Math.max(0,n-1),fill=$("#rangeFill");
+ if(!fill)return;
+ const left=max?rangeStartIdx/max*100:0,right=max?rangeEndIdx/max*100:100;
+ fill.style.left=left+"%";fill.style.width=Math.max(0,right-left)+"%";
+}
+function syncRange(){
+ const n=state.daily.length,max=Math.max(0,n-1),a=$("#rangeStartSlider"),b=$("#rangeEndSlider");
+ rangeStartIdx=Math.max(0,Math.min(rangeStartIdx,max));
+ rangeEndIdx=Math.max(rangeStartIdx,Math.min(rangeEndIdx,max));
+ a.max=max;b.max=max;a.value=rangeStartIdx;b.value=rangeEndIdx;
+ updateRangeFill();
+}
+$("#copyDailyCmd").onclick=()=>copy($("#dailyCmd").textContent);
+$("#copySessionCmd").onclick=()=>copy(sessionCmd);
+$("#updateCcusageBtn").onclick=async()=>{try{await navigator.clipboard.writeText(updateCcusageCmd);toast("更新命令已复制，请在 PowerShell 运行")}catch{prompt("请复制并在 PowerShell 运行：",updateCcusageCmd)}};
 $("#pasteBtn").onclick=async()=>{try{let t=await navigator.clipboard.readText();if(!t.trim())throw Error();loadText(t,"剪贴板 JSON")}catch{let t=prompt("请粘贴 ccusage JSON：");if(t)loadText(t,"粘贴 JSON")}};
-$("#fileInput").onchange=async e=>{let f=e.target.files?.[0];if(f)loadText(await f.text(),f.name)};
-$("#sampleBtn").onclick=()=>{state=sample();baseRange=30;windowCount=30;hiddenModels.clear();setLoadStatus("sample","示例数据");syncRange();render();toast("已切换示例数据")};
-$("#rangeSeg").onclick=e=>{let b=e.target.closest("button");if(!b)return;baseRange=b.dataset.r==="all"?"all":num(b.dataset.r);$("#rangeSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));syncRange();windowCount=num($("#rangeSlider").max);$("#rangeSlider").value=windowCount;render()};
-$("#rangeSlider").oninput=e=>{windowCount=num(e.target.value);render()};$("#statMetric").onchange=()=>renderStats(activeEntries());$("#dowAgg").onchange=()=>renderDow(activeEntries());
+$("#rangeSeg").onclick=e=>{let b=e.target.closest("button");if(!b)return;$("#rangeSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));setRangePreset(b.dataset.r==="all"?"all":num(b.dataset.r))};
+$("#rangeStartSlider").oninput=e=>{$("#rangeSeg").querySelectorAll("button").forEach(x=>x.classList.remove("active"));rangeStartIdx=Math.min(num(e.target.value),rangeEndIdx);syncRange();render()};
+$("#rangeEndSlider").oninput=e=>{$("#rangeSeg").querySelectorAll("button").forEach(x=>x.classList.remove("active"));rangeEndIdx=Math.max(num(e.target.value),rangeStartIdx);syncRange();render()};
+$("#statMetric").onchange=()=>renderStats(activeEntries());$("#dowAgg").onchange=()=>renderDow(activeEntries());
 $("#exportTokenPng").onclick=()=>exportCanvas("#tokenChart","codex-token-composition.png");$("#exportCostPng").onclick=()=>exportCanvas("#costChart","codex-cost.png");
 document.addEventListener("dragenter",e=>{e.preventDefault();$("#dropzone").classList.add("active","drag")});document.addEventListener("dragover",e=>e.preventDefault());document.addEventListener("drop",async e=>{e.preventDefault();$("#dropzone").classList.remove("drag");let f=e.dataTransfer?.files?.[0];if(f)loadText(await f.text(),f.name)});
 window.addEventListener("resize",()=>{clearTimeout(window._rz);window._rz=setTimeout(render,120)});
-state=sample();setLoadStatus("sample","示例数据");syncRange();render();
+state=sample();setLoadStatus("sample","示例数据");setRangePreset(30,false);syncRange();render();
 })();
 </script>
 </body>

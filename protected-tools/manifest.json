@@ -24,8 +24,15 @@
     },
     {
       "slug": "codex-usage-dashboard-v3-1",
-      "title": "Codex Usage Dashboard V5",
+      "title": "Codex Usage Dashboard V6.1",
       "summary": "导入并查看 Codex 用量、模型明细与会话统计。",
+      "enabled": true,
+      "cspProfile": "inline"
+    },
+    {
+      "slug": "evolution-slider",
+      "title": "强度进化",
+      "summary": "拖动强度滑杆，探索六个进化阶段与连续形态变化。",
       "enabled": true,
       "cspProfile": "inline"
     }

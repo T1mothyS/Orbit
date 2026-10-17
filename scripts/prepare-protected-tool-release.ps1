@@ -29,13 +29,23 @@ if (-not $ToolsRoot) { $ToolsRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptR
 if (-not $OutputRoot) { $OutputRoot = Join-Path ([IO.Path]::GetTempPath()) 'aicalendar-tool-releases' }
 
 $source = Get-Item -LiteralPath $InputPath
-if (-not $source.PSIsContainer -and $source.Extension.ToLowerInvariant() -eq '.html') {
-  $sourcePath = $source.FullName
-} else {
-  throw 'InputPath 必须指向一个 .html 文件。'
-}
-if ($source.Length -gt 10MB) { throw '单个工具 HTML 不能超过 10 MB。' }
+if (-not $source.PSIsContainer -and $source.Extension.ToLowerInvariant() -ne '.html') { throw 'InputPath 必须指向 .html 文件或含 index.html 的工具目录。' }
+$sourcePath = if ($source.PSIsContainer) { Join-Path $source.FullName 'index.html' } else { $source.FullName }
+if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) { throw '工具目录缺少 index.html。' }
+if ((Get-Item -LiteralPath $sourcePath).Length -gt 10MB) { throw '单个工具 HTML 不能超过 10 MB。' }
 if ($Slug.Length -gt 80) { throw 'Slug 不能超过 80 个字符。' }
+
+function Get-ToolFiles([string]$Root) {
+  $rootItem = Get-Item -LiteralPath $Root
+  if ($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw '工具目录不能是链接。' }
+  $entries = @(Get-ChildItem -LiteralPath $Root -Recurse -Force)
+  foreach ($entry in $entries) {
+    if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $entry.Name.StartsWith('.')) { throw '工具目录不能包含链接或隐藏文件。' }
+  }
+  @($entries | Where-Object { -not $_.PSIsContainer } | ForEach-Object {
+    [pscustomobject]@{ Relative = [IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/'); Path = $_.FullName; Hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+  } | Sort-Object Relative)
+}
 
 $manifestPath = Join-Path ([IO.Path]::GetFullPath($ToolsRoot)) 'manifest.json'
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "找不到工具清单: $manifestPath" }
@@ -53,6 +63,14 @@ if ((Get-FileHash -LiteralPath $trackedHtml).Hash -ne (Get-FileHash -LiteralPath
     $sourceEntry[0].cspProfile -ne $CspProfile -or $sourceEntry[0].enabled -eq $false) {
   throw '快传输入必须与源码 HTML 和清单完全一致。'
 }
+$trackedFiles = @(Get-ToolFiles (Join-Path $ToolsRoot $Slug))
+if ($source.PSIsContainer) {
+  $inputFiles = @(Get-ToolFiles $source.FullName)
+  if ($inputFiles.Count -ne $trackedFiles.Count) { throw '输入目录与源码文件清单不一致。' }
+  for ($index = 0; $index -lt $trackedFiles.Count; $index++) {
+    if ($inputFiles[$index].Relative -ne $trackedFiles[$index].Relative -or $inputFiles[$index].Hash -ne $trackedFiles[$index].Hash) { throw '输入目录与源码资源不一致。' }
+  }
+} elseif ($trackedFiles.Count -ne 1 -or $trackedFiles[0].Relative -ne 'index.html') { throw '工具含附属资源，请将 InputPath 指向完整工具目录。' }
 $releaseId = "tool-$((Get-Date).ToUniversalTime().ToString('yyMMdd.HHmmss'))-$Slug"
 $releaseDirectory = Join-Path ([IO.Path]::GetFullPath($OutputRoot)) $releaseId
 if (Test-Path -LiteralPath $releaseDirectory) { throw "发布目录已存在，请稍后重试: $releaseDirectory" }
@@ -62,7 +80,14 @@ New-Item -ItemType Directory -Path $stageToolRoot -Force | Out-Null
 
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
 [IO.File]::WriteAllBytes((Join-Path $stageRoot 'manifest.json'), [IO.File]::ReadAllBytes($manifestPath))
-[IO.File]::WriteAllBytes((Join-Path $stageToolRoot 'index.html'), [IO.File]::ReadAllBytes($sourcePath))
+$fileHashes = [ordered]@{ 'protected-tools/manifest.json' = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant() }
+foreach ($file in $trackedFiles) {
+  $target = Join-Path $stageToolRoot $file.Relative
+  [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target)) | Out-Null
+  [IO.File]::WriteAllBytes($target, [IO.File]::ReadAllBytes($file.Path))
+  if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -ne $file.Hash) { throw '准备发布包时源码发生变化。' }
+  $fileHashes["protected-tools/$Slug/$($file.Relative)"] = $file.Hash
+}
 
 $sourceHash = (Get-FileHash -LiteralPath $sourcePath -Algorithm SHA256).Hash.ToLowerInvariant()
 $manifestHash = (Get-FileHash -LiteralPath (Join-Path $stageRoot 'manifest.json') -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -72,9 +97,10 @@ $record = [ordered]@{
   generatedAt = (Get-Date).ToUniversalTime().ToString('o')
   sourceSha256 = $sourceHash
   manifestSha256 = $manifestHash
-  files = @('protected-tools/manifest.json', "protected-tools/$Slug/index.html")
+  files = @($fileHashes.Keys)
+  fileHashes = $fileHashes
   uploadMode = 'protected-tools fast path'
-  note = '仅包含受审阅的 HTML 和工具清单；服务器端仍需按备份、哈希核对、原子替换和回滚流程发布。'
+  note = '仅包含受审阅的完整静态工具目录和清单；服务器端仍需按逐文件哈希、备份、原子替换和回滚流程发布。'
 }
 [IO.File]::WriteAllText((Join-Path $releaseDirectory 'release.json'), ($record | ConvertTo-Json -Depth 6), $utf8NoBom)
 

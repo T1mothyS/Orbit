@@ -80,11 +80,11 @@ Daily Digest V2.5 增加 `sharp` 与 R2 S3 客户端，属于路径 B 的依赖�
 
 GitHub push、tag 和 Release 是版本发布记录，和服务器部署分开记录、分开授权、分开验收。
 
-## 受保护工具纯 HTML 快传路径
+## 受保护工具静态目录快传路径
 
 Tools 默认纳入源码和整站发布包，随应用版本发布和回滚，不采用 Knowledge Library 的独立外挂模式。完整发布前执行 `npm run tools:check`，解包后执行 `npx tsx scripts/check-protected-tools.ts <解包目录>/protected-tools`，清单或任一启用工具缺失/哈希不一致时阻止发布。
 
-纯 HTML 快传仅为另行明确授权的例外；工具 HTML、标题、摘要及 CSP 必须先纳入源码且与输入完全一致，脚本拒绝仅存在于临时目录的文件版本。例外发布编号只用于审计，不代替应用版本和源码记录。先在本地审阅并纳入源码，再运行：
+静态工具快传仅为另行明确授权的例外；完整工具目录、标题、摘要及 CSP 必须先纳入源码且与输入完全一致，脚本拒绝仅存在于临时目录的文件版本。例外发布编号只用于审计，不代替应用版本和源码记录；线上主应用版本仍以原 `.deploy` 为准，工具更新单独记录来源 commit、源码版本和逐文件哈希。先在本地审阅并纳入源码，再运行：
 
 ```powershell
 pwsh -NoProfile -File scripts/prepare-protected-tool-release.ps1 `
@@ -95,9 +95,11 @@ pwsh -NoProfile -File scripts/prepare-protected-tool-release.ps1 `
   -CspProfile inline
 ```
 
-脚本只生成临时发布包 `protected-tools/manifest.json`、目标 slug 的 `index.html` 和 `release.json`，记录独立 `releaseId`、HTML SHA-256 与清单 SHA-256，不连接服务器、不修改生产目录。获得明确上传授权后，将这两个文件上传到服务器暂存目录，分别核对哈希；备份线上目标工具目录和清单，把暂存内容原子切换到 `protected-tools/`，再用真实登录会话核对 `/api/tools`、工具页面和回滚材料。服务器运行时按请求读取清单，因此纯 HTML 快传不需要 PM2 重启。
+`InputPath` 也接受含 `index.html` 的完整目录；工具存在附属资源时必须使用目录输入。脚本校验输入和源码的完整文件集合及哈希，拒绝链接/隐藏文件，生成清单、完整工具目录和 `release.json`，其中 `fileHashes` 覆盖全部发布文件。它不连接服务器、不修改生产目录。
 
-这条快速路径只适用于本人控制或已经审阅的 HTML；同域工具不是第三方插件沙箱。如果涉及 React、Express、API、认证、CSP 规则或运行时依赖，必须回到路径 A/B，重新走整站版本、预构建、备份和回滚流程。
+获得明确上传授权后，把完整包上传到唯一暂存目录，核对文件集合与逐文件哈希；核对线上清单及主应用基线未变化，保留线上 Tools 备份。批量更新时在服务器从当前 Tools 复制一个独立候选目录，只替换授权工具，确认其他工具文件不变，再切换完整目录；失败恢复旧目录并保留现场。验收 `/api/tools`、两个入口、视频 Range/MIME、受保护资源和回滚材料，真实账号浏览器结果单独记录。服务器按请求读取清单和资源，因此静态工具快传不需要 PM2 重启。不得只传 HTML 而遗漏 `assets/`，也不得覆盖主应用版本元数据。
+
+这条快速路径只适用于本人控制或已经审阅的静态工具；同域工具不是第三方插件沙箱。如果涉及 React、Express、API、认证、CSP 规则或运行时依赖，必须回到路径 A/B，重新走整站版本、预构建、备份和回滚流程。
 
 ## Daily Digest 独立 Shadow 服务
 

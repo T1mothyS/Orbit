@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="zh-CN" style="--strength: 0">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eeefeb">
+  <meta name="description" content="拖动滑杆，探索从初始到超越的六种形态。一个纯前端的强度互动实验。">
+  <title>强度进化 · Evolution Slider</title>
+  <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/evolution/frames/frame-00.webp" as="image" fetchpriority="high">
+  <style>
+@font-face{font-family:Barlow;src:url('assets/fonts/BarlowCondensed-SemiBold.ttf') format('truetype');font-weight:600;font-display:swap}
+:root{--strength:0;--paper:#eeefeb;--ink:#1c201b;--muted:#60665e;--line:#bfc5ba;--accent:#47583a;--glow:0;--word-opacity:.08;--word-scale:1;--portrait-shadow:.13;color-scheme:light;font-family:Barlow,"PingFang SC","Microsoft YaHei",sans-serif;font-synthesis:none;background:var(--paper);color:var(--ink)}
+*{box-sizing:border-box}
+body{margin:0;min-width:300px;background:var(--paper)}
+button,input{font:inherit}
+button{color:inherit}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:6px}
+::selection{background:var(--accent);color:var(--paper)}
+body{scrollbar-color:var(--accent) var(--paper)}
+.instrument{max-width:1600px;margin:auto;padding:32px 4.5% 0;min-height:100svh;display:flex;flex-direction:column}
+.masthead{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;position:relative;z-index:2}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.16em;display:flex;gap:8px;align-items:center;margin:0 0 12px;color:var(--muted)}
+.eyebrow svg{width:16px;height:16px;fill:none;stroke:var(--accent);stroke-width:1.6}
+h1{font-size:clamp(34px,4.6vw,66px);font-weight:600;letter-spacing:-.04em;line-height:1.1;margin:0;text-wrap:balance}
+.title-outline{font-weight:300;margin-left:3px}
+.title-period{color:var(--accent);margin-left:4px}
+.strength-readout{min-width:152px;text-align:right;border-top:1px solid var(--ink);padding-top:9px}
+.micro{display:block;font-size:11px;letter-spacing:.1em}
+.micro span{font-size:11px;letter-spacing:.08em;color:var(--muted);margin-left:10px}
+#score{display:block;font-family:Barlow,Arial,sans-serif;font-size:clamp(50px,6vw,82px);font-weight:600;font-variant-numeric:tabular-nums;line-height:1.05;letter-spacing:-.02em;color:var(--accent)}
+.readout-range{font-family:Barlow,Arial,sans-serif;font-size:12px;color:var(--muted);letter-spacing:.06em;display:flex;justify-content:flex-end;gap:14px}
+.readout-range span{opacity:.6}
+.visual{position:relative;display:flex;align-items:center;flex-direction:column;justify-content:center;flex:1;min-height:400px;padding:12px 0 18px;isolation:isolate}
+.visual:before{content:"";position:absolute;width:65%;height:65%;left:17.5%;top:8%;z-index:-2;background:radial-gradient(ellipse,rgba(194,153,74,var(--glow)),transparent 68%);pointer-events:none}
+.backdrop-word{position:absolute;top:23%;left:0;right:0;text-align:center;font-family:Barlow,Arial,sans-serif;font-size:clamp(100px,20.8vw,300px);line-height:1;letter-spacing:.015em;font-weight:600;opacity:var(--word-opacity);transform:scale(var(--word-scale));z-index:-1;pointer-events:none;overflow:hidden;white-space:nowrap}
+.portrait{position:relative;width:clamp(260px,27vw,390px);aspect-ratio:1;background:#cbcdcb;box-shadow:0 18px 42px rgba(0,0,0,var(--portrait-shadow));isolation:isolate}
+.portrait:before,.portrait:after{content:"";position:absolute;inset:-8px;pointer-events:none;border-style:solid;border-color:var(--accent);opacity:.7}
+.portrait:before{border-width:1px 0 0 1px;width:16px;height:16px;inset:-8px auto auto -8px}
+.portrait:after{border-width:0 1px 1px 0;width:16px;height:16px;inset:auto -8px -8px auto}
+.poster,canvas{width:100%;height:100%;object-fit:contain;display:block}
+.poster{position:relative;z-index:1}
+canvas{position:absolute;inset:0;opacity:0;z-index:2}
+.portrait.has-video canvas{opacity:1}
+.portrait.has-video .poster{visibility:hidden}
+.visual-rail{position:absolute;top:40px;bottom:105px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:9px;font-weight:600;letter-spacing:.12em;writing-mode:vertical-rl}
+.rail-left{left:0;border-left:1px solid var(--line);padding-left:10px;transform:rotate(180deg)}
+.rail-right{right:0;border-right:1px solid var(--line);padding-right:10px}
+.visual-caption{text-align:center;margin-top:23px;position:relative;z-index:1}
+.stage-counter{font-family:Barlow,Arial,sans-serif;font-size:12px;letter-spacing:.14em;margin:0 0 5px;color:var(--muted)}
+.stage-counter b{font-weight:600;color:var(--accent)}
+.stage-title{display:flex;align-items:baseline;justify-content:center;gap:10px}
+h2{font-size:23px;font-weight:500;letter-spacing:.1em;margin:0}
+#stage-english{font-family:Barlow,Arial,sans-serif;font-size:15px;letter-spacing:.1em;color:var(--accent)}
+#stage-description{font-size:12px;letter-spacing:.06em;color:var(--muted);margin:8px 0 0;line-height:1.6}
+.controls{width:min(100%,1010px);margin:6px auto 0;position:relative;z-index:3}
+.control-labels{display:flex;justify-content:space-between;gap:16px;font-size:12px;letter-spacing:.025em}
+.keyboard-hint{color:var(--muted);display:flex;align-items:center;gap:6px;font-size:11px}
+.keyboard-hint svg{width:18px;height:13px;stroke:currentColor;stroke-width:1;fill:none}
+.slider-zone{position:relative;height:85px;margin-top:8px;--thumb:24px}
+.slider-line{position:absolute;top:23px;left:12px;right:12px;height:2px;background:var(--line);pointer-events:none}
+.slider-line>div{background:var(--accent);width:calc(var(--strength) * 100%);height:100%}
+input[type=range]{position:absolute;top:0;left:0;width:100%;height:48px;margin:0;padding:0;background:transparent;appearance:none;-webkit-appearance:none;cursor:ew-resize;touch-action:pan-y;z-index:2;border:0;border-radius:0}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:transparent}
+input[type=range]::-moz-range-track{height:2px;background:transparent}
+input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--paper);border:6px solid var(--accent);box-shadow:0 2px 5px rgba(0,0,0,.15);margin-top:-11px;transition:box-shadow .15s}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--paper);border:6px solid var(--accent);box-shadow:0 2px 5px rgba(0,0,0,.15)}
+input[type=range]:hover::-webkit-slider-thumb{box-shadow:0 0 0 5px color-mix(in srgb,var(--accent) 12%,transparent)}
+input[type=range]:disabled{cursor:progress;opacity:.5}
+.ticks{position:absolute;top:40px;left:12px;right:12px;height:13px;display:flex;justify-content:space-between;pointer-events:none}
+.tick{width:1px;height:5px;background:var(--line)}
+.tick.is-major{height:12px}
+.tick.is-active{background:var(--accent)}
+.scale-labels{position:absolute;left:12px;right:12px;top:60px;height:16px;font-family:Barlow,Arial,sans-serif;font-size:12px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.scale-labels span{position:absolute;transform:translateX(-50%)}
+.scale-labels span:nth-child(1){left:0}.scale-labels span:nth-child(2){left:20%}.scale-labels span:nth-child(3){left:40%}.scale-labels span:nth-child(4){left:60%}.scale-labels span:nth-child(5){left:80%}.scale-labels span:nth-child(6){left:100%}
+.stage-navigation{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--line);padding-top:1px}
+.stage-navigation button{background:none;border:0;min-height:48px;padding:10px 0;font-size:12px;letter-spacing:.04em;cursor:pointer;position:relative;text-align:left;color:var(--muted)}
+.stage-navigation button span{font-family:Barlow,Arial,sans-serif;font-size:11px;opacity:.65;margin-right:8px}
+.stage-navigation button:last-child{text-align:right}
+.stage-navigation button:before{content:"";position:absolute;top:-2px;left:0;width:0;height:2px;background:var(--accent)}
+.stage-navigation button.is-active{color:var(--accent);font-weight:600}
+.stage-navigation button.is-active:before{width:30px}
+.stage-navigation button:last-child:before{left:auto;right:0}
+.stage-navigation button:hover{color:var(--ink)}
+.stage-navigation button:disabled,.reset:disabled{cursor:progress;opacity:.45}
+.footer{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:61px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);letter-spacing:.04em;margin-top:10px}
+.footer p{display:flex;gap:7px;align-items:center;flex:1}
+.status-dot{width:4px;height:4px;background:var(--accent);border-radius:50%;display:inline-block;flex-shrink:0}
+.reset{display:flex;align-items:center;gap:6px;padding:10px 4px;background:none;border:0;color:var(--muted);font-size:11px;cursor:pointer;min-height:40px}
+.reset:hover{color:var(--ink)}
+.reset svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.2}
+.footer-note{flex:1;text-align:right}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#evolution-video{position:fixed;left:-2px;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none}
+@media(min-width:1500px){.visual{min-height:510px}.portrait{width:400px}}
+@media(max-width:600px){
+  .instrument{padding:24px 22px 0;min-height:100svh}
+  .eyebrow{font-size:11px;letter-spacing:.08em;gap:5px;margin-bottom:11px}
+  .eyebrow svg{width:12px;height:12px}
+  h1{font-size:34px}
+  .masthead{gap:10px}
+  .strength-readout{min-width:105px;padding-top:7px}
+  .micro{font-size:11px}.micro span{display:none}
+  #score{font-size:52px}.readout-range{font-size:11px;gap:10px}
+  .visual{min-height:365px;padding:30px 0 16px}
+  .portrait{width:min(69vw,300px)}
+  .visual-rail{top:40px;bottom:118px;font-size:7px;letter-spacing:.08em}
+  .rail-left{padding-left:5px}.rail-right{padding-right:5px}
+  .backdrop-word{font-size:30vw;top:28%;left:-10px;right:-10px}
+  .visual-caption{margin-top:22px}h2{font-size:21px}
+  #stage-english{font-size:13px}#stage-description{font-size:11px}
+  .controls{margin-top:7px}
+  .control-labels{font-size:11px}.keyboard-hint{display:none}
+  .stage-navigation button{font-size:12px;text-align:center;min-height:55px}
+  .stage-navigation button span{display:block;margin:0 0 4px;font-size:11px}
+  .stage-navigation button:first-child{text-align:left}.stage-navigation button:last-child{text-align:right}
+  .stage-navigation button:before{left:calc(50% - 10px)}.stage-navigation button:first-child:before{left:0}.stage-navigation button.is-active:before{width:20px}
+  .footer{gap:10px;min-height:54px;font-size:11px}.footer p{line-height:1.5}.footer-note{display:none}
+}
+@media(max-height:760px) and (min-width:601px){.instrument{padding-top:23px}.eyebrow{margin-bottom:8px}h1{font-size:46px}#score{font-size:58px}.visual{min-height:340px;padding-top:4px}.portrait{width:260px}.visual-caption{margin-top:17px}h2{font-size:21px}.stage-counter{margin-bottom:3px}#stage-description{margin-top:5px}.controls{margin-top:0}.footer{min-height:48px;margin-top:2px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;scroll-behavior:auto!important}}
+
+</style>
+
+
+
+</head>
+<body>
+  <main class="instrument" aria-labelledby="title">
+    <header class="masthead">
+      <div class="identity">
+        <p class="eyebrow"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 13V5h3v8m4 2V3m4 10V5h3v8"/></svg> EVOLUTION / STUDY</p>
+        <h1 id="title">强度<span class="title-outline">进化</span><span class="title-period">.</span></h1>
+      </div>
+      <div class="strength-readout">
+        <span class="micro">当前强度 <span>INTENSITY</span></span>
+        <output id="score" for="strength">−15.00</output>
+        <span class="readout-range">−15 <span>—</span> +15</span>
+      </div>
+    </header>
+
+    <section class="visual" aria-label="随强度变化的形态">
+      <div class="backdrop-word" id="backdrop-word" aria-hidden="true">ORIGIN</div>
+      <div class="visual-rail rail-left" aria-hidden="true"><span>FORM EXPLORATION</span><span>001 — 031</span></div>
+      <div class="portrait" id="portrait">
+        <img class="poster" id="poster" src="assets/evolution/frames/frame-00.webp" width="800" height="800" fetchpriority="high" alt="小难梁阶段的人像">
+        <canvas id="evolution-canvas" width="800" height="800" aria-label="当前强度对应的进化形态" role="img"></canvas>
+      </div>
+      <div class="visual-rail rail-right" aria-hidden="true"><span>CONTINUOUS EVOLUTION</span><span id="frame-number">F / 00</span></div>
+      <div class="visual-caption">
+        <p class="stage-counter" id="stage-counter">STAGE <b>01</b> / 06</p>
+        <div class="stage-title"><h2 id="stage-name">小难梁</h2><span id="stage-english">ORIGIN</span></div>
+        <p id="stage-description">一切变化，始于此刻。</p>
+      </div>
+    </section>
+
+    <section class="controls" aria-label="强度调节">
+      <div class="control-labels"><label for="strength">拖动，探索你的下一种形态</label><span class="keyboard-hint"><svg viewBox="0 0 24 16" aria-hidden="true"><rect x="1" y="1" width="22" height="14" rx="2"/><path d="M5 5h2m3 0h2m3 0h2M5 9h2m3 0h2m3 0h4"/></svg> 支持 ← → 按键微调</span></div>
+      <div class="slider-zone">
+        <div class="slider-line" aria-hidden="true"><div></div></div>
+        <input id="strength" type="range" min="-15" max="15" step="0.01" value="-15" aria-describedby="slider-help" aria-valuetext="−15.00，小难梁" disabled>
+        <div class="ticks" id="ticks" aria-hidden="true"></div>
+        <div class="scale-labels" aria-hidden="true"><span>−15</span><span>−9</span><span>−3</span><span>+3</span><span>+9</span><span>+15</span></div>
+      </div>
+      <div class="stage-navigation" aria-label="跳转到阶段" id="stage-navigation">
+        <button type="button" data-stage="0" class="is-active" aria-pressed="true" disabled><span>01</span>小难梁</button>
+        <button type="button" data-stage="1" aria-pressed="false" disabled><span>02</span>牢梁</button>
+        <button type="button" data-stage="2" aria-pressed="false" disabled><span>03</span>梁子</button>
+        <button type="button" data-stage="3" aria-pressed="false" disabled><span>04</span>梁圣</button>
+        <button type="button" data-stage="4" aria-pressed="false" disabled><span>05</span>梁神</button>
+        <button type="button" data-stage="5" aria-pressed="false" disabled><span>06</span>梁祖</button>
+      </div>
+      <p class="sr-only" id="slider-help">拖动调节强度。方向键调整 0.01，Home 到起点，End 到终点。也可以点击六个阶段。</p>
+    </section>
+
+    <footer class="footer">
+      <p><span class="status-dot" id="status-dot"></span><span id="media-status" role="status">正在准备画面…</span></p>
+      <button class="reset" id="reset" type="button" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6a5 5 0 1 1 0 4M3 2v4h4"/></svg>回到起点</button>
+      <span class="footer-note">31 级变化 · 自由探索</span>
+    </footer>
+    <noscript><p>请启用 JavaScript 以体验滑杆。静态预览图仍可查看。</p></noscript>
+  </main>
+  <video id="evolution-video" preload="auto" muted playsinline aria-hidden="true" tabindex="-1" poster="assets/evolution/frames/frame-00.webp">
+    <source src="assets/evolution/evolution.webm" type="video/webm">
+    <source src="assets/evolution/evolution.mp4" type="video/mp4">
+  </video>
+<script>
+(function (root) {
+  'use strict';
+  const STAGES = Object.freeze([
+    { name: '小难梁', english: 'ORIGIN', description: '一切变化，始于此刻。', start: -15, end: -10 },
+    { name: '牢梁', english: 'AWAKEN', description: '沉静之下，力量开始涌动。', start: -10, end: -5 },
+    { name: '梁子', english: 'TRANSFORM', description: '突破轮廓，重塑可能。', start: -5, end: 0 },
+    { name: '梁圣', english: 'ASCEND', description: '每一次向前，都是新的高度。', start: 0, end: 5 },
+    { name: '梁神', english: 'APEX', description: '让积蓄的力量，完整呈现。', start: 5, end: 10 },
+    { name: '梁祖', english: 'BEYOND', description: '抵达边界，然后跨越。', start: 10, end: 15 }
+  ].map(Object.freeze));
+
+  function describeScore(value) {
+    const number = Number(value);
+    const score = Math.max(-15, Math.min(15, Number.isFinite(number) ? number : -15));
+    const trackProgress = (score + 15) / 30;
+    const stageIndex = Math.min(5, Math.floor(trackProgress * 6));
+    const stage = STAGES[stageIndex];
+    return {
+      score,
+      displayScore: `${score > 0 ? '+' : score < 0 ? '−' : ''}${Math.abs(score).toFixed(2)}`,
+      frameIndex: Math.round(trackProgress * 30),
+      stage,
+      stageIndex,
+      stageProgress: Math.max(0, Math.min(1, (score - stage.start) / (stage.end - stage.start))),
+      trackProgress
+    };
+  }
+
+  const api = Object.freeze({ STAGES, describeScore });
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.EvolutionScore = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+(function (root) {
+  'use strict';
+
+  // One seek at a time. Input replaces the pending destination; it never queues work.
+  function createSeekController(video, draw, options = {}) {
+    const raf = options.raf || requestAnimationFrame;
+    const cancelRaf = options.cancelRaf || cancelAnimationFrame;
+    const onError = options.onError || (() => {});
+    let pendingTargetTime = null;
+    let seekInFlight = false;
+    let animationFrame = null;
+    let decodedCallback = null;
+    let fallbackFrame = null;
+    let watchdog = null;
+    let seekCompleted = false;
+    let frameDecoded = false;
+    let destroyed = false;
+    let activeTargetTime = 0;
+
+    function clearFrameWait() {
+      if (decodedCallback !== null && video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(decodedCallback);
+      if (fallbackFrame !== null) cancelRaf(fallbackFrame);
+      clearTimeout(watchdog);
+      decodedCallback = fallbackFrame = watchdog = null;
+    }
+
+    function schedule() {
+      if (!destroyed && animationFrame === null) animationFrame = raf(pump);
+    }
+
+    function finish() {
+      if (!seekInFlight || !seekCompleted || destroyed) return;
+      clearFrameWait();
+      seekInFlight = false;
+      // Present every completed decode, so sustained dragging keeps moving too.
+      draw(video);
+      if (pendingTargetTime !== null) schedule();
+    }
+
+    function handleSeeked() {
+      if (!seekInFlight || video.seeking) return;
+      seekCompleted = true;
+      if (frameDecoded) return finish();
+      // Some paused-video implementations defer rVFC until playback. After seeked,
+      // HAVE_CURRENT_DATA guarantees a decoded frame; give rVFC two paints first.
+      fallbackFrame = raf(() => {
+        fallbackFrame = raf(() => {
+          fallbackFrame = null;
+          if (video.readyState >= 2 && !video.seeking) finish();
+        });
+      });
+    }
+
+    function pump() {
+      animationFrame = null;
+      if (destroyed || seekInFlight || pendingTargetTime === null || video.readyState < 2) return;
+      const targetTime = pendingTargetTime;
+      pendingTargetTime = null;
+      if (!video.seeking && Math.abs(video.currentTime - targetTime) < 0.001) {
+        draw(video);
+        return;
+      }
+      seekInFlight = true;
+      seekCompleted = frameDecoded = false;
+      activeTargetTime = targetTime;
+      if (video.requestVideoFrameCallback) {
+        decodedCallback = video.requestVideoFrameCallback(() => {
+          decodedCallback = null;
+          frameDecoded = true;
+          if (seekCompleted) finish();
+        });
+      }
+      // A stalled decoder must never hold the input queue permanently.
+      watchdog = setTimeout(() => {
+        if (!video.seeking && video.readyState >= 2) {
+          seekCompleted = true;
+          finish();
+        } else {
+          clearFrameWait();
+          seekInFlight = false;
+          onError(new Error('Video seek did not finish.'));
+        }
+      }, 2500);
+      try {
+        video.currentTime = targetTime;
+      } catch (error) {
+        clearFrameWait();
+        seekInFlight = false;
+        onError(error);
+      }
+    }
+
+    video.addEventListener('seeked', handleSeeked);
+    return {
+      request(time) {
+        if (destroyed || !Number.isFinite(time)) return;
+        pendingTargetTime = Math.max(0, time);
+        schedule();
+      },
+      get state() { return { pendingTargetTime, seekInFlight, activeTargetTime }; },
+      destroy() {
+        destroyed = true;
+        clearFrameWait();
+        if (animationFrame !== null) cancelRaf(animationFrame);
+        video.removeEventListener('seeked', handleSeeked);
+      }
+    };
+  }
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = { createSeekController };
+  else root.createSeekController = createSeekController;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+</script>
+<script>
+(function () {
+  'use strict';
+  const { STAGES, describeScore } = EvolutionScore;
+  const root = document.documentElement;
+  const slider = document.getElementById('strength');
+  const video = document.getElementById('evolution-video');
+  const canvas = document.getElementById('evolution-canvas');
+  const context = canvas.getContext('2d', { alpha: false });
+  const poster = document.getElementById('poster');
+  const portrait = document.getElementById('portrait');
+  const status = document.getElementById('media-status');
+  const reset = document.getElementById('reset');
+  const stageButtons = [...document.querySelectorAll('[data-stage]')];
+  const output = document.getElementById('score');
+  const counter = document.querySelector('#stage-counter b');
+  const name = document.getElementById('stage-name');
+  const english = document.getElementById('stage-english');
+  const description = document.getElementById('stage-description');
+  const word = document.getElementById('backdrop-word');
+  const frameNumber = document.getElementById('frame-number');
+  let current = describeScore(slider.value);
+  let videoReady = false;
+  let fallback = !context;
+  let usingMp4 = false;
+  let posterRequest = 0;
+  let lastPosterIndex = 0;
+  let lastDrawnTime = null;
+  let fallbackRaf = null;
+  let fatalMediaFailure = false;
+  const posterCache = new Map();
+
+  for (let i = 0; i <= 30; i++) {
+    const tick = document.createElement('span');
+    tick.className = `tick${i % 6 === 0 ? ' is-major' : ''}`;
+    document.getElementById('ticks').appendChild(tick);
+  }
+  const ticks = [...document.querySelectorAll('.tick')];
+
+  const mix = (a, b, p) => a.map((value, i) => Math.round(value + (b[i] - value) * p));
+  const rgb = values => `rgb(${values.join(',')})`;
+  const luminance = color => color.map(value => {
+    const v = value / 255;
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  }).reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i], 0);
+  function legible(candidate, background) {
+    const ground = luminance(background);
+    const end = ground < 0.179 ? [255, 255, 255] : [0, 0, 0];
+    for (let step = 0; step <= 20; step++) {
+      const color = mix(candidate, end, step / 20);
+      const light = luminance(color);
+      if ((Math.max(ground, light) + 0.05) / (Math.min(ground, light) + 0.05) >= 4.5) return rgb(color);
+    }
+    return rgb(end);
+  }
+  function theme(progress) {
+    const background = mix([238, 239, 235], [15, 17, 16], progress);
+    root.style.setProperty('--strength', progress.toFixed(5));
+    root.style.setProperty('--paper', rgb(mix([238, 239, 235], [15, 17, 16], progress)));
+    // Ink changes polarity as the paper passes middle gray to preserve contrast.
+    const dark = progress >= 0.55;
+    root.style.setProperty('--ink', dark ? rgb(mix([236, 233, 223], [244, 238, 220], progress)) : rgb(mix([28, 32, 27], [8, 10, 8], progress)));
+    root.style.setProperty('--muted', dark ? rgb(mix([220, 219, 210], [170, 167, 153], progress)) : rgb(mix([96, 102, 94], [30, 34, 29], progress)));
+    root.style.setProperty('--line', dark ? rgb(mix([154, 154, 140], [68, 66, 55], progress)) : rgb(mix([191, 197, 186], [103, 109, 98], progress)));
+    root.style.setProperty('--accent', dark ? rgb(mix([230, 220, 186], [207, 173, 102], progress)) : rgb(mix([71, 88, 58], [77, 58, 23], progress)));
+    root.style.setProperty('--glow', (progress * 0.15).toFixed(3));
+    root.style.setProperty('--word-opacity', (0.07 + progress * 0.05).toFixed(3));
+    root.style.setProperty('--word-scale', (1 + progress * 0.04).toFixed(3));
+    root.style.setProperty('--portrait-shadow', (0.12 + progress * 0.22).toFixed(3));
+    // Keep all text readable even at the middle gray of the continuous transition.
+    root.style.setProperty('--ink', legible(dark ? [244,238,220] : [28,32,27], background));
+    root.style.setProperty('--muted', legible(dark ? [170,167,153] : [96,102,94], background));
+    root.style.setProperty('--accent', legible(dark ? mix([230,220,186],[207,173,102],progress) : mix([71,88,58],[77,58,23],progress), background));
+    root.style.colorScheme = dark ? 'dark' : 'light';
+    document.querySelector('meta[name=theme-color]').content = rgb(mix([238,239,235],[15,17,16],progress));
+  }
+
+  function setEnabled() {
+    slider.disabled = reset.disabled = false;
+    stageButtons.forEach(button => { button.disabled = false; });
+  }
+
+  function showPoster(index) {
+    if (lastPosterIndex === index && poster.complete && poster.naturalWidth) return;
+    const request = ++posterRequest;
+    let image = posterCache.get(index);
+    if (!image) {
+      image = new Image();
+      image.src = `assets/evolution/frames/frame-${String(index).padStart(2, '0')}.webp`;
+      posterCache.set(index, image);
+    }
+    function display() {
+      if (request !== posterRequest || !image.naturalWidth) return;
+      poster.src = image.src;
+      lastPosterIndex = index;
+      poster.alt = `${current.stage.name}，强度 ${current.displayScore}`;
+    }
+    if (image.complete) display();
+    else image.addEventListener('load', display, { once: true });
+  }
+
+  function usePosters() {
+    fatalMediaFailure = true;
+    clearTimeout(initialTimer);
+    fallback = true;
+    videoReady = false;
+    controller.destroy();
+    portrait.classList.remove('has-video');
+    status.textContent = '关键帧模式 · 可继续拖动';
+    showPoster(current.frameIndex);
+    setEnabled();
+  }
+
+  function draw(source) {
+    if (fallback || !context || source.readyState < 2 || !source.videoWidth) return;
+    try {
+      context.drawImage(source, 0, 0, canvas.width, canvas.height);
+      lastDrawnTime = source.currentTime;
+      canvas.dataset.renderedTime = String(lastDrawnTime);
+      portrait.classList.add('has-video');
+    } catch (_) { usePosters(); }
+  }
+
+  const controller = createSeekController(video, draw, { onError: usePosters });
+  function resizeCanvas() {
+    const rect = portrait.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.max(1, Math.round(rect.width * dpr));
+    const height = Math.max(1, Math.round(rect.height * dpr));
+    if (canvas.width === width && canvas.height === height) return;
+    canvas.width = width;
+    canvas.height = height;
+    if (lastDrawnTime !== null && !video.seeking) draw(video);
+    else portrait.classList.remove('has-video');
+  }
+
+  // The supplied video has 241 frames at 30fps (8s content + final frame hold).
+  // Never seek duration itself: it can be an undecodable end-of-stream position.
+  function targetTime(progress) {
+    return progress * Math.max(0, video.duration - 1 / 30);
+  }
+
+  function update(value) {
+    current = describeScore(value);
+    slider.value = String(current.score);
+    output.value = current.displayScore;
+    slider.setAttribute('aria-valuetext', `${current.displayScore}，${current.stage.name}`);
+    counter.textContent = String(current.stageIndex + 1).padStart(2, '0');
+    name.textContent = current.stage.name;
+    english.textContent = word.textContent = current.stage.english;
+    description.textContent = current.stage.description;
+    canvas.setAttribute('aria-label', `${current.stage.name}，强度 ${current.displayScore}`);
+    frameNumber.textContent = `F / ${String(current.frameIndex).padStart(2, '0')}`;
+    stageButtons.forEach((button, index) => {
+      const active = index === current.stageIndex;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    ticks.forEach((tick, index) => tick.classList.toggle('is-active', index <= current.trackProgress * 30));
+    theme(current.trackProgress);
+    if (videoReady) controller.request(targetTime(current.trackProgress));
+    else if (fallback) {
+      if (fallbackRaf === null) fallbackRaf = requestAnimationFrame(() => {
+        fallbackRaf = null;
+        showPoster(current.frameIndex);
+      });
+    }
+  }
+
+  slider.addEventListener('input', () => update(slider.value));
+  stageButtons.forEach((button, index) => button.addEventListener('click', () => update(index === 5 ? 15 : STAGES[index].start)));
+  reset.addEventListener('click', () => update(-15));
+  window.addEventListener('resize', resizeCanvas, { passive: true });
+  if (window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(portrait);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && videoReady) controller.request(targetTime(current.trackProgress));
+  });
+
+  let initialTimer = setTimeout(() => {
+    // Keep the toy usable on very slow connections, while still allowing video recovery.
+    fallback = true;
+    status.textContent = '视频加载中 · 关键帧可用';
+    setEnabled();
+    showPoster(current.frameIndex);
+  }, 5000);
+
+  video.addEventListener('loadeddata', () => {
+    if (fatalMediaFailure) return;
+    if (!context || !Number.isFinite(video.duration) || video.duration <= 0) return usePosters();
+    clearTimeout(initialTimer);
+    fallback = false;
+    videoReady = true;
+    resizeCanvas();
+    status.textContent = '画面就绪 · 随心拖动';
+    setEnabled();
+    controller.request(targetTime(current.trackProgress));
+  });
+
+  function tryMp4() {
+    if (fatalMediaFailure) return;
+    if (usingMp4) { clearTimeout(initialTimer); initialTimer = null; return usePosters(); }
+    usingMp4 = true;
+    video.src = 'assets/evolution/evolution.mp4';
+    video.load();
+  }
+  video.addEventListener('error', tryMp4);
+  // Browser source selection handles unsupported codecs. A failed WebM network load
+  // can fire only on <source>, so explicitly try MP4 for that case as well.
+  const sources = [...video.querySelectorAll('source')];
+  const failedSources = new Set();
+  sources.forEach(source => source.addEventListener('error', () => {
+    failedSources.add(source);
+    // Source errors may fire before networkState becomes NETWORK_NO_SOURCE.
+    if (failedSources.size === sources.length && !videoReady) tryMp4();
+  }));
+
+  poster.addEventListener('error', () => {
+    status.textContent = '预览图未找到，请检查 assets/evolution/frames';
+  });
+  resizeCanvas();
+  update(slider.value);
+  if (video.readyState >= 2) video.dispatchEvent(new Event('loadeddata'));
+  else setTimeout(() => {
+    // Inline builds run before the browser's asynchronous source selection.
+    // Wait one task before checking for source errors missed by deferred scripts.
+    if (!videoReady && !fatalMediaFailure && (video.networkState === 3 || video.error)) tryMp4();
+  }, 0);
+  if (!context) { clearTimeout(initialTimer); usePosters(); }
+})();
+
+</script>
+</body>
+</html>

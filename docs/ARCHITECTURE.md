@@ -194,7 +194,7 @@ Vite Web 构建写入 dist/；Electron TypeScript 编译写入 dist-electron/；
 
 ## Tools 与提示词优化（2026-09-20）
 
-Tools 的正式来源是 `protected-tools/manifest.json` 及各 slug 的 `index.html`，默认纳入源码、完整发布包及整站版本和回滚生命周期；不采用 Knowledge Library 的独立内容发布模式。发布检查见 [部署路径](DEPLOYMENT-PATHS.md)。
+Tools 的正式来源是 `protected-tools/manifest.json` 及各 slug 的完整静态目录（`index.html` 和附属资源），默认纳入源码、完整发布包及整站版本和回滚生命周期；不采用 Knowledge Library 的独立内容发布模式。`tools:check` 校验全部启用目录的文件集合、入口及逐文件 SHA-256，拒绝隐藏文件和链接。发布检查见 [部署路径](DEPLOYMENT-PATHS.md#受保护工具静态目录快传路径)。
 
 `POST /api/ai/prompt-optimize` 仍保留为兼容性的纯优化接口：使用当前账号认证、凭据及首选模型，接收 `{ text }`，返回 `{ optimizedText }`；正文为 1–2000 字符，输出同上限，90 秒超时。该独立调用禁用工具、配置加载和会话持久化，不读取日程/知识库，不写业务或聊天历史。
 
