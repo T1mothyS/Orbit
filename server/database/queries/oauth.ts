@@ -179,10 +179,18 @@ export function getOAuthRefreshToken(tokenHash: string): DbOAuthRefreshToken | u
   return queryOne<DbOAuthRefreshToken>('SELECT * FROM oauth_refresh_tokens WHERE token_hash = ?', [tokenHash]);
 }
 
-export function markOAuthRefreshTokenUsed(tokenHash: string, usedAt = new Date().toISOString()): boolean {
+export function getPriorOAuthOfflineGrantScope(clientId: string, userId: string): string | undefined {
+  return queryOne<{ scope: string }>(
+    `SELECT scope FROM oauth_refresh_tokens WHERE client_id = ? AND user_id = ?
+     AND (' ' || scope || ' ') LIKE '% offline_access %' ORDER BY created_at DESC LIMIT 1`,
+    [clientId, userId],
+  )?.scope;
+}
+
+export function markOAuthRefreshTokenUsed(tokenHash: string, usedAt = new Date().toISOString(), renewedExpiresAt?: string): boolean {
   return run(
-    'UPDATE oauth_refresh_tokens SET last_used_at = ? WHERE token_hash = ? AND revoked_at IS NULL',
-    [usedAt, tokenHash],
+    'UPDATE oauth_refresh_tokens SET last_used_at = ?, expires_at = MAX(expires_at, COALESCE(?, expires_at)) WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ?',
+    [usedAt, renewedExpiresAt ?? null, tokenHash, usedAt],
   ).changes > 0;
 }
 

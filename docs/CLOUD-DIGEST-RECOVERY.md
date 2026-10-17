@@ -2,7 +2,7 @@
 
 - Status: RUNBOOK
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verification: 2026-10-08，补充当前 V2 Run 阶段与部分成功只读核对方法；历史媒体诊断与完整模板隔离测试仍按 2026-09-19 的 `0.27.2-260919.1711` 时点使用。
+- Last verification: 2026-10-17，补充云端拒绝、连接失效和排程边界；V2 Run 阶段核对方法沿用 2026-10-08，历史媒体诊断与完整模板隔离测试仍按 2026-09-19 的 `0.27.2-260919.1711` 时点使用。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -10,7 +10,7 @@
 
 本手册用于诊断生成端与服务端合同不一致。历史问题是定时提示遗漏邮件简报、金融与市场及观察名单；历史运行状态见 [Cloud 文档的快照区](CHATGPT-WORK-CLOUD.md#cloud-run-history)。修正实际云端提示词与可执行解析/渲染测试必须一起交付，不能只部署校验器。本手册不证明当前 Work 提示或生产版本已同步。
 
-- V2 的 `prompts/cloud_scheduled_task.md` 是完整定时提示源，插件副本为 `references/scheduled-task.md`。服务端合同以 `server/daily-digest-contract.ts` 和 `read_inputs.markdownContract` 为准；Prompt 版本与服务端合同版本分别核对，不从历史版本号推定当前一致。
+- 外部日报 V2 项目的 `prompts/cloud_scheduled_task.md` 与插件副本 `references/scheduled-task.md` 属于 V1 兼容完整模板；服务端合同以 `server/daily-digest-contract.ts` 和 `read_inputs.markdownContract` 为准。正式 `daily-digest.v2` 的提示来源为 [production Prompt](../prompts/daily-report-cloud-v2-production.md)，服务端使用 `digest-v2-contract.ts` 和 `read_inputs_v2` 返回的 schema/manifest。两种 Prompt 与服务端合同版本分别核对，不互相替代，也不从历史版本号推定当前一致。
 - 修改后须在实际云端任务保存并重新打开核对版本、全文及原频率，不能把本地文件更新视作云端已同步。
 - 在 `DAILY_REPORT_V2_ROOT` 指向相应 V2 checkout 后运行 `npm run test:cross-project`。测试使用提示内的完整示例，经过生产解析器、完整性闸门以及 HTML/纯文本渲染，覆盖两封邮件、市场和两项观察对象。
 - Cloud 发布仅托管正文明确提供的图片/来源图标，不根据来源名称自动访问 favicon。无 `mediaBatchId` 时逐图 Best Effort，失败项降级为空图片位并返回 `candidateImageCount`、`mediaFailureCount`、`mediaFailures`；当前兼容代码允许成功图片数为零，不能把它描述为完整媒体成功。带批次时必须满足 READY、账号/日期/运行归属和完整媒体校验，不能套用兼容降级。两条路径均保持正文完整性硬闸门。
@@ -24,6 +24,14 @@
 先固定原 runId、日期与失败调用的内容 hash，只读该次 manifest 事件和相同账号/日期的 artifact、正式 report、去重通知状态。不得把 MCP `Internal error` 或网页无记录直接判定为未到达服务端，也不得用第一次失败解释第二次调用。阶段顺序是 `MEDIA_PREPARING → MEDIA_PREPARED → REPORT_SAVED → PUBLISHED`；`FAILED.failedPhase`、媒体 code/stage/reason/attempts 与最后成功事件共同定位。
 
 若停在媒体准备且无 artifact/report/通知，则尚未发布/入队；先核对原图片的可达性与许可，再在获授权恢复时复用原内容。若已有保存记录或通知，先核对内容 hash、正式/候选状态及去重记录，不重复发布或发送。PUBLISHED、QUEUED、SMTP accepted、收件箱到达分别记录，缺失证据直接标未知。图片失败的既有有界重试不能替代故障诊断，硬闸门不得放宽；无可复现代码缺陷时不增加猜测性补丁。真实重跑、补发与收件箱检查仍需分别授权。
+
+## 云端拒绝、连接失效与排程边界
+
+1. 先区分三个独立来源：本站校验/媒体/保存错误、云端工具动作安全拒绝、连接认证失效。本站没有 run 或发布事件只能定位请求尚未到达，不能据此推断安全拒绝。读取实际 Work 报错，再与相同 run 的服务端阶段对齐；拿不到被拒绝的参数或审核详情时，不猜具体触发词或断言误判。
+2. 本人私有日报可以摘要正常邀请、公开活动安排及普通待办；保留原文必要事项、时间和动作，不把邀请推断为已参加、正式日程或用户当前位置。只省略凭据、私有标识/联系信息、个性化登录链接及无关私人细节，保持每个输入 ID 可追溯。不能将已授权的普通邮件一概空泛化，也不把平台拒绝当作可以绕过的限制。
+3. 日报执行不得调用排程更新、暂停、禁用或删除工具。任何失败只停止当前执行并报告阶段、错误及保存/队列状态；平台强制暂停或要求重新授权时如实报告，由用户/维护流程恢复，不能承诺 Prompt 可以阻止平台行为。
+4. 连接显示过期时，只核对原账号/client 的 scope、创建/到期/最近使用/撤销时间等元数据，不读取或回显令牌。刷新令牌为 30 天闲置窗口；成功刷新自动续期，已过期/撤销或账号禁用仍须按原授权登录。重连须核对原账号、原 scope 及持续刷新权限，不能擅自扩大权限。Work 省略 `offline_access` 时，本站会把该账号对此 client 曾批准的持续刷新权限重新列入 consent，只有本次明确同意后才签发新令牌；不恢复旧令牌，其他账号/client 不继承。首次授权未申请该权限则仍不会签发刷新令牌，不能凭“已连接”推断获得长期刷新能力。
+5. 重连可能恢复挂起的旧执行。先核对是否有执行正在继续及是否已有日报/通知，避免非预期提前发布或重复发送；恢复连接、恢复排程和重跑/补发分别记录。回读实际保存的 Prompt、任务开启状态、频率和下一次时间，保留更新前的可恢复副本。
 
 ## 连续无图的定位顺序
 

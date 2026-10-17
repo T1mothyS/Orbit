@@ -359,10 +359,10 @@ export function completeDailyReportCloudLogin(requestId: string, csrfToken: stri
   if (!valid) return false;
   db.setOAuthAuthorizationRequestUser(request.id, user.id);
   const requestedScopes = parseScopes(request.scope);
-  const existingGrant = db.getActiveOAuthRefreshTokenForClientUser(request.client_id, user.id);
-  // Work 的 scope 增量授权请求可能不会重复携带 offline_access。若该账号此前已明确授予
-  // 同一 client 的持续刷新权限，则把它带回本次 consent，让新的 scope 升级仍可获得稳定 refresh token。
-  if (!requestedScopes.includes('offline_access') && existingGrant && parseScopes(existingGrant.scope).includes('offline_access')) {
+  const priorOfflineScope = db.getPriorOAuthOfflineGrantScope(request.client_id, user.id);
+  // Work 重连时可能省略 offline_access。先验证账号，再把该账号对同一 client 曾批准的
+  // 持续刷新权限重新列在 consent 中供用户审阅；不复活旧令牌，也不在用户同意前签发新令牌。
+  if (!requestedScopes.includes('offline_access') && priorOfflineScope && parseClientJson(clientFromId(request.client_id)).grantTypes.includes('refresh_token')) {
     db.setOAuthAuthorizationRequestScope(request.id, serializeScopes([...requestedScopes, 'offline_access']));
   }
   db.updateUserLastLogin(user.id);
@@ -531,9 +531,10 @@ export function refreshDailyReportCloudAccessToken(input: unknown): OAuthTokenRe
     throw new DailyReportCloudOAuthError('invalid_scope', '不能扩大 refresh_token 的授权范围');
   }
   // ChatGPT Work 的定时任务可能不会持久化 token 响应中的新 refresh_token。
-  // 在 30 天有效期内保持原 refresh_token 不变，避免访问令牌到期后因客户端仍持有旧值而反复要求重连。
-  if (!db.markOAuthRefreshTokenUsed(row.token_hash)) {
-    throw new DailyReportCloudOAuthError('invalid_grant', 'refresh_token 已被撤销');
+  // 保持原值，并在成功刷新时延长 30 天闲置窗口；持续运行不再因最初授权满 30 天而断连。
+  // 已过期或撤销的令牌不能通过续期恢复。
+  if (!db.markOAuthRefreshTokenUsed(row.token_hash, new Date().toISOString(), isoAfter(REFRESH_TOKEN_TTL_SECONDS))) {
+    throw new DailyReportCloudOAuthError('invalid_grant', 'refresh_token 已过期或被撤销');
   }
   return issueTokens(
     client.client_id,

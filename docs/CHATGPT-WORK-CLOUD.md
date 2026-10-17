@@ -76,7 +76,7 @@ daily_report:media_prepare
 offline_access
 ```
 
-OAuth 令牌只保存在数据库的 SHA-256 哈希；人工登录/权限审阅请求有效 30 分钟，授权码一次性使用且 5 分钟过期，访问令牌 15 分钟过期，刷新令牌在 30 天有效期内保持稳定并支持撤销。保持稳定是为了兼容定时任务客户端未可靠保存刷新响应的情况；同一 client 和账号已有未过期、未撤销的 `offline_access` 授权时，scope 增量授权会在登录后把该权限重新列入 consent，并随新 scope 生成新的稳定 refresh token；首次授权或已撤销授权仍需 Work 明确申请 `offline_access`。客户端为公开 PKCE 客户端，不使用 `client_secret`。账号禁用会立即阻止新的 MCP bearer 请求。
+OAuth 令牌只保存在数据库的 SHA-256 哈希；人工登录/权限审阅请求有效 30 分钟，授权码一次性使用且 5 分钟过期，访问令牌 15 分钟过期。刷新令牌值保持稳定，每次成功刷新后续期至至少当前时间后 30 天；持续使用不再因首次授权满 30 天而断连，连续 30 天未成功刷新则过期，不能续回已过期或撤销的令牌。续期不扩大 scope、账号或 resource，失败的刷新请求不会延长有效期。保持原值是为了兼容定时任务客户端未可靠保存刷新响应的情况。Work 重连可能省略 `offline_access`：登录核实身份后，若同一账号曾为同一 client 批准持续刷新，且 client 支持 refresh grant，将该权限重新列入 consent 供用户明确审阅；包括旧授权已过期或撤销的重连，但绝不恢复旧令牌。只有本次同意并完成授权码交换才签发新的 refresh token；拒绝则不签发。其他账号/client 不继承此权限，首次授权仍须 Work 明确申请 `offline_access`。客户端为公开 PKCE 客户端，不使用 `client_secret`。账号禁用会立即阻止新的 MCP bearer 请求。
 
 日报来源接收策略使用登录态接口：
 
@@ -140,6 +140,10 @@ dry-run 返回 `VALIDATED_NOT_PUBLISHED` 才能进行同正文正式发布。兼
 本节适用于 `daily-digest.v2`，产品阶段为 V2.5，应用版本独立维护。2026-09-21 本地实现基线为 `0.31.0-260921.1951`；真实 R2 测试成功不代表隔离 Work 的逐条新闻配图、跨日期运行、生产切换或收件箱验收。上文 V1 与外部 Local Prompt 保持兼容，不应将新版字段或降级规则套到 V1。
 
 ### 输入、校验和权限
+
+正式 V2 云端定时提示的可提交来源为 [production Prompt](../prompts/daily-report-cloud-v2-production.md)，独立于外部 V1 兼容提示和下文隔离 Shadow 示例。修改后必须在实际任务保存并回读全文、状态和原频率；仓库文件不自动同步云端。该执行只负责日报，不授权调用任何排程管理工具；失败只结束当前运行，不主动暂停后续任务。平台强制暂停、连接重授权和安全审批属于外部边界，不能由 Prompt 保证消除。
+
+本人私有日报的正常活动邀请、服务通知和待办保留原文明确的必要事项、时间和动作；邀请不代表报名、出席或正式日程。仅删除不必要的敏感片段，保留输入 ID 覆盖，不将普通活动信息一概判为禁止内容。平台明确拒绝后停止该动作并报告，不以重试、换通道或改写绕过审核；失败与恢复步骤见 [Cloud 排障](CLOUD-DIGEST-RECOVERY.md#云端拒绝连接失效与排程边界)。
 
 - `daily_report.read_inputs_v2({date})` 返回账号隔离的 `runId`、输入快照、Context 及 JSON schema。生成日期、时区、截止时间、Context 版本由服务端绑定；合同/生成规则版本由程序记录，模型版本为 `unknown`。Calendar 最多 300、Mail 最多 100、Watchlist 最多 100；达到截断条件显式 `partial`。
 - `daily_report.read_shadow_v2({artifactId})` 只读当前 OAuth 账号已保存的 Shadow `digest`、runId、内容哈希及 generation，用于在云端修订原稿；不读取生产稿或原始输入快照、不新建 run、不写 manifest、不下载图片、不发布或发信。要求既有 Calendar/Mail/Context/History 四项读取 scope，与 `read_inputs_v2` 相同，单独历史摘要权限不足；账号不匹配或非 Shadow 均返回不存在。仅在 V2 开启时提供，不改变旧 `read_history` 的正式日报去重摘要语义。
