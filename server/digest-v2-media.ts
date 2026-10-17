@@ -8,6 +8,7 @@ import { controlledMediaFetch, dailyReportMediaRoot, getDailyReportMediaPublicOr
 import { publicDigestUrl, type DigestV2 } from './digest-v2-contract.js';
 import { isValidDateKey } from './date-key.js';
 import { approvedCommonsRule } from './digest-v2-photos.js';
+import { approvedWebPhotoRule } from './digest-v2-photo-sources.js';
 
 export interface MediaCredit { caption: string; author: string; sourcePage: string; licenseName: string; licenseUrl: string }
 export interface MediaRule { pageHost: string; imageHosts: string[]; policy: 'OWNED_OPEN' | 'LICENSED' | 'EXTERNAL_ALLOWED'; licenseRef: string; pageUrl?: string; imageUrls?: string[]; credit?: MediaCredit; sourceFile?: string; sourceSha256?: string; kind?: 'source_icon'; visualKind?: 'photo' | 'archive_photo' | 'illustration' }
@@ -155,7 +156,7 @@ async function fallbackImage(category: string, seed = '') {
   const svg = `<svg width="960" height="320" xmlns="http://www.w3.org/2000/svg"><rect width="960" height="320" fill="${background}"/><circle cx="775" cy="155" r="138" fill="${accent}" opacity=".13"/>${blocks}<path d="M0 270 C210 ${205 + digest[15] % 55}, 300 ${205 + digest[16] % 55}, 520 290 L0 320Z" fill="${accent}" opacity=".22"/><text x="48" y="72" font-size="18" letter-spacing="3" fill="${foreground}" font-family="sans-serif">EDITORIAL ILLUSTRATION</text><text x="48" y="180" font-size="60" font-weight="700" fill="${foreground}" font-family="sans-serif">${categories[index]}</text><path d="M48 207 H330" stroke="${accent}" stroke-width="8" stroke-linecap="round"/></svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer({ resolveWithObject: true });
 }
-export async function prepareDigestMedia(d: DigestV2, options: { storage?: ObjectStorage | null; rules?: MediaRule[]; fetchOptions?: ControlledDailyReportMediaOptions; mode: 'shadow' | 'production'; mediaRoot?: string; storyIllustrations?: boolean; allowCommons?: boolean }) {
+export async function prepareDigestMedia(d: DigestV2, options: { storage?: ObjectStorage | null; rules?: MediaRule[]; fetchOptions?: ControlledDailyReportMediaOptions; mode: 'shadow' | 'production'; mediaRoot?: string; storyIllustrations?: boolean; allowCommons?: boolean; allowNonCommercialPhotos?: boolean }) {
   if (!isValidDateKey(d.date)) throw new Error('INVALID_DATE');
   const localOrigin = process.env.DIGEST_V2_MEDIA_STORE === 'local' ? getDailyReportMediaPublicOrigin() : null;
   if (localOrigin && (!publicDigestUrl(localOrigin) || new URL(localOrigin).origin !== localOrigin)) throw new Error('LOCAL_MEDIA_ORIGIN_INVALID');
@@ -187,7 +188,9 @@ export async function prepareDigestMedia(d: DigestV2, options: { storage?: Objec
     let transport: PreparedImage['sourceTransport'];
     let result: Awaited<ReturnType<typeof transformDigestImage>>;
     try {
-      if (!rule && !m.kind && options.allowCommons) rule = await approvedCommonsRule(evidence.url, m.url);
+      if (!rule && !m.kind && options.allowCommons) rule = new URL(evidence.url).hostname === 'commons.wikimedia.org'
+        ? await approvedCommonsRule(evidence.url, m.url)
+        : await approvedWebPhotoRule(evidence.url, m.url, { allowNonCommercial: options.allowNonCommercialPhotos });
       if (!rule) throw new Error('LICENSE_NOT_APPROVED');
       stage = 'download';
       let bytes: Buffer | undefined;

@@ -425,6 +425,46 @@ test('Shadow draft readback is scoped, immutable, and excludes production and sn
   finally { process.env.DIGEST_V2_ENABLED = 'true'; }
 });
 
+test('revoked noncommercial usage cannot replay a previously prepared NC artifact', async () => {
+  const previous = process.env.DIGEST_V2_NONCOMMERCIAL_PHOTO_USER_IDS;
+  const ncOwner = 'noncommercial-replay-fixture';
+  db.createUser({ id: ncOwner, email: 'noncommercial-replay@example.com', password_hash: 'synthetic', role: 'user', disabled: 0, created_at: now, updated_at: now });
+  try {
+    const d = illustrated(); d.date = '2026-11-09';
+    const run = service.createDigestSnapshotRun(ncOwner, { ...snapshot(), date: d.date });
+    const validation = service.validateDigestRun(ncOwner, run.runId, d); assert.equal(validation.valid, true);
+    activity.saveDigestArtifact({ id: crypto.randomUUID(), user_id: ncOwner, run_id: run.runId, report_date: d.date, mode: 'shadow', content_hash: validation.contentHash!, created_at: now,
+      payload_json: JSON.stringify({ publication: { digest: d, warnings: [], media: [{ id: d.media[0].id, credit: { licenseUrl: 'https://creativecommons.org/licenses/by-nc/2.0/' } }], renderer: DIGEST_V2_GENERATION }, status: 'SHADOW_SAVED', renderHash: 'synthetic' }) });
+    delete process.env.DIGEST_V2_NONCOMMERCIAL_PHOTO_USER_IDS;
+    const before = activity.exportUserActivity(ncOwner).notifications.length;
+    await assert.rejects(service.publishDigestV2(ncOwner, run.runId, d, 'shadow'), /PHOTO_USAGE_NOT_ALLOWED/);
+    const manifest = JSON.parse(activity.getDigestRun(ncOwner, run.runId)!.manifest_json);
+    assert.equal(manifest.code, 'PHOTO_USAGE_NOT_ALLOWED'); assert.equal(manifest.retryable, false);
+    assert.equal(activity.exportUserActivity(ncOwner).notifications.length, before);
+    assert.equal(activity.getDailyReport(ncOwner, d.date, 'cloud'), null);
+  } finally { if (previous === undefined) delete process.env.DIGEST_V2_NONCOMMERCIAL_PHOTO_USER_IDS; else process.env.DIGEST_V2_NONCOMMERCIAL_PHOTO_USER_IDS = previous; }
+});
+
+test('photo binding preflight covers market, macro and stories without writing business data', () => {
+  const keys = ['DIGEST_SHADOW_ONLY', 'DIGEST_V2_COMMONS_ENABLED', 'DIGEST_V2_SOURCES_ENABLED', 'DIGEST_V2_SOURCES_USER_IDS'];
+  const previous = keys.map(k => process.env[k]);
+  try {
+    process.env.DIGEST_SHADOW_ONLY = 'true'; process.env.DIGEST_V2_COMMONS_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_USER_IDS = userId;
+    const d = illustrated();
+    d.market = [{ ...d.stories[0], id: 'market-ai-credit', title: '市场配图检查', summary: '**市场**配图检查。', media_ids: [] }];
+    d.macro = [{ ...d.stories[0], id: 'macro-check', title: '宏观配图检查', summary: '**宏观**配图检查。', media_ids: [] }];
+    const run = service.createDigestSnapshotRun(userId, snapshot()), before = activity.exportActivityDb();
+    const missing = service.validateDigestRun(userId, run.runId, d);
+    assert.equal(missing.valid, false); assert.equal(missing.imageBindings.total, 3); assert.equal(missing.imageBindings.bound, 1);
+    assert.deepEqual(missing.imageBindings.missing, [{ path: '$.market[0].media_ids', storyId: 'market-ai-credit' }, { path: '$.macro[0].media_ids', storyId: 'macro-check' }]);
+    assert.ok(missing.errors.every(e => e.code === 'STORY_IMAGE_BINDING_REQUIRED'));
+    assert.deepEqual(activity.exportActivityDb(), before);
+    d.market[0].media_ids = [...d.stories[0].media_ids]; d.macro[0].media_ids = [...d.stories[0].media_ids];
+    const fixed = service.validateDigestRun(userId, run.runId, d);
+    assert.equal(fixed.valid, true); assert.equal(fixed.imageBindings.bound, 3); assert.equal(fixed.imageBindings.mediaReadiness, 'unobserved');
+  } finally { keys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i]; }); }
+});
+
 test('automatic photo tool preserves snapshots, enforces account/scope/expiry and strict Shadow images', async () => {
   const mcp = await import('./daily-report-cloud-mcp.js');
   const keys = ['DIGEST_SHADOW_ONLY', 'DIGEST_V2_COMMONS_ENABLED', 'DIGEST_V2_SOURCES_ENABLED', 'DIGEST_V2_SOURCES_USER_IDS'];
@@ -433,7 +473,7 @@ test('automatic photo tool preserves snapshots, enforces account/scope/expiry an
   try {
     process.env.DIGEST_SHADOW_ONLY = 'true'; process.env.DIGEST_V2_COMMONS_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_ENABLED = 'true'; process.env.DIGEST_V2_SOURCES_USER_IDS = `${userId},other`;
     const run = service.createDigestSnapshotRun(userId, snapshot()), before = activity.exportActivityDb();
-    const requests = [{ storyId: 's1', query: 'building' }];
+    const requests = [{ storyId: 's1', query: 'building', providers: ['commons'] }];
     const result = await service.findDigestRunPhotos(userId, run.runId, requests, fake);
     assert.equal(result.emailStatus, 'NOT_QUEUED'); assert.equal(calls, 1); assert.deepEqual(activity.exportActivityDb(), before);
     await assert.rejects(service.findDigestRunPhotos('other', run.runId, requests, fake), /RUN_NOT_FOUND/);

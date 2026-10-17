@@ -46,3 +46,19 @@
 | DOM 有图片但 naturalWidth 为 0 | 图片 URL、网络、权限、响应类型和 CSP |
 
 本地 0.27.2 起，新正文版本保存有界媒体统计，具体字段、重试与恢复语义见 [Cloud 合同](CHATGPT-WORK-CLOUD.md#markdown-合同与解析诊断)。旧版本、dry-run 和未变正文的后续尝试不补写历史统计；仍需区分工具回执与任务摘要。不得将“日志没找到”当成“从未失败”。修改运行中的定时提示需授权并回读核对，不能自动重发历史或发送邮件。
+
+## 多来源取图与缺图前置检查
+
+先看 `validate_v2.imageBindings`：`market/macro/stories` 的总数与绑定数必须一致，不能把单个栏目的4/4当整期就绪。启用照片账号的空绑定直接返回 `STORY_IMAGE_BINDING_REQUIRED` 与实际路径；修绑定后仍需确认最终媒体下载/托管，`mediaReadiness=unobserved` 不代表成功。
+
+找图支持原页 `pageUrls`、Commons/Openverse以及Bing/百度发现；完整字段、来源核对和NC账号配置只维护在 [照片合同](CHATGPT-WORK-CLOUD.md#shadow-自动资料照与专用代理)。先用具体主体词，再有界扩展产品、设施或地点；不相关的演员、聚会、Logo不能因许可正确而算贴题。`candidates` 与待复核 `discoveries` 分开；`review_required` 不代表搜索无结果，也不代表允许直接发布。302/403/429或浏览器渲染缺口不能伪装为已经接通；可沿返回搜索链接人工智能浏览器补查，再传原来源页核对。不为修一个来源关闭所有校验或改全局代理。
+
+仅做公开关键词的本地媒体专项试跑：
+
+```powershell
+npx tsx scripts/digest-photo-source-smoke.ts --query CoreWeave --date YYYY-MM-DD --noncommercial --out .local-docs/photo-smoke-new
+```
+
+`--date` 改为实际目标日期；`--page` 可追加已找到的公开原页面，`--story-id`/`--run-id` 仅是诊断关联，不会读取或修改原run。输出目录必须不存在以保护既有证据。脚本强制测试环境/独立数据目录，禁用后台/通知，不导入应用或打开业务库；公开源网络真实执行，存储为本地替身，输出 `discovery.json`、`result.json`、`media/`、`preview.html`。`LOCAL_MEDIA_READY` 只代表这张图许可核对/下载/转换/本地保存通过，必须实际看图确认相关性；不能作为完整日报回放、生产Shadow、正式托管、发布或邮件验收。
+
+推广前分别核对新版源码已部署、NC账号实际授权/配置、运行端Prompt已更新及自然执行结果。本地Prompt文件改动不会自动同步已保存的云端任务，未获部署/任务配置授权时保持原状态。

@@ -1,9 +1,10 @@
 import { digestMediaFetcher } from './digest-v2-relay.js';
 import { digestSourcesEnabled } from './digest-v2-sources.js';
 import type { MediaRule } from './digest-v2-media.js';
+import { PHOTO_PROVIDERS, discoverPhotoSource, inspectPhotoPage, photoPublicUrl, photoSearchLinks, type PhotoOptions, type PhotoDiscovery, type PhotoSourceResult } from './digest-v2-photo-sources.js';
 
-export const PHOTO_REQUEST_SCHEMA = { type: 'array', minItems: 1, maxItems: 8, items: { type: 'object', additionalProperties: false, required: ['storyId', 'query'], properties: { storyId: { type: 'string', minLength: 1, maxLength: 80 }, query: { type: 'string', minLength: 2, maxLength: 160 } } } };
-export interface PhotoCandidate { title: string; pageUrl: string; imageUrl: string; originalUrl: string; width: number; height: number; author: string; licenseName: string; licenseUrl: string; description: string; photoDate: string | null }
+export const PHOTO_REQUEST_SCHEMA = { type: 'array', minItems: 1, maxItems: 8, items: { type: 'object', additionalProperties: false, required: ['storyId', 'query'], properties: { storyId: { type: 'string', minLength: 1, maxLength: 80 }, query: { type: 'string', minLength: 2, maxLength: 160 }, providers: { type: 'array', minItems: 1, maxItems: 4, uniqueItems: true, items: { type: 'string', enum: [...PHOTO_PROVIDERS] } }, pageUrls: { type: 'array', maxItems: 3, uniqueItems: true, items: { type: 'string', format: 'uri', maxLength: 2048 } } } } };
+export interface PhotoCandidate { title: string; pageUrl: string; imageUrl: string; originalUrl: string; width: number; height: number; author: string; licenseName: string; licenseUrl: string; description: string; photoDate: string | null; provider?: string; usageRestriction?: 'standard' | 'noncommercial' }
 export function digestPhotosEnabled(userId: string): boolean {
   return process.env.DIGEST_V2_COMMONS_ENABLED === 'true' && digestSourcesEnabled(userId)
     && (process.env.DIGEST_SHADOW_ONLY === 'true'
@@ -61,22 +62,51 @@ async function commonsPages(params: Record<string, string>, fetcher = digestMedi
   if (value.error || !Array.isArray(value.query?.pages) || value.query.pages.length > 5) throw new Error('PHOTO_METADATA_INVALID');
   return value.query.pages;
 }
-export async function findDigestPhotos(requests: unknown, fetcher?: typeof fetch) {
+export async function findDigestPhotos(requests: unknown, fetcher = digestMediaFetcher().fetcher, options: PhotoOptions = {}) {
   if (!Array.isArray(requests) || requests.length < 1 || requests.length > 8) throw new Error('PHOTO_REQUEST_INVALID');
   const ids = new Set<string>();
   for (const r of requests) {
-    if (!r || Object.keys(r).some(k => !['storyId', 'query'].includes(k)) || typeof r.storyId !== 'string' || !r.storyId.trim() || r.storyId.length > 80 || typeof r.query !== 'string' || r.query.trim().length < 2 || r.query.length > 160 || /[\u0000-\u001f]/.test(r.query) || ids.has(r.storyId)) throw new Error('PHOTO_REQUEST_INVALID');
+    if (!r || Object.keys(r).some(k => !['storyId', 'query', 'providers', 'pageUrls'].includes(k)) || typeof r.storyId !== 'string' || !r.storyId.trim() || r.storyId.length > 80 || /[\u0000-\u001f]/.test(r.storyId) || typeof r.query !== 'string' || r.query.trim().length < 2 || r.query.length > 160 || /[\u0000-\u001f]/.test(r.query) || ids.has(r.storyId)
+        || (r.providers !== undefined && (!Array.isArray(r.providers) || !r.providers.length || r.providers.length > 4 || new Set(r.providers).size !== r.providers.length || r.providers.some((v: any) => !PHOTO_PROVIDERS.includes(v))))
+        || (r.pageUrls !== undefined && (!Array.isArray(r.pageUrls) || r.pageUrls.length > 3 || new Set(r.pageUrls).size !== r.pageUrls.length || r.pageUrls.some((v: any) => !photoPublicUrl(v))))) throw new Error('PHOTO_REQUEST_INVALID');
     ids.add(r.storyId);
   }
-  const results: Array<{ storyId: string; status: string; candidates: PhotoCandidate[]; failure?: string }> = [];
+  const results: Array<{ storyId: string; status: string; candidates: PhotoCandidate[]; discoveries: PhotoDiscovery[]; sources: PhotoSourceResult[]; searchLinks: ReturnType<typeof photoSearchLinks>; failure?: string }> = [];
+  const budget = AbortSignal.timeout(45_000), upstream = fetcher;
+  fetcher = (input, init) => upstream(input, { ...init, signal: init?.signal ? AbortSignal.any([budget, init.signal]) : budget });
   // Keep external load bounded and report each failure separately; never a whole-host permission.
-  const search = async (r: { storyId: string; query: string }) => {
-    try { const pages = await commonsPages({ generator: 'search', gsrsearch: `${r.query.trim()} filetype:bitmap`, gsrnamespace: '6', gsrlimit: '5' }, fetcher); const candidates = pages.map(commonsCandidate).filter((c): c is PhotoCandidate => !!c); results.push({ storyId: r.storyId, status: candidates.length ? 'ok' : 'empty', candidates }); }
-    catch { results.push({ storyId: r.storyId, status: 'failed', candidates: [], failure: 'PHOTO_METADATA_FAILED' }); }
+  const search = async (r: { storyId: string; query: string; providers?: typeof PHOTO_PROVIDERS[number][]; pageUrls?: string[] }) => {
+    const candidates: PhotoCandidate[] = [], discoveries: PhotoDiscovery[] = [], sources: PhotoSourceResult[] = [];
+    for (const pageUrl of r.pageUrls || []) {
+      try { const found = await inspectPhotoPage(pageUrl, fetcher, options); candidates.push(...found.candidates); discoveries.push(...found.discoveries); sources.push({ provider: 'article', status: found.candidates.length ? 'ok' : found.discoveries.length ? 'review_required' : 'empty', count: found.discoveries.length }); }
+      catch { sources.push({ provider: 'article', status: 'failed', count: 0, code: 'PHOTO_METADATA_FAILED' }); }
+    }
+    // Two providers at a time, and two stories at a time; no unbounded fan-out.
+    const providers = r.providers || [...PHOTO_PROVIDERS];
+    for (let i = 0; i < providers.length; i += 2) await Promise.all(providers.slice(i, i + 2).map(async provider => {
+      if (provider !== 'commons') { const found = await discoverPhotoSource(provider, r.query, fetcher, options); candidates.push(...found.candidates); discoveries.push(...found.discoveries); sources.push(found.source); return; }
+      try {
+        const pages = await commonsPages({ generator: 'search', gsrsearch: `${r.query.trim()} filetype:bitmap`, gsrnamespace: '6', gsrlimit: '5' }, fetcher);
+        const raw = pages.map(commonsCandidate).filter((c): c is PhotoCandidate => !!c);
+        const entity = r.query.match(/[a-z][a-z0-9-]{3,}/i)?.[0]?.toLowerCase();
+        const found = raw.filter(c => !entity || `${c.title} ${c.description} ${c.pageUrl}`.toLowerCase().includes(entity));
+        candidates.push(...found.map(c => ({ ...c, provider: 'commons' })));
+        sources.push({ provider, status: found.length ? 'ok' : 'empty', count: found.length, ...(raw.length && !found.length ? { code: 'QUERY_MISMATCH' } : {}) });
+      }
+      catch { sources.push({ provider, status: 'failed', count: 0, code: 'PHOTO_METADATA_FAILED' }); }
+    }));
+    const rank = (c: PhotoCandidate) => c.provider === 'article' || c.provider === 'flickr' ? 0 : c.provider === 'openverse' ? 1 : 2;
+    // Commons search can split an uncommon company name into unrelated words (Core + Weave).
+    const entity = r.query.match(/[a-z][a-z0-9-]{3,}/i)?.[0]?.toLowerCase();
+    const related = candidates.filter(c => !entity || `${c.title} ${c.description} ${c.pageUrl}`.toLowerCase().includes(entity));
+    const ordered = [...new Map(related.sort((a, b) => rank(a) - rank(b) || a.imageUrl.localeCompare(b.imageUrl)).map(c => [c.imageUrl, c])).values()].slice(0, 10);
+    const status = ordered.length ? 'ok' : sources.every(s => s.status === 'failed') ? 'failed' : discoveries.length || sources.some(s => s.status === 'review_required') ? 'review_required' : 'empty';
+    results.push({ storyId: r.storyId, status, candidates: ordered, discoveries: [...new Map(discoveries.map(c => [c.imageUrl, c])).values()].slice(0, 15), sources,
+      searchLinks: photoSearchLinks(r.query), ...(status === 'failed' ? { failure: 'PHOTO_METADATA_FAILED' } : {}) });
   };
   for (let i = 0; i < requests.length; i += 2) await Promise.all(requests.slice(i, i + 2).map(search));
   results.sort((a, b) => requests.findIndex(r => r.storyId === a.storyId) - requests.findIndex(r => r.storyId === b.storyId));
-  return { results, guidance: '这些是资料照候选，须人工智能逐条判断是否贴合新闻，不代表今天的现场。选图后将 pageUrl 加入 evidence 并令 media.evidence_id 指向它，media.url 使用 imageUrl。拍摄日期未知保持未知；服务端发布时重新核对同一文件的许可和精确直链，下载校验并托管。不能添加来源未确认的说明。' };
+  return { results, usage: options.allowNonCommercial ? 'noncommercial' : 'standard', guidance: '按原新闻/官方页面、开放图库和搜索来源逐步找图。candidates已核对来源许可但仍须判断贴题；discoveries和searchLinks仅供补查，不能视作使用授权。Google/Bing/百度结果须回原站核对；浏览器补查所得原页面可用pageUrls提交。Pexels/Pixabay/Unsplash须遵守原站条款，无法核验不自动通过。NC仅限已明确启用的非商业账号。不把资料照称为今天现场，不把行业背景图称为某公司设施。pageUrl加入evidence、media.url用精确imageUrl；发布再次核对许可并下载托管。所有market/macro/stories都需覆盖，来源图标不算新闻照片。' };
 }
 export async function approvedCommonsRule(pageUrl: string, url: string, fetcher?: typeof fetch): Promise<MediaRule> {
   const title = fileTitle(pageUrl);

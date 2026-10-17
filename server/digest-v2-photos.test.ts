@@ -44,11 +44,11 @@ test('Commons approval is exact-file, metadata-authoritative and conservative ab
 });
 test('photo lookup bounds inputs, distinguishes empty/failed and caps untrusted metadata streams', async () => {
   await assert.rejects(findDigestPhotos([{ storyId: 's1', query: 'x', credentials: 'forbidden' }]), /REQUEST_INVALID/);
-  await assert.rejects(findDigestPhotos(Array(9).fill({ storyId: 's1', query: 'building' })), /REQUEST_INVALID/);
-  const results = await findDigestPhotos([{ storyId: 's1', query: 'building' }, { storyId: 's2', query: 'other' }], async input => new URL(String(input)).searchParams.get('gsrsearch')!.startsWith('building') ? Response.json({ query: { pages: [page()] } }) : Response.json({ batchcomplete: true }));
+  await assert.rejects(findDigestPhotos(Array(9).fill({ storyId: 's1', query: 'building', providers: ['commons'] })), /REQUEST_INVALID/);
+  const results = await findDigestPhotos([{ storyId: 's1', query: 'building', providers: ['commons'] }, { storyId: 's2', query: 'other', providers: ['commons'] }], async input => new URL(String(input)).searchParams.get('gsrsearch')!.startsWith('building') ? Response.json({ query: { pages: [page()] } }) : Response.json({ batchcomplete: true }));
   assert.equal(results.results[0].status, 'ok'); assert.equal(results.results[1].status, 'empty');
   for (const fake of [async () => new Response('private provider error', { status: 503 }), async () => new Response('a'.repeat(1024 * 1024 + 1), { headers: { 'content-type': 'application/json' } }), async () => Response.json({ query: { pages: Array(6).fill(page()) } })]) {
-    const result = await findDigestPhotos([{ storyId: 's1', query: 'building' }], fake); assert.equal(result.results[0].status, 'failed'); assert.equal(result.results[0].failure, 'PHOTO_METADATA_FAILED');
+    const result = await findDigestPhotos([{ storyId: 's1', query: 'building', providers: ['commons'] }], fake); assert.equal(result.results[0].status, 'failed'); assert.equal(result.results[0].failure, 'PHOTO_METADATA_FAILED');
   }
 });
 test('automatic photos retain Shadow isolation and require explicit production opt-in for the allowlisted account', () => {
