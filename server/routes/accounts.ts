@@ -9,18 +9,27 @@ import { generateCode, sendVerificationEmail, summarizeEmailSendResult } from '.
 import { addLog } from '../log-service.js';
 import { getInviteCodeRole } from '../invite-code-service.js';
 import * as db from '../db.js';
+import { changeAccountPassword, PasswordChangeError } from '../account-security.js';
+import { InMemoryRateLimitStore } from '../http-security.js';
+import { newPasswordError } from '../../src/utils/password-policy.js';
 
 export function createAccountsRouter({ authenticate, signUserToken, setPageSessionCookie, setPageSessionFromBearer, clearPageSessionCookie }: Pick<ReturnType<typeof createAuth>, 'authenticate' | 'signUserToken' | 'setPageSessionCookie' | 'setPageSessionFromBearer' | 'clearPageSessionCookie'>) {
   const app = Router();
+  const passwordAttempts = new InMemoryRateLimitStore();
+  const auditPassword = (userId: string, code: string) => {
+    try { addLog(code === 'SUCCESS' ? 'info' : 'warn', 'auth', '账号密码更新结果', { event: 'account_password_change', userId, resultCode: code }); }
+    catch { /* Audit storage failure must not misreport a committed password change. */ }
+  };
   app.post("/api/auth/send-register-code", async (req, res) => {
     try {
       const email = String(req.body?.email || '').trim().toLowerCase();
-      const password = String(req.body?.password || '');
+      const password = req.body?.password;
       const invite_code = String(req.body?.invite_code || '');
       if (!email || !password || !invite_code) {
         return res.status(400).json({ error: '请填写邮箱、密码和邀请码' });
       }
-      if (password.length < 8) return res.status(400).json({ error: '密码至少需要 8 位' });
+      const invalid = newPasswordError(password);
+      if (invalid) return res.status(400).json({ error: invalid });
       // 验证邀请码
       const role = getInviteCodeRole(invite_code);
       if (!role) {
@@ -65,13 +74,14 @@ export function createAccountsRouter({ authenticate, signUserToken, setPageSessi
   app.post("/api/auth/register", async (req, res) => {
     try {
       const email = String(req.body?.email || '').trim().toLowerCase();
-      const password = String(req.body?.password || '');
+      const password = req.body?.password;
       const code = String(req.body?.code || '').trim();
       const invite_code = String(req.body?.invite_code || '');
       if (!email || !password || !code) {
         return res.status(400).json({ error: '请填写完整信息' });
       }
-      if (password.length < 8) return res.status(400).json({ error: '密码至少需要 8 位' });
+      const invalid = newPasswordError(password);
+      if (invalid) return res.status(400).json({ error: invalid });
       // 验证邀请码
       const role = getInviteCodeRole(invite_code);
       if (!role) {
@@ -140,7 +150,12 @@ export function createAccountsRouter({ authenticate, signUserToken, setPageSessi
       if (!valid) {
         return res.status(401).json({ error: '邮箱或密码错误' });
       }
-      const token = signUserToken(user);
+      // A password/role change can occur while bcrypt yields. Never turn an old
+      // password comparison into a token for a newer credential version.
+      const current = db.getUserByEmail(email);
+      if (!current || current.disabled || current.password_hash !== user.password_hash || (current.auth_version ?? 0) !== (user.auth_version ?? 0))
+        return res.status(401).json({ error: '账号状态已变化，请重新登录' });
+      const token = signUserToken(current);
 
       // 更新最后登录时间
       db.updateUserLastLogin(user.id);
@@ -169,6 +184,31 @@ export function createAccountsRouter({ authenticate, signUserToken, setPageSessi
   app.post("/api/auth/logout", (_req, res) => {
     clearPageSessionCookie(res);
     res.json({ success: true });
+  });
+
+  app.post('/api/auth/change-password', authenticate, async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const payload = (req as any).user as JwtPayload;
+    const attempt = passwordAttempts.consume(`password:${payload.userId}`, 5, 15 * 60_000);
+    if (!attempt.allowed) {
+      auditPassword(payload.userId, 'PASSWORD_RATE_LIMITED');
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil((attempt.resetAt - Date.now()) / 1000))));
+      return res.status(429).json({ code: 'PASSWORD_RATE_LIMITED', error: '修改密码尝试过于频繁，请稍后再试。' });
+    }
+    try {
+      await changeAccountPassword(payload.userId, payload.authVersion, req.body?.currentPassword, req.body?.newPassword);
+      clearPageSessionCookie(res);
+      auditPassword(payload.userId, 'SUCCESS');
+      return res.json({ success: true, reauthRequired: true });
+    } catch (error) {
+      if (error instanceof PasswordChangeError) {
+        auditPassword(payload.userId, error.code);
+        return res.status(error.status).json({ code: error.code, error: error.message });
+      }
+      auditPassword(payload.userId, 'PASSWORD_SAVE_FAILED');
+      // Never put request bodies, password hashes or disk exception detail into logs/responses.
+      return res.status(503).json({ code: 'PASSWORD_SAVE_FAILED', error: '密码未能确认保存，请稍后重新登录后检查，再重试修改。' });
+    }
   });
 
   // 获取所有用户列表（管理员）- 支持分页和搜索

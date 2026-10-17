@@ -7,12 +7,14 @@ import { useLocation } from 'react-router-dom';
 import { Button, Input, MessagePlugin } from 'tdesign-react';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
+import { InlineNotice } from '../ui';
+import { newPasswordError } from '../utils/password-policy';
 
 type Mode = 'login' | 'register';
 
 function getSafeNextPath(pathname: string, search: string): string | null {
   const queryNext = new URLSearchParams(search).get('next');
-  const candidate = queryNext || (/^\/(tools|project|reports|assistant|schedule|reminders|library|today)(\/|$)/.test(pathname) ? `${pathname}${search}` : null);
+  const candidate = queryNext || (/^\/(tools|project|reports|assistant|schedule|reminders|library|today|settings)(\/|$)/.test(pathname) ? `${pathname}${search}` : null);
   if (!candidate || !candidate.startsWith('/') || candidate.startsWith('//')) return null;
   try {
     const url = new URL(candidate, window.location.origin);
@@ -37,7 +39,7 @@ export function LoginPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  const { login, register, sendRegisterCode, isAuthenticated } = useAuth();
+  const { login, register, sendRegisterCode, isAuthenticated, notice } = useAuth();
   const location = useLocation();
   const nextPath = getSafeNextPath(location.pathname, location.search);
 
@@ -65,8 +67,9 @@ export function LoginPage() {
       MessagePlugin.warning('请输入有效的邮箱地址');
       return;
     }
-    if (password.length < 8) {
-      MessagePlugin.warning('密码至少8位');
+    const invalid = newPasswordError(password);
+    if (invalid) {
+      MessagePlugin.warning(invalid);
       return;
     }
     setSending(true);
@@ -111,8 +114,9 @@ export function LoginPage() {
         MessagePlugin.warning('两次密码不一致');
         return;
       }
-      if (password.length < 8) {
-        MessagePlugin.warning('密码至少8位');
+      const invalid = newPasswordError(password);
+      if (invalid) {
+        MessagePlugin.warning(invalid);
         return;
       }
       setLoading(true);
@@ -156,6 +160,7 @@ export function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {notice && <InlineNotice title={notice} />}
             {error && <p className="orbit-inline-error" role="alert">{error}</p>}
             <label className="block">
               <span className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>邮箱</span>
@@ -173,7 +178,7 @@ export function LoginPage() {
               <Input
                 value={password}
                 onChange={(v) => setPassword(v as string)}
-                placeholder={mode === 'register' ? '至少8位' : '请输入密码'}
+                placeholder={mode === 'register' ? '至少8位，最多72字节' : '请输入密码'}
                 autocomplete={mode === 'register' ? 'new-password' : 'current-password'}
                 size="large"
                 type="password"

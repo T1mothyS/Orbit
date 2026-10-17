@@ -2,6 +2,15 @@
 
 本文件记录具体版本变更；版本唯一来源为 package.json。历史生产结果属于当次记录，不代表当前上线状态。任务状态见 [TASKS](docs/TASKS.md)，未来目标见 [route.md](route.md)。
 
+## 0.58.2-261018.0050 — 账户与安全代表页、改密与 A 基线
+
+- 用户确认 Checkpoint A，建立 Windows Chromium Gallery 黄金图并启用阻断比较；Linux 基线仍待发布前核验。
+- 账户迁入 features/settings/account 和独立设置 Frame，提供手机分类首页、头像与渐进展开的密码表单，旧账户组件/上传样式删除；账户视觉待 B，其余分类与共享状态继续迁移至 C。
+- 改密复用 auth_version、CAS 与持久化事务：全部旧 Orbit 登录/Tools Cookie 失效，Cloud、日报/知识库令牌和 ChatGPT 凭据保留；覆盖并发、磁盘失败和提交点中断恢复，不增加 session 或 schema。
+- 注册、验证码发送和改密共用新密码长度/UTF-8 校验，已有账号登录保持兼容；改密返回沿用计划中的 reauthRequired 合同。
+- AuthProvider 单一持有身份，处理跨标签/账号、取消旧身份请求和草稿清理；旧账户 ID、来源返回、焦点和会话草稿保护有实际回归。
+- 同步架构、UI Playbook、用户指南与迁移/测试台账。验证边界见测试矩阵；未 push、部署或发信，不代表整块 Settings V3 完成或生产验收。
+
 ## 0.58.1-261018.0002 — 旧样式检查收尾
 
 - 删除无调用方的旧工具卡片强调边线及专用动画，收缩对应历史 UI lint 例外。

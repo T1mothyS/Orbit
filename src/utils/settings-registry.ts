@@ -1,6 +1,7 @@
 import { settingKeywords, searchSettings, type SearchableSetting } from './settings-search.js';
 // Stable IDs are shared by the settings UI, search and read-only AI recall. No values or secrets.
 const definitions = [
+  { id: 'account-password', section: 'account', label: '修改密码', description: '验证当前密码，更新后所有 Orbit 登录失效；独立授权保留。', admin: false },
   {id:'android-push-enabled',section:'notifications',label:'Android 手机提醒',description:'独立账号开关，默认关闭；普通日程和周期事务通过 FCM 发送标题与时间。',admin:false},
   {id:'android-notification-permission',section:'notifications',label:'系统权限与注册',description:'Android 通知权限与 FCM 设备注册。',admin:false},
   { id: 'library-full-export', section: 'library', label: '导出全库', description: '下载当前账号的完整知识库 JSON。', admin: false },

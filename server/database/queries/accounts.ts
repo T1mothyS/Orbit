@@ -60,6 +60,18 @@ export function getUserById(id: string): Omit<DbUser, 'password_hash'> | undefin
   );
 }
 
+// Internal credential read. Never return this record from a public account endpoint.
+export function getUserCredentials(id: string): DbUser | undefined {
+  return queryOne<DbUser>('SELECT * FROM users WHERE id = ?', [id]);
+}
+
+export function replaceUserPassword(id: string, expectedHash: string, expectedVersion: number, passwordHash: string): boolean {
+  return run(
+    'UPDATE users SET password_hash = ?, auth_version = COALESCE(auth_version, 0) + 1, updated_at = ? WHERE id = ? AND password_hash = ? AND COALESCE(auth_version, 0) = ? AND disabled = 0',
+    [passwordHash, new Date().toISOString(), id, expectedHash, expectedVersion],
+  ).changes === 1;
+}
+
 export function createUser(user: DbUser): Omit<DbUser, 'password_hash'> {
   run(
     'INSERT INTO users (id, email, password_hash, role, disabled, auth_version, preferred_model, admin_shared_api_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',

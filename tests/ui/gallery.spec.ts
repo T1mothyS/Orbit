@@ -114,3 +114,14 @@ test('essential text contrast and low-height sheet actions remain usable', async
   expect(box!.height).toBeGreaterThanOrEqual(44);
   expect(box!.y + box!.height).toBeLessThanOrEqual(480);
 });
+
+test('file selection feedback stays local and text navigation uses the shared link', async ({ page }) => {
+  const writes: string[] = [];
+  page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) writes.push(request.url()); });
+  await open(page, 'surfaces');
+  await page.getByLabel('选择示例图片', { exact: true }).setInputFiles({ name: 'local-example.png', mimeType: 'image/png', buffer: Buffer.from('local fixture, never uploaded') });
+  await expect(page.getByText('已选择 local-example.png；示例不会上传文件。', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: '返回控件示例', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '控件与表单', exact: true })).toBeVisible();
+  expect(writes).toEqual([]);
+});

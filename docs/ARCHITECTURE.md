@@ -12,7 +12,7 @@
 
 ## Orbit UI 基础层（迁移中）
 
-`src/design` 定义唯一 token 值，`src/ui` 暴露 Orbit API，Base UI 只作为内部交互基础。旧变量映射与使用方退出条件见 [迁移台账](FRONTEND-DEBT.md)。设置路由/状态与改密尚未实现，不能用 Gallery 推定业务迁移完成。
+`src/design` 定义唯一 token 值，`src/ui` 暴露 Orbit API，Base UI 只作为内部交互基础。旧变量映射与使用方退出条件见 [迁移台账](FRONTEND-DEBT.md)。A 已批准；账户真实页、改密和设置入口已实现，其余分类/共享草稿仍在迁移，不能用 Gallery 推定全部完成。
 
 main 用编译期 DEV 条件加载 `/dev/ui`，不渲染 App/认证 hooks。`dev:ui` 使用独立 ui-gallery mode 并关闭 envDir，不读 `.env`、不启动 Express/业务数据库；示例只操作组件内存。Gallery 与 Portal 使用同一 token。修改方法见 [UI Playbook](UI-GUIDELINES.md#orbit-ui-统一迁移与-agent-change-playbook)。
 
@@ -88,7 +88,10 @@ SettingsLayout 在正文滚动容器中测量章节位置，使用帧节流及�
 
 | 入口 | 职责 |
 | --- | --- |
-| src/main.tsx | 创建 React 根节点并加载全局样式 |
+| src/main.tsx | 创建 React 根节点、应用 AuthProvider 和全局样式；Gallery 不挂认证 |
+| src/hooks/useAuth.ts | 唯一认证状态、跨标签页同步、过期检查与登出清理 |
+| src/features/settings/account/ | 账户、头像与仅存内存的改密表单 |
+| src/layouts/SettingsFrame.tsx | 设置布局、主题、分类、页面焦点与安全返回 |
 | src/App.tsx | 登录态、顶层路由和登录后页面组合 |
 | src/pages/LoginPage.tsx | 登录、注册和验证码 |
 | src/components/AppShell.tsx | 登录后产品壳、导航、主题、设置和退出 |
@@ -101,9 +104,11 @@ SettingsLayout 在正文滚动容器中测量章节位置，使用帧节流及�
 | src/components/ResearchPage.tsx | 研究历史、观点提案与用户确认界面；不启动真实 Agent |
 | src/components/LibraryPage.tsx、library/LibraryDetailPage.tsx | 知识库列表与异步阅读、评论、版本 |
 | src/pages/ToolsPage.tsx | 登录后的挂载应用菜单；不加入产品顶部导航 |
-| src/components/settings/ | Settings V2 的 Dialog、Layout、Section、Row 和领域设置 |
+| src/components/settings/ | 尚未迁移的领域与旧容器；账户旧实现已退出 |
 
-当前登录后页面路由是 /today、/schedule、/assistant、/reminders、/reports、/reports/:date、/research、/library、/library/:id、/tools 和 /project；/import 重定向到 /assistant?tool=email-import；未登录时使用 /login。设置通过产品壳按钮打开 SettingsDialog，没有独立 /settings 路由；Tools 可从头像菜单或设置“挂载工具”分区进入，不加入产品顶部导航。
+当前登录后页面路由包括 /today、/schedule、/assistant、/reminders、/reports、/reports/:date、/research、/library、/library/:id、/tools 和 /project；/import 重定向到 /assistant?tool=email-import；未登录时使用 /login。头像菜单的设置进入独立 /settings，账户进入 /settings/account；旧账户 ID 经 moduleSettingsPath 定位新页，改密 ID 自动展开表单。其他分类暂转旧模块页/弹窗，C 批次统一退出。Tools 仍从头像菜单或设置进入，不加入产品顶部导航。
+
+设置 Frame 的返回地址仅接受同源站内路径；从业务页打开后经过设置首页/账户仍保留来源，显式返回恢复头像入口焦点。身份由一个 AuthProvider 管理；退出、401/403 或跨标签页身份变化清理当前账号草稿并卸载页面；过期异步身份响应受版本标识和取消信号保护，不能复活旧账号。临时网络失败保留 token。改密输入不入 local/session storage、URL、日志或共享草稿，离开/取消即卸载。
 
 ### 前端加载边界（Phase 2，0.21.1-260915.1408）
 
@@ -123,6 +128,16 @@ Phase 5 后，server/routes/ 拥有全部领域 HTTP 处理器，包括日程、
 认证中间件先解析登录身份；业务接口使用当前用户 ID 查询或写入数据。管理员接口额外检查管理员角色。外部日报接口使用独立的按账号绑定令牌，权限与登录会话分开。
 
 挂载工具保留现有 API 的 Bearer JWT 认证，同时为原始 HTML 页面和资源使用同一 JWT 派生的 `HttpOnly`、`SameSite=Lax` 页面 Cookie。登录/注册写入该 Cookie，`/api/auth/me` 为已有 Bearer 会话补写，退出接口清理；Cookie 校验仍检查账号禁用状态和 `auth_version`，不会替代 API 鉴权。
+
+### 账号密码与登录失效
+
+`POST /api/auth/change-password` 仅接受 Bearer；目标来自认证身份，忽略请求中的账号 ID。body 为 currentPassword/newPassword，成功返回 success/reauthRequired，不签发新 JWT，并清除当前 Tools Cookie。`utils/password-policy.ts` 为注册、发送注册验证码、改密及对应客户端共用的新密码校验：至少 8 位、不超过 72 个 UTF-8 字节，不 trim/截断；已有账号登录及历史较长的当前密码保持兼容。错误当前密码、无变化或输入不合法返回 400，不退出当前账号；并发凭据/禁用变化返回 409，认证无效仍是 401。进程内限流为每账号 5 次/15 分钟、每 IP 20 次/15 分钟，超限 429 携带 Retry-After。
+
+`account-security.ts` 在异步验证/哈希之后，用用户 ID、旧 hash、auth_version 和 enabled 条件做一次 CAS；password_hash 与 auth_version 同步更新，沿用 `withPersistenceTransaction` 的写盘恢复记录。写盘异常返回通用 503，不回显密码、hash 或内部磁盘错误；事务提交点之前失败/进程中断恢复旧凭据，回滚无法完成时保留恢复记录并阻断数据访问。提交点之后中断则重启读取新凭据。浏览器若没有收到明确结果，提示重新登录核对，不能将网络失败视为密码一定未改。登录在异步 bcrypt 后再次核对凭据版本，避免用旧比较结果签发新权限。
+
+成功后所有旧 Orbit Bearer 和 Tools Cookie 在下次鉴权时失效；包括当前浏览器/Electron/WebView 登录。普通退出只退出当前浏览器。独立 Cloud OAuth access/refresh、日报只读令牌、知识库发布令牌和 ChatGPT 凭据不被改密撤销；没有新增 session/refresh 体系或 schema migration，也不承诺强行取消已开始的普通业务请求。既有 Android 认证版本防护自然生效，重新登录及既有设备绑定流程沿用，FCM/AlarmManager 核心未改。
+
+应用代码回滚必须保留最新 data、密码 hash 和账号版本，不得恢复旧数据库来撤销改密。账号业务备份恢复与维护模式的完整系统快照恢复沿用原合同；完整历史快照会恢复当时的账号凭据，不属于普通代码回滚。本次失效保证针对保留当前安全数据的运行/代码回滚，不承诺跨历史数据库快照维持撤销。安全结果日志只记录账号 ID、事件与结果码；日志写入失败不改变已经提交的密码结果。
 
 领域路由保持已有认证、所有权及 Phase 3 可靠写入协议；固定路径先于参数路由，SPA fallback 最后安装。关闭 runtime 会停止新调度并等待在途 HTTP 与后台 Promise；外部服务超时和强制终止的边界见 [Phase 4 验证记录](archive/engineering/PHASE4-APP-RUNTIME-ROUTERS.md)。
 

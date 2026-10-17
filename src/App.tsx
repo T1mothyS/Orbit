@@ -21,6 +21,8 @@ const ResearchPage = lazy(() => import('./components/ResearchPage').then(module 
 const LibraryPage = lazy(() => import('./components/LibraryPage').then(module => ({ default: module.LibraryPage })));
 const ToolsPage = lazy(() => import('./pages/ToolsPage').then(module => ({ default: module.ToolsPage })));
 const ProjectEvolutionPage = lazy(() => import('./pages/ProjectEvolutionPage').then(module => ({ default: module.ProjectEvolutionPage })));
+const SettingsHomePage = lazy(() => import('./features/settings/SettingsHomePage'));
+const AccountPage = lazy(() => import('./features/settings/account/AccountPage'));
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -41,7 +43,7 @@ function App() {
       if (settingsDialog) {
         document.title = 'Orbit - 设置 / Settings';
       } else {
-        const moduleTitle = location.pathname === '/settings/profile' ? '个人资料' : location.pathname === '/reports/settings' ? '日报设置' : location.pathname === '/library/settings' ? '知识库设置' : null;
+        const moduleTitle = location.pathname === '/settings/account' ? '账户与安全' : location.pathname === '/settings' ? '设置' : location.pathname === '/settings/profile' ? '个人资料' : location.pathname === '/reports/settings' ? '日报设置' : location.pathname === '/library/settings' ? '知识库设置' : null;
         document.title = moduleTitle ? `Orbit - ${moduleTitle}` : /^\/project\/?$/.test(location.pathname)
           ? (new URLSearchParams(location.search).get('view')==='statistics'?'Orbit - 个人活动报告':'Orbit - 项目成长')
           : location.pathname.startsWith('/library/experience') ? 'Orbit - 记录经历' : /^\/tools\/?$/.test(location.pathname) ? 'Orbit - Tools' : /^\/assistant\/?$/.test(location.pathname)?'Orbit - 对话':'Orbit - 首页 / Home';
@@ -77,6 +79,8 @@ function App() {
           <Route path="/reports" element={<AppContent />} />
           <Route path="/reports/settings" element={<AppContent />} />
           <Route path="/settings/profile" element={<AppContent />} />
+          <Route path="/settings" element={<FeatureBoundary><SettingsHomePage /></FeatureBoundary>} />
+          <Route path="/settings/account" element={<FeatureBoundary><AccountPage /></FeatureBoundary>} />
           <Route path="/research" element={<AppContent />} />
           <Route path="/reports/:date" element={<FeatureBoundary key={location.pathname}><DailyReportReaderPage /></FeatureBoundary>} />
           <Route path="/library" element={<AppContent />} />
@@ -126,8 +130,13 @@ function AppContent() {
     if (destination && destination !== location.pathname) navigate(`${destination}${location.search}`, { replace: true });
     else if (!settingsModule) setShowSettings(true);
   }, [settingsId, settingsModule, location.pathname, location.search, navigate]);
-  useEffect(()=>{const open=(event:Event)=>{settingsTriggerRef.current=document.activeElement as HTMLElement;setShowSettings(true);const section=(event as CustomEvent<string>).detail;if(section)setTimeout(()=>document.dispatchEvent(new CustomEvent('orbit:settings-open-section',{detail:section})),200);};window.addEventListener('orbit:open-settings',open);return()=>window.removeEventListener('orbit:open-settings',open);},[]);
+  useEffect(()=>{const open=(event:Event)=>{const section=(event as CustomEvent<string>).detail;if(section==='account'){navigate('/settings/account',{state:{settingsReturnTo:location.pathname+location.search}});return;}settingsTriggerRef.current=document.activeElement as HTMLElement;setShowSettings(true);if(section)setTimeout(()=>document.dispatchEvent(new CustomEvent('orbit:settings-open-section',{detail:section})),200);};window.addEventListener('orbit:open-settings',open);return()=>window.removeEventListener('orbit:open-settings',open);},[navigate,location.pathname,location.search]);
   const closeSettings=()=>{setShowSettings(false);if(settingsId){const params=new URLSearchParams(location.search);params.delete('settings');navigate({pathname:location.pathname,search:params.toString()},{replace:true});}};
+  useEffect(() => {
+    if (!(location.state as { settingsFocusReturn?: boolean } | null)?.settingsFocusReturn) return;
+    const frame = requestAnimationFrame(() => document.querySelector<HTMLElement>('.account-menu > summary')?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [location.key, location.state]);
   // 设置弹窗打开/关闭时更新 Tab 标题
   useEffect(() => {
     document.title = showSettings
@@ -149,7 +158,7 @@ function AppContent() {
         onSectionChange={changeSection}
         theme={theme}
         onToggleTheme={toggleTheme}
-        onOpenSettings={() => { settingsTriggerRef.current = document.activeElement as HTMLElement; setShowSettings(true); }}
+        onOpenSettings={() => navigate('/settings', { state: { settingsReturnTo: location.pathname + location.search } })}
         onOpenAdmin={() => setShowAdmin(true)}
         user={user}
         onLogout={logout}

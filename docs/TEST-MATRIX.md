@@ -8,11 +8,11 @@
 
 ### Orbit UI 基础体系与 Checkpoint A
 
-`npm run dev:ui` 在 loopback 的 4196 端口提供 `/dev/ui`；独立 mode 关闭 envDir，示例不渲染认证 hooks、不启动业务服务。`npm run test:ui` 自行启动这个前端，用本仓库锁定的 Playwright 检查四尺寸明暗、密码显示、选择器/开关、焦点循环/返回、菜单、Tabs、Toast、减动、关键文字对比度和 390×480 Sheet 操作可达性；要求没有 API 请求、页面/console 错误或页面横向溢出。
+`npm run dev:ui` 在 loopback 的 4196 端口提供 `/dev/ui`；独立 mode 关闭 envDir，示例不渲染认证 hooks、不启动业务服务。先构建，再运行 `npm run test:ui`：Gallery 套件检查四尺寸明暗、密码显示、选择器/开关、焦点循环/返回、菜单、Tabs、Toast、减动、关键文字对比度和 390×480 Sheet 操作可达性；Gallery 要求没有 API 请求、页面/console 错误或横向溢出。账户套件另启独立的合成 API，见下节。
 
 首次本机运行可用 `npx playwright install chromium`；如已有 Edge，可在 PowerShell 进程级设置 `$env:ORBIT_BROWSER_CHANNEL='msedge'`。CI 固定安装锁定版本 Chromium，远端 CI 结果必须在 push 后另行核对，不能由本机通过推定。
 
-截图/trace 默认写系统临时目录，可用 ORBIT_UI_QA_DIR 指定。`tests/ui/visual-policy.json` 当前明确 A 尚未批准，故截图是候选，不称为视觉回归通过。A 确认后审阅并建立对应平台的黄金图，将批准标记切为 true；此后普通 `test:ui` 和 CI 都强制比较，缺图也失败。更新必须显式 `--update-snapshots=all` 并审阅差异；CI 不自动更新。Windows/Linux 基线分开，阈值在 Playwright 配置中维护，不能调大来掩盖漂移。
+截图/trace 默认写系统临时目录，可用 ORBIT_UI_QA_DIR 指定。用户于 2026-10-18 批准 A，`tests/ui/visual-policy.json` 已启用 Gallery 比较；锁定 Playwright Chromium 的 Windows 24 张黄金图已建立并通过比较。账户页在 B 批准前仍只采集候选。缺少批准截图会失败，更新必须显式 `--update-snapshots=all` 并审阅差异；CI 不自动更新。Windows/Linux 基线分开，阈值在 Playwright 配置中维护，不能调大掩盖漂移。当前没有可用本机 Linux 环境，Linux 黄金图与中文字体的实际 CI 核验留在发布前完成；未解决时不能宣布 CI/发布就绪。
 
 `npm run ui:lint` 检查绕过组件入口、裸基础控件、硬编码颜色/圆角/层级、inline 视觉和页面覆盖。历史基线按文件/规则/代码指纹/次数限制；新增副本和改写不能借用旧配额，ui/design/dev/features 不接受历史例外，CI 拒绝更新基线。`server/ui-lint.test.ts` 验证负向阻断；Calendar 显式 date-fns 依赖的本地日期边界单独回归。
 
@@ -23,6 +23,18 @@
 全局 token 兼容补验复用隔离预览：`mobile-compact-browser-smoke.cjs --baseline` 的 56 项六业务入口/搜索、四尺寸明暗检查通过（此模式只采集当前状态，不代表前后像素比较）；`native-dialog-browser-smoke.cjs` 的 6 组原生/自动化确认、资料草稿和焦点保护通过。较早 `browser-smoke.cjs` 因缺头像 fixture、仍定位旧的直接入口而失败，不计通过；没有修改产品来适配旧脚本。上述均为临时合成数据库与 loopback，后台任务/外部服务关闭，不能替代真实业务和生产验收。
 
 2026-10-18 旧样式检查收尾：删除无调用的工具卡片边线/动画，并记录语义引用的单文件单规则例外，依据见 [迁移台账](FRONTEND-DEBT.md)。554/554、typecheck、Web/Electron build、ui:lint、产物隔离及 diff 检查通过。默认 Chromium 可执行文件未安装，首轮浏览器未启动；使用文档已列明的进程级 msedge 后 13/13 通过，未修改测试标准或浏览器系统设置。Checkpoint A 原图继续作为相同视觉方向的候选，尚无批准基线或远端 CI 结果。
+
+### 账户真实页面与 Checkpoint B
+
+`tests/ui/account.spec.ts` 使用已构建 dist 的真实账户页与真实 API。Playwright 启动 `orbit-ui-preview.ts 4187 --iteration --account-ui`，只使用临时 DATA_DIR 与固定合成账号，不加载 .env，不复用已有监听器；后台、邮件、Push 和外部调用关闭/替代。与不调用 API 的 Gallery 分开取证，退出时清理监听。修改普通源码后先重新 build，再 test:ui，避免测试旧 dist。副作用场景不在相同已改密账号上自动重试。
+
+2026-10-18 本地验证：569/569 服务测试（含 15 项账号专项）、29/29 Playwright 通过。账户检查覆盖四尺寸明暗正常/展开表单、输入校验与错误密码、重复提交保护、头像真实上传/损坏文件/确认/失败重试、改密后双标签退出、新旧密码、旧链接、敏感表单离开清空、跨账号与旧身份慢响应、返回原页面和焦点。另补验设置往返保留原会话/未发送草稿。A 走批准黄金图比较，B 保留候选原图，不能将此结果当作 B 已批准。Avatar/FilePicker/TextLink 的 Gallery 样例与本地选文件/导航测试同步补入，只有布局与状态的八张图发生预期内容扩展，既有控件视觉方向保持。
+
+`server/account-security.test.ts` 覆盖 Bearer 与 Cookie 边界、请求目标隔离、共享注册/验证码/改密校验、bcrypt UTF-8 长度、历史长密码、并发 CAS、禁用竞争、fsync/rename 失败不误报成功/不泄漏至后续保存、旧 JWT/Tools Cookie 失效与独立授权保留、重载及限流。`password-crash.fixture.ts` 使用独立进程在数据库写入前/后、提交点后和回滚失败处强制中断，重启验证凭据与版本一致、恢复记录与阻断机制；另注入已提交后的存储阻断，验证接口不确认成功，重启仍读取新凭据。只输出布尔证据，不输出密码或 hash。
+
+本次首次头像浏览器夹具含损坏 PNG，现作为明确的拒绝/可读错误案例，再用程序生成的有效 PNG 测真实上传；取消浮层后等待关闭，并把触发器定位限定在账号区域。没有放宽图片校验或产品焦点保护来通过测试。现有原生确认脚本更新新设置页的显式返回，同时保留未迁移弹窗 Escape/焦点断言；六组确认/资料草稿回归通过。生产、真实个人数据、邮件/手机送达、Electron 安装、远端 CI 与 Linux 黄金图不在上述本地证据中。
+
+原有 mobile-compact 浏览器套件全流程 92 项通过，覆盖六业务/搜索四尺寸明暗及记事、图片、筛选、阅读返回、下载、失败/慢响应、草稿和退出；其旧“导出全库后关闭弹窗”断言与早已存在的知识库模块页不符，修正为返回知识库后用新的临时数据重跑，没有更改业务实现来迎合测试。
 
 ### 2026-10-09 原生确认框与浏览器自动化
 

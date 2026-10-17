@@ -22,10 +22,15 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  webServer: {
+  webServer: [{
     command: 'npm run dev:ui',
     url: 'http://127.0.0.1:4196/dev/ui',
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
-  },
+  }, {
+    command: 'node --import tsx scripts/orbit-ui-preview.ts 4187 --iteration --account-ui',
+    url: 'http://127.0.0.1:4187/api/health',
+    reuseExistingServer: false,
+    timeout: 60_000,
+  }],
 });

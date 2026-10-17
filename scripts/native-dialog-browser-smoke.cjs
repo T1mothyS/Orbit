@@ -101,7 +101,11 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
       await automated.getByLabel('关闭日程编辑', { exact: true }).click(); assert.equal(await automated.getByRole('dialog', { name: '新增日程', exact: true }).count(), 0);
       assert.deepEqual(await automated.evaluate(() => window.__orbitBrowserAudit.failures), []);
       telemetry.push({ mode: 'prelude-schedule', width, records: await automated.evaluate(() => window.__orbitBrowserAudit.records) });
-      await automated.locator('.account-menu > summary').click(); await automated.getByRole('button', { name: '设置', exact: true }).click(); await automated.getByLabel('关闭设置', { exact: true }).press('Escape');
+      await automated.locator('.account-menu > summary').click(); await automated.getByRole('button', { name: '设置', exact: true }).click();
+      await automated.getByRole('heading',{name:width>=768?'账户与安全':'设置',exact:true}).waitFor();await automated.getByRole('link',{name:'返回 Orbit',exact:true}).click();
+      await automated.waitForFunction(() => document.activeElement?.matches('.account-menu > summary'));
+      // Unmigrated categories still retain the old modal's Escape/focus contract until C.
+      await automated.goto(automatedBase + '/schedule?settings=setting-ai-1l45kwl');await automated.getByLabel('关闭设置', { exact: true }).press('Escape');
       await automated.waitForFunction(() => document.activeElement?.matches('.account-menu > summary'));
       await automated.goto(automatedBase + '/settings/profile'); await automated.getByLabel('职业背景', { exact: true }).waitFor();
       await arm(automated, '测试：下次资料离开取消放弃'); await automated.getByLabel('职业背景', { exact: true }).fill(`合成资料修改 ${width}`); await automated.getByRole('link', { name: /返回对话/ }).click(); assert.ok(automated.url().endsWith('/settings/profile'));
@@ -118,7 +122,7 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
       assert.equal(await automated.getByLabel('职业背景', { exact: true }).inputValue(), savedProfile);
       assert.equal(await automated.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
       await automated.screenshot({ path: path.join(output, `automated-${width}.png`) });
-      checks.push(`automated ${width}: time keyboard, confirm cancel/save/discard, settings Escape-focus, dirty return cancel/accept, dirty refresh, navigation/overflow`);
+      checks.push(`automated ${width}: time keyboard, confirm cancel/save/discard, settings page return and legacy Escape-focus, dirty return cancel/accept, dirty refresh, navigation/overflow`);
     }
     await automated.getByLabel('职业背景', { exact: true }).fill('合成关闭页面未保存');
     await Promise.all([automated.waitForEvent('close'), automated.close({ runBeforeUnload: true })]); await auto.context.close();

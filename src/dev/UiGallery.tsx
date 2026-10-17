@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowUpRight, Bell, Check, ChevronRight, Copy, HelpCircle, LogOut, Moon, MoreHorizontal, Plus, Search, Settings, Sun } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
-import { Badge, Button, Card, Checkbox, ConfirmDialog, Dialog, EmptyState, ErrorState, FormField, IconButton, InlineNotice, Input, LoadingState, Menu, PasswordInput, Popover, Section, Select, SettingRow, Sheet, Skeleton, Switch, Tabs, Textarea, ToastProvider, Tooltip, useToast } from '../ui';
+import { Avatar, Badge, Button, Card, Checkbox, ConfirmDialog, Dialog, EmptyState, ErrorState, FilePicker, FormField, IconButton, InlineNotice, Input, LoadingState, Menu, PasswordInput, Popover, Section, Select, SettingRow, Sheet, Skeleton, Switch, Tabs, Textarea, TextLink, ToastProvider, Tooltip, useToast } from '../ui';
 import './ui-gallery.css';
 
 export default function UiGallery() { return <ToastProvider><Gallery /></ToastProvider>; }
@@ -17,6 +17,7 @@ function Gallery() {
   const [dialog, setDialog] = useState(false), [sheet, setSheet] = useState(false), [confirm, setConfirm] = useState(false);
   const [tab, setTab] = useState('personal');
   const [notice, setNotice] = useState('');
+  const [fileName, setFileName] = useState('');
   const toast = useToast();
   const views = [{ id: 'controls', title: '控件与表单', description: '主次清楚，反馈明确。' }, { id: 'surfaces', title: '布局与状态', description: '让内容有层级，让状态可理解。' }, { id: 'overlays', title: '浮层与反馈', description: '按任务选择空间，保留操作连续性。' }];
   const current = views.find(item => item.id === view)!;
@@ -59,6 +60,10 @@ function Gallery() {
         </Section>
         <Section title="状态说清下一步" description="加载、失败与空内容有各自的表达，不用一个转圈代替所有情况。">
           <div className="gallery-state-list"><InlineNotice title="设置已保存">下次读取时生效，其他未保存内容仍然保留。</InlineNotice><InlineNotice tone="warning" title="连接暂不可用">设置仍然保留，连接恢复后可以重试。</InlineNotice><ErrorState description="网络连接中断，当前输入仍然保留。" onRetry={() => toast.show({ title: '已重新读取示例设置' })} /><EmptyState title="还没有记录" description="从一条简短的想法开始，稍后也可以继续整理。" actionLabel="添加记录" onAction={() => setNotice('已打开添加记录示例')} /><LoadingState /><Skeleton /></div>
+        </Section>
+        <Section title="头像与文件" description="识别信息保持轻量，文件选择沿用系统能力。">
+          <div className="gallery-inline"><Avatar label="Orbit" /><Avatar label="Orbit" size={48} /><FilePicker label="选择示例图片" accept="image/jpeg,image/png,image/webp" onFile={file => setFileName(file.name)} /><TextLink to="/dev/ui?view=controls">返回控件示例</TextLink></div>
+          <p className="oui-help" role="status">{fileName ? `已选择 ${fileName}；示例不会上传文件。` : '只演示文件选择，不读取或上传内容。'}</p>
         </Section>
       </>}
       {view === 'overlays' && <>

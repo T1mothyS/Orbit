@@ -10,10 +10,10 @@
 
 | 区域 | 当前事实与问题 | 目标、影响与验证重点 | 优先级 / 状态 |
 | --- | --- | --- | --- |
-| 视觉基础 | 多层 foundation、页面控件、TDesign，权威分散 | design 单一 token、ui 统一 API；Portal/主题及旧页面回归 | P1 / 待 Checkpoint A |
-| 设置入口 | 已有分区、搜索、稳定 ID，但弹窗/模块页并存 | 一个中心，旧 URL/ID/action 可达，删除旧容器 | P1 / 待迁移 |
+| 视觉基础 | design/ui/Gallery 已建立，旧区域尚有 TDesign | A 已批准；Windows Chromium 黄金图已启用，Linux 待补 | P1 / A 已确认 |
+| 设置入口 | 独立 /settings 和账户页；其他分类仍转既有入口 | C 批次完成统一路由、共享状态并删除旧容器 | P1 / 迁移中 |
 | 设置数据 | 资料/日报共用 Context，通知/日报邮件共用 preference，但状态分散 | 父路由单一所有者、领域草稿/版本冲突保护 | P0 / 待迁移 |
-| 账号安全 | bcrypt/JWT/auth_version，缺改密 | 原子更新及旧登录失效；独立授权保留，无 schema migration | P0 / 待实现 |
+| 账号安全 | 改密、共享认证、账户/头像页已实现 | CAS/持久化/失效/独立授权已本地验证；账户视觉待 B | P0 / 待 B |
 | Shell/搜索 | AppShell、GlobalSearch、账户菜单 | 统一入口、焦点/主题/公共控件，保留六业务导航 | P2 / 待迁移 |
 | AI/记事/附件 | AiSchedulePanel、useOrbitChat、NoteBoard、附件 hooks | 沿现有状态机提取呈现；保留确认/队列/取消/草稿 | 后续第 1 批 |
 | 周期/今日 | ReminderPage、ActionCenterPage、OrbitDialog | 表单/完成/部分成功/恢复，不混入领域重写 | 后续第 2 批 |
@@ -35,6 +35,8 @@
 | ui:lint 历史基线 | 未迁移控件和样式 | 随迁移减少，禁止新区域例外和 CI 自动扩充 |
 
 2026-10-18 清理：全仓调用检索确认旧 `.tool-detail-card` / `pulse-border` 只有自身 CSS，已删除。`.chat-markdown blockquote` 的边线用于引用识别，保留；设计检测器无法按 selector 豁免，故通过其 CLI 仅对 foundation.css 的 side-tab 添加文件范围例外，理由记录在 `.impeccable/config.json`。这不表示其他卡片可以使用强调侧边线；新体系仍受 UI 规范和其他检测约束。
+
+账户迁移已删除旧 AccountSettings/AvatarSettings 及相应头像/上传样式，没有保留第二套账户编辑器。`features/settings/navigation.ts` 中其他分类暂时指向原设置；这是 B→C 间的入口适配，C 必须替换并删除旧容器，不作为长期双轨。`/settings/profile` 和共享 Cloud/通知草稿的所有权仍在 C 批次，不由账户页面代为保存。
 
 ## 暂缓边界
 

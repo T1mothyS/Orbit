@@ -1,6 +1,5 @@
 import { useAuth } from '../../hooks/useAuth';
 import { SettingsLayout } from './SettingsLayout';
-import { AccountSettings } from './sections/AccountSettings';
 import { AiSettings } from './sections/AiSettings';
 import { IntegrationGuideSettings } from './sections/IntegrationGuideSettings';
 import { NotificationSettings } from './sections/NotificationSettings';
@@ -14,13 +13,12 @@ import { CaldavSettings } from './sections/CaldavSettings';
 import { ReportEmailSettings } from './sections/ReportEmailSettings';
 
 export function SettingsPage({ onOpenAdmin, onOpenTools, onOpenPreferences }: { onOpenAdmin?: () => void; onOpenTools?: () => void; onOpenPreferences?: () => void }) {
-  const { user, authHeaders, logout, isLoading } = useAuth();
+  const { user, authHeaders, isLoading } = useAuth();
   if (isLoading) return <p className="settings-empty" role="status">正在加载账号设置…</p>;
   if (!user) return <p className="settings-empty" role="alert">无法读取当前账号，请关闭设置后重新登录。</p>;
 
   return (
     <SettingsLayout isAdmin={user.role === 'admin'}>
-      <AccountSettings user={user} onLogout={logout} />
       <AiSettings authHeaders={authHeaders} isAdmin={user.role==='admin'} />
       <IntegrationGuideSettings authHeaders={authHeaders} />
       <CaldavSettings authHeaders={authHeaders} />

@@ -28,6 +28,7 @@ interface Bucket {
 }
 
 const rules: RateRule[] = [
+  { name: 'password-change', limit: 20, windowMs: 15 * 60_000, matches: req => req.method === 'POST' && req.path === '/api/auth/change-password' },
   { name: 'verification-email', limit: 5, windowMs: 15 * 60_000, matches: req => req.method === 'POST' && req.path === '/api/auth/send-register-code' },
   { name: 'authentication', limit: 20, windowMs: 15 * 60_000, matches: req => req.method === 'POST' && ['/api/auth/login', '/api/auth/register'].includes(req.path) },
   { name: 'invite-code-rotation', limit: 10, windowMs: 60 * 60_000, matches: req => req.method === 'POST' && /^\/api\/admin\/invite-codes\/(admin|user)\/rotate$/.test(req.path) },

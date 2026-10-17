@@ -8,7 +8,17 @@
 }
 .oui-root *, .oui-menu *, .oui-tooltip * { box-sizing: border-box; }
 .oui-root ::selection { background: var(--orbit-brand-soft); color: var(--orbit-text); }
-.oui-root :is(button, input, textarea, a, [tabindex]):focus-visible,
+.oui-avatar { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--orbit-space-8); height: var(--orbit-space-8); overflow: hidden; border-radius: var(--orbit-radius-full); color: var(--orbit-brand); background: var(--orbit-brand-soft); font-weight: 600; }
+.oui-avatar--large { width: var(--orbit-space-12); height: var(--orbit-space-12); }
+.oui-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.oui-text-link { color: var(--orbit-link-color); text-decoration: underline; text-underline-offset: .2em; font: inherit; }
+.oui-text-link:hover { color: var(--orbit-link-hover-color); }
+.oui-file-picker { position: relative; overflow: hidden; }
+.oui-file-picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.oui-file-picker:focus-within { outline: 2px solid var(--orbit-brand); outline-offset: 3px; }
+.oui-file-picker--disabled { opacity: .5; cursor: default; }
+.oui-file-picker--disabled input { cursor: default; }
+.oui-root :is(button, input, textarea, a, [tabindex]:not([tabindex="-1"])):focus-visible,
 :is(.oui-menu-item, .oui-option):focus-visible {
   outline: 2px solid var(--orbit-brand);
   outline-offset: 3px;
@@ -172,6 +182,7 @@
 .oui-toast-content .oui-icon-button { margin: calc(-1 * var(--orbit-space-2)); color: inherit; }
 .oui-toast[data-limited] { display: none; }
 @media (max-width: 767px) {
+  .oui-text-link { display: inline-flex; align-items: center; min-height: var(--orbit-touch-target); }
   .oui-setting-row { grid-template-columns: minmax(0, 1fr); gap: var(--orbit-space-3); padding-block: var(--orbit-space-4); }
   .oui-card { padding: var(--orbit-space-4); }
   .oui-overlay { align-items: end; padding: 0; }

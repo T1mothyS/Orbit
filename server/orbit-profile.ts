@@ -9,7 +9,9 @@ export async function saveAvatar(userId:string,body:{mimeType?:unknown;base64?:u
   if(!['image/png','image/jpeg','image/webp'].includes(String(body.mimeType))||typeof body.base64!=='string'||body.base64.length>7*1024*1024||!/^[A-Za-z0-9+/]+={0,2}$/.test(body.base64))throw new Error('头像需要是 JPEG、PNG 或 WebP 图片');
   const bytes=Buffer.from(body.base64,'base64');if(bytes.length>5*1024*1024)throw new Error('头像不能超过 5 MB');
   validateAttachmentBytes(String(body.mimeType),bytes);
-  const encoded=await sharp(bytes,{limitInputPixels:16777216,animated:false}).rotate().resize(256,256,{fit:'cover'}).webp({quality:85}).toBuffer();
+  let encoded:Buffer;
+  try{encoded=await sharp(bytes,{limitInputPixels:16777216,animated:false}).rotate().resize(256,256,{fit:'cover'}).webp({quality:85}).toBuffer();}
+  catch{throw new Error('图片无法读取，请更换图片后重试。');}
   if(!getUserById(userId)||getUserById(userId)?.disabled)throw new Error('账号已不可用');
   const old=getProfile(userId).avatarId;
   const saved=withPersistenceTransaction(()=>{const file=saveBase64Attachment({userId,importId:`avatar:${userId}`,originalName:'avatar.webp',mimeType:'image/webp',base64:encoded.toString('base64')});run('INSERT INTO orbit_profiles (user_id,avatar_id) VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET avatar_id=excluded.avatar_id',[userId,file.id]);return file;});

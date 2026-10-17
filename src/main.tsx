@@ -11,6 +11,7 @@ import './design/motion.css';
 import './design/legacy.css';
 import './ui/ui.css';
 import { initializeUnsavedContextGuard } from './hooks/useUnsavedContext';
+import { AuthProvider } from './hooks/useAuth';
 
 // 设置页面标题
 document.title = APP_CONFIG.name;
@@ -26,7 +27,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       {UiGallery && window.location.pathname === '/dev/ui'
         ? <React.Suspense fallback={<p role="status">正在加载界面预览…</p>}><UiGallery /></React.Suspense>
-        : <App />}
+        : <AuthProvider><App /></AuthProvider>}
     </BrowserRouter>
   </React.StrictMode>,
 );

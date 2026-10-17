@@ -7,14 +7,18 @@ import bcrypt from 'bcryptjs';
 import {randomUUID} from 'node:crypto';
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-ui-preview-'));
 const browserAudit=process.argv.includes('--browser-audit');
+const accountUi=process.argv.includes('--account-ui');
 Object.assign(process.env,{DATA_DIR:root,NODE_ENV:'test',APP_ENV:'development',JWT_SECRET:'isolated-preview-only-no-production',BACKGROUND_JOBS_ENABLED:'false',ORBIT_PROACTIVE_ENABLED:'false'});
-if(browserAudit) Object.assign(process.env,{ANDROID_PUSH_ENABLED:'false',DIGEST_V2_ENABLED:'false',SMTP_USER:'',SMTP_PASS:'',IMAP_PASS:'',CODEBUDDY_API_KEY:'',BACKUP_ENCRYPTION_KEY:''});
+if(browserAudit||accountUi) Object.assign(process.env,{ANDROID_PUSH_ENABLED:'false',DIGEST_V2_ENABLED:'false',SMTP_USER:'',SMTP_PASS:'',IMAP_PASS:'',CODEBUDDY_API_KEY:'',BACKUP_ENCRYPTION_KEY:''});
 const api=await import('../server/index.js');await api.initializeServer();
 const db=await import('../server/db.js'),orbit=await import('../server/orbit-store.js'),state=await import('../server/ai-chat-state.js');
 const {buildAiPlanSnapshot}=await import('../server/ai-plan.js');
 const stamp=new Date().toISOString(),uid='preview-owner';
 db.createUser({id:uid,email:'preview@example.invalid',password_hash:await bcrypt.hash('OrbitPreview123!',10),role:'admin',disabled:0,created_at:stamp,updated_at:stamp});
 db.createUser({id:'preview-empty',email:'empty@example.invalid',password_hash:await bcrypt.hash('OrbitPreview123!',10),role:'user',disabled:0,created_at:stamp,updated_at:stamp});
+if(accountUi) for(const id of ['preview-security','preview-avatar','preview-rate']) {
+  db.createUser({id,email:`${id}@example.invalid`,password_hash:await bcrypt.hash('OrbitPreview123!',10),role:'user',disabled:0,created_at:stamp,updated_at:stamp});
+}
 const cid=orbit.ensureDefaultConversation(uid);
 for(let i=0;i<12;i++)db.createAiScheduleMessage({id:randomUUID(),user_id:uid,conversation_id:cid,role:i%2?'assistant':'user',type:'text',content:i%2?'### 本周安排\n**重点**：先完成操作状态，再检查页面。\n- 上午 09:00 开会\n- 下午核对资料\n[官方来源](https://www.openai.com/)\n<script>这段内容只显示为文字</script>':'帮我整理一下本周安排。',intent:null,plan:null,schedule_items:null,created_at:new Date(Date.now()-600000+i*10000).toISOString()});
 const event=randomUUID(),message=randomUUID();
@@ -67,7 +71,7 @@ if(process.argv.includes('--iteration')) {
   });
 }
 const app=express();
-if(browserAudit) {
+if(browserAudit||accountUi) {
   // Read-only synthetic integration displays, never SDK/model/CalDAV calls.
   app.get('/api/models',(_req,res)=>res.json({models:[],defaultModel:'glm-5.1'}));
   app.get('/api/integrations/caldav/status',(_req,res)=>res.json({enabled:false,writeEnabled:false,automationAvailable:false,mode:'full-one-way',includeCompleted:true}));

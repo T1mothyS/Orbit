@@ -7,9 +7,10 @@
 ## Orbit UI 统一重构（进行中）
 
 - 用户已确认完整方向与连续实施方式，视觉 A/B/C 是集中确认节点，不是逐模块审批。
-- M0/M1：建立 design/ui/Gallery、临时旧变量映射及退出台账；基础视觉待 Checkpoint A。边界检查、浏览器交互和 CI 接入同步实施，不把候选截图宣称为批准基线。
-- 后续依次完成账号安全/账户代表页（B）、Settings 全分类/移动/Shell（C）、最终回归和第一轮同 SHA 发布；旧设置 URL、ID、草稿、共享状态、账号隔离和独立授权必须保留。
-- 尚未实现 Settings V3 或改密，尚未 push/部署。真实验证范围维护在 [测试矩阵](TEST-MATRIX.md#orbit-ui-基础体系与-checkpoint-a)，完整迁移去向和退出条件见 [前端台账](FRONTEND-DEBT.md)。
+- M0/M1：用户于 2026-10-18 确认 A，Windows Chromium 的 Gallery 黄金图启用且比较通过；Linux 基线待发布前补齐，远端 CI 尚未验。
+- 账户真实页、头像与改密、共享认证已本地实现并验证，旧账户组件/样式删除；账户视觉待 B。旧账户链接定位新页，其他设置分类仍在原实现。
+- 后续完成 Settings 全分类/共享草稿/移动/Shell（C）、最终回归和第一轮同 SHA 发布；原 URL/ID、草稿、共享状态、隔离和独立授权继续保护。
+- 尚未完成整块 Settings V3，尚未 push/部署。真实验证范围维护在 [测试矩阵](TEST-MATRIX.md#账户真实页面与-checkpoint-b)，完整迁移去向和退出条件见 [前端台账](FRONTEND-DEBT.md)。
 
 ## 2026-10-09 UI/UX 审计八项加固
 

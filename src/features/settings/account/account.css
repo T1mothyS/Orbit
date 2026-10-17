@@ -1,0 +1,9 @@
+.settings-account-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--orbit-space-3); }
+.settings-avatar-editor { display: grid; gap: var(--orbit-space-3); width: 100%; }
+.settings-account-identity { display: flex; align-items: center; flex-wrap: wrap; gap: var(--orbit-space-3); overflow-wrap: anywhere; }
+.settings-account-id { color: var(--orbit-text-secondary); font-family: var(--orbit-font-code); font-size: var(--orbit-type-caption); overflow-wrap: anywhere; }
+.settings-password-form { display: grid; gap: var(--orbit-space-5); width: 100%; max-width: 440px; min-width: 0; }
+@media (max-width: 767px) {
+  .settings-account-actions { gap: var(--orbit-space-2); }
+  .settings-password-form { max-width: none; }
+}

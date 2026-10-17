@@ -7,13 +7,13 @@ export function Card({ className = '', ...props }: HTMLAttributes<HTMLDivElement
   return <div {...props} className={`oui-card ${className}`} />;
 }
 export function Section({ title, description, children, id, action }: { title: string; description?: ReactNode; children: ReactNode; id?: string; action?: ReactNode }) {
-  return <section className="oui-section" id={id} aria-label={title}>
+  return <section className="oui-section" id={id} aria-label={title} tabIndex={id ? -1 : undefined}>
     <header className="oui-section-heading"><div><h2>{title}</h2>{description && <p>{description}</p>}</div>{action}</header>
     <div>{children}</div>
   </section>;
 }
 export function SettingRow({ label, description, children, htmlFor, id }: { label: string; description?: ReactNode; children: ReactNode; htmlFor?: string; id?: string }) {
-  return <div className="oui-setting-row" id={id}>
+  return <div className="oui-setting-row" id={id} tabIndex={id ? -1 : undefined}>
     <div className="oui-setting-copy">{htmlFor ? <label htmlFor={htmlFor}>{label}</label> : <h3>{label}</h3>}{description && <p>{description}</p>}</div>
     <div className="oui-setting-control">{children}</div>
   </div>;

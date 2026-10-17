@@ -1,4 +1,4 @@
 {
-  "galleryApproved": false,
-  "reason": "Checkpoint A is awaiting user review. Captures are candidates, not accepted regression baselines."
+  "galleryApproved": true,
+  "reason": "User accepted Checkpoint A on 2026-10-18 (Asia/Hong_Kong), source fba9f27. Platform goldens require review; missing approved screenshots fail comparison."
 }

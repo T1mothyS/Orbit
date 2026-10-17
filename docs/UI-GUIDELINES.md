@@ -4,7 +4,7 @@
 
 ## Orbit UI 统一迁移与 Agent Change Playbook
 
-Status: 进行中，基础视觉待 Checkpoint A。`src/design/` 是 token 值来源，`src/ui/` 是新基础控件唯一入口；`/dev/ui` 是不读取账号数据的开发 Gallery，正式构建不包含。下方历史 TDesign/class 规则仅适用于未迁移区域。迁移去向及退出条件见 [前端台账](FRONTEND-DEBT.md)。
+Status: 进行中；2026-10-18 用户确认 Checkpoint A，账户真实页待 B。`src/design/` 是 token 值来源，`src/ui/` 是新基础控件唯一入口；`/dev/ui` 是不读取账号数据的开发 Gallery，正式构建不包含。下方历史 TDesign/class 规则仅适用于未迁移区域。迁移去向及退出条件见 [前端台账](FRONTEND-DEBT.md)。
 
 1. **先定位：** 阅读 [PROJECT-MAP](../PROJECT-MAP.md)、本文、目标领域合同和测试。普通改动应只需 ui 与目标 feature，不以通读 App/全部 CSS 为前提。
 2. **控件入口：** 从 `src/ui` 引用，不直接依赖 Base UI/TDesign 或它们的类型，不复制控件和浮层生命周期。
@@ -15,6 +15,8 @@ Status: 进行中，基础视觉待 Checkpoint A。`src/design/` 是 token 值�
 7. **最低检查：** ui:lint、typecheck、test、build、test:ui、git diff --check；核对 Git/版本/文档。工程通过不代表视觉通过。
 8. **按风险追加：** 视觉检查明暗/长文本/截图；交互检查触屏/键盘/焦点/返回；状态检查失败/并发/草稿；路由检查旧链接/深链接/历史；安全检查认证/隔离/失效/持久化。
 9. **冲突顺序：** 当前代码事实与有效合同 → 用户确认目标 → 本文及组件合同 → 迁移/回归 → 删除旧实现。未知业务先核实；行为改变或不可逆决策才询问。
+
+当前账户实现从 `features/settings/account/AccountPage` 进入；`layouts/SettingsFrame` 只组合空间与导航，feature 提供分类及业务。认证的唯一所有者是 main 中的 `AuthProvider`；普通功能使用 `useAuth`，不再为每个控件各自请求身份。新增图片选择、头像和文本导航复用 ui 的 FilePicker/Avatar/TextLink。敏感表单只留组件内存，离开即卸载；不得加入 Settings 草稿缓存。接口与失效边界见 [账号安全合同](ARCHITECTURE.md#账号密码与登录失效)。
 
 新体系使用语义色、有限按钮变体、中文系统字体与轻量状态运动；输入至少 16px，触屏至少 44px。页面可以布局，不能重写 `.oui-*` 外观。Dialog/Sheet 统一名称、滚动、焦点和 busy 关闭保护，业务只提供内容/操作/状态。
 
