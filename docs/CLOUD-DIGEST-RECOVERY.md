@@ -62,3 +62,4 @@ npx tsx scripts/digest-photo-source-smoke.ts --query CoreWeave --date YYYY-MM-DD
 `--date` 改为实际目标日期；`--page` 可追加已找到的公开原页面，`--story-id`/`--run-id` 仅是诊断关联，不会读取或修改原run。输出目录必须不存在以保护既有证据。脚本强制测试环境/独立数据目录，禁用后台/通知，不导入应用或打开业务库；公开源网络真实执行，存储为本地替身，输出 `discovery.json`、`result.json`、`media/`、`preview.html`。`LOCAL_MEDIA_READY` 只代表这张图许可核对/下载/转换/本地保存通过，必须实际看图确认相关性；不能作为完整日报回放、生产Shadow、正式托管、发布或邮件验收。
 
 推广前分别核对新版源码已部署、NC账号实际授权/配置、运行端Prompt已更新及自然执行结果。本地Prompt文件改动不会自动同步已保存的云端任务，未获部署/任务配置授权时保持原状态。
+专用代理新增来源超时时，先对比系统解析后的IP连接与同代理域名连接。若系统DNS地址错误，可在媒体代理路径显式启用 `DIGEST_MEDIA_DNS_MODE=doh`，保留公网IP绑定/TLS/许可检查；固定服务和失败边界见[照片合同](CHATGPT-WORK-CLOUD.md#shadow-自动资料照与专用代理)。不要关闭SSRF、改全局DNS或把域名CONNECT对照成功当作应用已恢复。

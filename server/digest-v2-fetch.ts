@@ -4,6 +4,7 @@ import http from 'node:http';
 import tls from 'node:tls';
 import { Readable } from 'node:stream';
 import { assertPublicUpstreamUrl } from './daily-report-media-service.js';
+import { lookupDigestProxyDns } from './digest-v2-dns.js';
 
 /** Pin the validated address to the connection, preventing a second DNS lookup/rebinding. */
 export function digestProxyUrl(value: string): URL {
@@ -15,20 +16,24 @@ export function digestProxyUrl(value: string): URL {
 /** CONNECT the validated numeric IP; TLS still authenticates the original hostname. */
 export function proxiedDigestFetcher(endpoint: string): typeof fetch {
   const proxy = digestProxyUrl(endpoint);
+  const mode = process.env.DIGEST_MEDIA_DNS_MODE || 'system';
+  if (!['system', 'doh'].includes(mode)) throw Error('MEDIA_DNS_CONFIGURATION');
   return async (input, options) => {
-    try { return await fetchPinned(input, options, proxy); }
+    const lookup = mode === 'doh' ? (hostname: string) => lookupDigestProxyDns(hostname,
+      (url, init) => fetchPinned(url, init, proxy, async () => [{ address: '1.1.1.1', family: 4 }]), options?.signal) : undefined;
+    try { return await fetchPinned(input, options, proxy, lookup); }
     catch (error: any) {
       if (options?.signal?.aborted || !['ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(error?.code)) throw error;
       // One transient connection retry; every attempt independently validates/pins DNS.
-      return fetchPinned(input, options, proxy);
+      return fetchPinned(input, options, proxy, lookup);
     }
   };
 }
 export const fetchDigestImage: typeof fetch = (input, options) => fetchPinned(input, options);
-async function fetchPinned(input: Parameters<typeof fetch>[0], options: Parameters<typeof fetch>[1], proxy?: URL): Promise<Response> {
+async function fetchPinned(input: Parameters<typeof fetch>[0], options: Parameters<typeof fetch>[1], proxy?: URL, lookup?: (hostname: string) => Promise<Array<{ address: string; family: 4 | 6 }>>): Promise<Response> {
   let addresses: Awaited<ReturnType<typeof dns.lookup>>[] = [];
   const url = await assertPublicUpstreamUrl(String(input), async hostname => {
-    const resolved = await dns.lookup(hostname, { all: true, verbatim: true });
+    const resolved = lookup ? await lookup(hostname) : await dns.lookup(hostname, { all: true, verbatim: true });
     addresses = resolved;
     return resolved as Array<{ address: string; family: 4 | 6 }>;
   });
