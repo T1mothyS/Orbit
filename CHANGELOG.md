@@ -2,6 +2,11 @@
 
 本文件记录具体版本变更；版本唯一来源为 package.json。历史生产结果属于当次记录，不代表当前上线状态。任务状态见 [TASKS](docs/TASKS.md)，未来目标见 [route.md](route.md)。
 
+## 0.58.1-261018.0002 — 旧样式检查收尾
+
+- 删除无调用方的旧工具卡片强调边线及专用动画，收缩对应历史 UI lint 例外。
+- Markdown blockquote 的引用标记保留；设计检测仅为 foundation.css 的 side-tab 设置有依据的文件范围例外，其他文件和规则继续检查。Checkpoint A 视觉方向不变，仍待确认。
+
 ## 0.58.0-261017.2348 — Orbit UI 基础体系与开发 Gallery
 
 - 建立 design 语义 token、Orbit 自身基础控件 API、实际可交互的开发 Gallery；旧主题值收口为临时映射，业务页面依次迁移后退出旧实现。

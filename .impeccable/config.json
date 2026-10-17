@@ -6,5 +6,20 @@
       "maxFindings": 5,
       "maxChars": 8000
     }
+  },
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/styles/foundation.css"
+        ],
+        "createdAt": "2026-10-17T16:02:19.151Z",
+        "reason": "Agent reviewed: the remaining occurrence is .chat-markdown blockquote, a semantic quotation marker rather than a decorative card accent; unused tool-detail-card and pulse-border were removed after a repository-wide caller search."
+      }
+    ]
   }
 }

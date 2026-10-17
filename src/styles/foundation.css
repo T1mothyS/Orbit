@@ -407,34 +407,6 @@ t-chat-sender::part(send-btn):disabled,
   transform: scale(1.05);
 }
 
-/* 工具详情卡片样式 */
-.tool-detail-card {
-  border-left: 3px solid var(--td-brand-color);
-  transition: all 0.2s ease;
-}
-
-.tool-detail-card.is-running {
-  border-left-color: var(--td-warning-color, #e6a23c);
-  animation: pulse-border 1.5s ease-in-out infinite;
-}
-
-.tool-detail-card.is-completed {
-  border-left-color: var(--td-success-color, #67c23a);
-}
-
-.tool-detail-card.is-error {
-  border-left-color: var(--td-error-color, #f56c6c);
-}
-
-@keyframes pulse-border {
-  0%, 100% {
-    border-left-color: var(--td-warning-color, #e6a23c);
-  }
-  50% {
-    border-left-color: var(--td-brand-color);
-  }
-}
-
 /* 步骤计数器样式 */
 .step-counter {
   display: inline-flex;

@@ -22,6 +22,8 @@
 
 全局 token 兼容补验复用隔离预览：`mobile-compact-browser-smoke.cjs --baseline` 的 56 项六业务入口/搜索、四尺寸明暗检查通过（此模式只采集当前状态，不代表前后像素比较）；`native-dialog-browser-smoke.cjs` 的 6 组原生/自动化确认、资料草稿和焦点保护通过。较早 `browser-smoke.cjs` 因缺头像 fixture、仍定位旧的直接入口而失败，不计通过；没有修改产品来适配旧脚本。上述均为临时合成数据库与 loopback，后台任务/外部服务关闭，不能替代真实业务和生产验收。
 
+2026-10-18 旧样式检查收尾：删除无调用的工具卡片边线/动画，并记录语义引用的单文件单规则例外，依据见 [迁移台账](FRONTEND-DEBT.md)。554/554、typecheck、Web/Electron build、ui:lint、产物隔离及 diff 检查通过。默认 Chromium 可执行文件未安装，首轮浏览器未启动；使用文档已列明的进程级 msedge 后 13/13 通过，未修改测试标准或浏览器系统设置。Checkpoint A 原图继续作为相同视觉方向的候选，尚无批准基线或远端 CI 结果。
+
 ### 2026-10-09 原生确认框与浏览器自动化
 
 **来源与边界。** 上轮阻塞点是 `ScheduleFormModal.tsx` 关闭 dirty 日程时的 `window.confirm('放弃本次未保存的编辑？')`，属于 JavaScript dialog；本轮在正常浏览器模式实际捕获 confirm 的取消/确认，并确认取消保留草稿。个人资料/日报偏好还通过 `useUnsavedContext` 保护导航及刷新；实际捕获 dirty 刷新的 beforeunload，取消后草稿仍在。没有复现密码管理器、通知/定位权限或其他 Browser Chrome 提示，不能把这些猜测当根因。

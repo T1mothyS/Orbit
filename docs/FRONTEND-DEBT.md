@@ -34,6 +34,8 @@
 | 旧设置容器/模块页 | App、搜索、历史链接 | V3 统一适配并切换时删除容器 |
 | ui:lint 历史基线 | 未迁移控件和样式 | 随迁移减少，禁止新区域例外和 CI 自动扩充 |
 
+2026-10-18 清理：全仓调用检索确认旧 `.tool-detail-card` / `pulse-border` 只有自身 CSS，已删除。`.chat-markdown blockquote` 的边线用于引用识别，保留；设计检测器无法按 selector 豁免，故通过其 CLI 仅对 foundation.css 的 side-tab 添加文件范围例外，理由记录在 `.impeccable/config.json`。这不表示其他卡片可以使用强调侧边线；新体系仍受 UI 规范和其他检测约束。
+
 ## 暂缓边界
 
 不改 sql.js/数据库写回、Provider/队列和正式确认规则、Android FCM/AlarmManager 核心、PWA/离线、全局请求框架、登录 refresh/session 新体系。未知 legacy 先核对调用，不能因外观删除业务。计数用于定位；成功以 [UI 规范](UI-GUIDELINES.md)、[测试矩阵](TEST-MATRIX.md)及 A/B/C 实际确认判断。
