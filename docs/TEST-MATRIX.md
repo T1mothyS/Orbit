@@ -12,7 +12,7 @@
 
 首次本机运行可用 `npx playwright install chromium`；如已有 Edge，可在 PowerShell 进程级设置 `$env:ORBIT_BROWSER_CHANNEL='msedge'`。CI 固定安装锁定版本 Chromium，远端 CI 结果必须在 push 后另行核对，不能由本机通过推定。
 
-截图/trace 默认写系统临时目录，可用 ORBIT_UI_QA_DIR 指定。用户于 2026-10-18 批准 A/B/C 及页头调整，`tests/ui/visual-policy.json` 已启用 Gallery、账户、分类、帮助和页头比较。Windows 已建立 122 张黄金图；缺少批准截图会失败，首次建库只能显式 `--update-snapshots=missing`，已有图更新须审阅差异并显式操作。CI 不更新基线。Windows/Linux 分开，阈值在 Playwright 配置中维护，不能调大掩盖漂移。Linux 候选/中文字体与远端 CI 核验待首次获准 push 后完成；未解决时不能宣布 CI/发布就绪。候选采集与批准流程见[本轮收口](#2026-10-18-批准基线与第一轮收口)。
+截图/trace 默认写系统临时目录，可用 ORBIT_UI_QA_DIR 指定。用户于 2026-10-18 批准 A/B/C 及页头调整，`tests/ui/visual-policy.json` 已启用 Gallery、账户、分类、帮助和页头比较。Windows/Linux 各建立 122 张黄金图；Linux 来源与审阅范围记录在 `tests/ui/baselines/linux-provenance.json`。缺少批准截图会失败，首次建库只能显式 `--update-snapshots=missing`，已有图更新须审阅差异并显式操作。CI 不更新基线。Windows/Linux 分开，阈值在 Playwright 配置中维护，不能调大掩盖漂移。远端普通比较与实际发布结果按下方日期记录判断，候选流程见[本轮收口](#2026-10-18-批准基线与第一轮收口)。
 
 `npm run ui:lint` 检查绕过组件入口、裸基础控件、硬编码颜色/圆角/层级、inline 视觉和页面覆盖。历史基线按文件/规则/代码指纹/次数限制；新增副本和改写不能借用旧配额，ui/design/dev/features 不接受历史例外，CI 拒绝更新基线。`server/ui-lint.test.ts` 验证负向阻断；Calendar 显式 date-fns 依赖的本地日期边界单独回归。
 
@@ -540,3 +540,9 @@ Chrome既有登录会话中五项Tools菜单、V6.1版本标记/示例图表、�
 - 首次获准 push 后，Linux 普通比较预期因缺基线而失败；按已确认方向审阅 Linux 候选、核对 workflow SHA/版本/平台/hash 后落库，再运行普通 CI。显式安装 Noto CJK 并输出中文字体匹配；其实际效果、Actions条件和远端运行均尚未执行，不能由 YAML 检查推定通过。
 
 本地证据不是生产、实体手机/WebView、真实模型/邮箱/FCM/CalDAV、自然授权续期或收件箱验收。当前未 push/main/Release/部署/发信。后续业务迁移仍按 [台账](FRONTEND-DEBT.md) 分批，不把此轮 Settings/Shell 完成写成全站 TDesign 已退出。
+
+## 2026-10-18 Linux 基线与统一发布
+
+用户明确授权全分支归入main、push/tag/Release、Linux CI/候选审阅和生产部署后的增量验证。首次CI运行39090252875对应ac7b466：typecheck、578/578服务测试、构建及UI边界通过，中文匹配为Noto Sans CJK SC；普通比较因尚无Linux图失败，独立候选48/48通过。122张候选的平台/提交/版本/clean状态/唯一名称/图像hash全部核验；实际审阅Gallery、账户改密、通知、日报页签和手机搜索6张代表图，保持已确认视觉后入库。Windows图未替换，阈值未放宽。候选通过不冒充普通比较通过，普通CI及部署结果另记。
+
+当前版本保持0.58.5：本次补入平台图和验收资料，没有改变应用行为或npm依赖。服务器旧基线与新功能验收按实际部署清单核对，不以GitHub旧main替代生产。生产改密不作为验收动作；账号密码、持久化/CAS、共享草稿及隔离等用服务器临时合成库专项验证。不得把合成验收当作真实账号、外部授权续期或邮件送达。
