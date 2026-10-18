@@ -21,6 +21,20 @@
         "help-768-dark.png": "06515d7ac1125ddece12433db5542caf93e669d8a3b8ce515c0df2b982eaa488",
         "help-768-light.png": "2ae5424386c9ad1a3e4d6aa0b60ec397d5056518cd29aa2c05429dc137edcbd5"
       }
+    },
+    "linux": {
+      "sourceCommit": "f78b5ca933dc218c4ab893e0b84d2bef53893137",
+      "workflowRun": 39137384814,
+      "hashes": {
+        "help-1440-dark.png": "82d88837db2d040830b73e160d6ff4dd035df9f1f9d36359067e1bef4266a417",
+        "help-1440-light.png": "53fcc07c9a36d11b246cdca48ca52d9c7d8e3befa5c82326e1a6209e772edb74",
+        "help-390-dark.png": "94d2abcec7468455284c331691a39a172338200410eb183521487ff50be03890",
+        "help-390-light.png": "f7a46879fcc6e0ef7bc788f33d7a39b9d120c51392cbcca88766dca7af029724",
+        "help-430-dark.png": "44c085479c7be7810ac7f9b95bb3b2022bc3fe9c49776aa5d87df18ef2ce8116",
+        "help-430-light.png": "286260f7bd25dc88742d821c891d25ba3b15191825d28fb49479a63c4e2dc503",
+        "help-768-dark.png": "211bce21a69672b46d4418f3e53756aee106e547c3d17246583b10ed43371e0b",
+        "help-768-light.png": "1379abc8e8d23ea9114909d19ef3fdb60942e49ecdf677a95a26472687a21d33"
+      }
     }
   }
 }
