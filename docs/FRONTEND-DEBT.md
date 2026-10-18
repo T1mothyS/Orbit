@@ -120,3 +120,7 @@ C1–C4 checkpoint依次为ea8bca1、84d0f9e、86aed95、0b4ffaf，C5独立收�
 
 
 停止钩子补核（2026-10-18）：library.css 的唯一 side-tab 命中为 Markdown blockquote 引用标识（4fa1fd62），research.css 的唯一命中为已确认观点历史有序列表的中性分隔线（f9a3ebb1），均早于第二阶段且并非装饰卡片强调边。经 detector 实际复核后，通过 Impeccable CLI 分别记录文件范围的 side-tab 误报例外及证据；其他规则继续生效，不修改应用样式、UI lint 基线或批准图。
+
+### 第二阶段布局接纳与发布（2026-10-18）
+
+用户在统一发布任务中明确接纳第二阶段布局，并授权复核后更新 Windows/Linux 帮助页批准基线。各平台仅更新四尺寸明暗共8张 `help-*` 图片；平台来源与哈希记录在 `tests/ui/visual-policy.json` 和 `tests/ui/baselines/linux-provenance.json`。此前 C1–C5 的候选结果和待批准状态保留为当时证据；本次接纳关闭用户视觉批准待办，不自动将旧的失败运行改为通过。发布前仍须执行严格比较，不改变阈值、重试、账号隔离或业务断言；运行与服务器验收结果见本次发布记录。

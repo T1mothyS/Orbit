@@ -1,6 +1,26 @@
 {
   "galleryApproved": true,
-  "reason": "User accepted A/B and C with the requested header changes, then authorized the next step on 2026-10-18. Approved platform baselines are required; missing or changed images fail. Candidates never approve themselves.",
+  "reason": "User accepted A/B and C with the requested header changes, then authorized the next step on 2026-10-18. Approved platform baselines are required; missing or changed images fail. Candidates never approve themselves. On 2026-10-18 the user explicitly accepted the stage-two layout and authorized reviewed Windows/Linux help baseline updates.",
   "accountApproved": true,
-  "settingsApproved": true
+  "settingsApproved": true,
+  "stage2HelpApproval": {
+    "approvedAt": "2026-10-18T14:44:54.436Z",
+    "authorization": "User explicitly accepted the stage-two layout and approved Windows/Linux baseline updates after review.",
+    "sourceCommit": "a28d2f6ed3998b7d3d04852c9e2b1ce7c60a6360",
+    "sourceVersion": "0.59.4-261018.1555",
+    "windows": {
+      "node": "v24.14.1",
+      "platform": "win32",
+      "hashes": {
+        "help-1440-dark.png": "a953ff8833b8eab0af9477ea0d3f25b588039172319317192f984fac23a6c306",
+        "help-1440-light.png": "cfcc29098292352deb77be7b880b093ae441a88d0d40329c4d424334ae9deea6",
+        "help-390-dark.png": "988f3f9360afab07236a553bd842220bd36d6bc8a9ba9d03e5a33368049fe5fb",
+        "help-390-light.png": "60066fdd5dfbc83be7ef6cbdf095022ab3a9381e0f9e69b3b9f4b8375fb4e758",
+        "help-430-dark.png": "4a973e07daad16e57cab66f663fc1670824596623d8d6c1118762cfc7e339895",
+        "help-430-light.png": "15bafffdd071ddc9e6ec52d54df01a75cc8a3bf96f0310d1664687d8bc23b49f",
+        "help-768-dark.png": "06515d7ac1125ddece12433db5542caf93e669d8a3b8ce515c0df2b982eaa488",
+        "help-768-light.png": "2ae5424386c9ad1a3e4d6aa0b60ec397d5056518cd29aa2c05429dc137edcbd5"
+      }
+    }
+  }
 }
