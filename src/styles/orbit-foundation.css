@@ -3,12 +3,6 @@ button,input,select,textarea { transition-property:color,background-color,border
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible { outline:2px solid var(--td-brand-color); outline-offset:2px; }
 .primary-button { background:var(--td-brand-color); box-shadow:none; }
 .primary-button:hover,.secondary-button:hover { transform:none; box-shadow:none; }
-.product-nav-item.icon-only { box-shadow:none; }
-.product-nav-label{display:none}
-.product-nav-item.icon-only.active{background:var(--td-brand-color-light);color:var(--td-brand-color)}
-.product-nav-item.icon-only:hover .product-nav-image,.product-nav-item.icon-only.active .product-nav-image{transform:none;filter:none}
-.product-nav-item.icon-only:hover,.product-nav-item.icon-only.active { box-shadow:none; }
-.product-nav-item.icon-only:hover .product-nav-lucide,.product-nav-item.icon-only.active .product-nav-lucide { transform:none; filter:none; }
 .reminder-page { background:var(--td-bg-color-page); }
 .reminder-topbar { background:var(--td-bg-color-container); backdrop-filter:none; }
 .reminder-hero { gap:24px; margin-bottom:24px; }
@@ -23,19 +17,15 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .orbit-message-body code { font-family:ui-monospace,monospace; font-size:.9em; padding:1px 4px; border-radius:4px; background:var(--td-bg-color-component); }
 .orbit-message-body pre { max-width:100%; overflow:auto; margin:8px 0; padding:12px; border:1px solid var(--td-component-stroke); border-radius:6px; background:var(--td-bg-color-container); }
 .orbit-message-body pre code { padding:0; background:none; }
-.orbit-message-body a,.orbit-message-sources a,.settings-stack > a { color:var(--td-brand-color); text-decoration:underline; text-underline-offset:3px; }
-.dark .orbit-message-body a,.dark .orbit-message-sources a,.dark .settings-stack > a { color:var(--td-brand-color-9,var(--td-brand-color-active)); }
+.orbit-message-body a,.orbit-message-sources a { color:var(--td-brand-color); text-decoration:underline; text-underline-offset:3px; }
+.dark .orbit-message-body a,.dark .orbit-message-sources a { color:var(--td-brand-color-9,var(--td-brand-color-active)); }
 /* Small text links use the darker existing brand token in light mode. */
-:is(.setting-control,.settings-note,.settings-help,.context-help,.note-board-content) a:not([class*="button"]),
-.settings-stack > a:not([class*="button"]) {
+:is(.note-board-content) a:not([class*="button"]) {
   color:var(--orbit-link-color); text-decoration:underline; text-underline-offset:3px;
 }
-:is(.setting-control,.settings-note,.settings-help,.context-help,.note-board-content) a:not([class*="button"]):visited,
-.settings-stack > a:not([class*="button"]):visited { color:var(--orbit-link-color); }
-:is(.setting-control,.settings-note,.settings-help,.context-help,.note-board-content) a:not([class*="button"]):is(:hover,:active),
-.settings-stack > a:not([class*="button"]):is(:hover,:active) { color:var(--orbit-link-hover-color); text-decoration-thickness:2px; }
-:is(.setting-control,.settings-note,.settings-help,.context-help,.note-board-content) a:not([class*="button"]):focus-visible,
-.settings-stack > a:not([class*="button"]):focus-visible { outline-color:var(--orbit-link-color); }
+:is(.note-board-content) a:not([class*="button"]):visited { color:var(--orbit-link-color); }
+:is(.note-board-content) a:not([class*="button"]):is(:hover,:active) { color:var(--orbit-link-hover-color); text-decoration-thickness:2px; }
+:is(.note-board-content) a:not([class*="button"]):focus-visible { outline-color:var(--orbit-link-color); }
 .smart-time-panel { max-width:calc(100vw - 32px); }
 .smart-time-picker:nth-of-type(2) .smart-time-panel { left:auto; right:0; }
 .smart-time-list { display:block; width:100%; height:128px; padding:0; border:0; border-radius:0; background:var(--td-bg-color-container); color:var(--td-text-color-primary); font-size:14px; }
@@ -71,22 +61,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 @keyframes orbit-panel-arrive {from{opacity:0;transform:translateX(-12px);}to{opacity:1;transform:none;}}
 @keyframes orbit-overlay-arrive {from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
 .t-dialog,.t-popup,.t-message { transition-duration:var(--orbit-motion-overlay); animation-duration:var(--orbit-motion-overlay); }
-.settings-layout { grid-template-rows:auto minmax(0,1fr); }
-.settings-search { grid-column:1/-1; grid-row:1; position:relative; z-index:2; padding:12px 24px; border-bottom:1px solid var(--td-component-stroke); }
-.settings-search > input { width:100%; min-height:36px; border:1px solid var(--td-component-stroke); border-radius:6px; background:var(--td-bg-color-page); color:var(--td-text-color-primary); font-size:14px; padding:8px 12px; }
-.settings-search-results { position:absolute; top:calc(100% - 8px); left:24px; right:24px; max-height:min(340px,50vh); overflow:auto; border:1px solid var(--td-component-stroke); border-radius:8px; background:var(--td-bg-color-container); box-shadow:0 4px 12px rgb(0 0 0 / .08); }
-.settings-search-results button { display:block; width:100%; padding:10px 12px; text-align:left; font-size:13px; }
-.settings-search-results button[aria-selected=true],.settings-search-results button:hover { background:var(--td-bg-color-component); }
-.settings-search-results small { display:block; color:var(--td-text-color-secondary); margin-top:4px; font-size:12px; max-height:3em; overflow:hidden; }
-.settings-search-results p { padding:12px; }
-.settings-actions > select { min-width:120px; max-width:100%; min-height:32px; padding:4px 8px; border:1px solid var(--td-component-stroke); border-radius:var(--orbit-radius-control); background:var(--td-bg-color-container); color:var(--td-text-color-primary); font-size:13px; }
-.settings-actions > select:disabled { color:var(--td-text-color-disabled); }
-.settings-nav { grid-row:2; }
-.settings-scroll { grid-row:2; }
-.settings-nav button[aria-current=true] { color:var(--td-brand-color); background:var(--td-brand-color-light); }
 .setting-search-target { outline:2px solid var(--td-brand-color); outline-offset:4px; border-radius:8px; }
-@media(min-width:1600px) { .product-nav-item.icon-only { width:auto; padding:8px 10px; gap:6px; } .product-nav-item.icon-only .product-nav-label { display:inline; font-size:12px; } }
-@media(max-width:640px) { .orbit-message-body,.orbit-message-error { font-size:15px; } .settings-layout { grid-template-rows:auto auto minmax(0,1fr); } .settings-search { padding:10px 12px; } .settings-search-results { left:12px; right:12px; } .settings-nav { grid-row:2; } .settings-scroll { grid-row:3; } .orbit-provider-select select { max-width:180px; min-height:36px; } .reminder-hero h1 { font-size:24px; } }
+@media(max-width:640px) { .orbit-message-body,.orbit-message-error { font-size:15px; } .orbit-provider-select select { max-width:180px; min-height:36px; } .reminder-hero h1 { font-size:24px; } }
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
   .orbit-status-dot.is-working { animation:none; }
@@ -98,12 +74,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .app-shell .brand-mark { width:32px; height:32px; border-radius:8px; box-shadow:none; }
 .app-shell .brand-name { font-size:18px; font-weight:650; letter-spacing:-.02em; }
 .app-shell .brand-subtitle { display:none; }
-.app-shell .product-nav-item.icon-only { border:0; border-radius:8px; height:40px; }
-.app-shell .product-nav-lucide { width:21px; height:21px; }
-.app-shell .product-nav-item.icon-only.active { color:var(--td-brand-color); }
-.app-shell .product-nav-item.icon-only { color:var(--td-text-color-secondary); }
-.app-shell .product-nav-item.icon-only:hover { background:var(--td-bg-color-component); }
-.app-shell .product-nav-item.icon-only.active:hover { background:var(--td-brand-color-light); }
 .app-shell :is(.action-center-header,.library-header,.daily-reports-header,.reminder-hero) h1 { font-size:28px; line-height:1.3; font-weight:650; letter-spacing:-.025em; }
 .app-shell :is(.eyebrow,.library-eyebrow,.daily-reports-eyebrow) { display:none; }
 .app-shell :is(.action-center-page,.library-page,.daily-reports-page) { padding:24px clamp(16px,3vw,40px) 48px; }
@@ -182,10 +152,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .orbit-login-card > div:first-child { background:var(--td-bg-color-component); }
 .orbit-login-card button[aria-pressed=true] { background:var(--td-bg-color-container); color:var(--td-brand-color); box-shadow:none; }
 .orbit-login-card button[aria-pressed=false] { color:var(--td-text-color-secondary); }
-.settings-dialog-content .settings-dialog-toolbar { box-shadow:none; }
-.settings-dialog-content .settings-nav button { border-radius:6px; transition:color var(--orbit-motion-press),background-color var(--orbit-motion-press); }
-.settings-dialog-content .settings-card { box-shadow:none; border-radius:8px; }
-.settings-dialog-content :is(input,select,textarea) { border-radius:6px; }
 .daily-report-reader-page .daily-report-reader-toolbar { box-shadow:none; backdrop-filter:none; }
 .daily-report-reader-page .daily-report-more-menu { animation:orbit-overlay-arrive var(--orbit-motion-feedback) var(--orbit-ease); }
 .app-shell .research-review { border-radius:8px; box-shadow:none; }
@@ -205,14 +171,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .orbit-composer-overlay.is-closing .orbit-composer-menu { animation:orbit-overlay-depart var(--orbit-motion-overlay) var(--orbit-ease-exit) forwards; pointer-events:none; }
 .unscheduled-drawer.is-closing { animation:orbit-side-depart var(--orbit-motion-panel) var(--orbit-ease-exit) forwards; pointer-events:none; }
 @keyframes orbit-side-depart { to { opacity:0; transform:translateX(12px); } }
-@media(min-width:1100px) { .app-shell .product-nav-item.icon-only { width:auto; padding:8px 12px; gap:7px; } .app-shell .product-nav-label { display:inline; font-size:13px; } }
 @media(max-width:767px) {
   .app-shell .app-topbar { flex-basis:88px; padding:0 12px; gap:0 8px; }
-  .app-shell .product-nav { padding:0; gap:0; }
-  .app-shell .product-nav-item.icon-only { position:relative; isolation:isolate; height:44px; width:auto; flex:1 1 16.6667%; padding:0; background:transparent; }
-  .app-shell .product-nav-item.icon-only::before { content:''; position:absolute; z-index:-1; inset:5px 6px; border-radius:var(--orbit-radius-control,8px); }
-  .app-shell .product-nav-item.icon-only.active::before { background:var(--td-brand-color-light); }
-  .app-shell .product-nav-lucide { width:24px; height:24px; }
   .app-shell :is(.action-center-header,.library-header,.daily-reports-header,.reminder-hero) h1 { font-size:24px; }
   .app-shell :is(.action-center-page,.library-page,.daily-reports-page) { padding:12px 12px 24px; }
   .app-shell .reminder-content { padding:12px 12px 24px; width:100%; }
@@ -228,8 +188,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   .app-shell .library-card-open { padding:12px; }
   .app-shell .library-card-footer { margin-top:12px; }
   .app-shell .library-card-tags { margin-top:8px; }
-  .app-shell .global-search-trigger { width:44px; height:44px; min-width:44px; min-height:44px; }
-  .app-shell .account-menu summary { min-width:44px; min-height:44px; align-items:center; justify-content:center; }
   .app-shell .brand-mark { width:30px; height:30px; }
   .app-shell .brand-subtitle { display:none; }
   .note-board-header { min-height:52px; padding:4px 12px; }
@@ -239,11 +197,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   .note-board-row-toolbar { gap:0; flex-wrap:wrap; }
   .note-board-action,.note-board-select { width:44px; min-width:44px; height:44px; min-height:44px; }
   .app-shell :is(.primary-button,.secondary-button,.complete-button,.library-secondary-button,.daily-report-toolbar-button,.research-button) { min-height:44px; }
-  .app-shell :is(.library-primary-button,.calendar-toolbar-primary > button,.agenda-complete-button,.card-actions .icon-button.small),
-  :is(.module-settings-page,.settings-dialog) :is(.t-button,.settings-dialog-close,.settings-actions > button,.setting-control > button,.avatar-upload),
-  .daily-report-reader-page :is(.daily-report-back,.daily-report-more-button,.daily-report-more-menu button),
-  .library-markdown .library-code-copy,
-  .smart-time-panel button { min-width:var(--orbit-touch-target); min-height:var(--orbit-touch-target); }
+  .app-shell :is(.library-primary-button,.calendar-toolbar-primary > button,.agenda-complete-button,.card-actions .icon-button.small),.daily-report-reader-page :is(.daily-report-back,.daily-report-more-button,.daily-report-more-menu button),.library-markdown .library-code-copy,.smart-time-panel button { min-width:var(--orbit-touch-target); min-height:var(--orbit-touch-target); }
   .app-shell :is(.agenda-complete-button,.card-actions .icon-button.small) { width:var(--orbit-touch-target); height:var(--orbit-touch-target); flex-shrink:0; }
   .app-shell .card-actions .icon-button.small { flex-basis:var(--orbit-touch-target); }
   .app-shell .agenda-status-slot { width:var(--orbit-touch-target); height:var(--orbit-touch-target); flex-basis:var(--orbit-touch-target); }

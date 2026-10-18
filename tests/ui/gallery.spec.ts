@@ -1,5 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
+
+test('shared shell navigation and account menu expose selection, metadata and keyboard behavior without API calls', async ({ page }) => {
+  const calls: string[] = []; page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) calls.push(request.url()); });
+  await page.goto('/dev/ui?demo=shell');
+  await page.getByRole('button', { name: '设置示例', exact: true }).click(); await expect(page.getByRole('button', { name: '设置示例', exact: true })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('button', { name: '打开账户示例', exact: true }).click(); await expect(page.getByText('demo@example.invalid', { exact: true })).toBeVisible(); await expect(page.getByText('Orbit 开发示例', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: '打开账户示例', exact: true })).toBeFocused(); expect(calls).toEqual([]);
+});
 const visualPolicy = JSON.parse(fs.readFileSync(new URL('./visual-policy.json', import.meta.url), 'utf8')) as { galleryApproved: boolean };
 
 test.beforeEach(async ({ context }) => {

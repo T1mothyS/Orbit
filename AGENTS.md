@@ -64,7 +64,7 @@ Orbit 是面向个人和小规模使用的日程、周期事务、提醒、AI �
 - 不为了形式一次性拆分 server/index.ts；新功能优先在实际修改对应领域时逐步提取 router。
 - 不把无关格式化、重命名、依赖升级或大范围重构混入当前任务。
 - UI 修改必须保持窄屏、长文本、暗色主题、键盘操作和可访问性；统一原则见 docs/UI-GUIDELINES.md。
-- Settings V2 的布局、接口合同和危险操作确认不可被后续修改绕过。
+- Settings 的路由/草稿所有权、接口合同和危险操作确认不可被后续修改绕过；当前写法以 docs/UI-GUIDELINES.md 的 Agent Change Playbook 为入口。
 
 ## 6. 本地和 CI 验证
 

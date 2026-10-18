@@ -1,4 +1,6 @@
 {
   "galleryApproved": true,
-  "reason": "User accepted Checkpoint A on 2026-10-18 (Asia/Hong_Kong), source fba9f27. Platform goldens require review; missing approved screenshots fail comparison."
+  "reason": "User accepted A and B on 2026-10-18. Gallery goldens remain enforced; the Settings C extension is collected as explicit candidates pending C approval.",
+  "accountApproved": true,
+  "settingsApproved": false
 }

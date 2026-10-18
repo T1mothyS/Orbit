@@ -2,28 +2,38 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
-import { IconButton, TextLink, ToastProvider } from '../ui';
+import { IconButton, TextLink } from '../ui';
 import './settings-frame.css';
 
-export function SettingsFrame({ category, title, description, navigation, children }: { category?: string; title: string; description?: string; navigation: { id: string; title: string; to: string }[]; children: ReactNode }) {
+export function SettingsFrame({ category, title, description, navigation, children, search, fallbackReturnTo }: { category?: string; title: string; description?: string; navigation: { id: string; title: string; to: string }[]; children: ReactNode; search?: ReactNode; fallbackReturnTo?: string }) {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation(), heading = useRef<HTMLHeadingElement>(null);
-  const requested = (location.state as { settingsReturnTo?: unknown } | null)?.settingsReturnTo;
-  let returnTo = '/assistant';
+  const origin = useRef<string>();
+  const requested = (location.state as { settingsReturnTo?: unknown } | null)?.settingsReturnTo || (!origin.current ? fallbackReturnTo : undefined);
+  let returnTo = origin.current || '/assistant';
   if (typeof requested === 'string' && requested.startsWith('/') && !requested.startsWith('//')) {
     try {
     const candidate = new URL(requested, window.location.origin);
-    if (candidate.origin === window.location.origin) returnTo = candidate.pathname + candidate.search;
+    if (candidate.origin === window.location.origin && !candidate.pathname.startsWith('/settings')) { returnTo = candidate.pathname + candidate.search; origin.current = returnTo; }
     } catch { /* Invalid return locations use the application home. */ }
   }
   const navigationState = { settingsReturnTo: returnTo };
   useEffect(() => {
     const id = new URLSearchParams(location.search).get('settings');
-    const target = id && document.getElementById(id);
-    if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'center' }); }
-    else heading.current?.focus({ preventScroll: true });
+    heading.current?.focus({ preventScroll: true });
+    if (!id) return;
+    const locate = () => {
+      const target = document.getElementById(id);
+      if (!target?.getClientRects().length) return false;
+      target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'center' }); return true;
+    };
+    if (locate()) return;
+    const observer = new MutationObserver(() => { if (locate()) observer.disconnect(); });
+    observer.observe(document.querySelector('.settings-workspace-main')!, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'style', 'data-state'] });
+    const timer = setTimeout(() => observer.disconnect(), 3000);
+    return () => { clearTimeout(timer); observer.disconnect(); };
   }, [location.pathname, location.search]);
-  return <ToastProvider><div className="oui-root settings-workspace">
+  return <div className="oui-root settings-workspace">
     <header className="settings-workspace-topbar"><Link to="/assistant" className="settings-workspace-brand" aria-label="Orbit 首页"><img src="/orbit-logo.png" alt="" /><strong>Orbit</strong></Link>
       <div className="settings-workspace-actions"><TextLink to={returnTo} state={{ settingsFocusReturn: true }}>返回 Orbit</TextLink><IconButton label="切换主题" variant="quiet" onClick={toggleTheme}>{theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}</IconButton></div>
     </header>
@@ -32,7 +42,8 @@ export function SettingsFrame({ category, title, description, navigation, childr
     </aside><main className="settings-workspace-main">
       {category && <div className="settings-workspace-mobile-back"><TextLink to="/settings" state={navigationState}><ArrowLeft size={16} aria-hidden="true" />设置</TextLink></div>}
       <header className="settings-workspace-heading"><h1 tabIndex={-1} ref={heading}>{title}</h1>{description && <p>{description}</p>}</header>
+      {search}
       {children}
     </main></div>
-  </div></ToastProvider>;
+  </div>;
 }

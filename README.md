@@ -14,6 +14,7 @@
 | Agent 协作与安全规则 | [AGENTS.md](AGENTS.md) |
 | 发布指令与效率原则 | [docs/RELEASE.md](docs/RELEASE.md) |
 | 部署路径与回滚判据 | [docs/DEPLOYMENT-PATHS.md](docs/DEPLOYMENT-PATHS.md)；本机执行细节在被忽略的 DEPLOY.md |
+| 初次使用与常见任务 | [快速上手](docs/QUICK-START.md)，站内头像菜单 → 使用指南 |
 | 配置、使用与常见问题 | [docs/USER-GUIDE.md](docs/USER-GUIDE.md) |
 | Android 构建与 Firebase 配置 | [android/README.md](android/README.md) |
 | 模块与跨项目边界 | [PROJECT-MAP.md](PROJECT-MAP.md)、[架构](docs/ARCHITECTURE.md) |

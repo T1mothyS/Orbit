@@ -12,8 +12,8 @@ export function settingAction(id: string, admin = false): NavigationAction | nul
   const module = Object.entries(moduleIds).find(([, value]) => value === id);
   if ((!definition && !module) || definition?.admin && !admin || /(?:android-fcm-test|android-local-test)/.test(id)) return null;
   const path = moduleSettingsPath(id);
-  const target: NavigationTarget = path === '/reports/settings' ? 'settings.dailyReport' : path === '/library/settings' ? 'settings.knowledge'
-    : path === '/settings/profile' ? 'settings.profile' : definition?.section === 'notifications' ? 'settings.notifications' : 'settings.general';
+  const target: NavigationTarget = path === '/settings/reports' ? 'settings.dailyReport' : path === '/settings/library' ? 'settings.knowledge'
+    : path === '/settings/account/profile' ? 'settings.profile' : definition?.section === 'notifications' ? 'settings.notifications' : 'settings.general';
   const label = target === 'settings.dailyReport' ? '打开日报设置' : target === 'settings.knowledge' ? '打开知识库设置'
     : target === 'settings.profile' ? '打开个人资料' : target === 'settings.notifications' ? '打开通知设置' : `打开${definition!.label}`;
   return { type: 'navigate', target, settingId: id, label };

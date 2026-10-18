@@ -1,12 +1,14 @@
-import { ReactNode, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { AccountAvatar } from './AccountAvatar';
-import { BrowserNotifications } from './BrowserNotifications';
-import { AndroidNotifications } from './AndroidNotifications';
-import '../styles/account-menu.css';
-import { Bot, CalendarDays, CircleArrowRight, Repeat2, BookOpen, Moon, Newspaper, Settings, Sun, UserRound, ChartNoAxesCombined, type LucideIcon } from 'lucide-react';
+import { BookOpen,Bot,CalendarDays,ChartNoAxesCombined,CircleArrowRight,Moon,Newspaper,Repeat2,Settings,Sun,UserRound,type LucideIcon } from 'lucide-react';
+import { ReactNode } from 'react';
+import { useLocation,useNavigate } from 'react-router-dom';
 import { APP_CONFIG } from '../config';
+import '../styles/account-menu.css';
+import { IconButton,Menu,NavigationItem,ToastProvider,type MenuItem } from '../ui';
+import { AccountAvatar } from './AccountAvatar';
+import { AndroidNotifications } from './AndroidNotifications';
+import { BrowserNotifications } from './BrowserNotifications';
 import { GlobalSearch } from './GlobalSearch';
+import './shell-controls.css';
 
 type Section = 'today' | 'schedule' | 'assistant' | 'reminders' | 'reports' | 'library';
 
@@ -45,12 +47,22 @@ export function AppShell({
   onLogout,
   children,
 }: AppShellProps) {
-  const menu=useRef<HTMLDetailsElement>(null);
-  const close=()=>{if(menu.current)menu.current.open=false;};
-  const settingsEntry = () => { const trigger = menu.current?.querySelector('summary'); close(); trigger?.focus({ preventScroll: true }); };
-  useEffect(() => { const outside = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node)) close(); }; window.addEventListener('pointerdown', outside); return () => window.removeEventListener('pointerdown', outside); }, []);
+  const navigate=useNavigate(), location=useLocation();
+  const go=(to:string)=>()=>navigate(to,{state:{settingsReturnTo:location.pathname+location.search,helpReturnTo:location.pathname+location.search}});
+  const items:MenuItem[]=[
+    {id:'settings',label:'设置',icon:<Settings size={16}/>,onSelect:onOpenSettings},
+    {id:'account',label:'账户与头像',icon:<UserRound size={16}/>,onSelect:go('/settings/account')},
+    {id:'profile',label:'个人资料',icon:<UserRound size={16}/>,onSelect:go('/settings/account/profile')},
+    {id:'statistics',label:'使用统计',icon:<ChartNoAxesCombined size={16}/>,onSelect:go('/project?view=statistics')},
+    {id:'theme',label:'切换主题',icon:theme==='light'?<Moon size={16}/>:<Sun size={16}/>,onSelect:onToggleTheme},
+    {id:'import',label:'邮箱导入',separatorBefore:true,onSelect:go('/assistant?tool=email-import')},
+    {id:'research',label:'研究与观点',onSelect:go('/research')},{id:'tools',label:'Tools 工具中心',onSelect:go('/tools')},
+    {id:'growth',label:'项目成长',onSelect:go('/project?view=growth')},{id:'help',label:'使用指南',onSelect:go('/help')},
+    ...(user?.role==='admin'?[{id:'admin',label:'管理面板',onSelect:()=>onOpenAdmin?.()}]:[]),
+    {id:'logout',label:'退出登录',danger:true,separatorBefore:true,onSelect:()=>{onLogout?.();navigate('/login',{replace:true});}},
+  ];
   return (
-    <div className={`app-shell${mobileReader ? ' app-shell-mobile-reader' : ''}`}>
+    <ToastProvider><div className={`oui-root app-shell${mobileReader ? ' app-shell-mobile-reader' : ''}`}>
       <header className="reminder-topbar app-topbar">
         <div className="brand-lockup">
           <div className="brand-mark"><img src="/orbit-logo.png" alt="" aria-hidden="true" /></div>
@@ -60,49 +72,14 @@ export function AppShell({
           </div>
         </div>
 
-        <nav className="product-nav" aria-label="产品导航">
-          {productNavItems.map(item => (
-            <button
-              key={item.section}
-              className={`product-nav-item icon-only${activeSection === item.section ? ' active' : ''}`}
-              onClick={() => onSectionChange(item.section)}
-              title={item.label}
-              aria-label={item.label}
-              aria-current={activeSection === item.section ? 'page' : undefined}
-            >
-              {item.icon ? <img className="product-nav-image" src={item.icon} alt="" aria-hidden="true" /> : item.Icon ? <item.Icon className="product-nav-lucide" size={26} strokeWidth={1.8} aria-hidden="true" /> : null}
-              <span className="product-nav-label">{item.label}</span>
-            </button>
-          ))}
-        </nav>
+        <nav className="orbit-product-nav" aria-label="产品导航">{productNavItems.map(item=><NavigationItem key={item.section} label={item.label} icon={item.Icon?<item.Icon size={24} strokeWidth={1.8} aria-hidden="true"/>:null} current={activeSection===item.section} onSelect={()=>onSectionChange(item.section)}/>)}</nav>
 
         <div className="topbar-actions">
           <GlobalSearch />
-          <details className="account-menu" ref={menu} onKeyDown={e=>{if(e.key==='Escape'){close();menu.current?.querySelector('summary')?.focus();}}} onBlur={e=>{
-            const nextTarget=e.relatedTarget;
-            // Non-focusable menu text yields null. Collapsing details during that focus change hangs Chromium.
-            // Outside pointer clicks already close the menu; blur only handles an explicit outside focus target.
-            if(nextTarget instanceof Node&&!e.currentTarget.contains(nextTarget))close();
-          }}>
-            <summary aria-label="个人菜单" title={user?.email}><AccountAvatar email={user?.email||'O'}/></summary>
-            <div className="account-menu-panel"><strong>{user?.email}</strong>
-              <button type="button" onClick={()=>{settingsEntry();onOpenSettings();}}><Settings size={16}/> 设置</button>
-              <button type="button" onClick={()=>{settingsEntry();window.dispatchEvent(new CustomEvent('orbit:open-settings',{detail:'account'}));}}><UserRound size={16} />账户与头像</button>
-              <Link to="/settings/profile" onClick={close}><UserRound size={16} />个人资料</Link>
-              <Link to="/project?view=statistics" onClick={close}><ChartNoAxesCombined size={16} />使用统计</Link>
-              <button type="button" onClick={()=>{close();onToggleTheme();}}>{theme==='light'?<Moon size={16}/>:<Sun size={16}/>} 切换主题</button>
-              <hr />
-              <Link to="/assistant?tool=email-import" onClick={close}>邮箱导入</Link><Link to="/research" onClick={close}>研究与观点</Link>
-              <Link to="/tools" onClick={close}>Tools 工具中心</Link><Link to="/project?view=growth" onClick={close}>项目成长</Link>
-              {user?.role==='admin'&&<button type="button" onClick={()=>{close();onOpenAdmin?.();}}>管理面板</button>}
-              <hr />
-              <button type="button" onClick={()=>{onLogout?.();window.location.href='/login';}}>退出登录</button>
-              <div className="account-menu-version">Orbit {APP_CONFIG.version}</div>
-            </div>
-          </details>
+          <Menu label="个人菜单" trigger={<IconButton label="个人菜单" variant="quiet" data-account-menu-trigger title={user?.email}><AccountAvatar email={user?.email||'O'}/></IconButton>} header={<strong>{user?.email}</strong>} footer={'Orbit '+APP_CONFIG.version} items={items}/>
         </div>
       </header>
       <BrowserNotifications/><AndroidNotifications/><main className="app-shell-body">{children}</main>
-    </div>
+    </div></ToastProvider>
   );
 }

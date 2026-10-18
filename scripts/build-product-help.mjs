@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-export const PRODUCT_HELP_FILES = ['docs/USER-GUIDE.md', 'docs/LIBRARY.md', 'docs/ARCHITECTURE.md', 'docs/CHATGPT-WORK-CLOUD.md', 'docs/RELEASE.md', 'docs/DEPLOYMENT-PATHS.md'];
+export const PRODUCT_HELP_FILES = ['docs/QUICK-START.md', 'docs/USER-GUIDE.md', 'docs/LIBRARY.md', 'docs/ARCHITECTURE.md', 'docs/CHATGPT-WORK-CLOUD.md', 'docs/RELEASE.md', 'docs/DEPLOYMENT-PATHS.md'];
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const hash = value => createHash('sha256').update(value).digest('hex');
 export function buildProductHelp(directory = root) {

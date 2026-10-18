@@ -41,11 +41,11 @@ export function EmptyState({ title, description, actionLabel, onAction }: { titl
 export function ErrorState({ title = '暂时无法读取设置', description, onRetry }: { title?: string; description: string; onRetry: () => void }) {
   return <div className="oui-state oui-state--error" role="alert"><AlertCircle size={20} aria-hidden="true" /><div><h3>{title}</h3><p>{description}</p></div><Button onClick={onRetry}>重新读取</Button></div>;
 }
-export function Tabs({ label, value, onValueChange, items }: { label: string; value: string; onValueChange: (value: string) => void; items: { value: string; label: string; content: ReactNode }[] }) {
+export function Tabs({ label, value, onValueChange, items, keepMounted = false }: { label: string; value: string; onValueChange: (value: string) => void; items: { value: string; label: string; content: ReactNode }[]; keepMounted?: boolean }) {
   return <PrimitiveTabs.Root value={value} onValueChange={next => onValueChange(String(next))}>
     <PrimitiveTabs.List className="oui-tabs" aria-label={label} activateOnFocus>
       {items.map(item => <PrimitiveTabs.Tab key={item.value} value={item.value} className="oui-tab">{item.label}</PrimitiveTabs.Tab>)}
     </PrimitiveTabs.List>
-    {items.map(item => <PrimitiveTabs.Panel key={item.value} value={item.value} className="oui-tab-panel">{item.content}</PrimitiveTabs.Panel>)}
+    {items.map(item => <PrimitiveTabs.Panel key={item.value} value={item.value} keepMounted={keepMounted} className="oui-tab-panel">{item.content}</PrimitiveTabs.Panel>)}
   </PrimitiveTabs.Root>;
 }

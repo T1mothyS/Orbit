@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '../../../hooks/useAuth';
+import { useEffect,useRef,useState } from 'react';
 import { AccountAvatar } from '../../../components/AccountAvatar';
-import { Button, ConfirmDialog, FilePicker, InlineNotice, useToast } from '../../../ui';
+import { useAuth } from '../../../hooks/useAuth';
+import { Button,ConfirmDialog,FilePicker,InlineNotice,useToast } from '../../../ui';
 
 export function AvatarEditor({ email }: { email: string }) {
   const { authHeaders } = useAuth(), toast = useToast();

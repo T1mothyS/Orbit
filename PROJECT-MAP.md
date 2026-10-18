@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Source review: 2026-10-07 核对 Android 在线壳、Push 队列与知识库个人资料入口；版本以 package.json 为准，状态以 docs/TASKS.md 为准。
+- Source review: 2026-10-18 核对本次 Settings、共享状态、Shell 与帮助路径；其他领域按对应记录解释。版本以 package.json 为准，状态以 docs/TASKS.md 为准。
 - 2026-10-08 增量：产品帮助/只读诊断为 server/product-help.ts、system-query.ts、routes/system.ts；共享 action 为 src/utils/navigation-actions.ts；运维 CLI/config/timer 位于 scripts/orbit-operations.py 与 scripts/operations，合同见 [架构](docs/ARCHITECTURE.md#产品助手与受控运行诊断)及 [部署路径](docs/DEPLOYMENT-PATHS.md#受控运维记录与保留)。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
@@ -21,7 +21,7 @@
 
 ### 1.1 主仓库结构
 
-前端统一重构入口：`src/design` 管语义 token，`src/ui` 管基础控件，`src/dev/UiGallery.tsx` 为仅开发的 `/dev/ui`。账户已迁入 `features/settings/account`，`layouts/SettingsFrame` 管设置页面容器，`hooks/useAuth` 的 Provider 唯一持有应用认证。其他设置与业务目录按批迁移。当前边界见 [迁移台账](docs/FRONTEND-DEBT.md)，修改入口与验证见 [Agent Change Playbook](docs/UI-GUIDELINES.md#orbit-ui-统一迁移与-agent-change-playbook)，不据目标目录推定全部迁移完成。
+前端统一重构入口：`src/design` 管语义 token，`src/ui` 管基础控件，`src/dev/UiGallery.tsx` 为仅开发的 `/dev/ui`。账户已迁入 `features/settings/account`，`layouts/SettingsFrame` 管设置页面容器，`hooks/useAuth` 的 Provider 唯一持有应用认证。其余设置已迁入 features/settings/sections；SettingsState 管共享 Cloud/通知，features/help 管只读帮助和受控问题。其他业务目录按批迁移。当前边界见 [迁移台账](docs/FRONTEND-DEBT.md)，修改入口与验证见 [Agent Change Playbook](docs/UI-GUIDELINES.md#orbit-ui-统一迁移与-agent-change-playbook)，不据目标目录推定全部迁移完成。
 
 ```mermaid
 flowchart TD

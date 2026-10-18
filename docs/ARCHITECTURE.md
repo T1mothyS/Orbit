@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last local verification: 2026-10-08，产品助手查询/action、账号隔离、运维保留和 Android 入口收口；版本源为 package.json，验证入口/结果见 TEST-MATRIX。本轮本地验证不含真实 AI、生产、自然定时与收件箱；用户手机反馈和历史证据按对应日期独立使用。
+- Source review: 2026-10-18 核对 Settings V3、共享状态、Shell/搜索与帮助；其他领域按对应日期记录解释。版本源为 package.json，验证结果见 TEST-MATRIX；不据本地源码推断真实服务、设备或生产。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -12,7 +12,7 @@
 
 ## Orbit UI 基础层（迁移中）
 
-`src/design` 定义唯一 token 值，`src/ui` 暴露 Orbit API，Base UI 只作为内部交互基础。旧变量映射与使用方退出条件见 [迁移台账](FRONTEND-DEBT.md)。A 已批准；账户真实页、改密和设置入口已实现，其余分类/共享草稿仍在迁移，不能用 Gallery 推定全部完成。
+`src/design` 定义唯一 token 值，`src/ui` 暴露 Orbit API，Base UI 只作为内部交互基础。旧变量映射与使用方退出条件见 [迁移台账](FRONTEND-DEBT.md)。A/B 已批准；Settings V3 分类与共享状态已实现，C 视觉及最终发布验收仍独立，不能用 Gallery 推定生产完成。
 
 main 用编译期 DEV 条件加载 `/dev/ui`，不渲染 App/认证 hooks。`dev:ui` 使用独立 ui-gallery mode 并关闭 envDir，不读 `.env`、不启动 Express/业务数据库；示例只操作组件内存。Gallery 与 Portal 使用同一 token。修改方法见 [UI Playbook](UI-GUIDELINES.md#orbit-ui-统一迁移与-agent-change-playbook)。
 
@@ -80,7 +80,21 @@ React/Vite 与 Electron 壳都使用同一套前端页面。Electron 主进程�
 
 ## 2. 前端
 
-SettingsLayout 在正文滚动容器中测量章节位置，使用帧节流及尺寸观察更新导航高亮；导航自身只滚动到当前分类，不移动键盘焦点。知识库手机阅读页以专用样式覆盖通用页面顶部留白，箭头返回及章节控制条铺满阅读区域并覆盖后方正文。
+### Settings V3 路由与状态
+
+`/settings/*` 只挂一个 SettingsWorkspace，按账号 ID 创建 SettingsState，不能按 pathname 加 key。八类 canonical 地址为 `/settings/account`、`notifications`、`ai`、`reports`、`library`、`integrations`、`data`、`advanced`；个人资料为 `/settings/account/profile`，属于账户分类。`/settings/profile`、`/reports/settings`、`/library/settings` 与 `/library/preferences` 保留重定向；后者无 ID 时仍进入日报，有 ID 时按同一注册表分流。旧 `?settings=`、搜索、AI action/settingRefs 和 `orbit:open-settings` 共用 module-settings/settings-registry；未知和无权限分别提示，不任意执行 URL。桌面首页默认账户，重定向保留查询 ID；手机首页为分类列表。
+
+SettingsFrame 只管布局、分类、主题、同源返回与标题/目标焦点；feature 提供内容与搜索。已访问的普通分区及日报页签保留挂载，隐藏内容不可操作；首次按访问挂载，不为浏览一页启动所有领域请求。日报分“个性化”和“接收与邮件”，移动端保持同一任务顺序。已迁移的旧 SettingsDialog/Layout/Row/Section/Search/ModuleSettingsPage 及 LibraryPreferencesPage 已删除，旧全局设置/账户菜单/搜索规则退出。
+
+`ContextStore` 唯一持有完整 Cloud Context 快照、version、草稿与冲突状态。资料保存只合并 profile；日报保存合并非 profile 领域；以最新共同 version 提交，保留未知字段、旧格式和引用。确认结果更新快照并重基另一领域的草稿；取消仅影响当前领域。409 保留两个领域的草稿并停止覆盖；只有明确重新加载才丢弃两处草稿，不自动覆盖冲突。图形字段和研究框架规则继续由 daily-report-context 工具维护，不另建 JSON 编辑器或业务副本。
+
+`NotificationStore` 唯一持有通知偏好与日报邮件的 saved/draft，串行执行 PUT → GET，核对本次字段后才显示已保存。邮箱、提醒时间、渠道/免打扰、地点及即时开关分别提交目标字段；回读重基保留其他 dirty 输入及请求期间的新输入。日报邮件使用同一快照和已保存邮箱，不另发一次独立加载覆盖通知草稿。失败或回读不一致保留可重试草稿；重新读取也不抹掉 dirty 字段。
+
+SettingsGuard 统一注册 dirty 离开与 beforeunload/POP 保护；设置内部切换保留普通草稿，离开后清空。密码、API Key、授权码、备份密码/文件与一次性令牌仅在局部内存，离开对应分类/页签即清空；分类请求有取消生命周期，父作用域固定捕获账号认证并覆盖请求中的 Authorization，换账号/退出终止旧作用域。危险操作复用 Orbit ConfirmDialog，浏览器刷新和历史离开仍保留必要的原生保护。普通失败不报告保存成功；不取消或重构已开始的服务端事务。
+
+AppShell 的六业务入口、账户 Menu、主题和 GlobalSearch 复用 src/ui；Search 使用统一 Dialog/手机 Sheet，继续提供 Ctrl/Cmd K、异步取消、分组结果、Tools 门禁和焦点返回。`/help` 与 [快速上手](QUICK-START.md)说明常用任务；询问 AI 只接受固定问题 ID，把问题追加到原会话文字草稿，保留图片并消费导航状态，不自动请求模型。产品帮助索引在构建时包含快速上手，仍使用版本/hash 与权限边界。
+
+SettingsFrame 的分类高亮由路由决定；桌面左分类/右当前页，手机分类首页进入独立子页，保留标题、返回和焦点。知识库手机阅读页以专用样式覆盖通用页面顶部留白，箭头返回及章节控制条铺满阅读区域并覆盖后方正文。
 
 项目成长 `/project` 从头像菜单打开，页面及样式按路由懒加载。只读 `GET /api/project-evolution` 使用现有 Bearer 认证，读取服务端校验后的 `project-evolution/generated.json`；有效账号共享项目事实，不读取业务数据库，不在运行时调用 Git 或 AI。合同见 [项目成长维护说明](../project-evolution/README.md)。
 
@@ -104,15 +118,15 @@ SettingsLayout 在正文滚动容器中测量章节位置，使用帧节流及�
 | src/components/ResearchPage.tsx | 研究历史、观点提案与用户确认界面；不启动真实 Agent |
 | src/components/LibraryPage.tsx、library/LibraryDetailPage.tsx | 知识库列表与异步阅读、评论、版本 |
 | src/pages/ToolsPage.tsx | 登录后的挂载应用菜单；不加入产品顶部导航 |
-| src/components/settings/ | 尚未迁移的领域与旧容器；账户旧实现已退出 |
+| src/features/settings/ | SettingsWorkspace、账户级 SettingsState、领域分区与统一设置搜索；旧 components/settings 已删除 |
 
-当前登录后页面路由包括 /today、/schedule、/assistant、/reminders、/reports、/reports/:date、/research、/library、/library/:id、/tools 和 /project；/import 重定向到 /assistant?tool=email-import；未登录时使用 /login。头像菜单的设置进入独立 /settings，账户进入 /settings/account；旧账户 ID 经 moduleSettingsPath 定位新页，改密 ID 自动展开表单。其他分类暂转旧模块页/弹窗，C 批次统一退出。Tools 仍从头像菜单或设置进入，不加入产品顶部导航。
+当前登录后页面路由包括 /today、/schedule、/assistant、/reminders、/reports、/reports/:date、/research、/library、/library/:id、/tools 和 /project；/import 重定向到 /assistant?tool=email-import；未登录时使用 /login。头像菜单的设置进入独立 /settings，账户进入 /settings/account；旧账户 ID 经 moduleSettingsPath 定位新页，改密 ID 自动展开表单。其他分类均使用 /settings 下的 canonical 路由；旧模块入口仅重定向，不再保留旧容器。Tools 仍从头像菜单或设置进入，不加入产品顶部导航。
 
-设置 Frame 的返回地址仅接受同源站内路径；从业务页打开后经过设置首页/账户仍保留来源，显式返回恢复头像入口焦点。身份由一个 AuthProvider 管理；退出、401/403 或跨标签页身份变化清理当前账号草稿并卸载页面；过期异步身份响应受版本标识和取消信号保护，不能复活旧账号。临时网络失败保留 token。改密输入不入 local/session storage、URL、日志或共享草稿，离开/取消即卸载。
+设置 Frame 的返回地址仅接受同源站内路径；从业务页打开后经过设置首页/账户仍保留来源，显式返回恢复头像入口焦点；同一次设置访问中的跨分类链接继续保留来源。身份由一个 AuthProvider 管理；退出、401/403 或跨标签页身份变化清理当前账号草稿并卸载页面；过期异步身份响应受版本标识和取消信号保护，不能复活旧账号。临时网络失败保留 token。改密输入不入 local/session storage、URL、日志或共享草稿，离开/取消即卸载。
 
 ### 前端加载边界（Phase 2，0.21.1-260915.1408）
 
-App 保留登录、产品壳和 Today；SchedulePage、AiAssistantPage、ReminderPage、日报页面、LibraryPage、SettingsDialog、AdminModal 通过 React.lazy 加载，FeatureBoundary 提供等待、失败与刷新入口。弹窗等待状态可取消、Escape 关闭并恢复焦点。
+App 保留登录、产品壳和 Today；SchedulePage、AiAssistantPage、ReminderPage、日报页面、LibraryPage、SettingsWorkspace、HelpPage、AdminModal 通过 React.lazy 加载，FeatureBoundary 提供等待、失败与刷新入口。仍使用弹窗的业务保留等待取消、Escape 和焦点返回；设置本身为独立路由。
 
 - CalendarView 与 Today 共用 calendar/ScheduleFormModal、ScheduleDetailModal、schedule-types、schedule-presentation；共享层不得反向引用 CalendarView 或 lunar。
 - LibraryPage 负责列表；library/LibraryDetailPage 负责阅读、评论和版本。仅出现公式节点才导入 katex-renderer（含 KaTeX CSS）；Mermaid 仍按内容动态导入，保留源码和异步取消保护。

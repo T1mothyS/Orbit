@@ -6,7 +6,8 @@ import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHand
 import { Bot, BookOpen, Send, Loader2, Check, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus } from 'lucide-react';
 import type { InlineConfirmation } from '../hooks/useInlineConfirmation';
 import {safeChatHref} from '../utils/chat-markdown';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { appendHelpQuestion, helpQuestion } from '../features/help/topics';
 import { useAuth } from '../hooks/useAuth';
 import { AiProviderSelect } from './AiProviderSelect';
 import { OrbitSegmentedControl } from './OrbitSegmentedControl';
@@ -610,6 +611,15 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const changeImages = useCallback((images: NoteImage[]) => { updateComposerDraft(draftKey, { images }); }, [draftKey]);
   const imageUpload = useNoteImageUpload(noteImages, changeImages);
   const draftReady = !!user?.id && !!orbit.cid;
+  const navigateHelp = useNavigate();
+  useEffect(() => {
+    const state = location.state as { helpQuestion?: unknown } | null, question = helpQuestion(state?.helpQuestion);
+    if (!draftReady || !question) return;
+    const draft = readComposerDraft(draftKey);
+    updateComposerDraft(draftKey, { text: appendHelpQuestion(draft.text, question) });
+    navigateHelp(location.pathname + location.search, { replace: true, state: { ...state, helpQuestion: undefined } });
+    setNoteMode(false); textareaRef.current?.focus();
+  }, [draftReady, draftKey, location.key, location.state, location.pathname, location.search, navigateHelp]);
   const mutationBusy = !!confirmation.busy || orbit.mutating;
   const destructiveBlocked = orbit.creating || orbit.submitting || savingNotes || imageUpload.busy || !!confirmingPlanId || !!savingPlanOperationKey || attachments.files.some(file => ['uploading', 'processing'].includes(file.state));
   const clearDisabled = !draftReady || destructiveBlocked || isLoading || mutationBusy;

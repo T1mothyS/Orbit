@@ -33,7 +33,6 @@
   font-size: 12px;
 }
 .topbar-action:hover { color: #2563eb; border-color: rgba(37, 99, 235, .28); background: rgba(37, 99, 235, .08); }
-.product-nav-item { display: inline-flex; align-items: center; gap: 6px; }
 .schedule-workspace {
   width: 100%;
   height: 100%;

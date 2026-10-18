@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect,useRef,useState,type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getStoredAuthHeaders, useAuth } from '../../../hooks/useAuth';
-import { Button, FormField, InlineNotice, PasswordInput } from '../../../ui';
+import { getStoredAuthHeaders,useAuth } from '../../../hooks/useAuth';
+import { Button,FormField,InlineNotice,PasswordInput } from '../../../ui';
 import { newPasswordError } from '../../../utils/password-policy';
 
 export function PasswordForm({ onCancel }: { onCancel: () => void }) {

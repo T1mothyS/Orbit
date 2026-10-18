@@ -20,7 +20,7 @@
   z-index: 10;
 }
 
-.brand-lockup, .topbar-actions, .product-nav, .toolbar-actions, .card-actions, .task-card-head, .task-card-foot, .modal-head, .modal-foot {
+.brand-lockup, .topbar-actions, .toolbar-actions, .card-actions, .task-card-head, .task-card-foot, .modal-head, .modal-foot {
   display: flex;
   align-items: center;
 }
@@ -38,53 +38,6 @@
 }
 .brand-name { font-size: 14px; font-weight: 760; letter-spacing: -0.02em; white-space: nowrap; }
 .brand-subtitle { margin-top: 2px; font-size: 11px; color: rgb(var(--color-muted-foreground)); }
-.product-nav { gap: 4px; flex-shrink: 0; }
-.product-nav-item {
-  border: 0;
-  background: transparent;
-  color: rgb(var(--color-muted-foreground));
-  font-size: 13px;
-  padding: 8px 13px;
-  border-radius: 9px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.product-nav-item:hover, .product-nav-item.active { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
-.product-nav-item.icon-only {
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  justify-content: center;
-  padding: 6px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
-}
-.product-nav-item.icon-only:hover {
-  border-color: rgba(37, 99, 235, .2);
-  background: rgba(37, 99, 235, .1);
-  box-shadow: 0 5px 14px rgba(37, 99, 235, .12);
-}
-.product-nav-item.icon-only.active {
-  border-color: rgba(37, 99, 235, .28);
-  background: rgba(37, 99, 235, .16);
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .06), 0 6px 16px rgba(37, 99, 235, .14);
-}
-.product-nav-image {
-  display: block;
-  width: 29px;
-  height: 29px;
-  object-fit: contain;
-  transition: transform .18s ease, filter .18s ease;
-}
-.product-nav-item.icon-only:hover .product-nav-image,
-.product-nav-item.icon-only.active .product-nav-image {
-  transform: scale(1.08);
-  filter: drop-shadow(0 3px 5px rgba(15, 23, 42, .16));
-}
-.product-nav-lucide { display: block; transition: transform .18s ease, filter .18s ease; }
-.product-nav-item.icon-only:hover .product-nav-lucide,
-.product-nav-item.icon-only.active .product-nav-lucide { transform: scale(1.08); filter: drop-shadow(0 3px 5px rgba(15, 23, 42, .16)); }
 .topbar-actions { margin-left: auto; gap: 10px; }
 .user-chip { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgb(var(--color-muted-foreground)); font-size: 12px; }
 .icon-button, .text-button {
@@ -227,15 +180,11 @@
   .reminder-topbar { gap: 8px; padding-inline: 10px; }
   .brand-lockup { flex: 0 0 auto; }
   .brand-mark { width: 31px; height: 31px; }
-  .product-nav-item { gap: 4px; padding-inline: 8px; }
   .topbar-actions { gap: 3px; }
 }
 
 @media (max-width: 520px) {
   .reminder-topbar { height: 60px; }
-  .product-nav { margin-left: auto; }
-  .product-nav-item { gap: 3px; padding-inline: 3px; font-size: 12px; }
-  .product-nav-image { width: 27px; height: 27px; }
   .topbar-actions { margin-left: 0; }
   .topbar-actions .text-button { display: none; }
   .reminder-hero h1 { font-size: 31px; }

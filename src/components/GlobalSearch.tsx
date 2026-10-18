@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, BookOpen, CalendarDays, FileText, Loader2, Search, StickyNote, X } from 'lucide-react';
-import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { ArrowRight,BookOpen,CalendarDays,FileText,Search,StickyNote } from 'lucide-react';
+import { useEffect,useMemo,useRef,useState } from 'react';
+import { useLocation,useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useDialogLifecycle } from '../hooks/useDialogLifecycle';
+import { Button,Dialog,InlineNotice,Input,LoadingState,Sheet } from '../ui';
+import './shell-controls.css';
+
 
 type SearchResultType = 'schedule' | 'note' | 'report' | 'library'|'conversation'|'reminder'|'setting'|'tool'|'activity-report';
 
@@ -41,7 +42,7 @@ const TYPE_ICONS: Record<SearchResultType, typeof CalendarDays> = {
 const TYPE_ORDER: SearchResultType[] = ['setting','schedule','reminder','conversation','note','report','library','tool','activity-report'];
 
 export function GlobalSearch() {
-  const navigate = useNavigate();
+  const navigate = useNavigate(), location = useLocation();
   const { authHeaders } = useAuth();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -49,8 +50,10 @@ export function GlobalSearch() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  useDialogLifecycle(dialogRef, open);
+  const triggerRef=useRef<HTMLButtonElement>(null);
+  const [mobile,setMobile]=useState(()=>window.innerWidth<768);
+  useEffect(()=>{const media=window.matchMedia('(max-width:767px)'),update=()=>setMobile(media.matches);media.addEventListener('change',update);return()=>media.removeEventListener('change',update);},[]);
+  const Overlay=mobile?Sheet:Dialog;
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -118,84 +121,17 @@ export function GlobalSearch() {
 
   const openResult = (result: SearchResult) => {
     close();
-    if(/^\/tools\/[^/?]+/.test(result.target.path))window.location.assign(result.target.path);else navigate(result.target.path);
+    if(/^\/tools\/[^/?]+/.test(result.target.path))window.location.assign(result.target.path);else navigate(result.target.path, { state: result.type === 'setting' ? { settingsReturnTo: location.pathname + location.search } : undefined });
   };
 
-  const closeFromOverlay = (event: React.MouseEvent<HTMLDialogElement>) => {
-    if (event.target === event.currentTarget) close();
-  };
-
-  return (
-    <>
-      <button
-        type="button"
-        className="global-search-trigger"
-        onClick={() => setOpen(true)}
-        aria-label="打开全局搜索"
-        aria-haspopup="dialog"
-      >
-        <Search size={16} aria-hidden="true" />
-        <span>搜索</span>
-        <kbd>Ctrl K</kbd>
-      </button>
-
-      {open && createPortal((
-        <dialog ref={dialogRef} className="global-search-overlay orbit-dialog-viewport" aria-labelledby="global-search-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); close(); }} onClick={closeFromOverlay}>
-          <section className="global-search-dialog" onClick={event => event.stopPropagation()}>
-            <div className="global-search-head">
-              <div className="global-search-input-wrap">
-                <Search size={18} aria-hidden="true" />
-                <input
-                  ref={inputRef}
-                  value={query}
-                  onChange={event => setQuery(event.target.value)}
-                  placeholder="搜索事项、对话、记事、设置和报告"
-                  aria-label="搜索事项、对话、记事、设置和报告"
-                />
-                {loading && <Loader2 size={16} className="spin" aria-label="搜索中" />}
-              </div>
-              <button type="button" className="global-search-close" onClick={close} aria-label="关闭搜索"><X size={18} /></button>
-            </div>
-            <div className="global-search-body">
-              <h2 id="global-search-title">统一搜索</h2>
-              {!query.trim() && <p className="global-search-hint">输入关键词，搜索你的日程、记事、日报和知识库。</p>}
-              {error && <p className="global-search-state error" role="alert">{error}</p>}
-              {!error && query.trim() && !loading && response && response.results.length === 0 && (
-                <p className="global-search-state">没有找到匹配内容。</p>
-              )}
-              <div className="global-search-results">
-                {TYPE_ORDER.map(type => {
-                  const items = grouped.get(type) || [];
-                  if (!items.length) return null;
-                  const Icon = TYPE_ICONS[type];
-                  return (
-                    <section key={type} className="global-search-group" aria-labelledby={`global-search-group-${type}`}>
-                      <div className="global-search-group-title" id={`global-search-group-${type}`}>
-                        <span><Icon size={14} />{TYPE_LABELS[type]}</span>
-                        <em>{response?.counts?.[type] || items.length}</em>
-                      </div>
-                      <div className="global-search-result-list">
-                        {items.map(item => (
-                          <button key={`${item.type}-${item.id}`} type="button" className="global-search-result" onClick={() => openResult(item)}>
-                            <span className="global-search-result-main">
-                              <strong>{item.title}</strong>
-                              <span>{item.snippet || '打开查看详情'}</span>
-                            </span>
-                            <span className="global-search-result-meta">
-                              {item.date && <small>{item.type === 'schedule' ? item.date : item.date.slice(0, 10)}</small>}
-                              <ArrowRight size={15} aria-hidden="true" />
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-        </dialog>
-      ), document.body)}
-    </>
-  );
+  return <>
+    <Button ref={triggerRef} variant="quiet" className="global-search-trigger" onClick={()=>setOpen(true)} aria-label="打开全局搜索" aria-haspopup="dialog" leadingIcon={<Search size={18} aria-hidden="true"/>}><span className="global-search-caption">搜索 <kbd>Ctrl K</kbd></span></Button>
+    <Overlay open={open} onOpenChange={next=>{if(!next)close();}} title="统一搜索" description="搜索你的事项、对话、记事、设置和报告。" initialFocus={inputRef} returnFocus={triggerRef}>
+      <div className="global-search-head"><div className="global-search-input-wrap"><Input ref={inputRef} value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索事项、对话、记事、设置和报告" aria-label="搜索事项、对话、记事、设置和报告"/></div></div>
+      <div className="global-search-body">{loading&&<LoadingState label="搜索中…"/>}{!query.trim()&&<p className="oui-help">输入关键词，搜索你的日程、记事、日报和知识库。</p>}{error&&<InlineNotice tone="danger" title={error}/>}
+      {!error&&query.trim()&&!loading&&response&&!response.results.length&&<p role="status" className="oui-help">没有找到匹配内容。</p>}
+      <div className="global-search-results">{TYPE_ORDER.map(type=>{const items=grouped.get(type)||[];if(!items.length)return null;const Icon=TYPE_ICONS[type];return <section key={type} aria-labelledby={'global-search-group-'+type}><div className="global-search-group-title" id={'global-search-group-'+type}><span><Icon size={14}/>{TYPE_LABELS[type]}</span><span>{response?.counts?.[type]||items.length}</span></div><div className="global-search-result-list">{items.map(item=><Button key={item.type+item.id} variant="quiet" className="global-search-result" onClick={()=>openResult(item)}><span className="global-search-result-main"><strong>{item.title}</strong><span>{item.snippet||'打开查看详情'}</span></span><span className="global-search-result-meta">{item.date&&<small>{item.date.slice(0,10)}</small>}<ArrowRight size={15} aria-hidden="true"/></span></Button>)}</div></section>;})}</div>
+      </div>
+    </Overlay>
+  </>;
 }

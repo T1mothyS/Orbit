@@ -105,12 +105,12 @@ test('product help is separate, version bound, and filters admin-only deployment
   assert.throws(()=>searchProductHelp('a'.repeat(301)));
 });
 test('semantic actions map existing settings, reject mismatches/unknown/admin/test targets',()=>{
-  const action=settingsActions('怎么修改日报关注行业')[0];assert(action);assert.equal(action.type,'navigate');assert.match(navigationHref(action)!,/^\/reports\/settings\?settings=/);
+  const action=settingsActions('怎么修改日报关注行业')[0];assert(action);assert.equal(action.type,'navigate');assert.match(navigationHref(action)!,/^\/settings\/reports\?settings=/);
   assert.equal(navigationHref({...action,target:'settings.profile'}),null);
   assert.equal(settingAction('https://malicious.invalid'),null);assert.equal(settingAction('android-local-test'),null);
   assert.equal(navigationHref({type:'navigate',target:'settings.general',settingId:'unknown',url:'https://malicious.invalid'}),null);
-  assert.equal(navigationHref(settingAction('library-personal-preferences')),'/settings/profile?settings=library-personal-preferences');
-  assert.equal(navigationHref(settingAction('settings-library')),'/library/settings?settings=settings-library');
+  assert.equal(navigationHref(settingAction('library-personal-preferences')),'/settings/account/profile?settings=library-personal-preferences');
+  assert.equal(navigationHref(settingAction('settings-library')),'/settings/library?settings=settings-library');
   assert.deepEqual(JSON.parse(JSON.stringify(action)),action); // The persisted action stays semantic.
 });
 test('diagnostics outrank published-report shortcut; ordinary schedule creation remains distinct',()=>{

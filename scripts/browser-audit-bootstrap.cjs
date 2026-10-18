@@ -17,7 +17,7 @@ function installAuditPrelude() {
   };
   const respond = (type, message) => {
     const text = String(message ?? '');
-    const key = Object.keys(messages).find(key => messages[key] === text);
+    const key = Object.keys(messages).find(key => (messages[key] === text || key === 'profile' && text === '设置尚未保存，离开会丢弃当前修改。是否离开？'));
     const expected = type === 'confirm' && armed && armed.key === key &&
       (armed.path === location.pathname || key === 'profile' && armed.popPath === location.pathname) && armed.until >= Date.now();
     const accepted = !!(expected && armed.accept);

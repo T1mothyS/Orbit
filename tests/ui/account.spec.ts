@@ -1,15 +1,14 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import sharp from 'sharp';
+import { fixtureToken } from './auth-fixture';
 const base = 'http://127.0.0.1:4187';
 // Mutating fixtures are not replayed against already changed credentials on retry.
 test.describe.configure({ retries: 0 });
-const policy = JSON.parse(fs.readFileSync(new URL('./visual-policy.json', import.meta.url), 'utf8')) as { accountApproved?: boolean };
+const policy = JSON.parse(fs.readFileSync(new URL('./visual-policy.json', import.meta.url), 'utf8')) as { accountApproved?: boolean; settingsApproved?: boolean };
 
 async function login(context: BrowserContext, email = 'preview@example.invalid') {
-  const result = await context.request.post(base + '/api/auth/login', { data: { email, password: 'OrbitPreview123!' } });
-  expect(result.status()).toBe(200);
-  const { token } = await result.json();
+  const token = await fixtureToken(context, email);
   await context.addInitScript(value => localStorage.setItem('aicalendar_token', value), token);
   await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
   return token as string;
@@ -41,7 +40,7 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
       await expect(page.getByText('preview@example.invalid', { exact: true })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       const name = `account-${state}-${width}-${theme}.png`;
-      if (policy.accountApproved) await expect(page).toHaveScreenshot(name, { fullPage: true });
+      if (policy.settingsApproved) await expect(page).toHaveScreenshot(name, { fullPage: true });
       else await page.screenshot({ path: test.info().outputPath(name), fullPage: true, animations: 'disabled' });
     }
     if (width < 768) {
@@ -163,18 +162,18 @@ test('account changes in another tab clear sensitive inputs and render the new i
 
 test('settings returns to its original work page with keyboard focus restored', async ({ context, page }) => {
   await login(context); await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(base + '/schedule'); await page.locator('.account-menu > summary').click();
-  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.goto(base + '/schedule'); await page.locator('[data-account-menu-trigger]').click();
+  await page.getByRole('menuitem', { name: '设置', exact: true }).click();
   await page.getByRole('link', { name: '账户与安全 登录信息、头像与密码' }).click();
   await page.getByRole('link', { name: '返回 Orbit', exact: true }).click();
   await expect(page).toHaveURL(base + '/schedule');
-  await expect(page.locator('.account-menu > summary')).toBeFocused();
+  await expect(page.locator('[data-account-menu-trigger]')).toBeFocused();
   await page.goto(base + '/assistant');
   const composer = page.getByLabel('AI 助手输入框', { exact: true });
   await expect(composer).toBeVisible(); await page.waitForURL('**/assistant?conversation=*');
   await composer.fill('进入设置后仍应保留的未发送草稿');
   const origin = page.url();
-  await page.locator('.account-menu > summary').click(); await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.locator('[data-account-menu-trigger]').click(); await page.getByRole('menuitem', { name: '设置', exact: true }).click();
   await page.getByRole('link', { name: '返回 Orbit', exact: true }).click();
   await expect(page).toHaveURL(origin); await expect(composer).toHaveValue('进入设置后仍应保留的未发送草稿');
 });
