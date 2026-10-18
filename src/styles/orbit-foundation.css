@@ -220,3 +220,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .orbit-draft-file span{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.orbit-draft-file small{color:var(--td-text-color-secondary)}
 .orbit-file-card{display:flex;align-items:center;gap:8px;margin:8px 0;color:var(--td-text-color-primary);font-size:12px;white-space:normal;overflow-wrap:anywhere;max-width:100%}
 .orbit-file-card img{width:56px;height:56px;object-fit:contain}.orbit-file-card div{min-width:0;flex:1}.orbit-file-card strong,.orbit-file-card small{display:block}.orbit-file-card small{color:var(--td-text-color-secondary)}.orbit-file-card button{flex-shrink:0;color:var(--td-brand-color)}
+
+/* Active task rows expose completion, content and secondary actions on one line. */
+.app-shell .action-row--task { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: var(--orbit-space-1); padding: var(--orbit-space-1) var(--orbit-space-3); cursor: default; }
+.app-shell .action-row--task > :is(.action-row-actions, .suspended-todo-actions) { width: 44px; min-width: 44px; margin: 0; gap: 0; }
+.app-shell .action-row--task .priority-dot { display: inline-block; vertical-align: middle; margin-right: var(--orbit-space-1); }
+
+.action-row-label { display: grid; min-width: 0; gap: var(--orbit-space-1); padding: var(--orbit-space-2); }
+.action-row-label strong { font-weight: 600; overflow-wrap: anywhere; }
+.action-row-label > span { color: var(--orbit-text-secondary); font-size: var(--orbit-type-secondary); overflow-wrap: anywhere; }

@@ -1,8 +1,8 @@
 import { requestError } from '../utils/request-error';
 import { OrbitDialog } from './OrbitDialog';
 import { ArrowUpRight, CalendarClock, CheckCircle2, ChevronDown, Edit3, Mail, MoreVertical, Paperclip, RefreshCw, Trash2, X } from 'lucide-react';
-import { KeyboardEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { KeyboardEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { ActionRow, IconButton, Menu } from '../ui';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import type { Schedule } from './calendar/schedule-types';
@@ -85,12 +85,6 @@ function ActionItemMenu({ item, open, onToggle, onAction }: {
   onToggle: () => void;
   onAction: (action: ActionMenuAction) => void;
 }) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const firstItemRef = useRef<HTMLButtonElement>(null);
-  const wasOpenRef = useRef(false);
-  const [menuPosition, setMenuPosition] = useState({ left: 0, top: 0 });
-  const [menuReady, setMenuReady] = useState(false);
   const entries: Array<{ action: ActionMenuAction; label: string; icon?: typeof Edit3; danger?: boolean }> = [
     { action: 'edit', label: '编辑', icon: Edit3 },
     ...(item.sourceType === 'schedule' && !item.isUnscheduled && item.status !== 'completed'
@@ -102,147 +96,7 @@ function ActionItemMenu({ item, open, onToggle, onAction }: {
     { action: 'delete', label: '删除', icon: Trash2, danger: true },
   ];
 
-  const positionMenu = useCallback(() => {
-    const trigger = triggerRef.current;
-    const menu = menuRef.current;
-    if (!trigger || !menu) return;
-
-    const triggerRect = trigger.getBoundingClientRect();
-    const menuRect = menu.getBoundingClientRect();
-    const viewportWidth = window.visualViewport?.width || window.innerWidth;
-    const viewportHeight = window.visualViewport?.height || window.innerHeight;
-    const margin = 8;
-    const gap = 6;
-    const maxLeft = Math.max(margin, viewportWidth - menuRect.width - margin);
-    const left = Math.max(margin, Math.min(triggerRect.right - menuRect.width, maxLeft));
-    const belowTop = triggerRect.bottom + gap;
-    const aboveTop = triggerRect.top - menuRect.height - gap;
-    const belowFits = belowTop + menuRect.height <= viewportHeight - margin;
-    const aboveFits = aboveTop >= margin;
-    const preferredTop = belowFits || !aboveFits ? belowTop : aboveTop;
-    const maxTop = Math.max(margin, viewportHeight - menuRect.height - margin);
-    const top = Math.max(margin, Math.min(preferredTop, maxTop));
-
-    setMenuPosition({ left, top });
-    setMenuReady(true);
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!open) {
-      setMenuReady(false);
-      return;
-    }
-    positionMenu();
-  }, [entries.length, open, positionMenu]);
-
-  useEffect(() => {
-    if (!open) {
-      if (wasOpenRef.current) {
-        wasOpenRef.current = false;
-        triggerRef.current?.focus({ preventScroll: true });
-      }
-      return;
-    }
-    wasOpenRef.current = true;
-    firstItemRef.current?.focus({ preventScroll: true });
-    const scrollGuardUntil = Date.now() + 250;
-    const closeOnOutside = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!menuRef.current?.contains(target) && !triggerRef.current?.contains(target)) onToggle();
-    };
-    const closeOnUserScroll = (event: Event) => {
-      const target = event.target as Node | null;
-      if (target && menuRef.current?.contains(target)) return;
-      if (Date.now() >= scrollGuardUntil) onToggle();
-    };
-    const reposition = () => positionMenu();
-    const closeOnKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') onToggle();
-    };
-    document.addEventListener('pointerdown', closeOnOutside);
-    window.addEventListener('scroll', closeOnUserScroll, { capture: true, passive: true });
-    window.addEventListener('wheel', closeOnUserScroll, { capture: true, passive: true });
-    window.addEventListener('touchmove', closeOnUserScroll, { capture: true, passive: true });
-    window.addEventListener('resize', reposition);
-    window.addEventListener('orientationchange', reposition);
-    window.visualViewport?.addEventListener('resize', reposition);
-    document.addEventListener('keydown', closeOnKey);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutside);
-      window.removeEventListener('scroll', closeOnUserScroll, true);
-      window.removeEventListener('wheel', closeOnUserScroll, true);
-      window.removeEventListener('touchmove', closeOnUserScroll, true);
-      window.removeEventListener('resize', reposition);
-      window.removeEventListener('orientationchange', reposition);
-      window.visualViewport?.removeEventListener('resize', reposition);
-      document.removeEventListener('keydown', closeOnKey);
-    };
-  }, [onToggle, open, positionMenu]);
-
-  const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    event.stopPropagation();
-    if (open && event.key === 'Escape') {
-      event.preventDefault();
-      onToggle();
-      return;
-    }
-    if (!open || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
-    const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') || []);
-    if (!items.length) return;
-    event.preventDefault();
-    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? items.length - 1
-        : (currentIndex + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
-    items[nextIndex]?.focus({ preventScroll: true });
-  };
-
-  return <>
-    <div
-      className="action-row-menu"
-      onClick={event => event.stopPropagation()}
-      onKeyDown={handleMenuKeyDown}
-    >
-      <button
-        ref={triggerRef}
-        type="button"
-        className="icon-button action-menu-trigger"
-        aria-label={`打开 ${item.title} 的更多操作`}
-        title="更多设置"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={event => { event.stopPropagation(); onToggle(); }}
-      ><MoreVertical size={19} aria-hidden="true" /></button>
-    </div>
-    {open && typeof document !== 'undefined' && createPortal(
-      <div
-        ref={menuRef}
-        className="action-menu-popover"
-        role="menu"
-        aria-label={`${item.title} 的更多设置`}
-        aria-orientation="vertical"
-        style={{ left: menuPosition.left, top: menuPosition.top, visibility: menuReady ? 'visible' : 'hidden' }}
-        onPointerDown={event => event.stopPropagation()}
-        onClick={event => event.stopPropagation()}
-        onKeyDown={handleMenuKeyDown}
-      >
-        {entries.map((entry, index) => {
-          const Icon = entry.icon;
-          return <button
-            key={entry.action}
-            ref={index === 0 ? firstItemRef : undefined}
-            type="button"
-            role="menuitem"
-            className={entry.danger ? 'danger' : ''}
-            onClick={event => { event.stopPropagation(); onAction(entry.action); }}
-          >{Icon && <Icon size={14} />}<span>{entry.label}</span></button>;
-        })}
-      </div>,
-      document.body,
-    )}
-  </>;
+  return <Menu label={`${item.title} 的更多设置`} open={open} onOpenChange={next => { if (next !== open) onToggle(); }} trigger={<IconButton label={`打开 ${item.title} 的更多操作`} variant="quiet"><MoreVertical size={19} aria-hidden="true" /></IconButton>} items={entries.map(entry => ({ id: entry.action, label: entry.label, danger: entry.danger, icon: entry.icon ? <entry.icon size={16} /> : undefined, onSelect: () => onAction(entry.action) }))} />;
 }
 
 function ActionList({ title, hint, items, tone, menuScope, headerControl, onComplete, onEdit, onMenuAction, openMenuId, setOpenMenuId, completingId }: {
@@ -266,36 +120,22 @@ function ActionList({ title, hint, items, tone, menuScope, headerControl, onComp
         const menuId = menuScope + ':' + item.id;
         return <article
         key={item.id}
-        className={item.sourceType === 'schedule' ? 'action-row editable' : 'action-row'}
-        onClick={() => item.sourceType === 'schedule' && onEdit(item)}
-        onKeyDown={(event: KeyboardEvent<HTMLElement>) => {
-          if (event.target !== event.currentTarget) return;
-          if (item.sourceType === 'schedule' && (event.key === 'Enter' || event.key === ' ')) {
-            event.preventDefault();
-            onEdit(item);
-          }
-        }}
-        tabIndex={item.sourceType === 'schedule' ? 0 : undefined}
-        role={item.sourceType === 'schedule' ? 'button' : undefined}
-        aria-label={item.sourceType === 'schedule' ? `编辑日程：${item.title}` : undefined}
+        className="action-row action-row--task"
       >
-        {item.itemType === 'recurring' ? <div className="recurring-priority" title="周期事务" aria-label="周期事务"><RefreshCw size={22} strokeWidth={1.8} aria-hidden="true" /><span className={'priority-dot ' + item.priority} /></div> : <div className={'priority-dot ' + item.priority} />}
-        <div className="action-row-main"><div className="action-row-title">{item.title}</div><div className="action-row-meta"><span>{item.itemType === 'recurring' ? '周期事务' : item.itemType === 'todo' ? '待办' : '日程'}</span><span>{item.plannedAt ? `安排 ${formatDate(item.plannedAt, true)} · 到期 ${formatDate(item.dueAt,true)}` : formatDate(item.dueAt, item.allDay)}</span>{item.nextAction && <span>{item.nextAction}</span>}</div></div>
         <div className="action-row-actions">
-          <button
+          <IconButton variant="quiet"
             type="button"
-            className="complete-button"
-            aria-label={`${completingId === item.id ? '正在完成' : '完成'}：${item.title}`}
+            label={`${completingId === item.id ? '正在完成' : '完成'}：${item.title}`}
             title={completingId === item.id ? '完成中' : '完成'}
             onClick={event => { event.stopPropagation(); onComplete(item); }}
             onKeyDown={event => event.stopPropagation()}
             disabled={completingId === item.id}
           >
             {completingId === item.id ? <RefreshCw size={17} className="spin" aria-hidden="true" /> : <CheckCircle2 size={17} aria-hidden="true" />}
-            <span className="complete-button-label">{completingId === item.id ? '完成中…' : '完成'}</span>
-          </button>
-          <ActionItemMenu item={item} open={openMenuId === menuId} onToggle={() => setOpenMenuId(openMenuId === menuId ? null : menuId)} onAction={action => { setOpenMenuId(null); onMenuAction(item, action); }} />
+          </IconButton>
         </div>
+        {item.sourceType === 'schedule' ? <ActionRow compact className="action-row-main" aria-label={`编辑日程：${item.title}`} title={item.title} onClick={() => onEdit(item)} description={<><span className={'priority-dot ' + item.priority} aria-hidden="true" />{{high:'高',medium:'中',low:'低'}[item.priority]}优先级 · {item.itemType === 'recurring' ? '周期事务' : item.itemType === 'todo' ? '待办' : '日程'} · {item.plannedAt ? `安排 ${formatDate(item.plannedAt, true)} · 到期 ${formatDate(item.dueAt,true)}` : formatDate(item.dueAt, item.allDay)}{item.nextAction && ` · ${item.nextAction}`}</>} /> : <div className="action-row-label"><strong>{item.title}</strong><span>{<><span className={'priority-dot ' + item.priority} aria-hidden="true" />{{high:'高',medium:'中',low:'低'}[item.priority]}优先级 · {item.itemType === 'recurring' ? '周期事务' : item.itemType === 'todo' ? '待办' : '日程'} · {item.plannedAt ? `安排 ${formatDate(item.plannedAt, true)} · 到期 ${formatDate(item.dueAt,true)}` : formatDate(item.dueAt, item.allDay)}{item.nextAction && ` · ${item.nextAction}`}</>}</span></div>}
+        <ActionItemMenu item={item} open={openMenuId === menuId} onToggle={() => setOpenMenuId(openMenuId === menuId ? null : menuId)} onAction={action => { setOpenMenuId(null); onMenuAction(item, action); }} />
       </article>;
       })}
     </div>}
@@ -316,7 +156,7 @@ function SuspendedTodoSection({ items, onViewAll, onComplete, onEdit, onMenuActi
     <div className="suspended-todo-head">
       <div className="suspended-todo-title">
         <div className="suspended-todo-icon"><CalendarClock size={19} /></div>
-        <div><div className="suspended-todo-title-row"><h2>挂起待办</h2><button type="button" className="icon-button suspended-todo-view-all" title="查看全部" aria-label="查看全部挂起待办" onClick={onViewAll}><ArrowUpRight size={18} aria-hidden="true" /></button></div><span>没有具体执行日期，完成前会一直保留在这里</span></div>
+        <div><div className="suspended-todo-title-row"><h2>挂起待办</h2><IconButton label="查看全部挂起待办" variant="quiet" onClick={onViewAll}><ArrowUpRight size={18} aria-hidden="true" /></IconButton></div><span>没有具体执行日期，完成前会一直保留在这里</span></div>
       </div>
       <strong>{items.length}</strong>
     </div>
@@ -325,36 +165,22 @@ function SuspendedTodoSection({ items, onViewAll, onComplete, onEdit, onMenuActi
         const menuId = 'suspended:' + item.id;
         return <article
         key={item.id}
-        className="action-row suspended-todo-row editable"
-        onClick={() => onEdit(item)}
-        onKeyDown={(event: KeyboardEvent<HTMLElement>) => {
-          if (event.target !== event.currentTarget) return;
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            onEdit(item);
-          }
-        }}
-        tabIndex={0}
-        role="button"
-        aria-label={`编辑待办：${item.title}`}
+        className="action-row action-row--task suspended-todo-row"
       >
-        <div className={'priority-dot ' + item.priority} />
-        <div className="action-row-main"><div className="action-row-title">{item.title}</div><div className="action-row-meta"><span>无固定期限待办</span>{item.nextAction && <span>{item.nextAction}</span>}</div></div>
         <div className="suspended-todo-actions">
-          <button
-            className="complete-button"
+          <IconButton variant="quiet"
             type="button"
-            aria-label={`${completingId === item.id ? '正在完成' : '完成'}：${item.title}`}
+            label={`${completingId === item.id ? '正在完成' : '完成'}：${item.title}`}
             title={completingId === item.id ? '完成中' : '完成'}
             onClick={event => { event.stopPropagation(); onComplete(item); }}
             onKeyDown={event => event.stopPropagation()}
             disabled={completingId === item.id}
           >
             {completingId === item.id ? <RefreshCw size={17} className="spin" aria-hidden="true" /> : <CheckCircle2 size={17} aria-hidden="true" />}
-            <span className="complete-button-label">{completingId === item.id ? '完成中…' : '完成'}</span>
-          </button>
-          <ActionItemMenu item={item} open={openMenuId === menuId} onToggle={() => setOpenMenuId(openMenuId === menuId ? null : menuId)} onAction={action => { setOpenMenuId(null); onMenuAction(item, action); }} />
+          </IconButton>
         </div>
+        <ActionRow compact className="action-row-main" aria-label={`编辑待办：${item.title}`} title={item.title} onClick={() => onEdit(item)} description={<><span className={'priority-dot ' + item.priority} aria-hidden="true" />{{high:'高',medium:'中',low:'低'}[item.priority]}优先级 · 无固定期限{item.nextAction && ` · ${item.nextAction}`}</>} />
+        <ActionItemMenu item={item} open={openMenuId === menuId} onToggle={() => setOpenMenuId(openMenuId === menuId ? null : menuId)} onAction={action => { setOpenMenuId(null); onMenuAction(item, action); }} />
       </article>;
       })}
     </div>}

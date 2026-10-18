@@ -137,3 +137,95 @@ test('stage2 C2 compact filters remain reachable in a low-height viewport', asyn
   await page.keyboard.press('Escape'); await sheet.getByRole('button', { name: '取消', exact: true }).click();
   await expect(trigger).toBeFocused();
 });
+
+
+for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]) for (const theme of ['light', 'dark']) {
+  test(`stage2 C3 ${width} ${theme}: task actions, secondary menus and nested editor`, async ({ context, page }) => {
+    const token = await fixtureToken(context, 'preview@example.invalid');
+    await context.addInitScript(({token, theme}) => { localStorage.setItem('aicalendar_token', token); localStorage.setItem('theme', theme); }, {token, theme});
+    await context.route('**/*', route => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
+    await page.setViewportSize({width, height}); await page.goto(base + '/today');
+    const first = page.locator('.action-row--task').first(); await expect(first).toBeVisible();
+    expect(await first.locator('button button').count()).toBe(0); expect(await first.getByRole('button').count()).toBe(3);
+    await checkVisual(page, `stage2-today-${width}-${theme}.png`, false, false);
+    const menu = first.getByRole('button', {name: /打开 .* 的更多操作/}); await menu.click();
+    await expect(page.getByRole('menuitem', {name:'编辑', exact:true})).toBeVisible();
+    await page.keyboard.press('Escape'); await expect(menu).toBeFocused();
+    const trigger = page.getByRole('button', {name:'查看全部挂起待办', exact:true}); await trigger.click();
+    const drawer = page.getByRole('dialog', {name:'无固定期限待办', exact:true});
+    await expect(drawer.locator('article').first()).toBeVisible();
+    await checkVisual(page, `stage2-unscheduled-${width}-${theme}.png`, false, false);
+    await drawer.locator('.oui-action-row').first().click(); await expect(drawer.locator('.unscheduled-details')).toBeVisible();
+    await drawer.getByRole('combobox', {name:'状态',exact:true}).click(); await page.getByRole('option', {name:/^已完成/}).click();
+    await expect(drawer.locator('article').first()).toBeVisible();
+    await drawer.locator('article').first().getByRole('button', {name:/更多操作：/}).click();
+    await page.getByRole('menuitem', {name:'编辑',exact:true}).click();
+    await expect(page.getByLabel('日程标题', {exact:true})).toBeVisible();
+    page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', {name:'关闭日程编辑',exact:true}).click();
+    await expect(page.getByLabel('日程标题', {exact:true})).toHaveCount(0); await expect(drawer).toBeVisible();
+    await drawer.getByRole('button', {name:'关闭',exact:true}).click(); await expect(trigger).toBeFocused();
+    await page.goto(base + '/reminders'); await page.getByRole('button', {name:'+ 新建提醒',exact:true}).click();
+    await expect(page.getByRole('dialog', {name:'新建周期提醒',exact:true})).toBeVisible();
+    await checkVisual(page, `stage2-recurring-form-${width}-${theme}.png`, false, false);
+    await page.getByRole('button', {name:'关闭周期提醒编辑',exact:true}).click();
+    await page.goto(base + '/assistant'); await expect(page.getByLabel('AI 助手输入框',{exact:true})).toBeVisible();
+    await checkVisual(page, `stage2-chat-${width}-${theme}.png`, false, false);
+    await page.getByRole('button',{name:'打开 AI 记事板',exact:true}).click(); await expect(page.locator('#orbit-note-connected-note')).toBeVisible();
+    await checkVisual(page, `stage2-notes-${width}-${theme}.png`, false, false); if(width<1100) await page.getByRole('button',{name:'关闭记事板',exact:true}).click(); else await page.getByRole('button',{name:'打开 AI 记事板',exact:true}).click();
+    await page.getByRole('button',{name:'个人菜单',exact:true}).click();
+    await page.getByRole('menuitem',{name:'邮箱导入',exact:true}).or(page.getByRole('dialog',{name:'个人菜单',exact:true}).getByRole('button',{name:'邮箱导入',exact:true})).click();
+    await expect(page.getByRole('heading',{name:'邮箱导入',exact:true})).toBeVisible(); await checkVisual(page, `stage2-email-${width}-${theme}.png`, false, false);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
+
+
+test('stage2 C3 completion errors retain a task, retry/reopen and deletion cancellation are real isolated operations', async ({context, page}) => {
+  const token = await fixtureToken(context, 'preview-guards@example.invalid'), headers = {Authorization:`Bearer ${token}`};
+  await context.addInitScript(value => localStorage.setItem('aicalendar_token',value), token);
+  const title = 'C3 完成与重开合成待办';
+  const created = await context.request.post(base + '/api/schedules', {headers, data:{title,type:'todo',is_unscheduled:true,start_time:'2020-01-01T09:00:00',calendar_id:'personal',priority:'medium',category:'other'}});
+  expect(created.ok()).toBe(true); const id = (await created.json()).schedule.id;
+  await page.setViewportSize({width:430,height:520}); await page.goto(base + '/today');
+  await page.getByRole('button',{name:'查看全部挂起待办',exact:true}).click();
+  const drawer=page.getByRole('dialog',{name:'无固定期限待办',exact:true});
+  await expect(drawer.getByRole('button',{name:'关闭',exact:true})).toBeInViewport({ratio:1});
+  let failure=true, writes=0;
+  await page.route(`**/api/schedules/${id}/toggle`, route => {writes++;return failure?route.fulfill({status:503,json:{error:'合成更新失败'}}):route.continue();});
+  const complete=drawer.getByRole('button',{name:'标记完成：'+title,exact:true}); await complete.click();
+  await expect(drawer.getByRole('alert')).toContainText('合成更新失败'); await expect(complete).toBeVisible();
+  failure=false; await complete.click(); const reopen=drawer.getByRole('button',{name:'设为未完成：'+title,exact:true}); await expect(reopen).toBeVisible();
+  await reopen.click(); await expect(complete).toBeVisible(); expect(writes).toBe(3);
+  await drawer.getByRole('button',{name:'更多操作：'+title,exact:true}).click(); page.once('dialog',dialog=>dialog.dismiss());
+  await page.getByRole('menuitem',{name:'删除',exact:true}).click();
+  expect((await context.request.get(base + '/api/schedules/'+id,{headers})).ok()).toBe(true);
+  await drawer.getByRole('button',{name:'关闭',exact:true}).click();
+  await context.request.delete(base + '/api/schedules/'+id,{headers});
+});
+
+test('stage2 C3 recurring long form keeps drafts and close protection at low height', async ({context,page}) => {
+  const token=await fixtureToken(context,'preview@example.invalid');await context.addInitScript(value=>localStorage.setItem('aicalendar_token',value),token);
+  await page.setViewportSize({width:430,height:520});await page.goto(base+'/reminders');await page.getByRole('button',{name:'+ 新建提醒',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'新建周期提醒',exact:true});await dialog.getByLabel('任务名称',{exact:true}).fill('保留的长表单草稿');
+  await dialog.getByRole('button',{name:'生活事务',exact:true}).click();
+  const submit=dialog.getByRole('button',{name:'创建提醒',exact:true});await submit.scrollIntoViewIfNeeded();await expect(submit).toBeInViewport({ratio:1});
+  page.once('dialog',native=>native.dismiss());await dialog.getByRole('button',{name:'取消',exact:true}).click();await expect(dialog.getByLabel('任务名称',{exact:true})).toHaveValue('保留的长表单草稿');
+  page.once('dialog',native=>native.accept());await dialog.getByRole('button',{name:'取消',exact:true}).click();await expect(dialog).toHaveCount(0);
+});
+
+
+test('stage2 C3 configured email keeps guidance optional and a failed confirmation preserves the draft', async ({context,page}) => {
+  const token=await fixtureToken(context,'preview@example.invalid');await context.addInitScript(value=>localStorage.setItem('aicalendar_token',value),token);
+  const draft={kind:'schedule',title:'合成邮箱草稿',dueDate:'2026-10-20',dueTime:'09:00',templateKey:'custom',recurrence:{frequency:'once',interval:1,unit:'day',advancePolicy:'calendar'},reminderOffsets:[1],actionGuide:'核对后处理',notes:'',confidence:{},warnings:[]};
+  await page.route('**/api/email-import/settings',route=>route.fulfill({json:{setting:{enabled:true,importToken:'synthetic-layout-only'},imapConfigured:true}}));
+  await page.route('**/api/ai/imports?*',route=>route.fulfill({json:{imports:[{id:'synthetic-email',status:'draft',draft,expiresAt:'2026-10-19T00:00:00Z'}]}}));
+  let attempts=0,failure=true;
+  await page.route('**/api/ai/imports/synthetic-email/confirm',route=>{attempts++;expect(route.request().postDataJSON().draft.title).toBe('核对后的合成标题');return route.fulfill(failure?{status:503,json:{error:'合成确认失败'}}:{json:{success:true}});});
+  await page.setViewportSize({width:430,height:932});await page.goto(base+'/assistant?tool=email-import');
+  await expect(page.getByText('IMAP 已配置',{exact:true})).toBeVisible();await expect(page.locator('.ai-import-tutorial')).not.toHaveAttribute('open','');
+  await page.locator('.ai-import-tutorial > summary').click();await expect(page.getByText('打开下方的邮箱导入开关。',{exact:true})).toBeVisible();await page.locator('.ai-import-tutorial > summary').click();
+  await page.getByRole('button',{name:/^合成邮箱草稿/}).click();await page.getByLabel('标题',{exact:true}).fill('核对后的合成标题');expect(attempts).toBe(0);
+  await checkVisual(page,'stage2-email-configured-draft-430-light.png',false,false);
+  await page.getByRole('button',{name:'确认并创建',exact:true}).click();await expect(page.getByRole('alert')).toContainText('合成确认失败');await expect(page.getByLabel('标题',{exact:true})).toHaveValue('核对后的合成标题');
+  failure=false;await page.getByRole('button',{name:'确认并创建',exact:true}).click();await expect(page.getByText('待办日程已创建',{exact:true})).toBeVisible();expect(attempts).toBe(2);
+});

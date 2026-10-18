@@ -53,7 +53,7 @@
 .oui-button--quiet { color: var(--orbit-text-secondary); background: transparent; }
 .oui-button--quiet:hover { color: var(--orbit-text); background: var(--orbit-muted); }
 .oui-button--quiet:active { background: var(--orbit-hover); }
-.oui-button--quiet[aria-current=page] { color: var(--orbit-brand); background: var(--orbit-brand-soft); }
+.oui-button--quiet[aria-current=page], .oui-button--quiet[aria-pressed=true] { color: var(--orbit-brand); background: var(--orbit-brand-soft); }
 .oui-button--link { color: var(--orbit-link-color); background: transparent; text-decoration: underline; text-underline-offset: 3px; }
 .oui-button--link:hover { color: var(--orbit-link-hover-color); }
 .oui-button--danger { color: var(--orbit-destructive); background: transparent; border-color: currentColor; }
@@ -95,6 +95,8 @@
 .oui-action-row:hover { background: var(--orbit-hover); }
 .oui-action-row:active { background: var(--orbit-pressed); }
 .oui-action-row:disabled { color: var(--orbit-text-disabled); cursor: default; }
+.oui-action-row--compact { padding: var(--orbit-space-2); }
+.oui-action-row--compact strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .oui-action-row-copy { display: grid; flex: 1; min-width: 0; gap: var(--orbit-space-1); overflow-wrap: anywhere; }
 .oui-action-row-copy strong { font-weight: 600; }
 .oui-action-row-copy > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: var(--orbit-type-secondary); color: var(--orbit-text-secondary); }

@@ -51,9 +51,11 @@ export function ConfirmDialog({ onConfirm, confirmLabel, children, ...props }: O
 }
 
 export interface MenuItem { id: string; label: string; onSelect: () => void; icon?: ReactNode; disabled?: boolean; danger?: boolean; separatorBefore?: boolean }
-export function Menu({ trigger, label, items, header, footer, navigation = false }: { trigger: ReactElement; label: string; items: MenuItem[]; header?: ReactNode; footer?: ReactNode; navigation?: boolean }) {
+export function Menu({ trigger, label, items, header, footer, navigation = false, open: controlledOpen, onOpenChange }: { trigger: ReactElement; label: string; items: MenuItem[]; header?: ReactNode; footer?: ReactNode; navigation?: boolean; open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const [mobile, setMobile] = useState(() => navigation && window.matchMedia('(max-width: 767px)').matches);
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
+  const setOpen = (next: boolean) => { setLocalOpen(next); onOpenChange?.(next); };
   useEffect(() => {
     if (!navigation) return;
     const query = window.matchMedia('(max-width: 767px)'), change = () => { setMobile(query.matches); setOpen(false); };
@@ -70,7 +72,7 @@ export function Menu({ trigger, label, items, header, footer, navigation = false
       </div>)}</nav>
     </Sheet>
   </>;
-  return <PrimitiveMenu.Root><PrimitiveMenu.Trigger render={trigger} />
+  return <PrimitiveMenu.Root open={open} onOpenChange={setOpen}><PrimitiveMenu.Trigger render={trigger} />
     <PrimitiveMenu.Portal><PrimitiveMenu.Positioner sideOffset={6} align="end" className="oui-positioner">
       <PrimitiveMenu.Popup className={`oui-menu${navigation ? ' oui-menu--navigation' : ''}`} aria-label={label}>{header && <div className="oui-menu-caption">{header}</div>}{items.map(item => <div key={item.id} role="presentation">
         {item.separatorBefore && <PrimitiveMenu.Separator className="oui-menu-separator" />}

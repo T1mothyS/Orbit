@@ -87,14 +87,6 @@
 .recurring-priority .priority-dot { position: relative; z-index: 1; display: block; width: 7px; height: 7px; }
 .action-row-main { flex: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .action-row-actions { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
-.action-row-menu { position: relative; flex: 0 0 auto; }
-.action-menu-trigger { width: 32px; height: 32px; color: var(--td-text-color-secondary); }
-.action-menu-trigger:hover { color: var(--td-text-color-primary); background: var(--td-bg-color-component); }
-.action-menu-popover { position: fixed; z-index: 1000; width: min(166px, calc(100vw - 16px)); max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; padding: 5px; border: 1px solid var(--td-component-stroke); border-radius: 10px; background: var(--td-bg-color-container); box-shadow: 0 14px 34px rgba(15, 23, 42, .18); }
-.action-menu-popover button { width: 100%; min-height: 34px; display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 0; border-radius: 7px; background: transparent; color: var(--td-text-color-primary); text-align: left; font-size: 12px; cursor: pointer; }
-.action-menu-popover button:hover, .action-menu-popover button:focus-visible { background: var(--td-bg-color-component-hover); outline: none; }
-.action-menu-popover button.danger { color: #dc2626; }
-.action-menu-popover button.danger:hover, .action-menu-popover button.danger:focus-visible { background: rgba(220, 38, 38, .08); }
 .action-row-title { font-weight: 650; color: var(--td-text-color-primary); overflow-wrap: anywhere; word-break: break-word; }
 .action-row-meta { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 5px; font-size: 12px; color: var(--td-text-color-secondary); }
 .action-row-meta span { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
@@ -338,3 +330,7 @@
   .app-shell-mobile-reader > .app-topbar { display: none; }
   .feature-reader-back { min-height: 104px; }
 }
+
+.ai-import-tutorial > summary { min-height: var(--orbit-touch-target); cursor: pointer; font-size: var(--orbit-type-body); font-weight: 600; }
+.ai-import-tutorial > summary span { font-size: var(--orbit-type-secondary); font-weight: 400; color: var(--orbit-text-secondary); }
+.ai-import-tutorial[open] > summary { margin-bottom: var(--orbit-space-4); }

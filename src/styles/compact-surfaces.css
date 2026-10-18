@@ -31,3 +31,18 @@
 .compact-filter-fields { border: 0; padding: 0; margin: 0; display: grid; gap: var(--orbit-space-4); min-width: 0; }
 .compact-filter-fields > label { display: grid; gap: var(--orbit-space-2); font-size: var(--orbit-type-secondary); min-width: 0; }
 .compact-filter-fields select { min-height: var(--orbit-touch-target); width: 100%; color: var(--orbit-text); background: var(--orbit-elevated); border: 1px solid var(--orbit-input-border); border-radius: var(--orbit-radius-control); padding: var(--orbit-space-2); font: inherit; }
+
+/* The clipboard fallback owns its native modal while the board is in the top layer. */
+.note-copy-overlay { display: flex; align-items: center; justify-content: center; padding: var(--orbit-space-4); background: var(--orbit-mask); }
+.note-copy-sheet { display: flex; flex-direction: column; width: min(560px, 100%); max-height: 100%; min-height: 0; border-radius: var(--orbit-radius-panel); background: var(--orbit-elevated); }
+.note-copy-sheet > header { display: flex; align-items: center; justify-content: space-between; gap: var(--orbit-space-3); padding: var(--orbit-space-4); border-bottom: 1px solid var(--orbit-border); }
+.note-copy-sheet h2 { font-size: var(--orbit-type-section-title); margin: 0; }
+.note-copy-body { overflow-y: auto; min-height: 0; padding: var(--orbit-space-4); overscroll-behavior: contain; }
+.note-image-overlay > section { display: flex; flex-direction: column; gap: var(--orbit-space-2); min-height: 0; width: min(100%, 960px); }
+.note-image-overlay img { min-height: 0; max-height: calc(100dvh - 168px); flex-shrink: 1; }
+@media (max-width: 767px) {
+  .note-copy-overlay { align-items: end; padding: 0; }
+  .note-copy-sheet { max-height: 100%; border-radius: var(--orbit-radius-panel) var(--orbit-radius-panel) 0 0; }
+  .note-copy-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .note-copy-actions > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
