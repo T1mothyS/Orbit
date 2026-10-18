@@ -3,8 +3,11 @@ import os from 'node:os';
 import path from 'node:path';
 
 // Browser tests never boot the production API, load .env or open a business database.
+const scope = process.env.ORBIT_UI_SCOPE || 'all';
+if (!['all', 'gallery', 'app'].includes(scope) || (process.env.CI && scope !== 'all')) throw new Error('CI requires the complete UI scope');
 export default defineConfig({
   testDir: './tests/ui',
+  testMatch: scope === 'gallery' ? '**/gallery.spec.ts' : scope === 'app' ? ['**/account.spec.ts', '**/settings.spec.ts'] : '**/*.spec.ts',
   timeout: 30_000,
   fullyParallel: true,
   workers: process.env.CI ? 2 : 3,
@@ -22,15 +25,15 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  webServer: [{
+  webServer: [...(scope !== 'app' ? [{
     command: 'npm run dev:ui',
     url: 'http://127.0.0.1:4196/dev/ui',
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
-  }, {
+  }] : []), ...(scope !== 'gallery' ? [{
     command: 'node --import tsx scripts/orbit-ui-preview.ts 4187 --iteration --account-ui',
     url: 'http://127.0.0.1:4187/api/health',
     reuseExistingServer: false,
     timeout: 60_000,
-  }],
+  }] : [])],
 });

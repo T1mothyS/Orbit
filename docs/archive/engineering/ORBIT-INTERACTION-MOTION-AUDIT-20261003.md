@@ -313,7 +313,7 @@ CSS 的 transform、JS 拖动、Motion layout 不同时写同一个节点的 tra
 | repaint 风险 | ReminderPage loading 的 box-shadow 循环；搜索/阅读工具栏使用 blur | 只为有必要的层保留 blur；循环用 opacity；是否实际掉帧要测量 |
 | 状态恢复 | DailyReportsPage 来源/模式切换清空内容；UsageStatistics 条件变化 setData(null)；CalendarView 吞失败 | 先修真实错误，再局部读取状态与稳定布局，不靠动画掩盖 |
 
-相关实现：[日历与滚动](../../../src/components/calendar/AgendaView.tsx)、[搜索](../../../src/components/GlobalSearch.tsx)、[设置弹层](../../../src/components/settings/SettingsDialog.tsx)、[记事板](../../../src/components/NoteBoard.tsx)、[附件](../../../src/hooks/useChatAttachments.ts)、[日报](../../../src/components/DailyReportsPage.tsx)、[统计](../../../src/components/UsageStatisticsView.tsx)。
+相关实现：[日历与滚动](../../../src/components/calendar/AgendaView.tsx)、[搜索](../../../src/components/GlobalSearch.tsx)、[设置弹层](https://github.com/T1mothyS/Orbit/blob/10dfb2fa4885019c42ff8579e21b540466539aaa/src/components/settings/SettingsDialog.tsx)、[记事板](../../../src/components/NoteBoard.tsx)、[附件](../../../src/hooks/useChatAttachments.ts)、[日报](../../../src/components/DailyReportsPage.tsx)、[统计](../../../src/components/UsageStatisticsView.tsx)。
 
 ### 6.2 官方规范、开源实现和 Demo 的适配判断
 

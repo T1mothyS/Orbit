@@ -2,7 +2,7 @@
 
 普通知识文章以“知识库 V2”为内容加工入口；Orbit 的“记录经历”是独立的个人复盘入口，两者共同显示在知识库：
 
-`C:\Users\Elysia\Documents\Codex_Knowledge_Library`
+独立的 `Codex_Knowledge_Library` 工作区（不在本仓库内；实际位置只在本机配置维护）
 
 Codex 在本地批次中复制原始材料、保留 SHA-256、生成处理后的 Markdown 和 `relations.json`；普通文章由 Orbit 保存原文、只读呈现、提供评论、版本和导出。普通文章不在服务器做 AI 提炼或关系推理；经历复盘的明确例外见下文。
 
@@ -36,7 +36,7 @@ Codex 在本地批次中复制原始材料、保留 SHA-256、生成处理后的
 
 资料继续存于既有账号级 Cloud Context，纳入原加密账号备份；不创建配置文档或知识文章。下一次 Cloud 日报读取使用新版本，保存不生成、发布、发信或修改历史日报，不自动同步本地 YAML、任务、独立 Shadow 或其他账号。普通对话和经历复盘不读取此资料；原研究框架允许人工编辑，`/research` 的正式观点仍走独立确认。资料时区不更改调度，阅读与证据偏好不降低日报完整性、安全或媒体闸门。
 
-接口、并发和输入限制的唯一合同见 [Cloud Context 编辑与导入](CHATGPT-WORK-CLOUD.md#cloud-context-编辑与导入)，本地证据与未验范围见 [测试矩阵](TEST-MATRIX.md#个人资料与日报偏好)。
+接口、并发和输入限制的唯一合同见 [Cloud Context 编辑与导入](CHATGPT-WORK-CLOUD.md#cloud-context-编辑与导入)，本地证据与未验范围见 [测试矩阵](archive/engineering/TEST-MATRIX-20261018.md#个人资料与日报偏好)。
 
 ## 经历记忆
 
@@ -53,12 +53,12 @@ Codex 在本地批次中复制原始材料、保留 SHA-256、生成处理后的
 
 登录态接口统一位于 `/api/library/experience-sessions`：列表/创建、模型目录、按条目读取、图片读取、单会话读取/修改、`run/cancel/original/confirm/images/lifecycle/export`。所有接口按认证账号校验归属；不对日报只读令牌、Work OAuth 或知识发布令牌开放。首次加表前自动留存已有数据库迁移快照。
 
-当前本地验证与真实模型/生产边界见 [测试矩阵](TEST-MATRIX.md#经历记忆)。
+当前本地验证与真实模型/生产边界见 [测试矩阵](archive/engineering/TEST-MATRIX-20261018.md#经历记忆)。
 
 ## 2. V2 批次结构
 
 ```text
-C:\Users\Elysia\Documents\Codex_Knowledge_Library\
+<KnowledgeLibraryRoot>\
   docs\knowledge-library-runs\20260906-sample-01\
     originals\
     processed\
@@ -74,7 +74,7 @@ C:\Users\Elysia\Documents\Codex_Knowledge_Library\
 
 `originals/` 是不可修改的本批次备份；`processed/` 是唯一上传输入。发布脚本从自身所在的 V2 项目根目录解析批次，不接受 `--knowledge-dir`、`--tutorial-dir` 等旧目录参数。
 
-当前三篇试运行样本已放在 `20260906-sample-01`；针对 `C:\Users\Elysia\Desktop\知识库迁移` 的全量本地加工结果已放在 `20260906-full-01`，包含 33 篇业务材料、6 个排除的维护文档、原文副本、处理稿、130 条双向关系和上传报告。原始旧目录只被复制读取，未被修改；本轮全量批次已上传到本地隔离服务，未上传生产。
+当前三篇试运行样本已放在 `20260906-sample-01`；针对 旧本地迁移目录 的全量本地加工结果已放在 `20260906-full-01`，包含 33 篇业务材料、6 个排除的维护文档、原文副本、处理稿、130 条双向关系和上传报告。原始旧目录只被复制读取，未被修改；本轮全量批次已上传到本地隔离服务，未上传生产。
 
 ## 3. 数据边界
 
@@ -174,7 +174,7 @@ C:\Users\Elysia\Documents\Codex_Knowledge_Library\
 首次配置或仅检查时显式干跑（已明确目标的普通处理仍默认 publish）：
 
 ```powershell
-Set-Location 'C:\Users\Elysia\Documents\Codex_Knowledge_Library'
+Set-Location $KnowledgeLibraryRoot  # 本机选择的独立知识库工作区，不在仓库维护个人路径
 pwsh -NoProfile -File .\scripts\publish-library.ps1 -RunId 20260906-sample-01 -Operation publish -DryRun
 ```
 

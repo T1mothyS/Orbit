@@ -1,13 +1,8 @@
 # Orbit 文档索引
 
-- Status: LIVING；2026-10-18 核对 Settings V3、帮助与回归入口。此索引只负责导航，不复制任务、版本或生产状态。
-- 权威次序：源码/实际验证 → 领域合同 → 当前任务状态；历史报告按原日期解释。版本只读 package.json。
-- 常用任务从 [快速上手](QUICK-START.md) 或站内 `/help` 开始；Settings 的路由、共享草稿与敏感输入边界见 [Settings V3](ARCHITECTURE.md#settings-v3-路由与状态)，实际验收见 [Checkpoint C](TEST-MATRIX.md#settings-v3-与-checkpoint-c)。
-- 知识库的独立经历入口、联网候选和备份边界见 [经历记忆](LIBRARY.md#经历记忆)，本地证据见 [测试矩阵](TEST-MATRIX.md#经历记忆)。
-- 账号个人资料、日报设置与知识库设置的 [字段归属与兼容入口](LIBRARY.md#个人资料与日报偏好)、[Cloud 数据合同](CHATGPT-WORK-CLOUD.md#cloud-context-编辑与导入) 和 [本地验收](TEST-MATRIX.md#2026-10-08-设置通知上下文与阅读迭代) 独立于知识文章与正式研究观点。
-- 账户独立页面、改密/登录失效与独立授权边界见 [安全合同](ARCHITECTURE.md#账号密码与登录失效)、[使用方法](USER-GUIDE.md#账户与安全)和 [Checkpoint B 验证](TEST-MATRIX.md#账户真实页面与-checkpoint-b)。
-- 后续获授权的 [迭代上线与手机反馈](TEST-MATRIX.md#2026-10-08-迭代上线与手机反馈) 区分主站部署、Google 发送端验证与手机实际到达。
-- 产品助手/结构化导航/只读诊断见 [架构合同](ARCHITECTURE.md#产品助手与受控运行诊断)，成功旧版与日志 retention 见 [部署路径](DEPLOYMENT-PATHS.md#受控运维记录与保留)。后续 [用户实机后台通过证据及本轮本地验收](TEST-MATRIX.md#2026-10-08-产品助手运行诊断与保留) 独立保留，不改写旧时点记录。
+- Status: LIVING；只负责导航，不复制版本、当前任务或生产状态。
+- 开发任务先读 [PROJECT-MAP 的任务路由](../PROJECT-MAP.md#按任务选择入口)，再按标题定位必要章节；产品操作见 [快速上手](QUICK-START.md)或站内 /help。
+- 一个事实一个主要来源：路线看 route，状态看 TASKS，版本看 CHANGELOG，行为看领域合同，执行方法看 TEST-MATRIX/Runbook，日期证据看 archive。源码和实际验证优先，历史只对原时点成立。
 
 ## 路线、更新与任务
 
@@ -29,14 +24,14 @@
 | [Android 构建](../android/README.md) | 工具链、APK、固定站点、Firebase 配置与原生本地试验入口 |
 | [发布流程](RELEASE.md) | 可复用发布指令、冻结目标、效率与验收层级 |
 | [部署路径](DEPLOYMENT-PATHS.md) | 预构建/依赖变更/特殊路径和回滚判据 |
-| [项目地图](../PROJECT-MAP.md) | 模块/跨项目边界与源码路由 |
-| [测试矩阵](TEST-MATRIX.md) | 验证入口、风险范围和 UI/生产/业务证据边界 |
+| [项目地图](../PROJECT-MAP.md#按任务选择入口) | 按任务选择合同、源码、测试与升级范围 |
+| [测试矩阵](TEST-MATRIX.md) | Quick/Full/Release、领域覆盖、UI/平台及外部证据边界 |
 | [UI 规范](UI-GUIDELINES.md) | 布局、主题、响应式、聊天/Motion 与体验升级实施规则；逐块状态见 TASKS |
 | [前端迁移台账](FRONTEND-DEBT.md) | 入口、迁移目标、风险、优先级和旧实现退出条件；开发方法见 UI 规范的 Agent Change Playbook |
 | [UI / Interaction / Motion 专项审计（2026-10-03）](archive/engineering/ORBIT-INTERACTION-MOTION-AUDIT-20261003.md) | 原审计时点的日期快照与方案；当前逐批实施状态见 [TASKS](TASKS.md#uiuxmotion-体验升级执行清单)，不改写历史结论 |
 | [UI/UX 八项加固定向回归（2026-10-09）](archive/engineering/ORBIT-UI-UX-HARDEN-REGRESSION-20261009.md) | 针对前次八项问题的修复、独立复审和本地证据；不重新评分全站，不代表部署或真机验收 |
 
-本机 AGENTS.local.md、DEPLOY.md、CONTINUOUS-REQUIREMENTS.md 保持忽略。DEPLOY.md 的执行地址/细节和本机记录不复制到仓库或发布包；连续记录按末尾追加，不归并重写历史。
+本机 AGENTS.local.md、DEPLOY.md、CONTINUOUS-REQUIREMENTS.md 及 .local-docs/ 月卷/备份保持忽略。DEPLOY.md 的执行地址/细节和本机记录不复制到仓库或发布包；连续记录按末尾追加，按 [经验证的流程](archive/README.md#滚动维护流程)完整滚动迁移，不归并或改写历史。
 
 [2026-10-04 UI / Motion 实施验收](archive/engineering/ORBIT-UI-MOTION-VERIFICATION-20261004.md)：后续 1–7 项实现、逐态证据、发布和设备边界。
 

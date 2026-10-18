@@ -1,6 +1,6 @@
 # Orbit Android 构建
 
-状态：一期试验。Kotlin / Android WebView 在线壳，包名 `io.github.t1mothys.orbit`。行为和设备验收合同见 [架构](../docs/ARCHITECTURE.md#android-客户端与-push) 与 [测试矩阵](../docs/TEST-MATRIX.md#android-一期)。没有离线业务同步或厂商 Push。
+状态：一期试验。Kotlin / Android WebView 在线壳，包名 `io.github.t1mothys.orbit`。行为和设备验收合同见 [架构](../docs/ARCHITECTURE.md#android-客户端与-push) 与 [测试矩阵](../docs/archive/engineering/TEST-MATRIX-20261018.md#android-一期)。没有离线业务同步或厂商 Push。
 
 ## 工具链
 
@@ -42,7 +42,7 @@ $env:JAVA_HOME = 'C:\path\to\jdk-17'
 
 试验对话框使用可滚动的自定义视图，状态文字、五项操作和关闭按钮同时显示；权限回调、操作后和回到前台均刷新状态，不再组合平台的 message/items 内容分支。Web UI 通过线上页面进入现有 WebView，网页变更无需重新打包；原生、桥接、Firebase 配置或安装版本变化时重建 APK。部署 Android 服务端代码前，须按依赖变更流程准备 Linux 运行依赖，不复用缺少 firebase-admin 的旧 node_modules。
 
-实际展示、声音、锁屏、划掉 App、强行停止、国内无代理网络及键盘仍按 [真机矩阵](../docs/TEST-MATRIX.md#android-一期) 验证。构建或 JVM 测试不证明手机送达。
+实际展示、声音、锁屏、划掉 App、强行停止、国内无代理网络及键盘仍按 [真机矩阵](../docs/archive/engineering/TEST-MATRIX-20261018.md#android-一期) 验证。构建或 JVM 测试不证明手机送达。
 
 2026-10-08 后续用户真实手机反馈：精准和非精准提醒均触发，App 退到后台后均显示 Android 系统通知。此项核心后台展示验收已通过；证据来自用户运行反馈，不是代码推断。新 APK 的入口隐藏仍需安装后确认，不能因此撤销既有通知通过结果。本轮不更改 AlarmManager、Receiver、渠道、FCM 展示及绑定/解绑链路。
 

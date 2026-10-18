@@ -46,6 +46,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Documentation and generated help integrity
+        run: npm run docs:check -- --generated
+
       - name: Verify Gallery stays development-only
         run: node scripts/verify-ui-build.mjs
 

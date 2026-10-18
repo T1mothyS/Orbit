@@ -54,18 +54,17 @@ npm run dev
 
 ## 开发验证
 
+开发入口见 [任务路由](PROJECT-MAP.md#按任务选择入口)，按风险选择：
+
 ```powershell
-npm run typecheck
-npm test
-$env:ELECTRON_APP_URL = 'https://build.invalid.local'
-npm run build
-Remove-Item Env:ELECTRON_APP_URL
-git diff --check
+npm run verify:quick -- --base <任务开始SHA>
+npm run verify:full
+npm run verify:release
 ```
 
-build:client 已包含 Tools 和项目成长检查。涉及外部日报合同才在本机配置 DAILY_REPORT_V2_ROOT 并执行 npm run test:cross-project；CI 不读取个人路径。UI 改动按 [测试矩阵](docs/TEST-MATRIX.md)验收，不以构建替代实际渲染。
+普通局部修改运行 Quick；共享核心、模块完成或未知范围升级 Full；Release 增加隔离业务及原生弹窗检查，不自动发布或发信。纯说明用 `npm run docs:check`，帮助输入变化需要重建和查询回归。命令含义、浏览器安装/批准基线、跨项目和平台验证只维护在 [测试矩阵](docs/TEST-MATRIX.md)。
 
-Orbit UI 迁移中的基础控件从 `src/ui` 引用；先读 [Agent Change Playbook](docs/UI-GUIDELINES.md#orbit-ui-统一迁移与-agent-change-playbook)。`npm run dev:ui` 打开本机 `/dev/ui`，使用合成组件示例、不加载 `.env` 或启动业务服务；`npm run ui:lint` 与 `npm run test:ui` 检查代码边界和实际交互。浏览器安装和截图候选/批准基线流程见测试矩阵。
+UI 基础组件从 src/ui 引用；按 [Agent Change Playbook](docs/UI-GUIDELINES.md#orbit-ui-统一迁移与-agent-change-playbook)修改。`npm run dev:ui` 提供无业务 API 的开发 Gallery，迁移进度只看前端台账。
 
 ## 数据与发布
 

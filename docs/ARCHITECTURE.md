@@ -20,7 +20,7 @@ Calendar 使用的 date-fns 现显式声明，避免依赖开发工具间接安�
 
 ## Android 客户端与 Push
 
-常规构建仅提供正式账号开关、通知权限与注册/投递状态；原生顶部、离线和网页测试入口只有 debug 且显式开启 DEVELOPER_TOOLS 才显示。release 始终关闭；本地桥接测试同样检查该标记。下面的 AlarmManager 排错能力保留，正式 FCM、Receiver、渠道和绑定/解绑行为不变。后续用户真实手机已确认精准/非精准触发及后台系统展示通过，见 [新增实机证据](TEST-MATRIX.md#2026-10-08-产品助手运行诊断与保留)。
+常规构建仅提供正式账号开关、通知权限与注册/投递状态；原生顶部、离线和网页测试入口只有 debug 且显式开启 DEVELOPER_TOOLS 才显示。release 始终关闭；本地桥接测试同样检查该标记。下面的 AlarmManager 排错能力保留，正式 FCM、Receiver、渠道和绑定/解绑行为不变。后续用户真实手机已确认精准/非精准触发及后台系统展示通过，见 [新增实机证据](archive/engineering/TEST-MATRIX-20261018.md#2026-10-08-产品助手运行诊断与保留)。
 
 `android/` 是 Kotlin + WebView 在线壳，复用 Web 登录、聊天、路由与账号数据。构建时固定一个 HTTPS 来源，原生 `WebMessageListener` 只允许该来源的主框架和协议版本 1；未知方法拒绝，外部链接打开系统应用，不忽略 TLS 错误，不允许明文/混合内容、文件 URL 和第三方 Cookie。返回、键盘/系统栏安全区、文件选择及通知点击由原生负责。没有业务离线数据库和手机常驻轮询。
 
@@ -42,7 +42,7 @@ Calendar 使用的 date-fns 现显式声明，避免依赖开发工具间接安�
 
 每设备独立去重；FID 轮换只重新定位尚未发送的记录，已接受的同一事项/触发时间不重复发送，generation 负责绑定有效性。领取 CAS、持久 attempts、15/30/60/120 秒重试，最大四次；单设备失败不回滚其他设备。`sent` 仅证明 Admin SDK 接受发送，不证明手机展示。FCM 使用 `notification + data`：后台系统展示，前台原生展示；点击由账号/generation 检查后用已认证的目标读取接口定位。已经接受的后台通知可能在退出、改期后出现，无法保证撤回，必须区分此边界与发送前保护。
 
-Push 使用独立表和消费者；旧通知消费者明确排除 `push`，不会替手机渠道提前标 `sent`。没有为正式事项同时安排本地闹钟。设备/投递不进入账号备份，chat.db 启用 secure_delete 以清除已删除身份的空闲页残留；sql.js 导出会重置连接 PRAGMA，因此每次导出及内存恢复后都重新开启。全站备份在副本中安全清理并压缩，旧全站快照恢复也清理手机状态；恢复后重新授权开关并绑定。新增 schema 前保留数据库迁移快照，维护恢复拒绝开启 Push 扫描。构建配置/凭据方式见 [Android 构建](../android/README.md)，真机结论仅见 [验收矩阵](TEST-MATRIX.md#android-一期)。
+Push 使用独立表和消费者；旧通知消费者明确排除 `push`，不会替手机渠道提前标 `sent`。没有为正式事项同时安排本地闹钟。设备/投递不进入账号备份，chat.db 启用 secure_delete 以清除已删除身份的空闲页残留；sql.js 导出会重置连接 PRAGMA，因此每次导出及内存恢复后都重新开启。全站备份在副本中安全清理并压缩，旧全站快照恢复也清理手机状态；恢复后重新授权开关并绑定。新增 schema 前保留数据库迁移快照，维护恢复拒绝开启 Push 扫描。构建配置/凭据方式见 [Android 构建](../android/README.md)，真机结论仅见 [验收矩阵](archive/engineering/TEST-MATRIX-20261018.md#android-一期)。
 
 事项的通俗分类、字段解释及历史占位时间边界见 [日历数据人话版](CALENDAR-DATA-GUIDE.md)；该说明不改变现有数据模型。
 
@@ -52,7 +52,7 @@ Push 使用独立表和消费者；旧通知消费者明确排除 `push`，不�
 
 ### 产品助手与受控运行诊断
 
-`server/product-help.ts` 查询构建产物 `server/.product-help.json`。`scripts/build-product-help.mjs` 只从已有 USER-GUIDE、LIBRARY、ARCHITECTURE、CHATGPT-WORK-CLOUD、RELEASE、DEPLOYMENT-PATHS 的章节生成词法索引；来源列表是构建声明，不是另一套人工知识库。记录章节来源、source/content SHA-256 与 package 版本，发布检查同时核对原文 hash。索引位于公共静态目录之外，CI 明确复制到发布包的 server 目录；HTTP 只能经认证检索接口读取。代码块和机器路径行排除，发布/运维文档仅管理员召回。私人 runbook、运行数据和凭据不入索引。个人文章继续由既有 knowledge 工具按账号与检索偏好查询。
+`server/product-help.ts` 查询构建产物 `server/.product-help.json`。`scripts/build-product-help.mjs` 从构建脚本声明的七个既有文档（含 QUICK-START）生成词法索引；来源列表是构建声明，不是另一套人工知识库。记录章节来源、source/content SHA-256 与 package 版本，发布检查同时核对原文 hash。索引位于公共静态目录之外，CI 明确复制到发布包的 server 目录；HTTP 只能经认证检索接口读取。章节默认仅管理员可见；快速上手和用户指南中经审阅的操作说明用 `<!-- product-help: user -->` 显式开放，子标题继承、同级标题恢复父权限；标记只能紧跟标题，未知/位置错误会阻止构建。架构、Cloud、发布和部署技术合同禁止标记为普通用户内容。代码块、权限标记及机器路径行不进入正文。常见日程、密码、通知、知识库、日报操作由用户指南提供，测试同时验证标记、生成片段和实际查询，不能仅检查有结果。私人 runbook、运行数据和凭据不入索引。个人文章继续由既有 knowledge 工具按账号与检索偏好查询。
 
 `server/system-query.ts` 是 HTTP 和 AI 共用的只读服务，身份与权限在服务层复核，不依赖 Prompt。查询入口均要求登录：
 

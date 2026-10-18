@@ -1,7 +1,7 @@
 # Orbit 路线图
 
 - Status: ROADMAP / LIVING
-- 核对日期：2026-10-03；版本来源为 [package.json](package.json)。
+- 核对日期：2026-10-18；版本来源为 [package.json](package.json)。
 - 职责：阶段目标、顺序和范围。实际完成状态只维护在 [任务清单](docs/TASKS.md)，每次版本成果在 [更新日志](CHANGELOG.md)。
 - 本文件不证明生产部署、真实 AI、Work 运行或邮件到达，也不授予后续执行权限。
 

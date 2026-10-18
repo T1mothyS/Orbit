@@ -1,6 +1,6 @@
 {
   "name": "smart-schedule-agent",
-  "version": "0.58.5-261018.1018",
+  "version": "0.58.6-261018.1322",
   "description": "Orbit — chat-first personal workspace",
   "author": "Smart Schedule Team",
   "license": "MIT",
@@ -39,7 +39,13 @@
     "chatgpt:connect": "tsx scripts/chatgpt-connect.ts",
     "dev:ui": "vite --host 127.0.0.1 --port 4196 --strictPort --mode ui-gallery",
     "ui:lint": "tsx scripts/ui-lint.ts",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "docs:check": "node scripts/docs-check.mjs",
+    "verify:quick": "node scripts/verify.mjs --mode quick",
+    "verify:full": "node scripts/verify.mjs --mode full",
+    "verify:release": "node scripts/verify.mjs --mode release",
+    "history:check": "node scripts/history-maintenance.mjs --check",
+    "history:archive": "node scripts/history-maintenance.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1136.0",

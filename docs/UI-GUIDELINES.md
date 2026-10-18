@@ -4,7 +4,7 @@
 
 ## Orbit UI 统一迁移与 Agent Change Playbook
 
-Status: 第一轮本地收口；2026-10-18 用户确认 A/B/C 及页头调整后继续验收。`src/design/` 是 token 值来源，`src/ui/` 是新基础控件唯一入口；`/dev/ui` 是不读取账号数据的开发 Gallery，正式构建不包含。下方历史 TDesign/class 规则仅适用于未迁移区域。迁移去向及退出条件见 [前端台账](FRONTEND-DEBT.md)，平台截图和发布闸门见 [测试矩阵](TEST-MATRIX.md#2026-10-18-批准基线与第一轮收口)。
+Status: 第一轮本地收口；2026-10-18 用户确认 A/B/C 及页头调整后继续验收。`src/design/` 是 token 值来源，`src/ui/` 是新基础控件唯一入口；`/dev/ui` 是不读取账号数据的开发 Gallery，正式构建不包含。下方历史 TDesign/class 规则仅适用于未迁移区域。迁移去向及退出条件见 [前端台账](FRONTEND-DEBT.md)，平台截图和发布闸门见 [测试矩阵](archive/engineering/TEST-MATRIX-20261018.md#2026-10-18-批准基线与第一轮收口)。
 
 1. **先定位：** 阅读 [PROJECT-MAP](../PROJECT-MAP.md)、本文、目标领域合同和测试。普通改动应只需 ui 与目标 feature，不以通读 App/全部 CSS 为前提。
 2. **控件入口：** 从 `src/ui` 引用，不直接依赖 Base UI/TDesign 或它们的类型，不复制控件和浮层生命周期。
@@ -48,7 +48,7 @@ Mobile Compact 沿现有组件实施：手机页面/卡片通常12px内边距，
 - 可交互区域在触屏上至少接近 44px；图标按钮必须有可见的 hover/focus 状态和 aria-label。
 - Switch 同时表达视觉状态和 aria-checked/disabled 状态；loading 时阻止重复提交并保留错误反馈。
 - 表单标签和辅助说明与控件保持关联；键盘焦点、Escape、返回焦点和 Dialog 关闭行为要可预测。
-- 未保存资料仅在 dirty 时注册 beforeunload，保存、取消和卸载后移除；正常导航/刷新保留取消保护。自动化原生 dialog 的应答及合成预览旁路见 [测试矩阵](TEST-MATRIX.md#2026-10-09-原生确认框与浏览器自动化)，不得通过删掉用户保护修测试。
+- 未保存资料仅在 dirty 时注册 beforeunload，保存、取消和卸载后移除；正常导航/刷新保留取消保护。自动化原生 dialog 的应答及合成预览旁路见 [测试矩阵](archive/engineering/TEST-MATRIX-20261018.md#2026-10-09-原生确认框与浏览器自动化)，不得通过删掉用户保护修测试。
 - 日程时间弹层复制当前值到内部 draft，仅“确定”写回父表单；取消、Escape 和 Tab 离开丢弃 draft。小时/分钟复用原生列表选择，方向键移动，Enter/Space 依次进入分钟及确认按钮；关闭回到时间入口，Tab 离开继续到下一个控件。开始时间确认时才联动结束时间，跨日结束日期须保留并展示。
 - 从个人菜单打开设置时保留来源；显式返回恢复 `[data-account-menu-trigger]` 的焦点，不聚焦已关闭菜单项。设置内分类/页签导航和 AI/全局搜索定位共用路由映射，旧模块入口返回业务主页，避免重定向循环。
 - 记事操作名称使用“动作 + 当前卡片编号”，正文只作为内容呈现，不重复放入选择、编辑、复制、合并或恢复按钮名称。

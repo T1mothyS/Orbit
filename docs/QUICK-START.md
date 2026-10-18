@@ -1,4 +1,5 @@
 # Orbit 快速上手
+<!-- product-help: user -->
 
 - Status: FEATURE；对应 Web、Electron 与 Android 在线页面。
 - Authority: 当前功能源码；完整行为和配置边界见 [使用指南](USER-GUIDE.md)。

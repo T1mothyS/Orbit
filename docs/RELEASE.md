@@ -6,7 +6,7 @@
 
 ## 可复用任务指令
 
-先只读核对 checkout、工作区、刷新后的 origin/main、目标 commit、package.json/lock 版本、现有 tag/Release，以及生产 .deploy、Node、依赖清单和配置变化。已经在 main 不制造 merge；有未提交工作先保护，不强行 reset。冻结目标后执行一轮本地 typecheck、测试、生产构建和差异检查；仅涉及相关合同时做跨项目验证，UI 实际变化才补对应浏览器验收。
+先只读核对 checkout、工作区、刷新后的 origin/main、目标 commit、package.json/lock 版本、现有 tag/Release，以及生产 .deploy、Node、依赖清单和配置变化。已经在 main 不制造 merge；有未提交工作先保护，不强行 reset。冻结目标后按 [Release 层级](TEST-MATRIX.md#分级执行)执行一轮完整静态/服务/构建/视觉和隔离业务检查；同任务同源码同环境的有效 Full 结果可引用，不为了形式重复构建。涉及相关合同时另做跨项目和平台验证，真实外部验收另授权。
 
 按当前版本创建 annotated tag V<version>，推送 main 与 tag，创建或核对对应 GitHub Release，写明具体更新与验证边界；已存在且指向不同提交时停止，不覆盖 tag。根据线上依赖/运行环境证据选择 DEPLOY.md §8.1 或 §8.2，使用 2 GB 本地预构建包，核对双端 SHA-256、暂存清单与配置/数据恢复方案；停写后备份，原子切换，检查 PM2、loopback/public health、页面、实际 JS MIME/hash 与回滚材料。失败保留现场并恢复旧代码；涉及迁移时另核数据兼容性，不盲目覆盖新数据。
 
@@ -32,7 +32,7 @@ Luna 上次为何慢，需要对应执行记录才能确认。当前可确认的
 
 ## 状态与幂等
 
-UI 发布前先核对 [批准基线与平台验收](TEST-MATRIX.md#2026-10-18-批准基线与第一轮收口)。普通 CI 严格比较批准截图；缺图/差异保留失败状态，独立重跑只采集 `orbit-ui-candidates`（PNG 与来源/平台/浏览器/hash 元数据），不写基线、不代替批准。首次 Linux 候选必须按已确认视觉审阅，落入 `tests/ui/baselines/linux/` 后重新通过普通 CI；不能把 Windows 图复制为 Linux 图。CI 显式安装中文字体，字体及 Linux 渲染是否成立仍以当次运行证据为准。截图、源代码与最终发布 artifact 必须对应同一冻结提交。
+UI 发布前先核对 [批准基线与平台验收](archive/engineering/TEST-MATRIX-20261018.md#2026-10-18-批准基线与第一轮收口)。普通 CI 严格比较批准截图；缺图/差异保留失败状态，独立重跑只采集 `orbit-ui-candidates`（PNG 与来源/平台/浏览器/hash 元数据），不写基线、不代替批准。首次 Linux 候选必须按已确认视觉审阅，落入 `tests/ui/baselines/linux/` 后重新通过普通 CI；不能把 Windows 图复制为 Linux 图。CI 显式安装中文字体，字体及 Linux 渲染是否成立仍以当次运行证据为准。截图、源代码与最终发布 artifact 必须对应同一冻结提交。
 
 前端构建同时从现有 canonical 文档生成 `server/.product-help.json`；它不属于公共 `dist`，也不提交 Git。CI 暂存明确复制此产物；其他预构建打包入口也必须复制到包内同一位置。Linux release 准备核对索引版本和原文 hash，缺失或过期直接阻止发布。运维的 running/success/failed 记录、十个旧版与日志保留、配置/恢复引用见 [部署路径](DEPLOYMENT-PATHS.md#受控运维记录与保留)。成功前不得启动旧版删除；首轮服务器配置、timer 与 Shadow 日志切换需要单独上线验收。
 
