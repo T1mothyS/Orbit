@@ -26,10 +26,17 @@
 .settings-workspace .settings-guide-rules, .settings-workspace .settings-guide-examples { display: grid; gap: var(--orbit-space-4); }
 .settings-workspace .settings-guide-rules-head, .settings-workspace .settings-guide-example-head { display: flex; flex-wrap: wrap; gap: var(--orbit-space-3); align-items: center; justify-content: space-between; }
 .settings-workspace pre { max-width: 100%; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--orbit-type-secondary); }
-.settings-workspace .settings-search { position: relative; display: grid; gap: var(--orbit-space-2); margin-bottom: var(--orbit-space-8); max-width: var(--orbit-dialog-max); }
+.settings-workspace .settings-search { min-width: 0; }
+.settings-workspace .settings-search-field { position: relative; min-width: 0; }
+.settings-workspace .settings-search-field > input { width: 100%; }
 .settings-workspace .settings-search-results { position: absolute; top: 100%; inset-inline: 0; z-index: var(--orbit-z-popover); background: var(--orbit-surface); border: 1px solid var(--orbit-border); border-radius: var(--orbit-radius-control); padding: var(--orbit-space-2); max-height: min(50dvh, 28rem); overflow-y: auto; display: grid; gap: var(--orbit-space-1); }
 .settings-workspace .settings-search-results [role=option] { text-align: start; justify-content: start; }
 .settings-workspace .settings-search-results strong, .settings-workspace .settings-search-results span { display: block; white-space: normal; }
+@media (max-width: 767px) {
+  .settings-workspace .settings-search { display: contents; }
+  .settings-workspace .settings-search > button { grid-column: 2; grid-row: 1; }
+  .settings-workspace .settings-search-field { grid-column: 1 / -1; grid-row: 2; }
+}
 .settings-workspace .context-page { min-width: 0; }
 .settings-workspace .context-heading p, .settings-workspace .context-help { color: var(--orbit-text-secondary); font-size: var(--orbit-type-secondary); line-height: 1.7; overflow-wrap: anywhere; }
 .settings-workspace .context-savebar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--orbit-space-3); padding-block: var(--orbit-space-4); border-bottom: 1px solid var(--orbit-border); font-size: var(--orbit-type-secondary); }

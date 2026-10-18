@@ -17,6 +17,16 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     const capture = async (name: string) => { if (visualPolicy.settingsApproved) await expect(page).toHaveScreenshot(name, { fullPage: true }); else await page.screenshot({ path: test.info().outputPath(name), fullPage: true, animations: 'disabled' }); };
     await page.goto(base + '/settings/account');
+    const topbar = page.locator('.settings-workspace-topbar'), back = topbar.getByRole('link', { name: '返回 Orbit', exact: true });
+    await expect(back).toBeVisible(); await expect(back).toHaveText('');
+    const brandBox = (await topbar.getByRole('link', { name: 'Orbit 首页', exact: true }).boundingBox())!, backBox = (await back.boundingBox())!;
+    expect(backBox.x).toBeGreaterThan(brandBox.x + brandBox.width);
+    await expect(page.locator('.settings-workspace-main').getByRole('combobox', { name: '搜索设置', exact: true })).toHaveCount(0);
+    if (width < 768) {
+      const trigger = topbar.getByRole('button', { name: '搜索设置', exact: true });
+      await expect(trigger).toBeVisible(); await expect(topbar.getByRole('combobox', { name: '搜索设置', exact: true })).toHaveCount(0);
+      expect(backBox.height).toBeGreaterThanOrEqual(44); expect((await trigger.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    } else await expect(topbar.getByRole('combobox', { name: '搜索设置', exact: true })).toBeVisible();
     for (const [category, title] of categories) {
       if (width < 768) { await page.getByRole('link', { name: '设置', exact: true }).filter({ visible: true }).click(); await page.getByRole('navigation', { name: '设置入口' }).getByRole('link', { name: new RegExp('^' + title) }).click(); }
       else await page.getByRole('navigation', { name: '设置分类' }).getByRole('link', { name: title, exact: true }).click();
@@ -26,6 +36,7 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
       const invalidControls = await page.locator('input, button, [role=switch], [role=combobox]').evaluateAll(elements => elements.filter(element => element.getClientRects().length && getComputedStyle(element).fontSize === '0px').length);
       expect(invalidControls).toBe(0);
       await capture(`settings-${category}-${width}-${theme}.png`);
+      if (category === 'notifications') await page.screenshot({ path: test.info().outputPath(`settings-header-${width}-${theme}.png`), fullPage: false, animations: 'disabled' });
       if (category === 'reports') {
         await page.getByRole('tab', { name: '接收与邮件', exact: true }).click(); await page.waitForLoadState('networkidle');
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -57,6 +68,25 @@ test('Cloud domains share one version, preserve cross-page drafts and stop on a 
   await page.getByRole('button', { name: '保存', exact: true }).click(); await expect(page.getByRole('button', { name: '重新加载并核对' })).toBeVisible();
   await expect(page.getByLabel('职业背景', { exact: true })).toHaveValue('conflicting draft'); await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
   await page.screenshot({ path: test.info().outputPath('settings-conflict-1440-light.png'), fullPage: true });
+});
+for (const width of [390, 1440]) test(`header search ${width}: keyboard, empty results, deep link focus and return stay usable`, async ({ context, page }) => {
+  await login(context); await page.setViewportSize({ width, height: 900 });
+  await context.addInitScript(() => localStorage.setItem('theme', 'dark'));
+  await page.goto(base + '/library/settings');
+  const topbar = page.locator('.settings-workspace-topbar'), trigger = topbar.getByRole('button', { name: '搜索设置', exact: true }), input = topbar.getByRole('combobox', { name: '搜索设置', exact: true });
+  if (width < 768) { await trigger.click(); await expect(input).toBeFocused(); }
+  await input.fill('没有这个设置的合成关键词'); await expect(page.getByRole('status').filter({ hasText: '没有匹配的设置项' })).toBeVisible();
+  await input.fill('备份密码'); await expect(page.getByRole('listbox', { name: '设置搜索结果', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath(`settings-header-search-${width}-dark.png`), fullPage: false });
+  await input.press('Escape');
+  if (width < 768) { await expect(trigger).toBeFocused(); await expect(input).toHaveCount(0); await trigger.click(); }
+  else { await expect(input).toBeFocused(); await expect(page.getByRole('listbox', { name: '设置搜索结果', exact: true })).toHaveCount(0); }
+  await input.clear(); await input.fill('备份密码'); await input.press('Enter'); await expect(page).toHaveURL(/\/settings\/data\?settings=/);
+  const id = new URL(page.url()).searchParams.get('settings')!;
+  await expect(page.locator(`[id="${id}"]`)).toBeFocused();
+  if (width < 768) await expect(input).toHaveCount(0);
+  await topbar.getByRole('link', { name: '返回 Orbit', exact: true }).click(); await expect(page).toHaveURL(base + '/library');
 });
 test('report email automatic save preserves notification drafts and the shared saved address', async ({ context, page }) => {
   const headers = await login(context, 'preview-notifications');

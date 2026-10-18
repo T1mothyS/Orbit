@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowUpRight, Bell, Check, ChevronRight, Copy, HelpCircle, LogOut, Moon, MoreHorizontal, Plus, Search, Settings, Sun } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Bell, Check, ChevronRight, Copy, HelpCircle, LogOut, Moon, MoreHorizontal, Plus, Search, Settings, Sun } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { Avatar, Badge, Button, Card, Checkbox, ConfirmDialog, Dialog, EmptyState, ErrorState, FilePicker, FormField, IconButton, InlineNotice, Input, LoadingState, Menu, PasswordInput, Popover, Section, Select, SettingRow, Sheet, Skeleton, Switch, Tabs, Textarea, TextLink, ToastProvider, Tooltip, useToast } from '../ui';
 import './ui-gallery.css';
-import { NavigationItem } from '../ui';
+import { IconLink, NavigationItem } from '../ui';
 
 export default function UiGallery() { return <ToastProvider><Gallery /></ToastProvider>; }
 
@@ -31,7 +31,7 @@ function Gallery() {
       {views.map(item => <Button key={item.id} variant="quiet" aria-current={view === item.id ? 'page' : undefined} onClick={() => setSearch({ view: item.id })}>{item.title}<ChevronRight size={14} /></Button>)}
     </nav><div className="gallery-sidebar-note"><p>清晰、紧凑、从容。</p><p>基础控件的状态与行为，在这里保持一致。</p></div></aside>
     <main className="gallery-main"><div className="gallery-page-heading"><h1>{current.title}</h1><p>{current.description}</p></div>
-      {search.get('demo') === 'shell' && <Section title="Shell 导航" description="公共导航与账户菜单；仅操作本地示例状态。"><div className="gallery-inline"><NavigationItem label="今日示例" current={navigation === 'today'} icon={<Bell size={20} />} onSelect={() => setNavigation('today')} /><NavigationItem label="设置示例" current={navigation === 'settings'} icon={<Settings size={20} />} onSelect={() => setNavigation('settings')} /><Menu label="账户示例菜单" trigger={<Button>打开账户示例</Button>} header="demo@example.invalid" footer="Orbit 开发示例" items={[{ id: 'preferences', label: '编辑示例偏好', onSelect: () => setNotice('仅改变示例状态') }]} /></div></Section>}
+      {search.get('demo') === 'shell' && <Section title="Shell 导航" description="公共导航与账户菜单；仅操作本地示例状态。"><div className="gallery-inline"><IconLink label="返回示例" to="/dev/ui?demo=shell"><ArrowLeft size={18} aria-hidden="true" /></IconLink><NavigationItem label="今日示例" current={navigation === 'today'} icon={<Bell size={20} />} onSelect={() => setNavigation('today')} /><NavigationItem label="设置示例" current={navigation === 'settings'} icon={<Settings size={20} />} onSelect={() => setNavigation('settings')} /><Menu label="账户示例菜单" trigger={<Button>打开账户示例</Button>} header="demo@example.invalid" footer="Orbit 开发示例" items={[{ id: 'preferences', label: '编辑示例偏好', onSelect: () => setNotice('仅改变示例状态') }]} /></div></Section>}
       {view === 'controls' && <>
         <Section title="操作有主次" description="主要动作保持明确；辅助操作安静，危险动作说明后果。">
           <div className="gallery-demo-row"><span className="gallery-demo-label">常用操作</span><div className="gallery-inline"><Button variant="primary" leadingIcon={<Check size={16} />} onClick={() => toast.show({ title: '预览设置已保存', description: '这是组件示例，没有修改账号数据。' })}>保存修改</Button><Button onClick={() => setNotice('示例修改已取消')}>取消</Button><Button variant="quiet" onClick={() => setNotice('展开了示例说明')}>了解更多<ArrowUpRight size={14} /></Button><IconButton label="添加示例" onClick={() => setNotice('已添加一个示例')}><Plus size={18} /></IconButton></div></div>
