@@ -145,13 +145,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .orbit-note-dialog .note-board-drawer { display:flex; position:relative; width:min(380px,calc(100vw - 24px)); height:100%; min-width:0; border-left:1px solid var(--td-component-stroke); box-shadow:var(--orbit-shadow-overlay); transform:translateX(0); opacity:1; transition:transform var(--orbit-motion-panel) var(--orbit-ease),opacity var(--orbit-motion-overlay) var(--orbit-ease); }
 .orbit-note-dialog .note-board-drawer[data-phase=entering],.orbit-note-dialog .note-board-drawer[data-phase=closing] { transform:translateX(100%); opacity:0; }
 .orbit-note-dialog .note-board-close { display:grid; }
-.orbit-login-page { background:var(--td-bg-color-page); color:var(--td-text-color-primary); }
-.orbit-login-page p,.orbit-login-page footer { color:var(--td-text-color-secondary); }
-.orbit-login-card { border:1px solid var(--td-component-stroke); border-radius:12px; background:var(--td-bg-color-container); }
-.orbit-login-page .orbit-login-logo { width:48px; height:48px; border-radius:12px; margin-bottom:16px; box-shadow:none; }
-.orbit-login-card > div:first-child { background:var(--td-bg-color-component); }
-.orbit-login-card button[aria-pressed=true] { background:var(--td-bg-color-container); color:var(--td-brand-color); box-shadow:none; }
-.orbit-login-card button[aria-pressed=false] { color:var(--td-text-color-secondary); }
 .daily-report-reader-page .daily-report-reader-toolbar { box-shadow:none; backdrop-filter:none; }
 .daily-report-reader-page .daily-report-more-menu { animation:orbit-overlay-arrive var(--orbit-motion-feedback) var(--orbit-ease); }
 .app-shell .research-review { border-radius:8px; box-shadow:none; }

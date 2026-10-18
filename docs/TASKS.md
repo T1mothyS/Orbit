@@ -5,7 +5,7 @@
 
 ## Orbit UI 统一重构（进行中）
 
-首轮 Gallery、账户、Settings V3 和相关 Shell 已实现；A/B/C 视觉节点结束，Windows/Linux 独立批准基线及普通 Linux CI 已有历史通过证据。后续按 [迁移台账](FRONTEND-DEBT.md)推进 Shell/Assistant、Reminder/今日、Library/经历、日报/Research/统计、Calendar、Admin/登录/Tools，保留旧业务合同。UI 迁移未整体完成，真实设备和完整页面状态不能由首轮基线推定通过。
+首轮 Gallery、账户、Settings V3 和相关 Shell 已实现；A/B/C 已有Windows/Linux批准基线。第二阶段C1–C4已形成独立本地checkpoint，20组按整改或验证保留完成本地覆盖，C5收口低高度/200%时间浮层和集成证据；详情见[迁移台账](FRONTEND-DEBT.md)。主要视觉成果集中待用户审阅，帮助页8组预期差异尚未接纳，既有黄金图未改；因此普通严格视觉闸门尚未全绿。真实模型、邮箱、生产和实体设备不由本地结果替代。
 
 ## Android 一期
 

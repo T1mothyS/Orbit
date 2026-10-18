@@ -168,7 +168,7 @@
 :is(.oui-option, .oui-menu-item)[data-disabled] { color: var(--orbit-text-disabled); cursor: default; }
 .oui-menu-item--danger { color: var(--orbit-destructive); }
 .oui-menu-item--danger[data-highlighted] { color: var(--orbit-destructive); background: var(--orbit-destructive-soft); }
-.oui-menu-separator { height: 1px; background: var(--orbit-border); margin: var(--orbit-space-1) var(--orbit-space-2); }
+.oui-menu-separator { height: 1px; border: 0; background: var(--orbit-border); margin: var(--orbit-space-1) var(--orbit-space-2); }
 .oui-popover { padding: var(--orbit-space-4); }
 .oui-popover p { margin: var(--orbit-space-2) 0 0; }
 .oui-tooltip { max-width: 260px; padding: var(--orbit-space-2) var(--orbit-space-3); border-radius: var(--orbit-radius-control); color: var(--orbit-on-brand); background: var(--orbit-brand-active); box-shadow: var(--orbit-shadow-tooltip); font: var(--orbit-type-secondary)/1.5 var(--orbit-font-ui); }

@@ -26,7 +26,17 @@ function SmartTimePicker({
   const minRef = useRef<HTMLSelectElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
-  useLayoutEffect(() => { if (open) hourRef.current?.focus(); }, [open]);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelPosition, setPanelPosition] = useState({ left: 8, top: 8 });
+  useLayoutEffect(() => {
+    if (!open) return;
+    const trigger = triggerRef.current?.getBoundingClientRect(), panel = panelRef.current?.getBoundingClientRect();
+    if (trigger && panel) setPanelPosition({
+      left: Math.max(8, Math.min(trigger.left, innerWidth - panel.width - 8)),
+      top: trigger.bottom + panel.height + 4 <= innerHeight - 8 ? trigger.bottom + 4 : Math.max(8, trigger.top - panel.height - 4),
+    });
+    hourRef.current?.focus({ preventScroll: true });
+  }, [open]);
   const dismiss = () => { setOpen(false); triggerRef.current?.focus({ preventScroll: true }); };
 
   const handleConfirm = () => {
@@ -64,14 +74,11 @@ function SmartTimePicker({
 
       {open && (
         <div
+          ref={panelRef}
           role="group"
           aria-label={`${label || ''}时间选择`}
-          className="smart-time-panel absolute top-full left-0 mt-1 z-50 rounded-xl shadow-2xl overflow-hidden"
-          style={{
-            backgroundColor: 'var(--td-bg-color-container)',
-            border: '1px solid var(--td-component-stroke)',
-            width: '220px',
-          }}
+          className="smart-time-panel fixed z-50 rounded-xl shadow-2xl overflow-auto"
+          style={panelPosition}
         >
           <div className="flex">
             {/* 小时滚轮 */}

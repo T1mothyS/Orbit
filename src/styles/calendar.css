@@ -421,3 +421,4 @@
 @media (max-width: 767px) {
   .calendar-horizontal-hint { display: block; margin: 0; padding: var(--orbit-space-2) var(--orbit-space-4); font-size: var(--orbit-type-caption); color: var(--orbit-text-secondary); background: var(--orbit-surface-muted); }
 }
+.smart-time-panel { width: 220px; max-height: calc(100dvh - 16px); background: var(--orbit-elevated); border: 1px solid var(--orbit-border); }

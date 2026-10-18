@@ -5,6 +5,13 @@ import { checkVisual } from './visual-check';
 const base = 'http://127.0.0.1:4187';
 test.describe.configure({ retries: 0 });
 
+for (const [width,height] of [[430,520],[705,402]]) test(`stage2 C5 time picker fits ${width}x${height} without clipping or writing a draft`, async ({context,page})=>{
+  const token=await fixtureToken(context,'preview-guards@example.invalid');await context.addInitScript(value=>localStorage.setItem('aicalendar_token',value),token);await page.setViewportSize({width,height});await page.goto(base+'/schedule');await page.getByRole('button',{name:'添加日程',exact:true}).click();
+  const form=page.getByRole('dialog',{name:'新增日程',exact:true}),trigger=form.locator('.smart-time-picker').first().getByRole('button').first();await trigger.scrollIntoViewIfNeeded();await trigger.click();
+  const panel=form.getByRole('group',{name:'开始时间选择',exact:true});await expect(panel).toBeInViewport({ratio:1});await expect(form.getByLabel('开始时间：小时',{exact:true})).toBeFocused();await expect(panel.getByRole('button',{name:'确定',exact:true})).toBeInViewport({ratio:1});
+  await checkVisual(page,`stage2-time-picker-${width}x${height}.png`,false,false);await page.keyboard.press('Escape');await expect(panel).toHaveCount(0);await expect(trigger).toBeFocused();await expect(form).toBeVisible();await page.getByRole('button',{name:'关闭日程编辑',exact:true}).click();
+});
+
 for (const width of [390,1440]) test(`stage2 C4 five standalone tools ${width}: keyboard, persistence, import/export and isolated scrolling`, async ({context,page}) => {
   test.setTimeout(60_000);
   const token=await fixtureToken(context,'preview@example.invalid');await context.addInitScript(value=>localStorage.setItem('aicalendar_token',value),token);
