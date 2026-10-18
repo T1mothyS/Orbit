@@ -51,7 +51,7 @@
 .settings-workspace .context-field { display: grid; gap: var(--orbit-space-2); align-content: start; min-width: 0; }
 .settings-workspace .context-field > label { color: var(--orbit-text-secondary); font-size: var(--orbit-type-secondary); }
 .settings-workspace .context-item { margin-block: var(--orbit-space-3); padding-block: var(--orbit-space-4); border-bottom: 1px solid var(--orbit-border); min-width: 0; }
-.settings-workspace .context-item-head, .settings-workspace .context-text-item { display: flex; align-items: start; gap: var(--orbit-space-3); margin-block: var(--orbit-space-3); }
+.settings-workspace .context-item-head { display: flex; align-items: start; gap: var(--orbit-space-3); margin-block: var(--orbit-space-3); }
 .settings-workspace .context-item-head { justify-content: space-between; align-items: center; }
 .settings-workspace .context-item-head h4 { margin: 0; }
 .settings-workspace .context-related { display: flex; gap: var(--orbit-space-4); flex-wrap: wrap; padding-block: var(--orbit-space-6); font-size: var(--orbit-type-secondary); }
@@ -60,3 +60,6 @@
   .settings-workspace .context-savebar { align-items: start; }
   .settings-workspace .settings-search { margin-bottom: var(--orbit-space-6); }
 }
+
+.settings-workspace .context-text-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--orbit-space-2); margin-block: var(--orbit-space-2); }
+.settings-workspace .context-text-item > button { white-space: nowrap; }

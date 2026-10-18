@@ -8,8 +8,8 @@ import { IconButton } from './Button';
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className = '', ...props }, ref) {
   return <input {...props} ref={ref} className={`oui-input ${className}`} />;
 });
-export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className = '', ...props }, ref) {
-  return <textarea {...props} ref={ref} className={`oui-input oui-textarea ${className}`} />;
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement> & { compact?: boolean; autoGrow?: boolean }>(function Textarea({ className = '', compact = false, autoGrow = false, ...props }, ref) {
+  return <textarea {...props} ref={ref} className={`oui-input oui-textarea${compact ? ' oui-textarea--compact' : ''}${autoGrow ? ' oui-textarea--grow' : ''} ${className}`} />;
 });
 export const PasswordInput = forwardRef<HTMLInputElement, Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>>(function PasswordInput({ className = '', disabled, ...props }, ref) {
   const [visible, setVisible] = useState(false);

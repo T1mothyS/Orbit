@@ -24,7 +24,7 @@ build 已包含 Tools、项目成长和帮助生成，不再额外调用同一�
 | 入口 | 运行条件和保护目标 |
 | --- | --- |
 | Gallery | Quick 的 src/ui、design、dev 改动；只启动无业务 API 的 /dev/ui，验证基础控件、焦点、减动、对比度和布局 |
-| 账户/Settings | Quick 的设置、帮助和相关导航；先构建当前 Web，再启动独立合成 API；真实页面验证保存、冲突、草稿、身份和帮助行为 |
+| 账户/Settings/第二阶段业务 | Quick 的设置、帮助和相关导航；先构建当前 Web，再启动独立合成 API；真实页面验证保存、冲突、草稿、身份和帮助行为 |
 | 完整 Playwright | Full/Release、CI；两套服务各启动一次，四尺寸明暗和批准截图比较保持 |
 | 业务 Smoke | Release，或记事/图片/筛选/阅读/导出/壳变动时提前运行 mobile-compact-browser-smoke.cjs；保留独特业务链及故障断言 |
 | 原生弹窗 | Release，或 confirm/beforeunload/未保存保护/自动化引导变化时提前运行 native-dialog-browser-smoke.cjs |
@@ -85,3 +85,6 @@ Release runner 仅执行隔离 Web 回归，不自动 push、tag、发布、部�
 `npm run docs:check` 检查当前 Git 文档及待提交新文档的相对链接/锚点、索引目标、版本来源、帮助输入和 hash；`--generated` 额外要求生成索引与当前输入完全一致。历史项目成长引用按 commit:path 验证，评测 JSON 稳定路径不移动。外链可用性和语义准确性仍需针对性审阅，不把静态检查当作全自动文档审计。
 
 流水与历史版本的滚动条件、原文保护、备份和恢复只维护在 [归档 runbook](archive/README.md#滚动维护流程)。
+
+
+第二阶段的 `tests/ui/stage2.spec.ts` 随 app/all 范围执行，覆盖帮助滚动、视口导航菜单、搜索内容行与紧凑 Context 输入。显著布局重组的截图以候选保存在测试输出；`ORBIT_UI_VISUAL_CANDIDATES=1` 运行只能证明功能与候选采集，必须另行报告批准基线的比较状态，不可将其称为全部视觉比较通过。原有批准图和断言保留，最终由审阅后的显式基线流程接纳。

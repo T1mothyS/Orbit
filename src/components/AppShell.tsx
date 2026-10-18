@@ -1,4 +1,4 @@
-import { BookOpen,Bot,CalendarDays,ChartNoAxesCombined,CircleArrowRight,Moon,Newspaper,Repeat2,Settings,Sun,UserRound,type LucideIcon } from 'lucide-react';
+import { BookOpen,Bot,CalendarDays,ChartNoAxesCombined,CircleArrowRight,FlaskConical,HelpCircle,LogOut,Mail,Moon,Newspaper,Repeat2,Settings,Shield,Sun,TrendingUp,UserRound,Wrench,type LucideIcon } from 'lucide-react';
 import { ReactNode } from 'react';
 import { useLocation,useNavigate } from 'react-router-dom';
 import { APP_CONFIG } from '../config';
@@ -55,11 +55,11 @@ export function AppShell({
     {id:'profile',label:'个人资料',icon:<UserRound size={16}/>,onSelect:go('/settings/account/profile')},
     {id:'statistics',label:'使用统计',icon:<ChartNoAxesCombined size={16}/>,onSelect:go('/project?view=statistics')},
     {id:'theme',label:'切换主题',icon:theme==='light'?<Moon size={16}/>:<Sun size={16}/>,onSelect:onToggleTheme},
-    {id:'import',label:'邮箱导入',separatorBefore:true,onSelect:go('/assistant?tool=email-import')},
-    {id:'research',label:'研究与观点',onSelect:go('/research')},{id:'tools',label:'Tools 工具中心',onSelect:go('/tools')},
-    {id:'growth',label:'项目成长',onSelect:go('/project?view=growth')},{id:'help',label:'使用指南',onSelect:go('/help')},
-    ...(user?.role==='admin'?[{id:'admin',label:'管理面板',onSelect:()=>onOpenAdmin?.()}]:[]),
-    {id:'logout',label:'退出登录',danger:true,separatorBefore:true,onSelect:()=>{onLogout?.();navigate('/login',{replace:true});}},
+    {id:'import',label:'邮箱导入',icon:<Mail size={16}/>,separatorBefore:true,onSelect:go('/assistant?tool=email-import')},
+    {id:'research',label:'研究与观点',icon:<FlaskConical size={16}/>,onSelect:go('/research')},{id:'tools',label:'Tools 工具中心',icon:<Wrench size={16}/>,onSelect:go('/tools')},
+    {id:'growth',label:'项目成长',icon:<TrendingUp size={16}/>,onSelect:go('/project?view=growth')},{id:'help',label:'使用指南',icon:<HelpCircle size={16}/>,onSelect:go('/help')},
+    ...(user?.role==='admin'?[{id:'admin',label:'管理面板',icon:<Shield size={16}/>,onSelect:()=>onOpenAdmin?.()}]:[]),
+    {id:'logout',label:'退出登录',icon:<LogOut size={16}/>,danger:true,separatorBefore:true,onSelect:()=>{onLogout?.();navigate('/login',{replace:true});}},
   ];
   return (
     <ToastProvider><div className={`oui-root app-shell${mobileReader ? ' app-shell-mobile-reader' : ''}`}>
@@ -76,7 +76,7 @@ export function AppShell({
 
         <div className="topbar-actions">
           <GlobalSearch />
-          <Menu label="个人菜单" trigger={<IconButton label="个人菜单" variant="quiet" data-account-menu-trigger title={user?.email}><AccountAvatar email={user?.email||'O'}/></IconButton>} header={<strong>{user?.email}</strong>} footer={'Orbit '+APP_CONFIG.version} items={items}/>
+          <Menu navigation label="个人菜单" trigger={<IconButton label="个人菜单" variant="quiet" data-account-menu-trigger title={user?.email}><AccountAvatar email={user?.email||'O'}/></IconButton>} header={<strong>{user?.email}</strong>} footer={'Orbit '+APP_CONFIG.version} items={items}/>
         </div>
       </header>
       <BrowserNotifications/><AndroidNotifications/><main className="app-shell-body">{children}</main>

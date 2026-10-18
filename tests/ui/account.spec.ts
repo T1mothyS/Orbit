@@ -163,7 +163,7 @@ test('account changes in another tab clear sensitive inputs and render the new i
 test('settings returns to its original work page with keyboard focus restored', async ({ context, page }) => {
   await login(context); await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base + '/schedule'); await page.locator('[data-account-menu-trigger]').click();
-  await page.getByRole('menuitem', { name: '设置', exact: true }).click();
+  await page.getByRole('menuitem', { name: '设置', exact: true }).or(page.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '设置', exact: true })).click();
   await page.getByRole('link', { name: '账户与安全 登录信息、头像与密码' }).click();
   await page.getByRole('link', { name: '返回 Orbit', exact: true }).click();
   await expect(page).toHaveURL(base + '/schedule');
@@ -173,7 +173,7 @@ test('settings returns to its original work page with keyboard focus restored', 
   await expect(composer).toBeVisible(); await page.waitForURL('**/assistant?conversation=*');
   await composer.fill('进入设置后仍应保留的未发送草稿');
   const origin = page.url();
-  await page.locator('[data-account-menu-trigger]').click(); await page.getByRole('menuitem', { name: '设置', exact: true }).click();
+  await page.locator('[data-account-menu-trigger]').click(); await page.getByRole('menuitem', { name: '设置', exact: true }).or(page.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '设置', exact: true })).click();
   await page.getByRole('link', { name: '返回 Orbit', exact: true }).click();
   await expect(page).toHaveURL(origin); await expect(composer).toHaveValue('进入设置后仍应保留的未发送草稿');
 });

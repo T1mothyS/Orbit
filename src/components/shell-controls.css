@@ -6,10 +6,6 @@
 .global-search-group-title { display: flex; justify-content: space-between; gap: var(--orbit-space-3); margin-block: var(--orbit-space-2); color: var(--orbit-text-secondary); font-size: var(--orbit-type-secondary); }
 .global-search-group-title > span { display: inline-flex; gap: var(--orbit-space-2); align-items: center; }
 .global-search-result-list { display: grid; gap: var(--orbit-space-2); }
-.global-search-result-main { display: grid; min-width: 0; gap: var(--orbit-space-1); text-align: start; white-space: normal; overflow-wrap: anywhere; }
-.global-search-result-main strong { font-weight: 600; }
-.global-search-result-main > span { color: var(--orbit-text-secondary); font-size: var(--orbit-type-secondary); }
-.global-search-result-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--orbit-space-2); color: var(--orbit-text-secondary); }
 .global-search-caption kbd { margin-inline-start: var(--orbit-space-2); color: var(--orbit-text-secondary); font-size: var(--orbit-type-secondary); }
 @media (max-width: 899px) {
   .orbit-product-nav { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); width: 100%; gap: 0; }

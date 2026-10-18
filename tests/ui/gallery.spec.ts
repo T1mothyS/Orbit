@@ -12,6 +12,20 @@ test('shared shell navigation and account menu expose selection, metadata and ke
 });
 const visualPolicy = JSON.parse(fs.readFileSync(new URL('./visual-policy.json', import.meta.url), 'utf8')) as { galleryApproved: boolean };
 
+test('content row supports keyboard activation and compact text grows without losing multiline content', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/dev/ui?demo=stage2');
+  const row = page.getByRole('button', { name: /一条可以打开的记录/ });
+  await row.focus(); await page.keyboard.press('Enter');
+  await expect(page.getByText('已打开示例记录', { exact: true })).toBeVisible();
+  const input = page.getByLabel('简短偏好', { exact: true });
+  const initial = (await input.boundingBox())!.height;
+  await input.fill('第一行\n第二行\n第三行\n第四行');
+  await expect(input).toHaveValue('第一行\n第二行\n第三行\n第四行');
+  expect((await input.boundingBox())!.height).toBeGreaterThan(initial);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test.beforeEach(async ({ context }) => {
   await context.route('**/*', route => new URL(route.request().url()).origin === 'http://127.0.0.1:4196' ? route.continue() : route.abort());
 });

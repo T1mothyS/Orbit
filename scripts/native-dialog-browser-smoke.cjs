@@ -104,7 +104,7 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
       await automated.getByLabel('关闭日程编辑', { exact: true }).click(); assert.equal(await automated.getByRole('dialog', { name: '新增日程', exact: true }).count(), 0);
       assert.deepEqual(await automated.evaluate(() => window.__orbitBrowserAudit.failures), []);
       telemetry.push({ mode: 'prelude-schedule', width, records: await automated.evaluate(() => window.__orbitBrowserAudit.records) });
-      await automated.locator('[data-account-menu-trigger]').click(); await automated.getByRole('menuitem', { name: '设置', exact: true }).click();
+      await automated.locator('[data-account-menu-trigger]').click(); await automated.getByRole('menuitem', { name: '设置', exact: true }).or(automated.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '设置', exact: true })).click();
       await automated.getByRole('heading',{name:width>=768?'账户与安全':'设置',exact:true}).waitFor();await automated.getByRole('link',{name:'返回 Orbit',exact:true}).click();
       await automated.waitForFunction(() => document.activeElement?.matches('[data-account-menu-trigger]'));
       // Legacy setting URLs now enter the standalone page and return to their original work page.
@@ -113,7 +113,7 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
       await automated.goto(automatedBase + '/settings/profile'); await automated.getByLabel('职业背景', { exact: true }).waitFor();
       await arm(automated, '测试：下次资料离开取消放弃'); await automated.getByLabel('职业背景', { exact: true }).fill(`合成资料修改 ${width}`); await automated.getByRole('link', { name: '返回 Orbit', exact:true }).click(); assert.ok(automated.url().endsWith('/settings/account/profile'));
       await arm(automated, '测试：下次资料离开确认放弃'); await automated.getByRole('link', { name: '返回 Orbit', exact:true }).click(); await automated.waitForURL(url => url.pathname === '/assistant');
-      await automated.locator('[data-account-menu-trigger]').click(); await automated.getByRole('menuitem', { name: '个人资料', exact: true }).click();
+      await automated.locator('[data-account-menu-trigger]').click(); await automated.getByRole('menuitem', { name: '个人资料', exact: true }).or(automated.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '个人资料', exact: true })).click();
       await automated.getByLabel('职业背景', { exact: true }).waitFor();
       await arm(automated, '测试：下次资料离开取消放弃'); await automated.getByLabel('职业背景', { exact: true }).fill(`合成浏览器返回 ${width}`);
       await automated.goBack(); await automated.waitForURL('**/settings/account/profile');

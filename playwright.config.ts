@@ -7,7 +7,7 @@ const scope = process.env.ORBIT_UI_SCOPE || 'all';
 if (!['all', 'gallery', 'app'].includes(scope) || (process.env.CI && scope !== 'all')) throw new Error('CI requires the complete UI scope');
 export default defineConfig({
   testDir: './tests/ui',
-  testMatch: scope === 'gallery' ? '**/gallery.spec.ts' : scope === 'app' ? ['**/account.spec.ts', '**/settings.spec.ts'] : '**/*.spec.ts',
+  testMatch: scope === 'gallery' ? '**/gallery.spec.ts' : scope === 'app' ? ['**/account.spec.ts', '**/settings.spec.ts', '**/stage2.spec.ts'] : '**/*.spec.ts',
   timeout: 30_000,
   fullyParallel: true,
   workers: process.env.CI ? 2 : 3,

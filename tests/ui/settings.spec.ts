@@ -134,7 +134,7 @@ test('leaving Settings protects ordinary drafts; returning to an AI category cle
 test('help only appends a controlled question to the existing conversation and never sends it', async ({ context, page }) => {
   await login(context); await page.goto(base + '/assistant'); const input = page.getByLabel('AI 助手输入框', { exact: true }); await input.fill('existing draft'); await expect(page).toHaveURL(/conversation=/);
   let sends = 0; page.on('request', request => { if (request.method() === 'POST' && /\/api\/(?:ai-chat|orbit\/conversations\/[^/]+\/requests)$/.test(request.url())) sends++; });
-  await page.getByRole('button', { name: '个人菜单', exact: true }).click(); await page.getByRole('menuitem', { name: '使用指南', exact: true }).click();
+  await page.getByRole('button', { name: '个人菜单', exact: true }).click(); await page.getByRole('menuitem', { name: '使用指南', exact: true }).or(page.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '使用指南', exact: true })).click();
   await page.getByRole('button', { name: '询问 AI：提醒与通知', exact: true }).click();
   await expect(input).toHaveValue(/^existing draft\n\nOrbit 的邮件/); expect(sends).toBe(0); await page.reload(); await expect(input).toHaveValue(/^existing draft\n\nOrbit 的邮件/); expect(sends).toBe(0);
 });

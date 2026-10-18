@@ -1,4 +1,4 @@
-import { useRef, type ReactElement, type ReactNode, type RefObject } from 'react';
+import { cloneElement, useEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react';
 import { X } from 'lucide-react';
 import { Dialog as PrimitiveDialog } from '@base-ui/react/dialog';
 import { Menu as PrimitiveMenu } from '@base-ui/react/menu';
@@ -14,18 +14,20 @@ export interface DialogProps {
   children: ReactNode;
   footer?: ReactNode;
   busy?: boolean;
+  canClose?: () => boolean;
+  size?: 'default' | 'wide';
   initialFocus?: RefObject<HTMLElement | null>;
   returnFocus?: RefObject<HTMLElement | null>;
 }
-function Overlay({ open, onOpenChange, title, description, children, footer, busy = false, initialFocus, returnFocus, sheet = false }: DialogProps & { sheet?: boolean }) {
+function Overlay({ open, onOpenChange, title, description, children, footer, busy = false, canClose, size = 'default', initialFocus, returnFocus, sheet = false }: DialogProps & { sheet?: boolean }) {
   const close = useRef<HTMLButtonElement>(null);
   return <PrimitiveDialog.Root open={open} onOpenChange={(next, details) => {
-    if (!next && busy) details.cancel(); else onOpenChange(next);
+    if (!next && (busy || canClose?.() === false)) details.cancel(); else onOpenChange(next);
   }} disablePointerDismissal={busy}>
     <PrimitiveDialog.Portal>
       <PrimitiveDialog.Backdrop className="oui-backdrop" />
       <PrimitiveDialog.Viewport className={`oui-overlay ${sheet ? 'oui-overlay--sheet' : ''}`}>
-        <PrimitiveDialog.Popup className={`oui-root oui-popup ${sheet ? 'oui-sheet' : ''}`} aria-busy={busy || undefined}
+        <PrimitiveDialog.Popup className={`oui-root oui-popup${size === 'wide' ? ' oui-popup--wide' : ''} ${sheet ? 'oui-sheet' : ''}`} aria-busy={busy || undefined}
           initialFocus={initialFocus || close} finalFocus={returnFocus}>
           <header className="oui-popup-header"><div><PrimitiveDialog.Title className="oui-popup-title">{title}</PrimitiveDialog.Title>
             {description && <PrimitiveDialog.Description className="oui-help">{description}</PrimitiveDialog.Description>}</div>
@@ -49,10 +51,28 @@ export function ConfirmDialog({ onConfirm, confirmLabel, children, ...props }: O
 }
 
 export interface MenuItem { id: string; label: string; onSelect: () => void; icon?: ReactNode; disabled?: boolean; danger?: boolean; separatorBefore?: boolean }
-export function Menu({ trigger, label, items, header, footer }: { trigger: ReactElement; label: string; items: MenuItem[]; header?: ReactNode; footer?: ReactNode }) {
+export function Menu({ trigger, label, items, header, footer, navigation = false }: { trigger: ReactElement; label: string; items: MenuItem[]; header?: ReactNode; footer?: ReactNode; navigation?: boolean }) {
+  const [mobile, setMobile] = useState(() => navigation && window.matchMedia('(max-width: 767px)').matches);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!navigation) return;
+    const query = window.matchMedia('(max-width: 767px)'), change = () => { setMobile(query.matches); setOpen(false); };
+    query.addEventListener('change', change);
+    return () => query.removeEventListener('change', change);
+  }, [navigation]);
+  if (navigation && mobile) return <>
+    {cloneElement(trigger as ReactElement<Record<string, unknown>>, { onClick: () => setOpen(true), 'aria-haspopup': 'dialog', 'aria-expanded': open })}
+    <Sheet open={open} onOpenChange={setOpen} title={label} footer={footer}>
+      {header && <div className="oui-menu-caption">{header}</div>}
+      <nav className="oui-navigation-menu" aria-label={label}>{items.map(item => <div key={item.id}>
+        {item.separatorBefore && <hr className="oui-menu-separator" />}
+        <Button variant={item.danger ? 'danger' : 'quiet'} leadingIcon={item.icon} disabled={item.disabled} onClick={() => { setOpen(false); item.onSelect(); }}>{item.label}</Button>
+      </div>)}</nav>
+    </Sheet>
+  </>;
   return <PrimitiveMenu.Root><PrimitiveMenu.Trigger render={trigger} />
     <PrimitiveMenu.Portal><PrimitiveMenu.Positioner sideOffset={6} align="end" className="oui-positioner">
-      <PrimitiveMenu.Popup className="oui-menu" aria-label={label}>{header && <div className="oui-menu-caption">{header}</div>}{items.map(item => <div key={item.id} role="presentation">
+      <PrimitiveMenu.Popup className={`oui-menu${navigation ? ' oui-menu--navigation' : ''}`} aria-label={label}>{header && <div className="oui-menu-caption">{header}</div>}{items.map(item => <div key={item.id} role="presentation">
         {item.separatorBefore && <PrimitiveMenu.Separator className="oui-menu-separator" />}
         <PrimitiveMenu.Item className={`oui-menu-item ${item.danger ? 'oui-menu-item--danger' : ''}`} disabled={item.disabled} onClick={item.onSelect}>
           {item.icon}<span>{item.label}</span>

@@ -2,7 +2,7 @@ import { ArrowRight,BookOpen,CalendarDays,FileText,Search,StickyNote } from 'luc
 import { useEffect,useMemo,useRef,useState } from 'react';
 import { useLocation,useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Button,Dialog,InlineNotice,Input,LoadingState,Sheet } from '../ui';
+import { ActionRow,Button,Dialog,InlineNotice,Input,LoadingState,Sheet } from '../ui';
 import './shell-controls.css';
 
 
@@ -130,7 +130,7 @@ export function GlobalSearch() {
       <div className="global-search-head"><div className="global-search-input-wrap"><Input ref={inputRef} value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索事项、对话、记事、设置和报告" aria-label="搜索事项、对话、记事、设置和报告"/></div></div>
       <div className="global-search-body">{loading&&<LoadingState label="搜索中…"/>}{!query.trim()&&<p className="oui-help">输入关键词，搜索你的日程、记事、日报和知识库。</p>}{error&&<InlineNotice tone="danger" title={error}/>}
       {!error&&query.trim()&&!loading&&response&&!response.results.length&&<p role="status" className="oui-help">没有找到匹配内容。</p>}
-      <div className="global-search-results">{TYPE_ORDER.map(type=>{const items=grouped.get(type)||[];if(!items.length)return null;const Icon=TYPE_ICONS[type];return <section key={type} aria-labelledby={'global-search-group-'+type}><div className="global-search-group-title" id={'global-search-group-'+type}><span><Icon size={14}/>{TYPE_LABELS[type]}</span><span>{response?.counts?.[type]||items.length}</span></div><div className="global-search-result-list">{items.map(item=><Button key={item.type+item.id} variant="quiet" className="global-search-result" onClick={()=>openResult(item)}><span className="global-search-result-main"><strong>{item.title}</strong><span>{item.snippet||'打开查看详情'}</span></span><span className="global-search-result-meta">{item.date&&<small>{item.date.slice(0,10)}</small>}<ArrowRight size={15} aria-hidden="true"/></span></Button>)}</div></section>;})}</div>
+      <div className="global-search-results">{TYPE_ORDER.map(type=>{const items=grouped.get(type)||[];if(!items.length)return null;const Icon=TYPE_ICONS[type];return <section key={type} aria-labelledby={'global-search-group-'+type}><div className="global-search-group-title" id={'global-search-group-'+type}><span><Icon size={14}/>{TYPE_LABELS[type]}</span><span>{response?.counts?.[type]||items.length}</span></div><div className="global-search-result-list">{items.map(item=><ActionRow key={item.type+item.id} onClick={()=>openResult(item)} title={item.title} description={item.snippet||'打开查看详情'} trailing={<>{item.date&&<time>{item.date.slice(0,10)}</time>}<ArrowRight size={15} aria-hidden="true"/></>}/>)}</div></section>;})}</div>
       </div>
     </Overlay>
   </>;

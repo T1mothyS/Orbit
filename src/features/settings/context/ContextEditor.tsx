@@ -123,7 +123,7 @@ function ContextFieldView({ field, context, path, onChange, targetActions }: Fie
         {field.kind === 'objects' ? <><div className="context-item-head"><h4>{field.label} {index + 1}</h4><Button type="button" variant="quiet" aria-label={`移除${field.label}第${index + 1}项`} onClick={() => onChange(path, items.filter((_, i) => i !== index))}>移除</Button></div>
           {isContextObject(item) ? <><ObjectFields fields={field.fields || []} context={context} path={[...path, index]} onChange={onChange} />
             {targetActions && contextStockPaths(context).some(p => JSON.stringify(p) === JSON.stringify([...path, index])) && targetActions([...path, index], item)}</> : <p role="alert">这一项格式不兼容，原内容已保留；可明确移除这一项。</p>}</>
-          : <><Textarea aria-label={`${field.label}第${index + 1}项`} rows={2} value={typeof item === 'string' ? item : ''} disabled={typeof item !== 'string'} onChange={event => onChange([...path, index], event.target.value)} />
+          : <><Textarea aria-label={`${field.label}第${index + 1}项`} compact autoGrow rows={1} value={typeof item === 'string' ? item : ''} disabled={typeof item !== 'string'} onChange={event => onChange([...path, index], event.target.value)} />
             <Button type="button" variant="quiet" aria-label={`移除${field.label}第${index + 1}项`} onClick={() => onChange(path, items.filter((_, i) => i !== index))}>移除</Button></>}
       </div>)}
       <Button type="button"  disabled={items.length >= 200} onClick={() => {
@@ -139,6 +139,6 @@ function ContextFieldView({ field, context, path, onChange, targetActions }: Fie
       ? <Select id={id} label={field.label} value={typeof value === 'string' ? value : ''} onValueChange={value => onChange(path, value || '')} options={[{value:'',label:'未设置'}, ...(typeof value === 'string' && value && !field.options?.some(option => option[0] === value) ? [{value,label:value}] : []), ...(field.options || []).map(([value,label])=>({value,label}))]} />
       : field.kind === 'boolean' ? <Checkbox id={id} label={field.label} checked={value === true} onCheckedChange={value => onChange(path, value)} />
       : field.kind === 'number' ? <Input id={id} type="number" min={1} step={1} value={typeof value === 'number' ? value : ''} onChange={event => onChange(path, event.target.value === '' ? undefined : Number(event.target.value))} />
-      : <Textarea id={id} rows={2} value={typeof value === 'string' ? value : ''} onChange={event => onChange(path, event.target.value)} />}
+      : <Textarea id={id} compact autoGrow rows={1} value={typeof value === 'string' ? value : ''} onChange={event => onChange(path, event.target.value)} />}
   </div>;
 }
