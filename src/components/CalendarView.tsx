@@ -23,6 +23,7 @@ Trash2,
 X
 } from 'lucide-react';
 import { useCallback, useRef, useEffect, useMemo, useState } from 'react';
+import { Button, IconButton } from '../ui';
 import { useAuth } from '../hooks/useAuth';
 import { getScheduleCategory } from '../utils/scheduleCategories';
 import {
@@ -1443,47 +1444,10 @@ export function CalendarView({
         style={{ borderBottom: '1px solid var(--td-component-stroke)' }}
       >
         <div className="calendar-toolbar-primary flex items-center gap-2">
-          {onOpenRail && (
-            <button
-              type="button"
-              onClick={onOpenRail}
-              className="calendar-rail-trigger p-1.5 rounded-lg transition-colors"
-              aria-label="打开日历侧栏"
-              aria-controls="schedule-navigation-rail"
-              aria-expanded={isRailOpen}
-            >
-              <PanelLeftOpen className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            onClick={goToday}
-            className="calendar-go-today px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-            style={{ backgroundColor: 'var(--td-brand-color-light)', color: 'var(--td-brand-color)' }}
-            aria-label="回到今天"
-          >
-            <span className="calendar-go-today-full">回到今天</span>
-            <span className="calendar-go-today-compact" aria-hidden="true">今天</span>
-          </button>
-          <button 
-            onClick={navigatePrev} 
-            aria-label={viewMode === 'week' ? '上一周' : viewMode === 'month' ? '上一月' : '上一天'}
-            className="p-1.5 rounded-lg transition-colors"
-            style={{ color: 'var(--td-text-color-secondary)' }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--td-bg-color-component)'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            <ChevronLeft aria-hidden="true" className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={navigateNext} 
-            aria-label={viewMode === 'week' ? '下一周' : viewMode === 'month' ? '下一月' : '下一天'}
-            className="p-1.5 rounded-lg transition-colors"
-            style={{ color: 'var(--td-text-color-secondary)' }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--td-bg-color-component)'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            <ChevronRight aria-hidden="true" className="w-4 h-4" />
-          </button>
+          {onOpenRail && <IconButton label="打开日历侧栏" onClick={onOpenRail} className="calendar-rail-trigger" variant="quiet" aria-controls="schedule-navigation-rail" aria-expanded={isRailOpen}><PanelLeftOpen size={18}/></IconButton>}
+          <Button onClick={goToday} variant="quiet" className="calendar-go-today" aria-label="回到今天"><span className="calendar-go-today-full">回到今天</span><span className="calendar-go-today-compact" aria-hidden="true">今天</span></Button>
+          <IconButton onClick={navigatePrev} label={viewMode === 'week' ? '上一周' : viewMode === 'month' ? '上一月' : '上一天'} variant="quiet"><ChevronLeft size={18}/></IconButton>
+          <IconButton onClick={navigateNext} label={viewMode === 'week' ? '下一周' : viewMode === 'month' ? '下一月' : '下一天'} variant="quiet"><ChevronRight size={18}/></IconButton>
           <span className="calendar-toolbar-date calendar-toolbar-date-full" style={{ color: 'var(--td-text-color-primary)' }}>
             {headerTitle()}
           </span>
@@ -1504,38 +1468,18 @@ export function CalendarView({
         </div>
 
         <div className="calendar-toolbar-actions flex items-center gap-2">
-          <div className="calendar-view-switch flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--td-component-stroke)' }}>
+          <div className="calendar-view-switch" role="group" aria-label="日历视图">
             {([
               { key: 'agenda', label: '日程', Icon: LayoutList },
               { key: 'day', label: '日', Icon: Calendar },
               { key: 'week', label: '周', Icon: LayoutGrid },
               { key: 'month', label: '月', Icon: CalendarDays },
             ] as { key: ViewMode; label: string; Icon: any }[]).map(({ key, label, Icon }) => (
-              <button
-                key={key}
-                onClick={() => setViewMode(key)}
-                className="px-3 py-1.5 flex items-center gap-1 text-xs font-medium transition-all"
-                aria-label={`切换到${label}视图`}
-                style={{
-                  backgroundColor: viewMode === key ? 'var(--td-brand-color)' : 'transparent',
-                  color: viewMode === key ? '#fff' : 'var(--td-text-color-secondary)',
-                }}
-              >
-                <Icon className="w-3 h-3" />
-                <span className="calendar-view-label">{label}</span>
-              </button>
+              <Button key={key} onClick={() => setViewMode(key)} variant="quiet" aria-pressed={viewMode === key} aria-label={`切换到${label}视图`} leadingIcon={<Icon size={15} aria-hidden="true"/>}><span className="calendar-view-label">{label}</span></Button>
             ))}
           </div>
 
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="calendar-add-button flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-            style={{ backgroundColor: 'var(--td-brand-color)', color: '#fff' }}
-            aria-label="添加日程"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>添加日程</span>
-          </button>
+          <Button onClick={() => setShowAddModal(true)} variant="primary" className="calendar-add-button" aria-label="添加日程" leadingIcon={<Plus size={16} aria-hidden="true"/>}>添加日程</Button>
         </div>
       </div>
 
@@ -1603,8 +1547,9 @@ export function CalendarView({
       </div>}
       {mutating && <p className="calendar-operation-feedback" role="status">正在更新事项…</p>}
       {loading && schedules.length > 0 && <p className="calendar-operation-feedback" role="status">正在刷新日程…</p>}
+      {(viewMode === 'week' || viewMode === 'month') && <p className="calendar-horizontal-hint" id="calendar-horizontal-hint">左右滑动查看完整一周；键盘聚焦日历后可横向滚动。</p>}
       {/* 日程内容区 */}
-      <div className={`calendar-content-viewport calendar-content-${viewMode} flex-1 overflow-hidden`}>
+      <div className={`calendar-content-viewport calendar-content-${viewMode} flex-1 overflow-hidden`} tabIndex={viewMode === 'week' || viewMode === 'month' ? 0 : undefined} role={viewMode === 'week' || viewMode === 'month' ? 'region' : undefined} aria-label={viewMode === 'week' || viewMode === 'month' ? '可横向滚动的日历' : undefined}>
         {loading && !schedules.length ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-sm" style={{ color: 'var(--td-text-color-secondary)' }}>加载中...</div>

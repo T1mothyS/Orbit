@@ -1,13 +1,13 @@
 /**
  * 登录/注册页面
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 
-import { Button, Input, MessagePlugin } from 'tdesign-react';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
-import { InlineNotice } from '../ui';
+import { Button, FormField, InlineNotice, Input, PasswordInput, Tabs } from '../ui';
+import './login.css';
 import { newPasswordError } from '../utils/password-policy';
 
 type Mode = 'login' | 'register';
@@ -38,6 +38,9 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [feedback,setFeedback] = useState('');
+  const errorTarget = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (error) errorTarget.current?.focus(); }, [error]);
 
   const { login, register, sendRegisterCode, isAuthenticated, notice } = useAuth();
   const location = useLocation();
@@ -59,27 +62,28 @@ export function LoginPage() {
   }, [codeCountdown]);
 
   const handleSendCode = async () => {
+    setError('');setFeedback('');
     if (!email || !password || !inviteCode) {
-      MessagePlugin.warning('请先填写邮箱、密码和邀请码');
+      setError('请先填写邮箱、密码和邀请码');
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      MessagePlugin.warning('请输入有效的邮箱地址');
+      setError('请输入有效的邮箱地址');
       return;
     }
     const invalid = newPasswordError(password);
     if (invalid) {
-      MessagePlugin.warning(invalid);
+      setError(invalid);
       return;
     }
     setSending(true);
     try {
       await sendRegisterCode(email, password, inviteCode);
-      MessagePlugin.success('验证码已发送到您的邮箱');
+      setFeedback('验证码已发送到您的邮箱');
       setCodeSent(true);
       setCodeCountdown(60);
     } catch (e: any) {
-      MessagePlugin.error(e.message);
+      setError(e.message);
     } finally {
       setSending(false);
     }
@@ -91,13 +95,12 @@ export function LoginPage() {
     setError('');
     if (mode === 'login') {
       if (!email || !password) {
-        MessagePlugin.warning('请填写邮箱和密码');
+        setError('请填写邮箱和密码');
         return;
       }
       setLoading(true);
       try {
         await login(email, password);
-        MessagePlugin.success('登录成功！');
         // 强制刷新确保所有全局状态重置
         window.location.href = nextPath || '/assistant';
       } catch (e: any) {
@@ -107,22 +110,21 @@ export function LoginPage() {
       }
     } else {
       if (!email || !password || !code || !inviteCode) {
-        MessagePlugin.warning('请填写完整信息');
+        setError('请填写完整信息');
         return;
       }
       if (password !== confirmPassword) {
-        MessagePlugin.warning('两次密码不一致');
+        setError('两次密码不一致');
         return;
       }
       const invalid = newPasswordError(password);
       if (invalid) {
-        MessagePlugin.warning(invalid);
+        setError(invalid);
         return;
       }
       setLoading(true);
       try {
         await register(email, password, code, inviteCode);
-        MessagePlugin.success('注册成功！');
       } catch (e: any) {
         setError(e.message || '注册失败，请重试');
       } finally {
@@ -131,148 +133,17 @@ export function LoginPage() {
     }
   };
 
-  return (
-    <div className="orbit-login-page min-h-screen flex flex-col">
-      <main className="flex flex-1 items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <img src="/orbit-logo.png" alt="" className="orbit-login-logo" /><h1 className="text-3xl font-bold mb-1">Orbit</h1>
-          <p className="text-sm">以对话为入口，管理你的个人事务</p>
-        </div>
-
-        {/* 表单卡片 */}
-        <div className="orbit-login-card p-8">
-          {/* Tab 切换 */}
-          <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
-            <button
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${mode === 'login' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => { setMode('login'); setError(''); }} disabled={loading || sending} aria-pressed={mode === 'login'}
-            >
-              登录
-            </button>
-            <button
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${mode === 'register' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => { setMode('register'); setError(''); }} disabled={loading || sending} aria-pressed={mode === 'register'}
-            >
-              注册
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {notice && <InlineNotice title={notice} />}
-            {error && <p className="orbit-inline-error" role="alert">{error}</p>}
-            <label className="block">
-              <span className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>邮箱</span>
-              <Input
-                autocomplete="email"
-                value={email}
-                onChange={(v) => setEmail(v as string)}
-                placeholder="请输入邮箱地址"
-                size="large"
-              />
-            </label>
-
-            <label className="block">
-              <span className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>密码</span>
-              <Input
-                value={password}
-                onChange={(v) => setPassword(v as string)}
-                placeholder={mode === 'register' ? '至少8位，最多72字节' : '请输入密码'}
-                autocomplete={mode === 'register' ? 'new-password' : 'current-password'}
-                size="large"
-                type="password"
-              />
-            </label>
-
-            {mode === 'register' && (
-              <>
-                <label className="block">
-                  <span className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>确认密码</span>
-                  <Input
-                    value={confirmPassword}
-                    onChange={(v) => setConfirmPassword(v as string)}
-                    placeholder="再次输入密码"
-                    size="large"
-                    type="password"
-                    autocomplete="new-password"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>邀请码</span>
-                  <Input
-                    value={inviteCode}
-                    onChange={(v) => setInviteCode(v as string)}
-                    placeholder="请输入邀请码"
-                    size="large"
-                  />
-                </label>
-
-                <div>
-                  <div className="flex gap-2 items-end">
-                    <label className="flex-1 min-w-0">
-                      <span className="block text-sm font-medium mb-1.5" style={{ color: 'var(--td-text-color-primary)' }}>邮箱验证码</span>
-                      <Input
-                        value={code}
-                        onChange={(v) => setCode(v as string)}
-                        placeholder="输入6位验证码"
-                        size="large"
-                        maxlength={6}
-                        autocomplete="one-time-code"
-                      />
-                    </label>
-                    <Button
-                      onClick={handleSendCode}
-                      loading={sending}
-                      disabled={codeCountdown > 0}
-                      variant="outline"
-                      style={{ flexShrink: 0 }}
-                    >
-                      {codeCountdown > 0 ? `${codeCountdown}s` : '获取验证码'}
-                    </Button>
-                  </div>
-                  {!codeSent && (
-                    <div className="mt-1 text-xs" style={{ color: 'var(--td-text-color-secondary)' }}>
-                      点击「获取验证码」前请先填好邮箱、密码和邀请码
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            <Button
-              type="submit"
-              variant="base"
-              block
-              size="large"
-              loading={loading}
-              style={{ background: 'var(--td-brand-color)', color: '#fff', border: 'none', marginTop: '8px' }}
-            >
-              {mode === 'login' ? '登 录' : '完 成 注 册'}
-            </Button>
-          </form>
-
-          {mode === 'login' && (
-            <div className="mt-4 text-center">
-              <p className="text-xs" style={{ color: 'var(--td-text-color-secondary)' }}>
-                还没有账号？<button className="text-blue-500 hover:underline" onClick={() => setMode('register')}>立即注册</button>
-              </p>
-            </div>
-          )}
-        </div>
-
-          <p className="text-center text-xs mt-6">
-            Orbit © 2026
-          </p>
-        </div>
-      </main>
-
-      <footer className="flex-none px-4 pb-5 text-center text-xs">
-        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
-          冀ICP备2026028167号
-        </a>
-      </footer>
-    </div>
-  );
+  const form = <form onSubmit={handleSubmit} className="login-form" aria-busy={loading || sending}>
+    {notice && <InlineNotice title={notice}/>}{feedback && <InlineNotice title={feedback}/>}
+    {error && <div ref={errorTarget} tabIndex={-1}><InlineNotice tone="danger" title={error}/></div>}
+    <FormField id="login-email" label="邮箱"><Input id="login-email" inputMode="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="请输入邮箱地址" disabled={loading || sending}/></FormField>
+    <FormField id="login-password" label="密码"><PasswordInput key={mode} id="login-password" aria-label="密码" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} value={password} onChange={event => setPassword(event.target.value)} placeholder={mode === 'register' ? '至少8位，最多72字节' : '请输入密码'} disabled={loading || sending}/></FormField>
+    {mode === 'register' && <>
+      <FormField id="register-confirm" label="确认密码"><PasswordInput id="register-confirm" aria-label="确认密码" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} placeholder="再次输入密码" autoComplete="new-password" disabled={loading || sending}/></FormField>
+      <FormField id="register-invite" label="邀请码"><Input id="register-invite" value={inviteCode} onChange={event => setInviteCode(event.target.value)} placeholder="请输入邀请码" autoComplete="off" disabled={loading || sending}/></FormField>
+      <div><div className="login-code-row"><FormField id="register-code" label="邮箱验证码"><Input id="register-code" value={code} onChange={event => setCode(event.target.value)} placeholder="输入6位验证码" inputMode="numeric" maxLength={6} autoComplete="one-time-code" disabled={loading || sending}/></FormField><Button onClick={() => void handleSendCode()} loading={sending} disabled={loading || codeCountdown > 0}>{codeCountdown > 0 ? `${codeCountdown}s` : '获取验证码'}</Button></div>{!codeSent && <p className="oui-help login-code-hint">点击“获取验证码”前请先填写邮箱、密码和邀请码。</p>}</div>
+    </>}
+    <Button type="submit" variant="primary" loading={loading} disabled={sending} className="login-submit">{mode === 'login' ? '登录' : '完成注册'}</Button>
+  </form>;
+  return <div className="oui-root orbit-login-page"><main className="login-main"><div className="login-content"><header className="login-brand"><img src="/orbit-logo.png" alt=""/><h1>Orbit</h1><p>以对话为入口，管理你的个人事务</p></header><section className="orbit-login-card"><Tabs label="登录方式" value={mode} disabled={loading || sending} onValueChange={value => { if(value==='login'||value==='register'){setMode(value);setError('');setFeedback('');} }} items={[{value:'login',label:'登录',content:mode === 'login' ? form : null},{value:'register',label:'注册',content:mode === 'register' ? form : null}]}/></section><p className="login-copyright">Orbit © 2026</p></div></main><footer className="login-footer"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">冀ICP备2026028167号</a></footer></div>;
 }

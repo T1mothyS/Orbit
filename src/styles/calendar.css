@@ -415,3 +415,9 @@
 @media (hover:none), (max-width:1100px) { .orbit-conversation-actions { visibility:visible; } }
 .orbit-reminder-actions{display:flex;flex-direction:column;gap:8px;margin-top:12px}.orbit-reminder-actions>div{display:flex;flex-wrap:wrap;gap:8px}.orbit-reminder-actions button{border:1px solid var(--td-component-border);border-radius:6px;background:var(--td-bg-color-container);color:var(--td-text-color-primary);padding:6px 10px;font-size:12px;cursor:pointer}.orbit-reminder-actions button:disabled{opacity:.5}
 .orbit-reminder-settings{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:15px 0;padding:12px;border:1px solid var(--td-component-border);border-radius:8px;font-size:12px}.orbit-reminder-settings strong,.orbit-reminder-settings small{width:100%}.orbit-reminder-settings input[type=number]{width:65px;background:var(--td-bg-color-container);color:var(--td-text-color-primary);border:1px solid var(--td-component-border)}.orbit-reminder-settings button,.orbit-scope-chat{padding:6px 10px;border-radius:6px;background:var(--td-brand-color-light);color:var(--td-brand-color)}.orbit-scope-chat{width:100%;margin-bottom:12px}
+
+@media (max-width: 767px) { .schedule-context-menu button { min-height: var(--orbit-touch-target); } }
+.calendar-horizontal-hint { display: none; }
+@media (max-width: 767px) {
+  .calendar-horizontal-hint { display: block; margin: 0; padding: var(--orbit-space-2) var(--orbit-space-4); font-size: var(--orbit-type-caption); color: var(--orbit-text-secondary); background: var(--orbit-surface-muted); }
+}

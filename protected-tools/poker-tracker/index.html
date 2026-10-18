@@ -101,7 +101,7 @@
     background: transparent;
     cursor: pointer;
     font-size: 18px;
-    color: #999;
+    color: #5c6878;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -193,7 +193,7 @@
 
   .suit-header .suit-label { color: #333; }
   .suit-header .count {
-    color: #aaa;
+    color: #5c6878;
     font-weight: 400;
     font-size: 12px;
     margin-left: auto;
@@ -206,6 +206,7 @@
 
   /* ===== 卡牌 ===== */
   .card {
+    appearance: none; padding: 0; font-family: inherit;
     width: 56px;
     height: 80px;
     border-radius: 8px;
@@ -228,11 +229,11 @@
   .card.joker .rank { font-size: 13px; line-height: 1.2; }
 
   /* 卡牌颜色 */
-  .bg-red    { background: linear-gradient(145deg, #e74c3c, #c0392b); }
-  .bg-gold   { background: linear-gradient(145deg, #f1c40f, #e67e22); }
+  .bg-red    { background: linear-gradient(145deg, #bd3028, #a3261f); }
+  .bg-gold   { background: linear-gradient(145deg, #f1c40f, #e67e22); color: #362100; }
   .bg-purple { background: linear-gradient(145deg, #9b59b6, #8e44ad); }
-  .bg-blue   { background: linear-gradient(145deg, #3498db, #2980b9); }
-  .bg-green  { background: linear-gradient(145deg, #27ae60, #229954); }
+  .bg-blue   { background: linear-gradient(145deg, #1f70a5, #1e6088); }
+  .bg-green  { background: linear-gradient(145deg, #167345, #146238); }
 
   /* 收集状态 */
   .card.collected {
@@ -240,12 +241,14 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.18);
   }
   .card.uncollected {
-    opacity: 0.15;
-    filter: grayscale(60%);
+    opacity: 1;
+    filter: none;
+    background: #f1f3f7;
+    color: #526074;
+    border-color: #dce1e9;
   }
   .card.uncollected:hover {
-    opacity: 0.4;
-    filter: grayscale(30%);
+    background: #e6eaf2;
     transform: translateY(-2px);
   }
   .card.collected::after {
@@ -253,7 +256,7 @@
     position: absolute;
     top: -6px;
     right: -6px;
-    background: #2ecc71;
+    background: #167345;
     color: white;
     border-radius: 50%;
     width: 18px;
@@ -268,7 +271,7 @@
 
   .footer-hint {
     text-align: center;
-    color: #aaa;
+    color: #5c6878;
     font-size: 12px;
     margin-top: 18px;
     line-height: 1.6;
@@ -299,23 +302,14 @@
   }
 
   /* ===== 批量识别弹窗 ===== */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 20px;
-  }
-  .modal-overlay.show { display: flex; }
+  .modal-overlay { margin: auto; border: 0; padding: 0; background: transparent; width: min(560px, calc(100% - 32px)); max-width: none; max-height: calc(100dvh - 32px); overflow: visible; }
+  .modal-overlay::backdrop { background: rgba(0,0,0,0.45); }
   .modal {
     background: white;
     border-radius: 14px;
     width: 100%;
     max-width: 560px;
-    max-height: 85vh;
+    max-height: calc(100dvh - 32px);
     overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0,0,0,0.2);
   }
@@ -332,7 +326,7 @@
     background: none;
     font-size: 20px;
     cursor: pointer;
-    color: #999;
+    color: #5c6878;
     padding: 0 4px;
     line-height: 1;
   }
@@ -353,7 +347,7 @@
   .modal-body textarea:focus { border-color: #635bff; }
   .modal-hint {
     font-size: 12px;
-    color: #999;
+    color: #5c6878;
     margin-top: 8px;
     line-height: 1.6;
   }
@@ -396,6 +390,11 @@
   }
   .modal-footer .btn-primary { background: #635bff; color: white; border-color: #635bff; }
   .modal-footer .btn-primary:hover { background: #5851db; }
+  .profile-tab-group{display:inline-flex;align-items:center;flex:0 0 auto}
+  .card:focus-visible{outline:3px solid #635bff;outline-offset:3px;opacity:1;filter:none;transform:none}
+  button:focus-visible{outline:3px solid #635bff;outline-offset:3px}
+  @media(max-width:767px){.btn,.tab,.tab-add,.tab-del,.modal-close{min-width:44px;min-height:44px}.header-actions{flex-wrap:wrap}}
+  @media(prefers-reduced-motion:reduce){.card{transition:none}.card:hover{transform:none}}
 </style>
 </head>
 <body>
@@ -440,14 +439,14 @@
 <div class="toast" id="toast"></div>
 
 <!-- 批量识别弹窗 -->
-<div class="modal-overlay" id="batchModal">
+<dialog class="modal-overlay" id="batchModal" aria-labelledby="batch-title">
   <div class="modal">
     <div class="modal-header">
-      <h2>批量识别导入</h2>
-      <button class="modal-close" onclick="closeBatchModal()">×</button>
+      <h2 id="batch-title">批量识别导入</h2>
+      <button class="modal-close" aria-label="关闭批量识别" onclick="closeBatchModal()">×</button>
     </div>
     <div class="modal-body">
-      <textarea id="batchInput" placeholder="例如：方片A，红桃 4，黑桃 3，梅花 10，大王，小王&#10;花色和点数之间可以有空格，支持逗号/顿号/换行分隔"></textarea>
+      <textarea aria-label="批量牌面文字" id="batchInput" placeholder="例如：方片A，红桃 4，黑桃 3，梅花 10，大王，小王&#10;花色和点数之间可以有空格，支持逗号/顿号/换行分隔"></textarea>
       <div class="modal-hint">
         格式：<code>花色+点数</code>，多张用逗号/顿号/换行隔开<br>
         花色和点数之间可以有空格，如 <code>方片 A</code> 也能识别<br>
@@ -465,7 +464,7 @@
       <button class="btn btn-primary" onclick="doBatchImport()">识别并导入</button>
     </div>
   </div>
-</div>
+</dialog>
 
 <script>
   // ===== 常量 =====
@@ -544,11 +543,13 @@
   function toggleCard(cardId) {
     const profile = getCurrentProfile();
     if (!profile) return;
+    const restoreFocus = document.activeElement?.getAttribute('data-card-id') === cardId;
     const idx = profile.collected.indexOf(cardId);
     if (idx >= 0) profile.collected.splice(idx, 1);
     else profile.collected.push(cardId);
     saveState();
     render();
+    if (restoreFocus) Array.from(document.querySelectorAll('[data-card-id]')).find(element => element.getAttribute('data-card-id') === cardId)?.focus({preventScroll:true});
   }
 
   function createProfile() {
@@ -652,11 +653,11 @@
   };
 
   function openBatchModal() {
-    document.getElementById('batchModal').classList.add('show');
+    document.getElementById('batchModal').showModal();
     document.getElementById('batchInput').focus();
   }
   function closeBatchModal() {
-    document.getElementById('batchModal').classList.remove('show');
+    document.getElementById('batchModal').close();
     document.getElementById('batchResult').className = 'modal-result';
     document.getElementById('batchResult').textContent = '';
   }
@@ -811,11 +812,10 @@
     state.profiles.forEach(function(p) {
       const isActive = p.id === state.currentId;
       const count = p.collected ? p.collected.length : 0;
-      tabsHtml += '<button class="tab ' + (isActive ? 'active' : '') + '" onclick="switchProfile(\'' + p.id + '\')">'
+      tabsHtml += '<span class="profile-tab-group"><button type="button" class="tab ' + (isActive ? 'active' : '') + '" aria-pressed="' + isActive + '" onclick="switchProfile(\'' + p.id + '\')">'
                 + '<span>' + escapeHtml(p.name) + '</span>'
-                + '<span class="tab-count">' + count + '</span>'
-                + '<button class="tab-del" onclick="event.stopPropagation(); deleteProfile(\'' + p.id + '\')" title="删除此档案">×</button>'
-                + '</button>';
+                + '<span class="tab-count">' + count + '</span></button>'
+                + '<button type="button" class="tab-del" onclick="deleteProfile(\'' + p.id + '\')" aria-label="删除档案：' + escapeHtml(p.name) + '">×</button></span>';
     });
     tabsHtml += '<button class="tab-add" onclick="createProfile()" title="新建档案">+</button>';
     document.getElementById('tabsRow').innerHTML = tabsHtml;
@@ -843,10 +843,10 @@
         var isCollected = collected.has(cardId);
         if (isCollected) suitCount++;
         var bg = getBgClass(rank);
-        cardsHtml += '<div class="card ' + bg + ' ' + (isCollected ? 'collected' : 'uncollected') + '" onclick="toggleCard(\'' + cardId + '\')" title="' + suit.name + rank + '">'
+        cardsHtml += '<button type="button" aria-pressed="' + isCollected + '" data-card-id="' + cardId + '" class="card ' + bg + ' ' + (isCollected ? 'collected' : 'uncollected') + '" onclick="toggleCard(\'' + cardId + '\')" aria-label="' + suit.name + rank + '" title="' + suit.name + rank + '">'
                    + '<span class="rank">' + rank + '</span>'
                    + '<span class="suit">' + suit.symbol + '</span>'
-                   + '</div>';
+                   + '</button>';
       });
       html += '<div class="suit-group suit-' + suit.id + '">'
             + '<div class="suit-header">'
@@ -864,9 +864,9 @@
     JOKERS.forEach(function(joker) {
       var isCollected = collected.has(joker.id);
       if (isCollected) jokerCount++;
-      jokersHtml += '<div class="card joker ' + joker.bgClass + ' ' + (isCollected ? 'collected' : 'uncollected') + '" onclick="toggleCard(\'' + joker.id + '\')" title="' + joker.label + '">'
+      jokersHtml += '<button type="button" aria-pressed="' + isCollected + '" data-card-id="' + joker.id + '" class="card joker ' + joker.bgClass + ' ' + (isCollected ? 'collected' : 'uncollected') + '" onclick="toggleCard(\'' + joker.id + '\')" aria-label="' + joker.label + '" title="' + joker.label + '">'
                   + '<span class="rank">' + joker.label + '</span>'
-                  + '</div>';
+                  + '</button>';
     });
     html += '<div class="suit-group suit-joker">'
           + '<div class="suit-header">'
@@ -885,6 +885,8 @@
     div.textContent = str;
     return div.innerHTML;
   }
+
+  document.getElementById('batchModal').addEventListener('cancel', function(event) { event.preventDefault(); closeBatchModal(); });
 
   // ===== 初始化 =====
   loadState();

@@ -157,6 +157,7 @@
 .oui-tab { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--orbit-text-secondary); min-height: var(--orbit-touch-target); padding: var(--orbit-space-2) var(--orbit-space-1); font: inherit; font-size: var(--orbit-type-body); cursor: pointer; }
 .oui-tab:hover { color: var(--orbit-text); }
 .oui-tab[data-active] { color: var(--orbit-brand); border-bottom-color: var(--orbit-brand); font-weight: 600; }
+.oui-tab[data-disabled] { opacity: 0.5; cursor: not-allowed; }
 .oui-tab-panel { padding-top: var(--orbit-space-6); }
 .oui-positioner { z-index: var(--orbit-z-nested); max-width: calc(100vw - var(--orbit-space-6)); }
 .oui-menu { box-sizing: border-box; min-width: 180px; max-width: min(360px, calc(100vw - var(--orbit-space-6))); max-height: min(400px, var(--available-height, 50dvh)); overflow-y: auto; padding: var(--orbit-space-1); border-radius: var(--orbit-radius-card); background: var(--orbit-elevated); color: var(--orbit-text); box-shadow: var(--orbit-shadow-overlay); font: var(--orbit-type-body)/1.5 var(--orbit-font-ui); outline: none; transform-origin: var(--transform-origin); }

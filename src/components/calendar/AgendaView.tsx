@@ -135,7 +135,12 @@ export function AgendaView({
         syncDateFromScroll();
       }, 140);
     };
-    const cancelProgrammaticScroll = () => {
+    const cancelProgrammaticScroll = (event: Event) => {
+      // Direct interaction takes over from navigation's smooth scroll. Otherwise a
+      // queued scroll event can dismiss a context menu just opened by the user.
+      if (event.type === 'pointerdown' || event.type === 'keydown') {
+        container.scrollTo({ top: container.scrollTop, behavior: 'instant' });
+      }
       programmaticScrollRef.current = false;
       if (programmaticScrollTimerRef.current != null) {
         window.clearTimeout(programmaticScrollTimerRef.current);

@@ -4,6 +4,24 @@ import { checkVisual } from './visual-check';
 
 const base = 'http://127.0.0.1:4187';
 test.describe.configure({ retries: 0 });
+
+for (const width of [390,1440]) test(`stage2 C4 five standalone tools ${width}: keyboard, persistence, import/export and isolated scrolling`, async ({context,page}) => {
+  test.setTimeout(60_000);
+  const token=await fixtureToken(context,'preview@example.invalid');await context.addInitScript(value=>localStorage.setItem('aicalendar_token',value),token);
+  await page.setViewportSize({width,height:width===390?844:900});const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  const capture=async(name:string)=>{expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await checkVisual(page,`stage2-tool-${name}-${width}.png`,false,false);};
+  await page.goto(base+'/tools/poker-tracker/');const card=page.getByRole('button',{name:'黑桃A',exact:true});await expect(card).toHaveAttribute('aria-pressed','false');await card.focus();await page.keyboard.press('Space');await expect(card).toHaveAttribute('aria-pressed','true');await expect(card).toBeFocused();await expect(page.locator('#progressCount')).toHaveText('1');
+  const state=await page.evaluate(()=>localStorage.getItem('poker-tracker-v2'));const download=page.waitForEvent('download');await page.getByRole('button',{name:'导出',exact:true}).click();const file=await download;expect(file.suggestedFilename()).toMatch(/\.json$/);const stream=await file.createReadStream();const chunks:Buffer[]=[];for await(const chunk of stream!)chunks.push(Buffer.from(chunk));expect(JSON.parse(Buffer.concat(chunks).toString())).toEqual(JSON.parse(state!));
+  await page.reload();await expect(card).toHaveAttribute('aria-pressed','true');await capture('poker');
+  const batch=page.getByRole('button',{name:'批量识别',exact:true});await batch.click();await expect(page.getByRole('dialog',{name:'批量识别导入',exact:true})).toBeVisible();await expect(page.getByLabel('批量牌面文字',{exact:true})).toBeFocused();await page.setViewportSize({width,height:520});await page.getByRole('button',{name:'关闭批量识别',exact:true}).scrollIntoViewIfNeeded();await checkVisual(page,`stage2-tool-poker-batch-${width}.png`,false,false);await page.keyboard.press('Escape');await expect(batch).toBeFocused();
+  page.once('dialog',dialog=>dialog.accept());await page.locator('#importInput').setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer:Buffer.from(state!)});await expect(page.locator('#progressCount')).toHaveText('1');expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('poker-tracker-v2')!))).toEqual(JSON.parse(state!));
+  await page.setViewportSize({width,height:width===390?844:900});await page.goto(base+'/tools/pelican-bicycle/');const toggle=page.locator('#toggle');await toggle.click();await expect(toggle).toHaveAttribute('aria-pressed','true');await page.locator('#speed').fill('1.5');await expect(page.locator('#rate')).toHaveText('1.5×');await capture('pelican');
+  await page.goto(base+'/tools/evolution-slider/');await expect(page.locator('#strength')).toBeEnabled();await page.locator('#strength').focus();await page.keyboard.press('End');await expect(page.locator('#score')).toHaveText('+15.00');await expect(page.locator('[data-stage="5"]')).toHaveAttribute('aria-pressed','true');await page.locator('.reset').click();await expect(page.locator('#score')).toHaveText('−15.00');await capture('evolution');
+  await page.goto(base+'/tools/codex-usage-dashboard-v3-1/');await expect(page.locator('#statusBadge')).toHaveText('DEMO');await expect(page.locator('#sumEntries')).not.toHaveText('—');await page.locator('[data-r="7"]').click();await expect(page.locator('[data-r="7"]')).toHaveClass(/active/);await page.locator('#statMetric').selectOption('outputTokens');await capture('usage');
+  await page.goto(base+'/tools/alipay-growth-planner/');await expect(page.locator('#chart svg.main-svg').first()).toBeVisible({timeout:20_000});await expect(page.locator('#mMonthly')).not.toBeEmpty();await page.locator('#wealthAum').fill('30000');await page.getByRole('button',{name:'重新计算',exact:true}).click();await expect(page.locator('#statusBadge')).toContainText('30,000');page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'保存参数',exact:true}).click();await page.reload();await expect(page.locator('#wealthAum')).toHaveValue('30000');await capture('alipay');
+  const table=page.getByRole('region',{name:'成长值断点明细，可横向滚动',exact:true});await expect(table).toBeVisible();if(width===390)expect(await table.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
+  expect(errors).toEqual([]);
+});
 for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]) for (const theme of ['light', 'dark']) {
   test(`stage2 C1 ${width} ${theme}: reachable help, navigation and search rows`, async ({ context, page }) => {
     const token = await fixtureToken(context, 'preview@example.invalid');
@@ -49,6 +67,43 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }
+
+test('stage2 C4 admin failures, rollback, confirmation cancellation and manual log filters', async ({context,page}) => {
+  const token=await fixtureToken(context,'preview@example.invalid');
+  await context.addInitScript(value=>localStorage.setItem('aicalendar_token',value),token);
+  await page.setViewportSize({width:430,height:520});await page.goto(base+'/today');
+  await page.getByRole('button',{name:'个人菜单',exact:true}).click();await page.getByRole('dialog',{name:'个人菜单',exact:true}).getByRole('button',{name:'管理面板',exact:true}).click();
+  const admin=page.getByRole('dialog',{name:'管理面板',exact:true});
+  await admin.getByRole('button',{name:'管理账户 empty@example.invalid',exact:true}).filter({visible:true}).click();
+  const account=page.getByRole('dialog',{name:'empty@example.invalid · 账户管理',exact:true}),sharing=account.getByRole('switch',{name:'共享管理员 API',exact:true});
+  let failSharing=true,sharingWrites=0,dangerWrites=0;
+  await page.route('**/api/admin/users/preview-empty/api-share',route=>{sharingWrites++;return route.fulfill(failSharing?{status:503,json:{error:'合成共享更新失败'}}:{json:{enabled:true,adminApiAvailable:true}});});
+  await page.route('**/api/admin/users/preview-empty',route=>{if(route.request().method()==='DELETE')dangerWrites++;return route.continue();});
+  await page.route('**/api/admin/users/preview-empty/clear-data',route=>{dangerWrites++;return route.continue();});
+  await sharing.click();await expect(account.getByRole('alert')).toContainText('合成共享更新失败');await expect(sharing).not.toBeChecked();
+  failSharing=false;await sharing.click();await expect(sharing).toBeChecked();expect(sharingWrites).toBe(2);
+  await account.locator('summary').click();for(const name of ['清空数据','删除用户']){page.once('dialog',dialog=>dialog.dismiss());await account.getByRole('button',{name,exact:true}).click();}expect(dangerWrites).toBe(0);
+  await expect(account.getByRole('button',{name:'完成',exact:true})).toBeInViewport({ratio:1});await account.getByRole('button',{name:'完成',exact:true}).click();
+  let failLogs=false,clears=0;const requests:string[]=[];
+  await page.route('**/api/logs?**',route=>{requests.push(route.request().url());return route.fulfill(failLogs?{status:503,json:{error:'合成日志读取失败'}}:{json:{logs:[{timestamp:'2026-10-18T06:00:00Z',level:'info',category:'admin',message:'应保留的合成日志'}],total:1,max:2000}});});
+  await page.route('**/api/logs',route=>{if(route.request().method()==='DELETE'){clears++;return route.fulfill({status:503,json:{error:'合成清空失败'}});}return route.continue();});
+  await admin.getByRole('tab',{name:'调试日志',exact:true}).click();await expect(admin.getByText('应保留的合成日志',{exact:true})).toBeVisible();
+  await admin.getByRole('switch',{name:'自动刷新日志',exact:true}).click();
+  await admin.getByRole('combobox',{name:'日志级别筛选',exact:true}).click();await page.getByRole('option',{name:'错误',exact:true}).click();await expect.poll(()=>requests.some(url=>url.includes('level=error'))).toBe(true);
+  failLogs=true;await admin.getByRole('button',{name:'刷新',exact:true}).click();await expect(admin.getByRole('alert')).toContainText('合成日志读取失败');await expect(admin.getByText('应保留的合成日志',{exact:true})).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());await admin.getByRole('button',{name:'清空',exact:true}).click();await expect(admin.getByRole('alert')).toContainText('合成清空失败');await expect(admin.getByText('应保留的合成日志',{exact:true})).toBeVisible();expect(clears).toBe(1);
+  failLogs=false;await admin.getByRole('button',{name:'重试读取',exact:true}).click();await expect(admin.getByRole('alert')).toHaveCount(0);
+});
+
+test('stage2 C4 real login retry retains the protected tool destination; register errors never send mail', async ({context,page}) => {
+  await page.setViewportSize({width:390,height:844});await page.goto(base+'/login?next=%2Ftools%2Fpoker-tracker%2F');
+  await page.getByLabel('邮箱',{exact:true}).fill('empty@example.invalid');await page.getByLabel('密码',{exact:true}).fill('incorrect password');await page.getByRole('button',{name:'登录',exact:true}).click();
+  await expect(page.getByRole('alert')).toBeVisible();await expect(page.locator('form [tabindex="-1"]')).toBeFocused();
+  await page.getByLabel('密码',{exact:true}).fill('OrbitPreview123!');await page.getByRole('button',{name:'登录',exact:true}).click();await expect(page).toHaveURL(base+'/tools/poker-tracker/');await expect(page.locator('#cardGrid button')).toHaveCount(54);
+  await page.evaluate(()=>localStorage.removeItem('aicalendar_token'));await context.clearCookies();await page.goto(base+'/login');await page.getByRole('tab',{name:'注册',exact:true}).click();
+  let sends=0;await page.route('**/api/auth/send-register-code',route=>{sends++;return route.fulfill({status:503,json:{error:'合成发送失败'}});});
+  await page.getByRole('button',{name:'获取验证码',exact:true}).click();await expect(page.getByRole('alert')).toContainText('请先填写邮箱、密码和邀请码');expect(sends).toBe(0);
+});
 
 
 for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]) for (const theme of ['light', 'dark']) {
@@ -229,3 +284,29 @@ test('stage2 C3 configured email keeps guidance optional and a failed confirmati
   await page.getByRole('button',{name:'确认并创建',exact:true}).click();await expect(page.getByRole('alert')).toContainText('合成确认失败');await expect(page.getByLabel('标题',{exact:true})).toHaveValue('核对后的合成标题');
   failure=false;await page.getByRole('button',{name:'确认并创建',exact:true}).click();await expect(page.getByText('待办日程已创建',{exact:true})).toBeVisible();expect(attempts).toBe(2);
 });
+
+
+for (const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (const theme of ['light','dark']) {
+  test(`stage2 C4 ${width} ${theme}: authentication, calendar views, administration and tools`, async ({context,page}) => {
+    await context.addInitScript(value=>localStorage.setItem('theme',value),theme);
+    await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
+    await page.setViewportSize({width,height});const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+    const capture=async(name:string)=>{expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await checkVisual(page,`stage2-${name}-${width}-${theme}.png`,false,false);};
+    await page.goto(base+'/login');await expect(page.getByRole('button',{name:'登录',exact:true})).toBeVisible();
+    await expect.poll(()=>page.locator('form button[type=submit]').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe(theme==='dark'?'rgb(147, 183, 255)':'rgb(37, 99, 235)');await capture('login');
+    await page.getByRole('tab',{name:'注册',exact:true}).click();await expect(page.getByLabel('确认密码',{exact:true})).toBeVisible();await capture('register');
+    await page.getByRole('button',{name:'完成注册',exact:true}).scrollIntoViewIfNeeded();await expect(page.getByRole('button',{name:'完成注册',exact:true})).toBeInViewport({ratio:1});
+    const token=await fixtureToken(context,'preview@example.invalid');await context.addInitScript(value=>localStorage.setItem('aicalendar_token',value),token);
+    await page.goto(base+'/schedule');await expect(page.getByRole('group',{name:'日历视图',exact:true})).toBeVisible();
+    for(const [label,key] of [['日程','agenda'],['日','day'],['周','week'],['月','month']]){const button=page.getByRole('button',{name:`切换到${label}视图`,exact:true});await button.click();await expect(button).toHaveAttribute('aria-pressed','true');await expect(page.locator('.calendar-content-'+key)).toBeVisible();await capture('calendar-'+key);}
+    await page.getByRole('button',{name:'切换到日程视图',exact:true}).click();const card=page.locator('.agenda-view [data-schedule-id]').first();await expect(card).toBeVisible();await card.focus();await page.keyboard.press('Shift+F10');
+    const menu=page.getByRole('menu',{name:/的日程操作$/});await expect(menu).toBeVisible();await expect(menu.getByRole('menuitem').first()).toBeFocused();await page.keyboard.press('End');await expect(menu.getByRole('menuitem',{name:'删除日程',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(card).toBeFocused();
+    await page.getByRole('button',{name:'添加日程',exact:true}).click();await expect(page.getByLabel('日程标题',{exact:true})).toBeVisible();await capture('calendar-form');await page.getByRole('button',{name:'关闭日程编辑',exact:true}).click();
+    await page.getByRole('button',{name:'个人菜单',exact:true}).click();await page.getByRole('menuitem',{name:'管理面板',exact:true}).or(page.getByRole('dialog',{name:'个人菜单',exact:true}).getByRole('button',{name:'管理面板',exact:true})).click();
+    const admin=page.getByRole('dialog',{name:'管理面板',exact:true}),manage=admin.getByRole('button',{name:'管理账户 preview@example.invalid',exact:true}).filter({visible:true});await expect(manage).toBeEnabled();await capture('admin-users');
+    await manage.click();const detail=page.getByRole('dialog',{name:'preview@example.invalid · 账户管理',exact:true});await expect(detail.getByRole('combobox',{name:'账户角色',exact:true})).toBeDisabled();await detail.locator('summary').click();await expect(detail.getByRole('button',{name:'删除用户',exact:true})).toBeDisabled();await capture('admin-account');await detail.getByRole('button',{name:'完成',exact:true}).click();await expect(manage).toBeFocused();
+    await admin.getByRole('tab',{name:'邀请码',exact:true}).click();await expect(admin.getByRole('heading',{name:'邀请码管理',exact:true})).toBeVisible();await capture('admin-invites');
+    await admin.getByRole('tab',{name:'调试日志',exact:true}).click();await expect(admin.getByRole('combobox',{name:'日志级别筛选',exact:true})).toBeVisible();await expect(admin.getByText('正在读取日志…',{exact:true})).toHaveCount(0);await capture('admin-logs');await page.getByRole('button',{name:'关闭管理面板',exact:true}).click();
+    await page.goto(base+'/tools');await expect(page.locator('[data-tool-slug]')).toHaveCount(5);await capture('tools');expect(errors).toEqual([]);
+  });
+}
