@@ -10,11 +10,11 @@
 
 | 区域 | 当前事实与问题 | 目标、影响与验证重点 | 优先级 / 状态 |
 | --- | --- | --- | --- |
-| 视觉基础 | design/ui/Gallery 已建立，旧区域尚有 TDesign | A 已批准；Windows Chromium 黄金图已启用，Linux 待补 | P1 / A 已确认 |
-| 设置入口 | 统一 /settings/* 八分类与账户内资料页；旧模块入口重定向 | 统一路由与共享状态已落地，旧容器/编辑器已删除；待 C | P1 / 迁移中 |
-| 设置数据 | SettingsState 单一持有 Cloud 快照/版本和通知 preference | 父路由单一所有者、领域草稿/版本冲突保护 | P0 / 待 C |
+| 视觉基础 | design/ui/Gallery 已建立，旧区域尚有 TDesign | A/B/C 已批准；Windows 全部比较启用，Linux 待补 | P1 / 本地收口 |
+| 设置入口 | 统一 /settings/* 八分类与账户内资料页；旧模块入口重定向 | 统一路由与共享状态已落地，旧容器/编辑器已删除 | P1 / C 已确认 |
+| 设置数据 | SettingsState 单一持有 Cloud 快照/版本和通知 preference | 父路由单一所有者、领域草稿/版本冲突保护 | P0 / C 已确认 |
 | 账号安全 | 改密、共享认证、账户/头像页已实现 | CAS/持久化/失效/独立授权已本地验证；B 已批准 | P0 / B 已确认 |
-| Shell/搜索 | AppShell 六入口、账户 Menu、GlobalSearch 已复用 ui；帮助入口已补齐 | 统一入口、焦点/主题/公共控件，保留六业务导航 | P2 / 待 C |
+| Shell/搜索 | AppShell 六入口、账户 Menu、GlobalSearch 已复用 ui；设置搜索只留顶栏，手机图标展开 | 统一入口、焦点/主题/公共控件，保留六业务导航 | P2 / C 与页头已确认 |
 | AI/记事/附件 | AiSchedulePanel、useOrbitChat、NoteBoard、附件 hooks | 沿现有状态机提取呈现；保留确认/队列/取消/草稿 | 后续第 1 批 |
 | 周期/今日 | ReminderPage、ActionCenterPage、OrbitDialog | 表单/完成/部分成功/恢复，不混入领域重写 | 后续第 2 批 |
 | 知识/经历 | library 子模块、阅读与确认保存 | 列表/详情/筛选/编辑，保护引用、隔离、阅读恢复 | 后续第 3 批 |
@@ -29,7 +29,7 @@
 | 临时实现 | 现有使用方 | 删除条件 |
 | --- | --- | --- |
 | design/legacy.css 的旧变量映射 | 未迁移业务 CSS/TDesign | 最后使用方迁移并验证后删除 |
-| TDesign/icons/main 全局样式 | 现行设置、Admin、Login 等 | 全部调用方退出后删除依赖与覆盖 |
+| TDesign/icons/main 全局样式 | 未迁移业务、Admin、Login 等 | 全部调用方退出后删除依赖与覆盖 |
 | 原 OrbitDialog/CompactFilterSheet/SegmentedControl | 周期/今日、筛选、聊天 | 对应批次迁入 ui 后删除原实现 |
 | 旧设置 URL/ID 适配 | 搜索、AI action、历史链接 | 合同兼容保留 URL 映射；旧容器和旧基础控件已删除 |
 | ui:lint 历史基线 | 未迁移控件和样式 | 随迁移减少，禁止新区域例外和 CI 自动扩充 |

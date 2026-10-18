@@ -12,7 +12,7 @@
 
 首次本机运行可用 `npx playwright install chromium`；如已有 Edge，可在 PowerShell 进程级设置 `$env:ORBIT_BROWSER_CHANNEL='msedge'`。CI 固定安装锁定版本 Chromium，远端 CI 结果必须在 push 后另行核对，不能由本机通过推定。
 
-截图/trace 默认写系统临时目录，可用 ORBIT_UI_QA_DIR 指定。用户于 2026-10-18 批准 A，`tests/ui/visual-policy.json` 已启用 Gallery 比较；锁定 Playwright Chromium 的 Windows 24 张黄金图已建立并通过比较。账户页在 B 批准前仍只采集候选。缺少批准截图会失败，更新必须显式 `--update-snapshots=all` 并审阅差异；CI 不自动更新。Windows/Linux 基线分开，阈值在 Playwright 配置中维护，不能调大掩盖漂移。当前没有可用本机 Linux 环境，Linux 黄金图与中文字体的实际 CI 核验留在发布前完成；未解决时不能宣布 CI/发布就绪。
+截图/trace 默认写系统临时目录，可用 ORBIT_UI_QA_DIR 指定。用户于 2026-10-18 批准 A/B/C 及页头调整，`tests/ui/visual-policy.json` 已启用 Gallery、账户、分类、帮助和页头比较。Windows 已建立 122 张黄金图；缺少批准截图会失败，首次建库只能显式 `--update-snapshots=missing`，已有图更新须审阅差异并显式操作。CI 不更新基线。Windows/Linux 分开，阈值在 Playwright 配置中维护，不能调大掩盖漂移。Linux 候选/中文字体与远端 CI 核验待首次获准 push 后完成；未解决时不能宣布 CI/发布就绪。候选采集与批准流程见[本轮收口](#2026-10-18-批准基线与第一轮收口)。
 
 `npm run ui:lint` 检查绕过组件入口、裸基础控件、硬编码颜色/圆角/层级、inline 视觉和页面覆盖。历史基线按文件/规则/代码指纹/次数限制；新增副本和改写不能借用旧配额，ui/design/dev/features 不接受历史例外，CI 拒绝更新基线。`server/ui-lint.test.ts` 验证负向阻断；Calendar 显式 date-fns 依赖的本地日期边界单独回归。
 
@@ -524,3 +524,19 @@ Chrome既有登录会话中五项Tools菜单、V6.1版本标记/示例图表、�
 本地 typecheck、578/578 服务测试、48/48 Playwright、ui:lint（1089 存量、无新增）、Web/Electron build、生产 Gallery 排除及 diff 检查通过。390×844、430×932、768×1024、1440×900 明暗截图覆盖顶栏；新增键盘用例覆盖空结果、Escape/焦点返回、深链接定位/聚焦、返回原页面。既有未保存保护、跨页草稿和账户隔离继续回归。第一次新用例在 Escape 后对原值重复 fill，未触发新输入；改为清空后重新输入再完整重跑，产品断言未放宽。
 
 截图为本地合成账号的浏览器渲染，供用户复看；未验证实体手机软键盘、WebView 或生产外部服务。未 push、部署或发信。
+
+## 2026-10-18 批准基线与第一轮收口
+
+用户在 C 及顶部搜索/左箭头调整复看后授权继续。A/B/C 视觉方向已确认；本次不改页面视觉或业务，完成第一轮本地验收和发布准备。Windows 的 122 张批准截图覆盖 Gallery 24、账户正常/改密16、设置分类/日报两个页签/帮助72、页头8及搜索展开2。首次仅显式补缺图，不覆盖既有 A 图；随后普通模式严格比较 48/48 通过。
+
+当前验证：typecheck、578/578 服务测试、48/48 严格截图/交互测试、92 项业务 smoke、6 组原生弹窗 smoke、ui:lint（1089 存量、无新增）、Web/Electron build、Gallery 生产排除和 diff 检查通过。负向实验临时移除/替换一个本批新增基线：缺图、明显视觉变化均退出1，随后原字节恢复；未放宽阈值或更改业务来适配测试。原有已提交 Gallery 基线无修改。
+
+候选流程与正式比较分开：
+
+- 普通 `npm run test:ui` 必须匹配当前平台批准图；缺图/差异失败。
+- 在独立输出目录设置 `ORBIT_UI_VISUAL_CANDIDATES=1` 后显式运行同一套测试，只采集 PNG/JSON，不进行像素批准。JSON 包含候选标记、源码提交与 dirty 状态、应用版本、平台、浏览器、viewport、字体声明和图像 SHA-256；不包含真实数据。
+- 本地独立候选运行48/48通过，122张图及元数据/hash完整，采集前后已跟踪基线无变化；负向实验使用的本批新图已校验恢复原字节。该通过只说明候选采集及交互，不能替代普通比较。
+- CI 的普通 UI 步失败后，保留该失败，再启动新合成夹具采集全部候选到 `orbit-ui-candidates` artifact；失败差异留在 `orbit-ui-failures`。没有自动写入基线、提交、扩大阈值或让原失败变绿。
+- 首次获准 push 后，Linux 普通比较预期因缺基线而失败；按已确认方向审阅 Linux 候选、核对 workflow SHA/版本/平台/hash 后落库，再运行普通 CI。显式安装 Noto CJK 并输出中文字体匹配；其实际效果、Actions条件和远端运行均尚未执行，不能由 YAML 检查推定通过。
+
+本地证据不是生产、实体手机/WebView、真实模型/邮箱/FCM/CalDAV、自然授权续期或收件箱验收。当前未 push/main/Release/部署/发信。后续业务迁移仍按 [台账](FRONTEND-DEBT.md) 分批，不把此轮 Settings/Shell 完成写成全站 TDesign 已退出。

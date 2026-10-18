@@ -52,10 +52,33 @@ jobs:
       - name: Install UI test browser
         run: npx playwright install --with-deps chromium
 
+      - name: Install and verify Chinese UI font
+        run: |
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-match ':lang=zh-cn'
+
       - name: UI interactions and layout
+        id: ui
         env:
           ORBIT_UI_QA_DIR: ${{ runner.temp }}/orbit-ui-tests
         run: npm run test:ui
+
+      # Preserve the failed comparison. A separate fresh fixture captures ALL
+      # candidates for review without writing baselines or making CI pass.
+      - name: Capture visual candidates after a failed comparison
+        if: failure() && steps.ui.outcome == 'failure'
+        env:
+          ORBIT_UI_QA_DIR: ${{ runner.temp }}/orbit-ui-candidates
+          ORBIT_UI_VISUAL_CANDIDATES: '1'
+        run: npm run test:ui
+
+      - name: Upload unapproved visual candidates
+        if: failure() && steps.ui.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-ui-candidates
+          path: ${{ runner.temp }}/orbit-ui-candidates
+          retention-days: 7
 
       - name: Upload UI failure evidence
         if: failure()

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
+import { checkVisual } from './visual-check';
 
 test('shared shell navigation and account menu expose selection, metadata and keyboard behavior without API calls', async ({ page }) => {
   const calls: string[] = []; page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) calls.push(request.url()); });
@@ -32,9 +33,7 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await expect(page.locator('h1')).toBeVisible();
         const name = `gallery-${view}-${width}-${theme}.png`;
-        // Checkpoint captures are candidates. Comparison becomes blocking only after approval.
-        if (visualPolicy.galleryApproved || process.env.ORBIT_UI_VISUAL === 'compare') await expect(page).toHaveScreenshot(name, { fullPage: true });
-        else await page.screenshot({ path: test.info().outputPath(name), fullPage: true, animations: 'disabled' });
+        await checkVisual(page, name, visualPolicy.galleryApproved);
       }
       expect(errors).toEqual([]);
       expect(apiCalls).toEqual([]);

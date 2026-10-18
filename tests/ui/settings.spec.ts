@@ -1,6 +1,7 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
 import fs from 'node:fs';
 import { fixtureToken } from './auth-fixture';
+import { checkVisual } from './visual-check';
 const base = 'http://127.0.0.1:4187';
 const visualPolicy = JSON.parse(fs.readFileSync(new URL('./visual-policy.json', import.meta.url), 'utf8')) as { settingsApproved?: boolean };
 test.describe.configure({ retries: 0 });
@@ -15,7 +16,7 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
   test(`settings ${width} ${theme}: all categories use real pages and responsive controls`, async ({ context, page }) => {
     await login(context); await page.setViewportSize({ width, height }); await context.addInitScript(value => localStorage.setItem('theme', value), theme);
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-    const capture = async (name: string) => { if (visualPolicy.settingsApproved) await expect(page).toHaveScreenshot(name, { fullPage: true }); else await page.screenshot({ path: test.info().outputPath(name), fullPage: true, animations: 'disabled' }); };
+    const capture = (name: string) => checkVisual(page, name, !!visualPolicy.settingsApproved);
     await page.goto(base + '/settings/account');
     const topbar = page.locator('.settings-workspace-topbar'), back = topbar.getByRole('link', { name: '返回 Orbit', exact: true });
     await expect(back).toBeVisible(); await expect(back).toHaveText('');
@@ -36,7 +37,7 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
       const invalidControls = await page.locator('input, button, [role=switch], [role=combobox]').evaluateAll(elements => elements.filter(element => element.getClientRects().length && getComputedStyle(element).fontSize === '0px').length);
       expect(invalidControls).toBe(0);
       await capture(`settings-${category}-${width}-${theme}.png`);
-      if (category === 'notifications') await page.screenshot({ path: test.info().outputPath(`settings-header-${width}-${theme}.png`), fullPage: false, animations: 'disabled' });
+      if (category === 'notifications') await checkVisual(page, `settings-header-${width}-${theme}.png`, !!visualPolicy.settingsApproved, false);
       if (category === 'reports') {
         await page.getByRole('tab', { name: '接收与邮件', exact: true }).click(); await page.waitForLoadState('networkidle');
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -78,7 +79,7 @@ for (const width of [390, 1440]) test(`header search ${width}: keyboard, empty r
   await input.fill('没有这个设置的合成关键词'); await expect(page.getByRole('status').filter({ hasText: '没有匹配的设置项' })).toBeVisible();
   await input.fill('备份密码'); await expect(page.getByRole('listbox', { name: '设置搜索结果', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: test.info().outputPath(`settings-header-search-${width}-dark.png`), fullPage: false });
+  await checkVisual(page, `settings-header-search-${width}-dark.png`, !!visualPolicy.settingsApproved, false);
   await input.press('Escape');
   if (width < 768) { await expect(trigger).toBeFocused(); await expect(input).toHaveCount(0); await trigger.click(); }
   else { await expect(input).toBeFocused(); await expect(page.getByRole('listbox', { name: '设置搜索结果', exact: true })).toHaveCount(0); }

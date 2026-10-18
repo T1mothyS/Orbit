@@ -2,6 +2,7 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import sharp from 'sharp';
 import { fixtureToken } from './auth-fixture';
+import { checkVisual } from './visual-check';
 const base = 'http://127.0.0.1:4187';
 // Mutating fixtures are not replayed against already changed credentials on retry.
 test.describe.configure({ retries: 0 });
@@ -40,8 +41,7 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
       await expect(page.getByText('preview@example.invalid', { exact: true })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       const name = `account-${state}-${width}-${theme}.png`;
-      if (policy.settingsApproved) await expect(page).toHaveScreenshot(name, { fullPage: true });
-      else await page.screenshot({ path: test.info().outputPath(name), fullPage: true, animations: 'disabled' });
+      await checkVisual(page, name, !!policy.settingsApproved);
     }
     if (width < 768) {
       for (const name of ['更新并重新登录', '取消', '退出当前登录']) {

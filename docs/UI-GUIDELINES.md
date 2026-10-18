@@ -4,7 +4,7 @@
 
 ## Orbit UI 统一迁移与 Agent Change Playbook
 
-Status: 进行中；2026-10-18 用户确认 Checkpoint A/B，Settings V3 主要页面待 C。`src/design/` 是 token 值来源，`src/ui/` 是新基础控件唯一入口；`/dev/ui` 是不读取账号数据的开发 Gallery，正式构建不包含。下方历史 TDesign/class 规则仅适用于未迁移区域。迁移去向及退出条件见 [前端台账](FRONTEND-DEBT.md)。
+Status: 第一轮本地收口；2026-10-18 用户确认 A/B/C 及页头调整后继续验收。`src/design/` 是 token 值来源，`src/ui/` 是新基础控件唯一入口；`/dev/ui` 是不读取账号数据的开发 Gallery，正式构建不包含。下方历史 TDesign/class 规则仅适用于未迁移区域。迁移去向及退出条件见 [前端台账](FRONTEND-DEBT.md)，平台截图和发布闸门见 [测试矩阵](TEST-MATRIX.md#2026-10-18-批准基线与第一轮收口)。
 
 1. **先定位：** 阅读 [PROJECT-MAP](../PROJECT-MAP.md)、本文、目标领域合同和测试。普通改动应只需 ui 与目标 feature，不以通读 App/全部 CSS 为前提。
 2. **控件入口：** 从 `src/ui` 引用，不直接依赖 Base UI/TDesign 或它们的类型，不复制控件和浮层生命周期。
