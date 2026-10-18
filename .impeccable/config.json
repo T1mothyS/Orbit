@@ -19,6 +19,24 @@
         ],
         "createdAt": "2026-10-17T16:02:19.151Z",
         "reason": "Agent reviewed: the remaining occurrence is .chat-markdown blockquote, a semantic quotation marker rather than a decorative card accent; unused tool-detail-card and pulse-border were removed after a repository-wide caller search."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/components/library/library.css"
+        ],
+        "createdAt": "2026-10-18T08:07:04.032Z",
+        "reason": "Agent reviewed: the only detected occurrence is .library-markdown blockquote, a semantic Markdown quotation marker. git blame dates it to 4fa1fd62 before stage two; it is not a decorative card accent."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/styles/research.css"
+        ],
+        "createdAt": "2026-10-18T08:07:04.420Z",
+        "reason": "Agent reviewed: the only detected occurrence is .research-version-list li, a neutral component-stroke separator in the ordered confirmed-viewpoint history with timestamps. It predates stage two in f9a3ebb1 and is not a colored card accent."
       }
     ]
   }
