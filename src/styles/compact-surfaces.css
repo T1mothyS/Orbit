@@ -1,18 +1,6 @@
 /* Shared secondary surfaces: filtering, image viewing and clipboard fallback. */
 .mobile-filter-trigger { display:none !important; }
 .filter-count { display:inline-grid; place-items:center; min-width:18px; height:18px; padding:0 4px; border-radius:50px; background:var(--td-brand-color-light); color:var(--td-brand-color); font-size:11px; }
-.compact-sheet-overlay { display:flex; justify-content:center; align-items:center; padding:16px; background:rgb(15 23 42 / .32); }
-.compact-sheet { width:min(480px,100%); max-height:90dvh; display:flex; flex-direction:column; min-height:0; border:1px solid var(--td-component-stroke); border-radius:var(--orbit-radius-panel,12px); background:var(--td-bg-color-container); }
-.compact-sheet header { display:flex; align-items:center; gap:8px; padding:4px 12px; border-bottom:1px solid var(--td-component-stroke); flex-shrink:0; }
-.compact-sheet h2 { flex:1; margin:0; font-size:16px; font-weight:600; }
-.compact-sheet header button { width:44px; height:44px; display:grid; place-items:center; border-radius:var(--orbit-radius-control,8px); }
-.compact-sheet-body { min-height:0; overflow:auto; overscroll-behavior:contain; padding:12px; }
-.compact-sheet fieldset { border:0; padding:0; margin:0; display:grid; gap:12px; min-width:0; }
-.compact-sheet label { display:grid; gap:6px; font-size:13px; }
-.compact-sheet select { width:100%; min-width:0; min-height:44px; padding:8px 12px; border-radius:var(--orbit-radius-control,8px); border:1px solid var(--td-component-stroke); background:var(--td-bg-color-container); color:inherit; font-size:16px; }
-.compact-sheet footer { display:flex; justify-content:flex-end; gap:8px; padding:8px 12px max(8px,env(safe-area-inset-bottom)); border-top:1px solid var(--td-component-stroke); flex-shrink:0; }
-.compact-sheet footer button { min-height:44px; }
-.compact-sheet footer button:first-child { margin-right:auto; }
 .compact-filter-hint,.note-copy-sheet p { font-size:12px; color:var(--td-text-color-secondary); line-height:1.6; margin:0; }
 .library-filters label { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--td-text-color-secondary); }
 .report-view-status { display:inline-block; margin-top:4px; color:var(--td-text-color-secondary); font-size:12px; }
@@ -36,9 +24,10 @@
 @media(max-width:767px) {
   .mobile-filter-trigger { display:inline-flex !important; align-items:center; gap:6px; }
   .desktop-filters { display:none !important; }
-  .compact-sheet-overlay { align-items:flex-end; padding:0; }
-  .compact-sheet { width:100%; max-height:85dvh; border-radius:16px 16px 0 0; border-bottom:0; }
   .note-image-actions { position:relative; width:132px; margin-left:-22px; }
   .note-image-actions button { min-width:44px; height:44px; }
   .note-images:has(.note-image-actions) { gap:44px; padding-inline:22px; }
 }
+.compact-filter-fields { border: 0; padding: 0; margin: 0; display: grid; gap: var(--orbit-space-4); min-width: 0; }
+.compact-filter-fields > label { display: grid; gap: var(--orbit-space-2); font-size: var(--orbit-type-secondary); min-width: 0; }
+.compact-filter-fields select { min-height: var(--orbit-touch-target); width: 100%; color: var(--orbit-text); background: var(--orbit-elevated); border: 1px solid var(--orbit-input-border); border-radius: var(--orbit-radius-control); padding: var(--orbit-space-2); font: inherit; }

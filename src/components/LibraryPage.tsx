@@ -1,4 +1,5 @@
 import { BookOpen, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { Button, ButtonLink, Select } from '../ui';
 import { CompactFilterSheet } from './CompactFilterSheet';
 import { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -103,23 +104,23 @@ function LibraryHomePage() {
 
   const filterCount = Number(type !== 'all') + Number(kind !== 'all') + Number(status !== 'active') + Number(sort !== DEFAULT_LIBRARY_SORT);
   const filterFields = (value: typeof pendingFilters, change: (value: typeof pendingFilters) => void, disabled = false) => <>
-    <label>类型<select value={value.type} disabled={disabled} onChange={event => change({ ...value, type: event.target.value as typeof type })} aria-label="筛选内容类型"><option value="all">全部类型</option>{(Object.keys(typeLabels) as LibraryType[]).map(option => <option key={option} value={option}>{typeLabels[option]}</option>)}</select></label>
-    <label>形态<select value={value.kind} disabled={disabled} onChange={event => change({ ...value, kind: event.target.value as typeof kind })} aria-label="筛选内容形态"><option value="all">全部形态</option><option value="article">正式知识</option><option value="fragment">知识碎片</option></select></label>
-    <label>状态<select value={value.status} disabled={disabled} onChange={event => change({ ...value, status: event.target.value as typeof status })} aria-label="筛选内容状态"><option value="active">有效内容</option><option value="draft">草稿</option><option value="archived">已归档</option><option value="all">全部状态</option></select></label>
-    <label>排序<select value={value.sort} disabled={disabled} onChange={event => change({ ...value, sort: event.target.value as LibrarySort })} aria-label="知识库排序">{(Object.keys(sortLabels) as LibrarySort[]).map(option => <option key={option} value={option}>{sortLabels[option]}</option>)}</select></label>
+    <label>类型<Select label="筛选内容类型" value={value.type} disabled={disabled} onValueChange={next => change({ ...value, type: (next || 'all') as typeof type })} options={[{value:'all',label:'全部类型'}, ...(Object.keys(typeLabels) as LibraryType[]).map(value => ({value,label:typeLabels[value]}))]} /></label>
+    <label>形态<Select label="筛选内容形态" value={value.kind} disabled={disabled} onValueChange={next => change({ ...value, kind: (next || 'all') as typeof kind })} options={[{value:'all',label:'全部形态'},{value:'article',label:'正式知识'},{value:'fragment',label:'知识碎片'}]} /></label>
+    <label>状态<Select label="筛选内容状态" value={value.status} disabled={disabled} onValueChange={next => change({ ...value, status: (next || 'active') as typeof status })} options={[{value:'active',label:'有效内容'},{value:'draft',label:'草稿'},{value:'archived',label:'已归档'},{value:'all',label:'全部状态'}]} /></label>
+    <label>排序<Select label="知识库排序" value={value.sort} disabled={disabled} onValueChange={next => change({ ...value, sort: (next || DEFAULT_LIBRARY_SORT) as LibrarySort })} options={(Object.keys(sortLabels) as LibrarySort[]).map(value => ({value,label:sortLabels[value]}))} /></label>
   </>;
 
   return (
-    <div className="library-page" ref={listRef} aria-busy={loading}>
+    <div className="oui-root library-page" ref={listRef} aria-busy={loading}>
       <header className="library-header">
         <div>
           <h1>知识库</h1>
           <p>阅读、回顾，连接你的知识。</p>
         </div>
         <div className="library-header-actions">
-          <Link className="library-primary-button" to="/library/experience">记录经历</Link>
-          <Link className="library-secondary-button" to="/library/settings">知识库设置</Link>
-          <button type="button" className="library-secondary-button mobile-filter-trigger" disabled={!sortPreferenceReady || sortSaving} onClick={() => { setPendingFilters({ kind, type, status, sort }); setFiltersOpen(true); }}><SlidersHorizontal size={16} />筛选{filterCount > 0 && <span className="filter-count">{filterCount}</span>}</button>
+          <ButtonLink variant="primary" to="/library/experience">记录经历</ButtonLink>
+          <ButtonLink variant="quiet" to="/library/settings">知识库设置</ButtonLink>
+          <Button className="mobile-filter-trigger" disabled={!sortPreferenceReady || sortSaving} onClick={() => { setPendingFilters({ kind, type, status, sort }); setFiltersOpen(true); }}><SlidersHorizontal size={16} />筛选{filterCount > 0 && <span className="filter-count">{filterCount}</span>}</Button>
         </div>
       </header>
 

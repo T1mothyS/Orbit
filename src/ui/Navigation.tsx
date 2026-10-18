@@ -1,5 +1,10 @@
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, type LinkProps } from 'react-router-dom';
 import type { AnchorHTMLAttributes, ReactNode } from 'react';
+import type { ButtonProps } from './Button';
+
+export function ButtonLink({ variant = 'secondary', className = '', ...props }: LinkProps & { variant?: ButtonProps['variant'] }) {
+  return <RouterLink {...props} className={`oui-button oui-button--${variant} oui-button--default ${className}`} />;
+}
 
 export function TextLink({ to, state, children }: { to: string; state?: unknown; children: ReactNode }) {
   return <RouterLink to={to} state={state} className="oui-text-link">{children}</RouterLink>;

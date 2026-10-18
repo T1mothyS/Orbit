@@ -5,6 +5,7 @@ import { APP_CONFIG } from '../config';
 import { getStoredAuthHeaders } from '../hooks/useAuth';
 import { architectureChanges, type EvolutionData, type EvolutionMilestone, type EvolutionSnapshot } from '../types/project-evolution';
 import '../styles/project-evolution.css';
+import { ActionRow, Button } from '../ui';
 import { UsageStatisticsView } from '../components/UsageStatisticsView';
 
 const day = (date: string) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Hong_Kong', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
@@ -31,7 +32,6 @@ function ProjectEvolutionContent() {
   const [copyStatus, setCopyStatus] = useState('');
   const heading = useRef<HTMLHeadingElement>(null);
   const track = useRef<HTMLDivElement>(null);
-  const mobileTrack = useRef<HTMLOListElement>(null);
   useEffect(() => { heading.current?.focus(); }, []);
   useEffect(() => {
     const controller = new AbortController();
@@ -66,9 +66,7 @@ function ProjectEvolutionContent() {
     const frame = requestAnimationFrame(() => {
       const container = track.current;
       const selected = container?.querySelector<HTMLElement>('.is-selected');
-      if (container && selected) container.scrollLeft += selected.getBoundingClientRect().left - container.getBoundingClientRect().left - container.clientWidth / 2 + selected.clientWidth / 2;
-      const mobile = mobileTrack.current, item = mobile?.querySelector<HTMLElement>('[aria-pressed=true]');
-      if (mobile && item) mobile.scrollTop += item.getBoundingClientRect().top - mobile.getBoundingClientRect().top - mobile.clientHeight / 2 + item.clientHeight / 2;
+      if (container && selected && container.clientHeight) container.scrollTop += selected.getBoundingClientRect().top - container.getBoundingClientRect().top - container.clientHeight / 2 + selected.clientHeight / 2;
     });
     return () => cancelAnimationFrame(frame);
   }, [milestone?.id, view]);
@@ -86,20 +84,21 @@ function ProjectEvolutionContent() {
       {invalid && <p role="status" className="evolution-notice">链接中的选择无效，已显示最新收录的成长历程。<button onClick={() => select(milestone.id, 'growth')}>重置链接</button></p>}
       <div className="evolution-selection"><label htmlFor="evolution-milestone">当前里程碑</label><select id="evolution-milestone" value={milestone.id} onChange={e => select(e.target.value)}>{data.milestones.map(m => <option value={m.id} key={m.id}>{day(data.facts.find(f => f.id === m.id)!.date)} · {m.title}</option>)}</select></div>
       {view === 'growth' ? <>
-        <section className="evolution-timeline" aria-label="日期、版本和提交时间线">
-          <div className="evolution-track-labels"><span>日期</span><span>版本</span><span>提交</span></div>
-          <div className="evolution-track-scroll" ref={track} tabIndex={0} aria-label="按日期顺序排列，可横向滚动">{days.map(([date, entries]) => {
-            const expanded = entries.length === 1 || expandedDays.includes(date);
-            return <div className="evolution-day" key={date}>
-              {entries.length > 1 && <button className="evolution-day-toggle" onClick={() => setExpandedDays(v => v.includes(date) ? v.filter(d => d !== date) : [...v, date])} aria-expanded={expanded}>{date} · {entries.length} 项</button>}
-              <div className="evolution-day-items">{(expanded ? entries : [entries.find(m => m.id === milestone.id) ?? entries[entries.length - 1]]).map(m => { const f = data.facts.find(f => f.id === m.id)!; return <div className={`evolution-stop ${m.id === milestone.id ? 'is-selected' : ''}`} key={m.id}>{[date, f.version ? `V${f.version}` : '版本未记录', f.commit.slice(0, 7)].map((label, i) => <button key={i} aria-pressed={m.id === milestone.id} onClick={() => select(m.id)} aria-label={`${['日期', '版本', '提交'][i]} ${label}：${m.title}`}><i aria-hidden="true" />{label}</button>)}<p>{m.title}</p></div>; })}</div>
-            </div>;
-          })}</div>
-        </section>
-        <ol className="evolution-mobile-timeline" ref={mobileTrack} aria-label="成长时间线">{data.milestones.map(m => { const f = data.facts.find(f => f.id === m.id)!; return <li key={m.id}><button aria-pressed={milestone.id === m.id} onClick={() => select(m.id)}><span>{day(f.date)} · {f.version ? `V${f.version}` : '版本未记录'}</span><strong>{m.title}</strong><code>{f.commit.slice(0, 7)}</code></button></li>; })}</ol>
+        <div className="evolution-workbench">
+        <nav className="evolution-history" aria-label="成长时间线"><h2>里程碑</h2><div className="evolution-track-scroll" ref={track} tabIndex={0} aria-label="按日期顺序排列，可纵向滚动">{days.map(([date, entries]) => {
+          const expanded = entries.length === 1 || expandedDays.includes(date);
+          return <div className="evolution-day" key={date}>
+            {entries.length > 1 ? <Button variant="quiet" className="evolution-day-toggle" onClick={() => setExpandedDays(v => v.includes(date) ? v.filter(d => d !== date) : [...v, date])} aria-expanded={expanded}>{date} · {entries.length} 项 {expanded ? '收起' : '展开'}</Button> : <span className="evolution-day-date">{date}</span>}
+            <ol className="evolution-day-items">{(expanded ? entries : [entries.find(m => m.id === milestone.id) ?? entries[entries.length - 1]]).map(m => {
+              const f = data.facts.find(f => f.id === m.id)!;
+              return <li className={`evolution-stop ${m.id === milestone.id ? 'is-selected' : ''}`} key={m.id}><ActionRow aria-pressed={m.id === milestone.id} onClick={() => select(m.id)} title={m.title} description={<>{f.version ? `V${f.version}` : '版本未记录'} · <code>{f.commit.slice(0, 7)}</code></>} /></li>;
+            })}</ol>
+          </div>;
+        })}</div></nav>
         <article className="evolution-detail" aria-live="polite"><div className="evolution-detail-heading"><span className="evolution-eyebrow">{data.stages[milestone.stage]}</span><span>{day(fact.date)} · V{fact.version ?? '—'}</span></div><h2>{milestone.title}</h2><p className="evolution-summary">{milestone.summary}</p><button className="evolution-text-link" onClick={() => select(milestone.id, 'architecture')}>查看这一刻的系统结构 <ArrowUpRight size={16} /></button>
           <details><summary><GitCommitHorizontal size={17} /> 工程细节与证据</summary><p>{milestone.engineering}</p><dl><dt>实现提交</dt><dd><code>{fact.commit}</code> <button onClick={async () => { try { await navigator.clipboard.writeText(fact.commit); setCopyStatus('已复制提交哈希'); } catch { setCopyStatus('复制失败，请选择上方哈希手动复制'); } }}>复制</button><span role="status">{copyStatus}</span></dd><dt>版本依据</dt><dd>该提交的 package.json：{fact.version ?? '未记录'}；标签：{fact.tags.join('、') || '未记录'}。不据此推断发行或部署。</dd><dt>源码依据</dt><dd>{milestone.evidencePaths.join('、')}</dd><dt>验证记录</dt><dd>{milestone.tests ? `本地测试 ${milestone.tests.count} 项；${milestone.tests.evidence}` : '本地测试数量未记录'}；生产验证：本页未记录。</dd><dt>能力领域</dt><dd>{milestone.featureAreas.join(' · ')}</dd></dl>{fact.warnings.map(w => <p className="evolution-notice" key={w}>{w}</p>)}<p className="evolution-muted">历史版本保留当时原值，早期 1.0.0 与后续 0.x 不构成连续递增序列。</p></details>
         </article>
+        </div>
         <Metrics data={data} selectedId={milestone.id} />
       </> : <Architecture key={snapshot.id} data={data} current={snapshot} previous={prior} />}
       <footer className="evolution-footer">历史基于已收录提交整理 · 日期使用香港时区 · 页面不读取个人日程、邮件或知识内容</footer>

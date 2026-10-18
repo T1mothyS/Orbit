@@ -6,7 +6,7 @@ export { Card, Section, SettingRow, Badge, InlineNotice, Skeleton, LoadingState,
 export { Dialog, Sheet, ConfirmDialog, Menu, Tooltip, Popover } from './Overlay';
 export type { DialogProps, MenuItem } from './Overlay';
 export { ToastProvider, useToast } from './Toast';
-export { TextLink, IconLink, ExternalLink, NavigationItem } from './Navigation';
+export { TextLink, ButtonLink, IconLink, ExternalLink, NavigationItem } from './Navigation';
 export { FilePicker } from './FilePicker';
 export { Avatar } from './Avatar';
 export { ActionRow } from './ActionRow';

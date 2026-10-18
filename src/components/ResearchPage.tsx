@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Button } from '../ui';
 import { useAuth } from '../hooks/useAuth';
 
 interface ResearchRun {
@@ -40,6 +41,7 @@ async function responseError(response: Response): Promise<Error> {
 
 export function ResearchPage() {
   const { authHeaders } = useAuth();
+  const reviewHeading = useRef<HTMLHeadingElement>(null);
   const [runs, setRuns] = useState<ResearchRun[]>([]);
   const [proposals, setProposals] = useState<ThesisProposal[]>([]);
   const [versions, setVersions] = useState<ThesisVersion[]>([]);
@@ -107,24 +109,25 @@ export function ResearchPage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : '观点决定失败'); }
     finally { setBusy(false); }
   };
+  useEffect(() => { if (selected) reviewHeading.current?.focus(); }, [selected]);
   const selectedProposal = proposals.find(item => item.id === selected);
   const selectedRun = runs.find(item => item.id === selectedProposal?.runId);
 
   return (
-    <div className="research-page">
+    <div className="oui-root research-page">
       <header className="research-header">
         <div>
           <Link className="research-back" to="/reports"><ArrowLeft size={16} aria-hidden="true" />返回日报</Link>
           <h1>研究与观点</h1>
           <p>研究结果保留为历史记录。建议观点只是草稿，只有你的确认才会形成正式观点。</p>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading || busy} className="research-button">
+        <Button onClick={() => void load()} disabled={loading || busy}>
           <RefreshCw size={16} aria-hidden="true" />刷新
-        </button>
+        </Button>
       </header>
       {error && <div className="research-error" role="alert">{error}<button type="button" onClick={() => void load()}>重试</button></div>}
       {loading && !runs.length && !proposals.length ? <div className="research-state" role="status">正在加载研究记录…</div> : (
-        <div className="research-grid">
+        <div className={`research-grid${selectedProposal ? ' has-review' : ''}`}>
           <section aria-labelledby="research-history-title">
             <h2 id="research-history-title">研究历史</h2>
             {runs.length === 0 ? <div className="research-state">尚无研究记录。自动研究尚未接入真实 Agent。</div> : (
@@ -132,7 +135,7 @@ export function ResearchPage() {
                 {runs.map(run => <li key={run.id} className="research-card">
                   <div className="research-card-top"><strong>{run.subjectTitle}</strong><span>{runStatus[run.status]}</span></div>
                   <p>{run.question}</p>
-                  {run.resultBody && <div className="research-result">{run.resultBody}</div>}
+                  {run.resultBody && <details className="research-result"><summary>查看研究结果</summary><div>{run.resultBody}</div></details>}
                   <small>{dateTime(run.createdAt)}{run.eventRevisionId && <> · 事件修订 {run.eventRevisionId}</>}</small>
                 </li>)}
               </ol>
@@ -155,7 +158,7 @@ export function ResearchPage() {
             )}
           </section>
           {selectedProposal && <section className="research-review" aria-labelledby="research-review-title">
-            <h2 id="research-review-title">核对提案</h2>
+            <h2 ref={reviewHeading} tabIndex={-1} id="research-review-title">核对提案</h2>
             <p className="research-review-label">研究问题</p><p>{selectedRun?.question || '原研究记录不可用'}</p>
             <p className="research-review-label">研究结果</p><p>{selectedRun?.resultBody || '暂无结果'}</p>
             <p className="research-review-label">绑定的事件证据</p>
@@ -175,8 +178,8 @@ export function ResearchPage() {
               {versions.map(version => <li key={version.id}><span>{dateTime(version.confirmedAt)}</span><p>{version.body}</p></li>)}
             </ol>}
             {selectedProposal.status === 'draft' && <div className="research-actions">
-              <button type="button" disabled={busy || !historyReady} onClick={() => void decide(selectedProposal, 'confirm')} className="research-button primary">确认观点</button>
-              <button type="button" disabled={busy || !historyReady} onClick={() => void decide(selectedProposal, 'reject')} className="research-button">拒绝草稿</button>
+              <Button variant="primary" disabled={busy || !historyReady} onClick={() => void decide(selectedProposal, 'confirm')}>确认观点</Button>
+              <Button disabled={busy || !historyReady} onClick={() => void decide(selectedProposal, 'reject')}>拒绝草稿</Button>
             </div>}
           </section>}
         </div>

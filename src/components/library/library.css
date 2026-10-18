@@ -308,3 +308,20 @@
   .app-shell .library-card p { min-height:0; margin-bottom:0; -webkit-line-clamp:2; }
   .app-shell .library-card-footer { padding-top:0; margin-top:8px; }
 }
+
+/* The list remains a knowledge catalogue; bounded titles keep scanning predictable. */
+.app-shell .library-toolbar { padding-block: var(--orbit-space-3); border-block: 1px solid var(--orbit-border); }
+.app-shell .library-filters { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: var(--orbit-space-4); width: min(100%, 840px); }
+.app-shell .library-filters label { display: grid; gap: var(--orbit-space-1); min-width: 0; }
+.app-shell .library-grid { align-items: stretch; gap: var(--orbit-space-4); }
+.app-shell .library-card { min-height: 0; }
+.app-shell .library-card-open { height: 100%; }
+.app-shell .library-card h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin-block: var(--orbit-space-3) var(--orbit-space-2); }
+.app-shell .library-card p { -webkit-line-clamp: 2; min-height: 0; margin-bottom: 0; }
+.app-shell .library-card-tags { margin-top: var(--orbit-space-3); }
+.app-shell .library-card-footer { margin-top: var(--orbit-space-3); }
+@media (max-width: 767px) {
+  .app-shell .library-header { align-items: start; flex-wrap: wrap; }
+  .app-shell .library-header-actions { flex: 1 1 auto; justify-content: end; }
+  .app-shell .library-card { min-height: 0; }
+}

@@ -217,3 +217,11 @@
     gap: 4px;
   }
 }
+
+@media (min-width: 801px) {
+  .experience-layout.has-preview { grid-template-columns: minmax(280px, .85fr) minmax(0, 1.15fr); gap: var(--orbit-space-6); }
+  .experience-layout.has-preview .experience-messages { max-height: 360px; overflow-y: auto; padding-right: var(--orbit-space-2); }
+}
+.experience-preview { border-radius: var(--orbit-radius-card); }
+.experience-preview > h2 { margin-top: 0; }
+.experience-composer .experience-models label { margin-block: var(--orbit-space-3); }

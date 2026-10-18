@@ -315,3 +315,16 @@
   .daily-report-markdown .digest-v2--editorial .digest-v2-story-body > p:first-child { margin-top: 0 !important; }
   .daily-report-markdown .digest-v2--editorial .digest-v2-image-credit { margin-top: 8px !important; font-size: 12px !important; line-height: 1.6 !important; color: var(--td-text-color-secondary); opacity: 1 !important; }
 }
+
+/* History uses concise entries; the latest report retains its editorial lead. */
+.daily-report-history .daily-report-card { min-height: 0; border: 0; border-bottom: 1px solid var(--orbit-border); border-radius: 0; }
+.daily-report-history .daily-report-card-open { border-radius: 0; }
+.daily-report-history .daily-report-card-open:hover { background: var(--orbit-hover); }
+.daily-report-history .daily-report-card-body { padding: var(--orbit-space-4) var(--orbit-space-3); }
+.daily-report-history .daily-report-card p { flex: 0; margin: var(--orbit-space-2) 0; -webkit-line-clamp: 2; }
+.daily-report-history .daily-report-card-headline { font: 600 var(--orbit-type-body)/1.5 var(--orbit-font-ui); margin-top: var(--orbit-space-2); }
+.daily-report-history .daily-report-card-date { font-size: var(--orbit-type-body); font-weight: 600; }
+.daily-report-history .daily-reports-history-list { gap: 0; }
+.daily-report-history .daily-report-card-open.with-image { grid-template-columns: 104px minmax(0, 1fr); }
+.daily-report-history .daily-report-card-hero { width: 88px; height: 72px; margin: var(--orbit-space-4) 0 0 var(--orbit-space-2); border-radius: var(--orbit-radius-control); }
+.daily-report-history .daily-report-card-open.illustrated .daily-report-card-hero { height: auto; aspect-ratio: 3 / 1; }
