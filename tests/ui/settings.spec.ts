@@ -15,7 +15,7 @@ const categories = [['notifications', '通知与提醒'], ['ai', 'AI 与模型']
 for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]) for (const theme of ['light', 'dark']) {
   test(`settings ${width} ${theme}: all categories use real pages and responsive controls`, async ({ context, page }) => {
     // Visual fixtures own their saved state; parallel functional cases mutate other accounts.
-    await login(context, `preview-settings-${width}-${theme}`);
+    await login(context);
     await page.setViewportSize({ width, height }); await context.addInitScript(value => localStorage.setItem('theme', value), theme);
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     const capture = (name: string) => checkVisual(page, name, !!visualPolicy.settingsApproved);

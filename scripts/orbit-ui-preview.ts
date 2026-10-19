@@ -16,9 +16,9 @@ const {buildAiPlanSnapshot}=await import('../server/ai-plan.js');
 const stamp=new Date().toISOString(),uid='preview-owner';
 db.createUser({id:uid,email:'preview@example.invalid',password_hash:await bcrypt.hash('OrbitPreview123!',10),role:'admin',disabled:0,created_at:stamp,updated_at:stamp});
 db.createUser({id:'preview-empty',email:'empty@example.invalid',password_hash:await bcrypt.hash('OrbitPreview123!',10),role:'user',disabled:0,created_at:stamp,updated_at:stamp});
-if(accountUi) for(const id of ['preview-security','preview-avatar','preview-rate','preview-settings','preview-context','preview-notifications','preview-guards','preview-statistics',...['390','430','768','1440'].flatMap(width=>['light','dark'].map(theme=>`preview-settings-${width}-${theme}`))]) {
+if(accountUi) for(const id of ['preview-security','preview-avatar','preview-rate','preview-settings','preview-context','preview-notifications','preview-guards','preview-statistics']) {
   db.createUser({id,email:`${id}@example.invalid`,password_hash:await bcrypt.hash('OrbitPreview123!',10),role:'user',disabled:0,created_at:stamp,updated_at:stamp});
-  if(id.startsWith('preview-settings-')) db.upsertReminder({id:randomUUID(),user_id:id,enabled:0,hour:8,minute:0,reminder_email:'preview-settings@example.invalid',created_at:'2026-10-01T00:00:00.000Z',updated_at:'2026-10-01T00:00:00.000Z'});
+  if(id==='preview-settings') db.upsertReminder({id:randomUUID(),user_id:id,enabled:0,hour:8,minute:0,reminder_email:'preview-settings@example.invalid',created_at:'2026-10-01T00:00:00.000Z',updated_at:'2026-10-01T00:00:00.000Z'});
 }
 const cid=orbit.ensureDefaultConversation(uid);
 for(let i=0;i<12;i++)db.createAiScheduleMessage({id:randomUUID(),user_id:uid,conversation_id:cid,role:i%2?'assistant':'user',type:'text',content:i%2?'### 本周安排\n**重点**：先完成操作状态，再检查页面。\n- 上午 09:00 开会\n- 下午核对资料\n[官方来源](https://www.openai.com/)\n<script>这段内容只显示为文字</script>':'帮我整理一下本周安排。',intent:null,plan:null,schedule_items:null,created_at:new Date(Date.now()-600000+i*10000).toISOString()});
