@@ -7,7 +7,7 @@ import { APP_CONFIG } from '../config';
 import { getStoredAuthHeaders } from '../hooks/useAuth';
 import { architectureChanges, type EvolutionData, type EvolutionMilestone, type EvolutionSnapshot } from '../types/project-evolution';
 import '../styles/project-evolution.css';
-import { ActionRow, Button, IconButton } from '../ui';
+import { ActionRow, Button, IconButton, Tooltip } from '../ui';
 import { UsageStatisticsView } from '../components/UsageStatisticsView';
 
 const day = (date: string) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Hong_Kong', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
@@ -32,6 +32,7 @@ function ProjectEvolutionContent() {
   const [params, setParams] = useSearchParams();
   const reduced=useReducedMotion();
   const [playing,setPlaying]=useState(()=>!params.has('milestone')&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const [playbackRound,setPlaybackRound]=useState(0);
   const [autoIndex,setAutoIndex]=useState(0),[selection,setSelection]=useState(params.get('milestone')||'');
   const mapSection=useRef<HTMLElement>(null),motionVisible=useVisibleMotion(mapSection),linked=useRef(false);
 
@@ -68,9 +69,9 @@ function ProjectEvolutionContent() {
   const snapshotIndex = data?.snapshots.findIndex(s => s.id === snapshot?.id) ?? 0;
   const prior = data?.snapshots[snapshotIndex - 1];
   const additions=snapshot?.nodes.filter(n=>!prior?.nodes.some(old=>old.id===n.id)).length||0;
-  useEvolutionAdvance(snapshot?.id||'',playing&&motionVisible,3000+(reduced?0:600+additions*180),()=>setAutoIndex(index=>data?(index+1)%data.snapshots.length:0));
+  useEvolutionAdvance(`${snapshot?.id||''}:${playbackRound}`,playing&&motionVisible,3000+(reduced?0:600+additions*180),()=>setAutoIndex(index=>data?(index+1)%data.snapshots.length:0));
   const pause=()=>{setPlaying(false);if(milestone)setSelection(milestone.id);};
-  const togglePlayback=()=>{if(playing)pause();else{setAutoIndex(Math.max(0,snapshotIndex));setPlaying(true);const next=new URLSearchParams(params);next.delete('milestone');setParams(next,{replace:true});}};
+  const togglePlayback=()=>{if(playing)pause();else{setAutoIndex(Math.max(0,snapshotIndex));setPlaybackRound(round=>round+1);setPlaying(true);const next=new URLSearchParams(params);next.delete('milestone');setParams(next,{replace:true});}};
 
   useEffect(() => {
     if (!fact) return;
@@ -96,10 +97,10 @@ function ProjectEvolutionContent() {
       <div className="evolution-stats"><div><strong>{data.milestones.length}</strong><span>关键里程碑</span></div><div><strong>{new Set(data.milestones.flatMap(m => m.featureAreas)).size}</strong><span>能力领域</span></div><div><strong>{data.snapshots.length}</strong><span>架构快照</span></div><p>代码记录证明能力的演进。<br />生产部署与设备验收，需要各自的证据。</p></div>
       <nav className="evolution-stages" aria-label="成长阶段">{data.stages.map((stage, i) => <button key={stage} aria-pressed={milestone.stage === i} onClick={() => { const target = data.milestones.find(m => m.stage === i); if (target) select(target.id); }}><span>0{i + 1}</span>{stage}<ArrowUpRight size={14} /></button>)}</nav>
       <section id="evolution-architecture" data-playback-active={playing&&motionVisible} ref={mapSection} className="evolution-playback-section">
-      <header className="evolution-playback-header"><div><h2><Layers size={21}/>架构演化</h2><p>{playing?'沿着历史，看系统逐步连接。':'已定格，选择节点查看职责与连接。'}</p></div><div className="evolution-playback-actions"><span>{snapshotIndex+1} / {data.snapshots.length}</span>{playing?<IconButton label="暂停架构播放" variant="quiet" onClick={togglePlayback}><Pause size={17}/></IconButton>:<Button variant="quiet" leadingIcon={<Play size={16}/>} onClick={togglePlayback}>{reduced?'播放历史':'继续播放'}</Button>}</div></header>
+      <header className="evolution-playback-header"><div><h2><Layers size={21}/>架构演化</h2><p>{playing?'沿着历史，看系统逐步连接。':'已定格，选择节点查看职责与连接。'}</p></div><div className="evolution-playback-actions"><span>{snapshotIndex+1} / {data.snapshots.length}</span>{playing?<Tooltip content="暂停架构播放"><IconButton label="暂停架构播放" variant="quiet" onClick={togglePlayback}><Pause size={17}/></IconButton></Tooltip>:<Button variant="quiet" leadingIcon={<Play size={16}/>} onClick={togglePlayback}>{reduced?'播放历史':'继续播放'}</Button>}</div></header>
       <div className="evolution-playback-progress" aria-hidden="true"><span style={{transform:`scaleX(${(snapshotIndex+1)/data.snapshots.length})`}}/></div>
       {invalid && <p role="status" className="evolution-notice">链接中的选择无效，已显示最新收录记录。<Button variant="quiet" onClick={() => select(milestone.id)}>重置链接</Button></p>}
-      <div className="evolution-selection"><label htmlFor="evolution-milestone">当前里程碑</label><select id="evolution-milestone" value={milestone.id} onChange={e => select(e.target.value)}>{data.milestones.map(m => <option value={m.id} key={m.id}>{day(data.facts.find(f => f.id === m.id)!.date)} · {m.title}</option>)}</select></div>
+      <div className="evolution-selection" onPointerDownCapture={pause} onFocusCapture={pause}><label htmlFor="evolution-milestone">当前里程碑</label><select id="evolution-milestone" value={milestone.id} onChange={e => select(e.target.value)}>{data.milestones.map(m => <option value={m.id} key={m.id}>{day(data.facts.find(f => f.id === m.id)!.date)} · {m.title}</option>)}</select></div>
       <Architecture data={data} current={snapshot} previous={prior} playing={playing&&!reduced} motionActive={motionVisible} onPause={pause}/>
       </section>
       <section id="evolution-growth" className="evolution-growth-section"><h2>成长历程</h2>

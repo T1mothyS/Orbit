@@ -175,7 +175,8 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
     await checkVisual(page, `stage2-help-${width}-${theme}.png`, false, false);
     const frame = page.locator('.orbit-page-frame');
     await page.mouse.move(width / 2, height - 100); await page.mouse.wheel(0, 3000);
-    await expect(page.getByRole('link', { name: '返回对话', exact: true })).toBeInViewport();
+    await expect(page.locator('.orbit-help-page footer')).toBeInViewport();
+    await expect(page.getByRole('link',{name:'返回今日行动中心',exact:true})).toHaveAttribute('href','/today');
     await expect(page.getByRole('heading', { name: '账户与安全', exact: true })).toBeInViewport();
     expect(await frame.evaluate(el => el.scrollHeight > el.clientHeight ? el.scrollTop > 0 : true)).toBe(true);
     await page.getByRole('button', { name: '个人菜单', exact: true }).click();

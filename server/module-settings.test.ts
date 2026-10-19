@@ -1,3 +1,4 @@
+import { settingAction,navigationHref } from '../src/utils/navigation-actions.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { moduleSettingsPath } from '../src/utils/module-settings.js';
@@ -9,6 +10,11 @@ test('stable preference, publishing, export, source policy and mail links resolv
   for(const id of ['setting-daily-report-16vp9eg','setting-notifications-1ov9hhr'])assert.equal(moduleSettingsPath(id),'/settings/reports/delivery');
   assert.equal(moduleSettingsPath('statistics-filters'),'/settings/statistics');
   assert.equal(moduleSettingsPath('statistics-history'),'/settings/statistics/history');
+  const action=settingAction('settings-daily-report')!;
+  assert.equal(action.target,'settings.dailyReport');
+  assert.equal(action.label,'打开日报设置');
+  assert.equal(navigationHref(action),'/settings/reports/delivery?settings=settings-daily-report');
+  assert.equal(navigationHref({type:'navigate',target:'settings.dailyReport',settingId:'setting-daily-report-16vp9eg',label:'旧消息入口'}),'/settings/reports/delivery?settings=setting-daily-report-16vp9eg');
   assert.equal(moduleSettingsPath('setting-notifications-x4nqrq'),'/settings/notifications');
   for (const id of ['account', 'settings-account', 'account-password', 'setting-account-m2enu0', 'setting-account-3jrccd', 'setting-account-i5oc5l']) assert.equal(moduleSettingsPath(id), '/settings/account');
 });

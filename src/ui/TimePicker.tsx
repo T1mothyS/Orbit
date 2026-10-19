@@ -20,7 +20,16 @@ export function TimePicker({ value, onChange, label = '时间', disabled = false
   useEffect(() => { input.current?.setCustomValidity(valid ? '' : '请输入 00:00 至 23:59 的时间'); onValidityChange?.(valid); }, [valid, onValidityChange]);
   useLayoutEffect(() => {
     if (!open) return;
-    const place = () => { const anchor = trigger.current?.getBoundingClientRect(), popup = panel.current?.getBoundingClientRect(); if (anchor && popup) setPosition({ left: Math.max(8, Math.min(anchor.left, innerWidth - popup.width - 8)), top: anchor.bottom + popup.height + 4 < innerHeight ? anchor.bottom + 4 : Math.max(8, anchor.top - popup.height - 4) }); };
+    const place = () => {
+      const element=panel.current,anchor=trigger.current?.getBoundingClientRect(),popup=element?.getBoundingClientRect();
+      if(!element||!anchor||!popup)return;
+      const left=Math.max(8,Math.min(anchor.left,innerWidth-popup.width-8));
+      const top=anchor.bottom+popup.height+4<innerHeight?anchor.bottom+4:Math.max(8,anchor.top-popup.height-4);
+      // A transformed Popover positioner establishes the fixed panel's containing block.
+      const parent=element.offsetParent as HTMLElement|null,origin=parent?.getBoundingClientRect();
+      const scale=origin&&parent?.offsetWidth?origin.width/parent.offsetWidth:1;
+      setPosition(origin&&parent?{left:(left-origin.left)/scale+parent.scrollLeft-parent.clientLeft,top:(top-origin.top)/scale+parent.scrollTop-parent.clientTop}:{left,top});
+    };
     place(); hour.current?.focus({ preventScroll: true });
     const frame = requestAnimationFrame(() => {
       for (const list of [hour.current, minute.current]) {

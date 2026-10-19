@@ -61,11 +61,16 @@ test('account model preferences survive backup and preserve other preferences, l
     assert.equal(store.getAiSelection('preference-b'), null);
 });
 test('statistics defaults preserve other preferences and survive backup; legacy merge preserves and replace resets',()=>{
+    for(const id of ['statistics-a','statistics-b'])db.createUser({...users[0],id,email:id+'@example.invalid',password_hash:'synthetic'});
     const value={taskType:'todo',reportSource:'cloud'} as const;
     store.setAiPreference('statistics-a',true);store.setStatisticsFilters('statistics-a',value);
     assert.deepEqual(store.getStatisticsFilters('statistics-a'),value);assert.equal(store.getAiPreference('statistics-a'),true);
     assert.deepEqual(store.getStatisticsFilters('statistics-b'),{taskType:'all',reportSource:'all'});
     const snapshot=store.exportOrbit('statistics-a');store.restoreOrbit('statistics-b',snapshot,'merge',true);
+    assert.deepEqual(store.getStatisticsFilters('statistics-b'),value);
+    const encrypted=backup.createUserBackup('statistics-a','synthetic-statistics-backup');
+    store.setStatisticsFilters('statistics-b',{taskType:'all',reportSource:'all'});
+    backup.restoreUserBackup('statistics-b',encrypted,'synthetic-statistics-backup','merge');
     assert.deepEqual(store.getStatisticsFilters('statistics-b'),value);
     store.restoreOrbit('statistics-b',{conversations:[],messages:[],autoKnowledge:false},'merge');assert.deepEqual(store.getStatisticsFilters('statistics-b'),value);
     store.restoreOrbit('statistics-b',{conversations:[],messages:[],autoKnowledge:false},'replace');assert.deepEqual(store.getStatisticsFilters('statistics-b'),{taskType:'all',reportSource:'all'});
