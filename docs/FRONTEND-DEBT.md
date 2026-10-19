@@ -16,7 +16,7 @@
 | 账号安全 | 改密、共享认证、账户/头像页已实现 | CAS/持久化/失效/独立授权已本地验证；B 已批准 | P0 / B 已确认 |
 | Shell/搜索 | AppShell 六入口、账户 Menu、GlobalSearch 已复用 ui；设置搜索只留顶栏，手机图标展开 | 统一入口、焦点/主题/公共控件，保留六业务导航 | P2 / C1已实施，视觉待集中审阅 |
 | AI/记事/附件 | AiSchedulePanel、useOrbitChat、NoteBoard、附件 hooks | 沿现有状态机提取呈现；保留确认/队列/取消/草稿 | C3呈现收口/业务保留 |
-| 周期/今日 | ReminderPage、ActionCenterPage、OrbitDialog | 表单/完成/部分成功/恢复，不混入领域重写；周期新建/编辑追加紧凑Demo，低频项折叠、头脚与正文滚动分离 | C3已实施；紧凑Demo待用户确认，其他阶段未推进 |
+| 周期/今日 | ReminderPage、ActionCenterPage、OrbitDialog | 表单/完成/部分成功/恢复，不混入领域重写；周期新建/编辑采用已确认紧凑弹窗，低频项折叠、头脚与正文滚动分离 | C3与第三轮已实施；完整平台及服务器验收分层记录 |
 | 知识/经历 | library 子模块、阅读与确认保存 | 列表/详情/筛选/编辑，保护引用、隔离、阅读恢复 | C2已实施 |
 | 日报/研究/统计 | DailyReportsPage、ResearchPage、ProjectEvolutionPage | 保留 Local/Cloud、来源、投递合同，统一操作层 | C2已实施 |
 | Calendar | 已有 calendar 子模块，仍有复杂视图 | 按视图和状态拆分，日期/拖动/冲突专项回归 | C4/C5定向完成 |

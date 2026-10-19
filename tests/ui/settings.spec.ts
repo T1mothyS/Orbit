@@ -14,7 +14,9 @@ async function login(context: BrowserContext, actor = 'preview-settings') {
 const categories = [['notifications', '通知与提醒'], ['ai', 'AI 与模型'], ['reports', '日报'], ['library', '知识库'], ['integrations', '同步与集成'], ['data', '数据与备份'], ['advanced', '高级']] as const;
 for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]) for (const theme of ['light', 'dark']) {
   test(`settings ${width} ${theme}: all categories use real pages and responsive controls`, async ({ context, page }) => {
-    await login(context); await page.setViewportSize({ width, height }); await context.addInitScript(value => localStorage.setItem('theme', value), theme);
+    // Visual fixtures own their saved state; parallel functional cases mutate other accounts.
+    await login(context, `preview-settings-${width}-${theme}`);
+    await page.setViewportSize({ width, height }); await context.addInitScript(value => localStorage.setItem('theme', value), theme);
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     const capture = (name: string) => checkVisual(page, name, !!visualPolicy.settingsApproved);
     await page.goto(base + '/settings/account');
@@ -40,6 +42,10 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
       if (category === 'notifications') await checkVisual(page, `settings-header-${width}-${theme}.png`, !!visualPolicy.settingsApproved, false);
       if (category === 'reports') {
         await page.getByRole('tab', { name: '接收与邮件', exact: true }).click(); await page.waitForLoadState('networkidle');
+        await expect(page.getByRole('button', { name: '生成令牌', exact: true })).toBeEnabled();
+        await expect(page.getByRole('switch', { name: '接收并转发本地日报', exact: true })).toBeEnabled();
+        await expect(page.getByRole('switch', { name: '日报邮件', exact: true })).toBeEnabled();
+        await expect(page.getByRole('switch', { name: '启用日报读取', exact: true })).toBeEnabled();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await capture(`settings-reports-functional-${width}-${theme}.png`);
       }

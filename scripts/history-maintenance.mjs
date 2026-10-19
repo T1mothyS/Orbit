@@ -104,8 +104,9 @@ export function changelogPlan(directory, now, force = false) {
   const cut = entries[20].index, tail = original.slice(cut), active = original.slice(0, cut);
   const file = `docs/archive/changelog/CHANGELOG-${today(now).slice(0, 7)}.md`;
   const prior = exists(directory, file) ? read(directory, file).toString('utf8') : null;
-  if (prior && prior.split(payloadStart).length !== 2) throw new Error('Unknown changelog archive format');
-  const oldPayload = prior ? prior.split(payloadStart)[1] : '';
+  const payloadMarkers = prior ? [...prior.matchAll(/<!-- history-payload:start -->\r?\n/g)] : [];
+  if (prior && payloadMarkers.length !== 1) throw new Error('Unknown changelog archive format');
+  const oldPayload = prior ? prior.slice(payloadMarkers[0].index + payloadMarkers[0][0].length) : '';
   const versions = [...tail.matchAll(/^## (\d+\.\d+\.\d+(?:-\d{6}\.\d{4})?)\b/gm)].map(match => match[1]);
   for (const version of versions) if ([...oldPayload.matchAll(/^## (\d+\.\d+\.\d+(?:-\d{6}\.\d{4})?)\b/gm)].some(match => match[1] === version)) throw new Error(`Duplicate archived version: ${version}`);
   const moved = rewriteRelativeLinks(tail, 'CHANGELOG.md', file);

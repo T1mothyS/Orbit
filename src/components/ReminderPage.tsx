@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import type { CreditCardConfig, GenericReminderConfig, ReminderTask, ReminderTaskType, SimConfig,ReminderCycle } from '../reminder-types';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Input, RequiredMark, Select } from '../ui';
 
 interface ReminderPageProps {
@@ -176,7 +176,7 @@ function configToForm(task: ReminderTask): FormState {
 
 export function ReminderPage() {
   const { authHeaders } = useAuth();
-  const location = useLocation();
+  const location = useLocation(), navigate = useNavigate();
   const [tasks, setTasks] = useState<ReminderTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -227,8 +227,8 @@ export function ReminderPage() {
     const task = tasks.find(item => item.id === taskId);
     if (!task) return;
     openEdit(task);
-    window.history.replaceState({}, '', location.pathname);
-  }, [location.pathname, location.search, tasks]);
+    navigate(location.pathname, { replace: true });
+  }, [location.pathname, location.search, tasks, navigate]);
 
   const saveTask = async (event: FormEvent) => {
     event.preventDefault();

@@ -167,4 +167,12 @@ test('changelog rolls complete batches to 20 versions, preserves old text/links 
   const archive = fs.readFileSync(path.join(directory, 'docs/archive/changelog/CHANGELOG-2026-10.md'), 'utf8').split('<!-- history-payload:start -->\n')[1];
   assert.equal(rewriteRelativeLinks(archive, 'docs/archive/changelog/CHANGELOG-2026-10.md', 'CHANGELOG.md'), versions.slice(versions.indexOf('## 0.1.7-')));
   assert.deepEqual(archiveHistory(directory, { now, apply: true }).files, []);
+  const archiveFile = path.join(directory, 'docs/archive/changelog/CHANGELOG-2026-10.md');
+  fs.writeFileSync(archiveFile, fs.readFileSync(archiveFile, 'utf8').replace(/\r?\n/g, '\r\n'));
+  const oldPayload = fs.readFileSync(archiveFile, 'utf8').split('<!-- history-payload:start -->\r\n')[1];
+  const added = Array.from({ length: 5 }, (_, i) => `## 0.1.${32 - i}-261020.0732\r\n\r\nnew ${i}\r\n\r\n`).join('');
+  write(directory, 'CHANGELOG.md', added + active);
+  assert.equal(archiveHistory(directory, { now, apply: true }).archivedVersions, 5);
+  assert(fs.readFileSync(archiveFile, 'utf8').endsWith(oldPayload), 'Existing CRLF archive payload must remain byte-identical');
+  assert.deepEqual(archiveHistory(directory, { now, apply: true }).files, []);
 });

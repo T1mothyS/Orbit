@@ -109,8 +109,10 @@ for (const [type, label] of [['credit_card', '信用卡'], ['sim', 'SIM 卡'], [
       await expect(dialog.getByLabel('提醒时间', { exact: true })).toHaveValue('09:37');
       await dialog.getByLabel('任务名称', { exact: true }).fill('编辑后保留配置 ' + type);
       const patched = page.waitForResponse(item => item.request().method() === 'PATCH' && new URL(item.url()).pathname === '/api/cycle-reminders/' + task.id);
+      const refreshed = page.waitForResponse(item => item.request().method() === 'GET' && new URL(item.url()).pathname === '/api/cycle-reminders');
       await dialog.getByRole('button', { name: '保存修改', exact: true }).click(); const updated = await patched; expect(updated.ok()).toBe(true);
-      expect((await updated.json()).task.config).toEqual(task.config); await expect(dialog).toHaveCount(0);
+      expect((await updated.json()).task.config).toEqual(task.config); await refreshed; await page.waitForLoadState('networkidle');
+      await expect(page).toHaveURL(base + '/reminders'); await expect(dialog).toHaveCount(0);
     } finally { await context.request.delete(base + '/api/cycle-reminders/' + task.id, { headers }); }
   });
 }
