@@ -1,3 +1,4 @@
+import { parseStatisticsFilters } from '../../src/utils/statistics-filters.js';
 import { activityReportChatText } from '../activity-report-chat.js';
 import { chatTimelinePage } from '../chat-timeline.js';
 import { getNotification } from '../activity-store.js';
@@ -75,18 +76,20 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
   app.post('/api/orbit/conversations/:id/read', authenticate, safe((req,res) => {orbit.markConversationRead(user(req),req.params.id,req.body?.observedAt);res.json({success:true});}));
   app.patch('/api/orbit/conversations/:id', authenticate, safe((req,res) => { orbit.renameConversation(user(req),req.params.id,String(req.body?.title || ''));res.json({success:true}); }));
   app.delete('/api/orbit/conversations/:id', authenticate, safe((req,res) => {const uid=user(req),cid=req.params.id;if(orbit.conversation(uid,cid).is_main)throw new Error('主对话不能删除');const failures=clearOwnedConversation(uid,cid,true);res.json({success:true,...(failures?{attachmentCleanupPending:true}:{})}); }));
-  app.get('/api/orbit/preferences', authenticate, safe((req,res) => res.json({ autoKnowledge: orbit.getAiPreference(user(req)),aiSelection:orbit.getAiSelection(user(req)),proactiveEnabled:getProactivePreference(user(req)),runnerEnabled:process.env.ORBIT_PROACTIVE_ENABLED==='true' })));
+  app.get('/api/orbit/preferences', authenticate, safe((req,res) => res.json({ statisticsFilters:orbit.getStatisticsFilters(user(req)),autoKnowledge: orbit.getAiPreference(user(req)),aiSelection:orbit.getAiSelection(user(req)),proactiveEnabled:getProactivePreference(user(req)),runnerEnabled:process.env.ORBIT_PROACTIVE_ENABLED==='true' })));
   app.patch('/api/orbit/preferences', authenticate, safe((req,res) => {
     const body = req.body || {};
-    if (body.autoKnowledge === undefined && body.proactiveEnabled === undefined && body.aiSelection === undefined) throw new Error('偏好设置格式不正确');
+    if (body.autoKnowledge === undefined && body.proactiveEnabled === undefined && body.aiSelection === undefined && body.statisticsFilters === undefined) throw new Error('偏好设置格式不正确');
     // Validate every supplied field before changing any preference.
     if (body.autoKnowledge !== undefined && typeof body.autoKnowledge !== 'boolean') throw new Error('检索设置格式不正确');
     if (body.proactiveEnabled !== undefined && typeof body.proactiveEnabled !== 'boolean') throw new Error('提醒设置格式不正确');
+    const statistics = body.statisticsFilters === undefined ? undefined : parseStatisticsFilters(body.statisticsFilters);
     const selection = body.aiSelection === undefined ? undefined : parseAiSelection(body.aiSelection);
     const uid = user(req);
     if (body.autoKnowledge !== undefined) orbit.setAiPreference(uid, body.autoKnowledge);
     if (body.proactiveEnabled !== undefined) setProactivePreference(uid, body.proactiveEnabled);
     if (selection) orbit.setAiSelection(uid, selection);
+    if (statistics) orbit.setStatisticsFilters(uid,statistics);
     res.json({success:true});
   }));
   app.post('/api/orbit/requests', authenticate, safe((req,res) => res.status(202).json({ request: requestView(orbitQueue.submitOrbitRequest(user(req),req.body || {})) })));

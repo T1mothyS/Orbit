@@ -1,0 +1,51 @@
+import { test,expect } from '@playwright/test';
+import { fixtureToken } from './auth-fixture';
+import { checkVisual } from './visual-check';
+const base='http://127.0.0.1:4187';
+test.describe.configure({retries:0});
+for(const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]])for(const theme of ['light','dark'])test(`round4 ${width} ${theme}: nested navigation, account menu, statistics range and growing architecture`,async({page,context})=>{
+  test.setTimeout(60_000);
+  const token=await fixtureToken(context,'preview@example.invalid');await context.addInitScript(({token,theme})=>{localStorage.setItem('aicalendar_token',token);localStorage.setItem('theme',theme);},{token,theme});
+  await page.setViewportSize({width,height});const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(base+'/settings/account');await page.getByRole('tab',{name:'个人资料',exact:true}).click();await expect(page).toHaveURL(base+'/settings/account/profile');await expect(page.getByLabel('职业背景',{exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('tab',{name:'个人资料',exact:true})).toHaveAttribute('aria-selected','true');
+  if(width>=768){const nav=page.getByRole('navigation',{name:'设置分类',exact:true});await expect(nav.getByRole('link',{name:'个人资料',exact:true})).toHaveAttribute('aria-current','page');await nav.getByRole('button',{name:'收起账户与安全',exact:true}).click();await expect(nav.getByRole('link',{name:'个人资料',exact:true})).toBeHidden();await nav.getByRole('button',{name:'展开账户与安全',exact:true}).click();}
+  await checkVisual(page,`round4-settings-profile-${width}-${theme}.png`,false,false);
+  await page.getByRole('button',{name:'个人菜单',exact:true}).click();await expect(page.getByRole('menuitem',{name:'切换主题',exact:true}).or(page.getByRole('dialog',{name:'个人菜单',exact:true}).getByRole('button',{name:'切换主题',exact:true}))).toBeVisible();await page.keyboard.press('Escape');
+  await page.goto(base+'/settings/reports/delivery');await expect(page.getByRole('tab',{name:'接收与邮件',exact:true})).toHaveAttribute('aria-selected','true');await page.goBack();await expect(page.getByRole('tab',{name:'个人资料',exact:true})).toHaveAttribute('aria-selected','true');
+  await page.goto(base+'/project?view=statistics');await expect(page.getByRole('heading',{name:'执行趋势',exact:true})).toBeVisible();await expect(page.locator('.activity-date,.activity-filter-controls')).toHaveCount(0);await checkVisual(page,`round4-statistics-${width}-${theme}.png`,false,false);
+  await page.getByRole('button',{name:'自定义',exact:true}).click();await expect(page.locator('.activity-range-popover')).toBeInViewport({ratio:1});await checkVisual(page,`round4-statistics-range-${width}-${theme}.png`,false,false);await page.keyboard.press('Escape');await expect(page.locator('.activity-range-popover')).toHaveCount(0);
+  await page.goto(base+'/project?view=architecture');await expect(page.getByRole('button',{name:'暂停架构播放',exact:true})).toBeVisible();await expect(page.locator('.evolution-node-list')).toBeVisible();
+  expect(await page.locator('#evolution-architecture').evaluate(el=>el.getBoundingClientRect().top<document.getElementById('evolution-growth')!.getBoundingClientRect().top)).toBe(true);
+  if(width===1440&&theme==='light'){await page.screenshot({path:test.info().outputPath('architecture-growth-start.png'),animations:'allow'});await page.waitForTimeout(800);await page.screenshot({path:test.info().outputPath('architecture-growth-nodes.png'),animations:'allow'});}
+  await page.locator('.evolution-node-list button').first().click();await expect(page.getByRole('button',{name:'继续播放',exact:true})).toBeVisible();await checkVisual(page,`round4-architecture-${width}-${theme}.png`,false,false);
+  await page.locator('.evolution-metrics').scrollIntoViewIfNeeded();await expect(page.locator('.evolution-metrics')).toHaveClass(/is-drawing/);await checkVisual(page,`round4-growth-${width}-${theme}.png`,false,false);
+  await page.getByRole('link',{name:'返回今日行动中心',exact:true}).click();await expect(page).toHaveURL(base+'/today');expect(errors).toEqual([]);
+});
+
+test('round4 defaults save failure retains draft, historical snapshots stay frozen and custom range applies atomically',async({page,context})=>{
+  test.setTimeout(60_000);const token=await fixtureToken(context,'preview-statistics@example.invalid'),headers={Authorization:'Bearer '+token};await context.addInitScript(token=>localStorage.setItem('aicalendar_token',token),token);
+  await page.goto(base+'/settings/statistics');await page.getByRole('combobox',{name:'默认事项类型',exact:true}).click();await page.getByRole('option',{name:'待办',exact:true}).click();
+  await page.route('**/api/orbit/preferences',route=>route.request().method()==='PATCH'?route.fulfill({status:503,json:{error:'合成保存失败'}}):route.continue());await page.getByRole('button',{name:'保存默认筛选',exact:true}).click();await expect(page.getByRole('alert')).toContainText('合成保存失败');await expect(page.getByRole('combobox',{name:'默认事项类型',exact:true})).toHaveText('待办');
+  page.once('dialog',d=>d.dismiss());await page.getByRole('link',{name:'返回今日行动中心',exact:true}).click();await expect(page).toHaveURL(base+'/settings/statistics');await page.unroute('**/api/orbit/preferences');await page.getByRole('button',{name:'保存默认筛选',exact:true}).click();await expect(page.getByText('默认筛选已保存',{exact:true})).toBeVisible();
+  const frozen=await(await context.request.post(base+'/api/orbit/activity-reports',{headers,data:{period:'week',taskType:'event',reportSource:'cloud'}})).json();expect(frozen.snapshot.filters).toEqual({taskType:'event',reportSource:'cloud'});
+  await page.getByRole('tab',{name:'已保存报告',exact:true}).click();await page.locator('.statistics-saved-list a').first().click();await expect(page).toHaveURL(new RegExp('report='+frozen.id));await expect(page.getByText(/已保存快照/)).toBeVisible();
+  expect((await(await context.request.get(base+'/api/orbit/activity-reports/'+frozen.id,{headers})).json()).snapshot.filters).toEqual({taskType:'event',reportSource:'cloud'});
+  const response=page.waitForResponse(r=>r.url().includes('/api/orbit/statistics?')&&r.url().includes('taskType=todo'));await page.getByRole('button',{name:'返回当前周',exact:true}).click();await response;
+  await page.getByRole('button',{name:'自定义',exact:true}).click();await page.getByLabel('范围开始日期',{exact:true}).fill('2026-10-01');await page.getByLabel('范围开始时间',{exact:true}).fill('09:37');await page.getByLabel('范围结束日期',{exact:true}).fill('2026-10-02');await page.getByLabel('范围结束时间',{exact:true}).fill('18:43');
+  const before=page.url();await page.keyboard.press('Escape');expect(page.url()).toBe(before);await page.getByRole('button',{name:'自定义',exact:true}).click();await page.getByLabel('范围开始日期',{exact:true}).fill('2026-10-01');await page.getByLabel('范围开始时间',{exact:true}).fill('09:37');await page.getByLabel('范围结束日期',{exact:true}).fill('2026-10-02');await page.getByLabel('范围结束时间',{exact:true}).fill('18:43');
+  await page.getByRole('button',{name:'应用',exact:true}).click();await expect(page).toHaveURL(/period=custom/);await expect(page.locator('.activity-range-popover')).toHaveCount(0);await expect(page.locator('.activity-window')).toContainText('2026-10-01');await page.reload();await expect(page.locator('.activity-window')).toContainText('2026-10-01');
+});
+
+test('round4 quips rotate every three seconds without changing the request and stop at failure',async({page,context})=>{
+  const token=await fixtureToken(context,'preview-guards@example.invalid');await context.addInitScript(token=>localStorage.setItem('aicalendar_token',token),token);let state='running';
+  const request={id:'quip-test',text:'合成慢请求',createdAt:new Date().toISOString()};
+  await page.route('**/api/orbit/requests?*',route=>route.fulfill({json:{requests:[{...request,state}]}}));await page.route('**/api/ai-schedule/history?*',route=>route.fulfill({json:{messages:[],requests:[{...request,state}],start:'start',nextBefore:null}}));await page.clock.install({time:new Date('2026-10-19T10:00:00Z')});await page.clock.pauseAt(new Date('2026-10-19T10:00:01Z'));await page.goto(base+'/assistant');
+  const card=page.locator('[data-request-id="quip-test"]'),quip=card.locator('.orbit-request-quip');await expect(quip).not.toBeEmpty();const initial=await quip.innerText();await page.clock.runFor(2999);expect(await quip.innerText()).toBe(initial);await page.clock.runFor(1);expect(await quip.innerText()).not.toBe(initial);await expect(card).toContainText('合成慢请求');await expect(card.getByRole('button',{name:'取消',exact:true})).toBeVisible();
+  state='failed';await page.clock.runFor(2100);await expect(card).toContainText('处理失败');await expect(quip).toHaveCount(0);await page.clock.runFor(6000);await expect(card.getByRole('button',{name:'重试',exact:true})).toBeVisible();
+});
+
+test('round4 architecture pauses offscreen, advances without history entries and honors reduced motion deep links',async({page,context})=>{
+  const token=await fixtureToken(context,'preview-guards@example.invalid');await context.addInitScript(token=>localStorage.setItem('aicalendar_token',token),token);await page.setViewportSize({width:1440,height:900});await page.clock.install({time:new Date('2026-10-19T10:00:00Z')});await page.clock.pauseAt(new Date('2026-10-19T10:00:01Z'));await page.goto(base+'/project?view=architecture');await expect(page.locator('#evolution-milestone')).toBeVisible();const initial=await page.locator('#evolution-milestone').inputValue(),url=page.url();await page.clock.runFor(8000);await expect(page.locator('#evolution-milestone')).not.toHaveValue(initial);expect(page.url()).toBe(url);
+  await page.locator('.evolution-metrics').scrollIntoViewIfNeeded();await expect(page.locator('#evolution-architecture')).toHaveAttribute('data-playback-active','false');const paused=await page.locator('#evolution-milestone').inputValue();await page.clock.runFor(20000);await expect(page.locator('#evolution-milestone')).toHaveValue(paused);
+  await page.emulateMedia({reducedMotion:'reduce'});await page.goto(base+'/project?view=architecture&milestone=retrieval');await expect(page.locator('#evolution-milestone')).toHaveValue('retrieval');await expect(page.getByRole('button',{name:'播放历史',exact:true})).toBeVisible();await page.clock.runFor(20000);await expect(page.locator('#evolution-milestone')).toHaveValue('retrieval');
+});

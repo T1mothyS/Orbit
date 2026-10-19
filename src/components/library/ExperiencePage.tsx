@@ -1,3 +1,4 @@
+import { ReturnToToday } from '../ReturnToToday';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -58,9 +59,7 @@ function ExperienceHome() {
   return (
     <div className="library-page experience-page">
       <div className="experience-shell">
-        <Link className="library-back-button" to="/library">
-          ← 知识库
-        </Link>
+        <ReturnToToday/>
         <header>
           <h1>记录经历</h1>
           <p>聊聊一次旅行或一段值得留住的经历，整理成自己的回忆。</p>

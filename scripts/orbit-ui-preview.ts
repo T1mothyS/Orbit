@@ -16,7 +16,7 @@ const {buildAiPlanSnapshot}=await import('../server/ai-plan.js');
 const stamp=new Date().toISOString(),uid='preview-owner';
 db.createUser({id:uid,email:'preview@example.invalid',password_hash:await bcrypt.hash('OrbitPreview123!',10),role:'admin',disabled:0,created_at:stamp,updated_at:stamp});
 db.createUser({id:'preview-empty',email:'empty@example.invalid',password_hash:await bcrypt.hash('OrbitPreview123!',10),role:'user',disabled:0,created_at:stamp,updated_at:stamp});
-if(accountUi) for(const id of ['preview-security','preview-avatar','preview-rate','preview-settings','preview-context','preview-notifications','preview-guards']) {
+if(accountUi) for(const id of ['preview-security','preview-avatar','preview-rate','preview-settings','preview-context','preview-notifications','preview-guards','preview-statistics']) {
   db.createUser({id,email:`${id}@example.invalid`,password_hash:await bcrypt.hash('OrbitPreview123!',10),role:'user',disabled:0,created_at:stamp,updated_at:stamp});
 }
 const cid=orbit.ensureDefaultConversation(uid);

@@ -60,6 +60,18 @@ test('account model preferences survive backup and preserve other preferences, l
     store.restoreOrbit('preference-b', { conversations: [], messages: [], autoKnowledge: false }, 'replace');
     assert.equal(store.getAiSelection('preference-b'), null);
 });
+test('statistics defaults preserve other preferences and survive backup; legacy merge preserves and replace resets',()=>{
+    const value={taskType:'todo',reportSource:'cloud'} as const;
+    store.setAiPreference('statistics-a',true);store.setStatisticsFilters('statistics-a',value);
+    assert.deepEqual(store.getStatisticsFilters('statistics-a'),value);assert.equal(store.getAiPreference('statistics-a'),true);
+    assert.deepEqual(store.getStatisticsFilters('statistics-b'),{taskType:'all',reportSource:'all'});
+    const snapshot=store.exportOrbit('statistics-a');store.restoreOrbit('statistics-b',snapshot,'merge',true);
+    assert.deepEqual(store.getStatisticsFilters('statistics-b'),value);
+    store.restoreOrbit('statistics-b',{conversations:[],messages:[],autoKnowledge:false},'merge');assert.deepEqual(store.getStatisticsFilters('statistics-b'),value);
+    store.restoreOrbit('statistics-b',{conversations:[],messages:[],autoKnowledge:false},'replace');assert.deepEqual(store.getStatisticsFilters('statistics-b'),{taskType:'all',reportSource:'all'});
+    assert.throws(()=>store.restoreOrbit('statistics-b',{...snapshot,statisticsFilters:{taskType:'invalid',reportSource:'all'} as any},'replace'),/统计筛选/);
+    assert.deepEqual(store.getStatisticsFilters('statistics-b'),{taskType:'all',reportSource:'all'});
+});
 test('queue serializes one account, allows short writes and other accounts, cancellation and idempotent retry', async () => {
     const cid = store.createConversation('owner').id, otherCid = store.createConversation('other').id;
     const order: string[] = [];
@@ -179,6 +191,15 @@ test('HTTP conversation, history, queue and planned-date routes enforce authenti
         assert.deepEqual((await (await request('/api/orbit/preferences')).json()).aiSelection, selected);
         assert.equal((await (await request('/api/orbit/preferences', 1)).json()).aiSelection, null);
         const autoBefore = store.getAiPreference('owner');
+        const filters={taskType:'todo',reportSource:'cloud'};
+        assert.equal((await request('/api/orbit/preferences',0,'PATCH',{statisticsFilters:filters})).status,200);
+        assert.deepEqual((await(await request('/api/orbit/preferences')).json()).statisticsFilters,filters);
+        assert.deepEqual((await(await request('/api/orbit/preferences',1)).json()).statisticsFilters,{taskType:'all',reportSource:'all'});
+        assert.equal((await request('/api/orbit/preferences',0,'PATCH',{autoKnowledge:!autoBefore,statisticsFilters:{taskType:'bad',reportSource:'all'}})).status,400);
+        assert.equal(store.getAiPreference('owner'),autoBefore);
+        assert.deepEqual(store.getStatisticsFilters('owner'),filters);
+        assert.equal((await request('/api/orbit/preferences',0,'PATCH',{statisticsFilters:filters,aiSelection:{provider:'bad',models:{}}})).status,400);
+
         assert.equal((await request('/api/orbit/preferences', 0, 'PATCH', { autoKnowledge: !autoBefore, aiSelection: { provider: 'invalid', models: {} } })).status, 400);
         assert.equal(store.getAiPreference('owner'), autoBefore);
         assert.deepEqual(store.getAiSelection('owner'), selected);

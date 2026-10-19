@@ -1,5 +1,6 @@
-import { ArrowLeft, ArrowUpRight } from 'lucide-react';
-import { ButtonLink, EmptyState, ErrorState, LoadingState } from '../ui';
+import { ReturnToToday } from '../components/ReturnToToday';
+import { ArrowUpRight } from 'lucide-react';
+import { EmptyState, ErrorState, LoadingState } from '../ui';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -55,7 +56,7 @@ export function ToolsPage() {
   useEffect(() => { void loadTools(); }, [loadTools, reloadKey]);
 
   return <section className="oui-root tools-page" aria-labelledby="tools-page-title"><div className="tools-page-inner">
-    <header className="tools-page-header"><div><h1 id="tools-page-title">工具中心</h1><p>{loading ? '正在读取个人应用…' : error ? '个人应用与实用工具' : `${tools.length} 个个人应用，选择后在当前页面打开。`}</p></div><ButtonLink to="/today" variant="quiet"><ArrowLeft size={16} aria-hidden="true"/>返回主站</ButtonLink></header>
+    <ReturnToToday/><header className="tools-page-header"><div><h1 id="tools-page-title">工具中心</h1><p>{loading ? '正在读取个人应用…' : error ? '个人应用与实用工具' : `${tools.length} 个个人应用，选择后在当前页面打开。`}</p></div></header>
     {loading ? <LoadingState label="正在读取工具…"/> : error ? <ErrorState title="工具暂时无法加载" description={error} onRetry={() => setReloadKey(value => value + 1)}/> : !tools.length ? <EmptyState title="还没有可用的工具" description="启用的个人应用会显示在这里。"/> : <div className="tools-grid">{tools.map(tool => <article key={tool.slug} className="tools-card" data-tool-slug={tool.slug}><a className="tools-card-link" href={tool.path} aria-label={`打开 ${tool.title}`}><span className="tools-card-mark" aria-hidden="true">{toolMark(tool.title)}</span><div><h2>{tool.title}</h2><p>{tool.summary}</p></div><ArrowUpRight size={18} aria-hidden="true"/></a></article>)}</div>}
   </div></section>;
 }

@@ -302,3 +302,5 @@
   .agenda-complete-button { width: 40px; height: 40px; }
   .calendar-toolbar button { min-height: 40px; }
 }
+
+.orbit-request-quip { color:var(--orbit-text-secondary); font-size:var(--orbit-type-secondary); min-height:3.2em; line-height:1.6; margin-block:6px; overflow-wrap:anywhere; }

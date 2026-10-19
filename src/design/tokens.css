@@ -35,6 +35,8 @@
   --orbit-destructive: #b42318;
   --orbit-destructive-hover: #912018;
   --orbit-destructive-soft: #fff0ee;
+  --orbit-chart-knowledge: #087e8b;
+  --orbit-chart-ai: #7653bd;
   --orbit-success: #207245;
   --orbit-success-soft: #edf8f0;
   --orbit-warning: #8b570a;
@@ -100,6 +102,8 @@
   --orbit-destructive: #ffaaa3;
   --orbit-destructive-hover: #ffc3bd;
   --orbit-destructive-soft: #3c2423;
+  --orbit-chart-knowledge: #5dced5;
+  --orbit-chart-ai: #bba1ef;
   --orbit-success: #8bd5a6;
   --orbit-success-soft: #203329;
   --orbit-warning: #f2c879;

@@ -1,6 +1,6 @@
+import { ReturnToToday } from './ReturnToToday';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '../ui';
 import { useAuth } from '../hooks/useAuth';
 
@@ -117,7 +117,7 @@ export function ResearchPage() {
     <div className="oui-root research-page">
       <header className="research-header">
         <div>
-          <Link className="research-back" to="/reports"><ArrowLeft size={16} aria-hidden="true" />返回日报</Link>
+          <ReturnToToday/>
           <h1>研究与观点</h1>
           <p>研究结果保留为历史记录。建议观点只是草稿，只有你的确认才会形成正式观点。</p>
         </div>

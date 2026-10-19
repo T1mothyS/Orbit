@@ -244,3 +244,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .import-page-back { padding:var(--orbit-space-3) var(--orbit-space-4) 0; }
 
 .orbit-user-message { background:var(--orbit-brand-soft); color:var(--orbit-text); }
+
+.orbit-page-return { display:flex; align-items:center; margin-bottom:var(--orbit-space-3); min-height:var(--orbit-touch-target); }
+@media (prefers-reduced-motion: reduce) { .settings-nav-parent svg { transition:none; } }

@@ -160,13 +160,13 @@ test('account changes in another tab clear sensitive inputs and render the new i
   await expect(page.getByLabel('新密码', { exact: true })).toBeEmpty();
 });
 
-test('settings returns to its original work page with keyboard focus restored', async ({ context, page }) => {
+test('settings returns to Today with keyboard focus restored and original chat draft retained', async ({ context, page }) => {
   await login(context); await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base + '/schedule'); await page.locator('[data-account-menu-trigger]').click();
   await page.getByRole('menuitem', { name: '设置', exact: true }).or(page.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '设置', exact: true })).click();
   await page.getByRole('link', { name: '账户与安全', exact: true }).click();
-  await page.getByRole('link', { name: '返回 Orbit', exact: true }).click();
-  await expect(page).toHaveURL(base + '/schedule');
+  await page.getByRole('link', { name: '返回今日行动中心', exact: true }).click();
+  await expect(page).toHaveURL(base + '/today');
   await expect(page.locator('[data-account-menu-trigger]')).toBeFocused();
   await page.goto(base + '/assistant');
   const composer = page.getByLabel('AI 助手输入框', { exact: true });
@@ -174,6 +174,6 @@ test('settings returns to its original work page with keyboard focus restored', 
   await composer.fill('进入设置后仍应保留的未发送草稿');
   const origin = page.url();
   await page.locator('[data-account-menu-trigger]').click(); await page.getByRole('menuitem', { name: '设置', exact: true }).or(page.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '设置', exact: true })).click();
-  await page.getByRole('link', { name: '返回 Orbit', exact: true }).click();
-  await expect(page).toHaveURL(origin); await expect(composer).toHaveValue('进入设置后仍应保留的未发送草稿');
+  await page.getByRole('link', { name: '返回今日行动中心', exact: true }).click();
+  await expect(page).toHaveURL(base + '/today'); await page.goto(origin); await expect(composer).toHaveValue('进入设置后仍应保留的未发送草稿');
 });

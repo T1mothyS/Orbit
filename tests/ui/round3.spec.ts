@@ -38,7 +38,7 @@ for (const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (c
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await checkVisual(page,`round3-import-${width}-${theme}.png`,false,false);
     await page.goBack(); await expect(page).toHaveURL(base+'/tools'); await page.goForward(); await expect(page).toHaveURL(base+'/import'); await page.reload();
-    await page.getByRole('link',{name:'返回',exact:true}).click(); await expect(page).toHaveURL(base+'/tools');
+    await page.getByRole('link',{name:'返回今日行动中心',exact:true}).click(); await expect(page).toHaveURL(base+'/today');
     await page.goto(base+'/assistant?tool=email-import'); await expect(page).toHaveURL(base+'/import'); await page.reload(); await expect(page.getByRole('heading',{name:'邮箱导入',exact:true})).toBeVisible(); expect(errors).toEqual([]);
   });
 }

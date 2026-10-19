@@ -82,9 +82,9 @@ React/Vite 与 Electron 壳都使用同一套前端页面。Electron 主进程�
 
 ### Settings V3 路由与状态
 
-`/settings/*` 只挂一个 SettingsWorkspace，按账号 ID 创建 SettingsState，不能按 pathname 加 key。八类 canonical 地址为 `/settings/account`、`notifications`、`ai`、`reports`、`library`、`integrations`、`data`、`advanced`；个人资料为 `/settings/account/profile`，属于账户分类。`/settings/profile`、`/reports/settings`、`/library/settings` 与 `/library/preferences` 保留重定向；后者无 ID 时仍进入日报，有 ID 时按同一注册表分流。旧 `?settings=`、搜索、AI action/settingRefs 和 `orbit:open-settings` 共用 module-settings/settings-registry；未知和无权限分别提示，不任意执行 URL。桌面首页默认账户，重定向保留查询 ID；手机首页为分类列表。
+`/settings/*` 只挂一个 SettingsWorkspace，按账号 ID 创建 SettingsState，不能按 pathname 加 key。九类 canonical 地址为 `/settings/account`、`notifications`、`ai`、`reports`、`library`、`integrations`、`data`、`advanced`、`statistics`；个人资料为 `/settings/account/profile`，属于账户分类。`/settings/profile`、`/reports/settings`、`/library/settings` 与 `/library/preferences` 保留重定向；后者无 ID 时仍进入日报，有 ID 时按同一注册表分流。旧 `?settings=`、搜索、AI action/settingRefs 和 `orbit:open-settings` 共用 module-settings/settings-registry；未知和无权限分别提示，不任意执行 URL。桌面首页默认账户，重定向保留查询 ID；手机首页为分类列表。
 
-SettingsFrame 只管布局、分类、主题、同源返回与标题/目标焦点；feature 提供内容与搜索。已访问的普通分区及日报页签保留挂载，隐藏内容不可操作；首次按访问挂载，不为浏览一页启动所有领域请求。日报分“个性化”和“接收与邮件”，移动端保持同一任务顺序。已迁移的旧 SettingsDialog/Layout/Row/Section/Search/ModuleSettingsPage 及 LibraryPreferencesPage 已删除，旧全局设置/账户菜单/搜索规则退出。
+SettingsFrame 只管布局、分类和标题/目标焦点；feature 提供内容、搜索与共用 AccountMenu。独立页面的左上箭头统一返回 `/today`；知识/日报正文和内部编辑仍返回各自列表。已访问的普通分区及日报页签保留挂载，隐藏内容不可操作；首次按访问挂载，不为浏览一页启动所有领域请求。账户分“账号管理”和“个人资料”；日报分“个性化”和“接收与邮件”（`/settings/reports/delivery`）；使用统计分默认筛选和历史（`/settings/statistics/history`）。父子导航共用注册表，正文 tab 与左侧子项由 URL 同步，移动端保留分类及二级切换。已迁移的旧 SettingsDialog/Layout/Row/Section/Search/ModuleSettingsPage 及 LibraryPreferencesPage 已删除，旧全局设置/账户菜单/搜索规则退出。
 
 `ContextStore` 唯一持有完整 Cloud Context 快照、version、草稿与冲突状态。资料保存只合并 profile；日报保存合并非 profile 领域；以最新共同 version 提交，保留未知字段、旧格式和引用。确认结果更新快照并重基另一领域的草稿；取消仅影响当前领域。409 保留两个领域的草稿并停止覆盖；只有明确重新加载才丢弃两处草稿，不自动覆盖冲突。图形字段和研究框架规则继续由 daily-report-context 工具维护，不另建 JSON 编辑器或业务副本。
 
@@ -369,3 +369,13 @@ Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓�
 客户端保留已加载消息/请求并按原提交位置排序；最新 40 条请求端点仍用于队列恢复，不是完整历史的唯一来源。更早记录由按钮按需加载并补偿滚动高度；消息深链接按页读取直到目标可见，保持按需读取；清空、切换和删除不能被未完成旧读取回填。只有新增消息序列在读者跟随底部时触发滚动，状态刷新不滚动。历史窗口的扩大由用户加载或当前新消息驱动，不在首次进入加载全会话。
 
 已识别个人周报的站内正文基于通知关联、当前账号拥有的冻结快照生成，事项以标题链接显示，日期和事实摘要保留。历史 DB 原文、邮件文本和用户普通消息不改写；快照已删除时显示不可访问状态，不回显旧的 ID/裸链接。站内不再用字符 slice 截断 Markdown。
+
+### 统计默认筛选与等待文案
+
+`GET /api/orbit/preferences` 返回 `statisticsFilters:{taskType,reportSource}`，`PATCH` 接受同名完整对象。枚举与统计查询一致：事项为 all/event/todo/reminder，来源为 all/local/cloud；拒绝缺失、未知字段或无效枚举，所有输入在修改任一偏好前校验。仅写入当前认证账号的 `orbit_preferences.statistics_filters` 可空 JSON 列，旧账号/缺失值默认 all/all，保留其他偏好。
+
+偏好只为交互式实时统计提供默认值，不改变自动周报或历史冻结快照。原报告列表及详情 API 仍检查账号归属；列表在设置中管理，打开后沿用 `/project?view=statistics&report=...`。自定义范围先在浮层编辑，应用后提交原 UTC ISO 半开区间；URL 保留周期与范围，返回当前周期保留周/月/年类型。
+
+`exportOrbit/restoreOrbit` 携带 `statisticsFilters`；旧备份 merge 保留目标值，replace 恢复 all/all，非法值在写入前拒绝。此偏好没有资源 ID，允许按既有账号恢复流程导入，不触发发信或 AI。
+
+请求状态中的俏皮话是前端展示：queued/running 每三秒轮换，终态和页面隐藏时停止计时，不进入消息、备份、日志或模型上下文。真实步骤、耗时、错误、取消与重试仍由既有请求状态决定。

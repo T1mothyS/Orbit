@@ -2,8 +2,11 @@ import { lazy,useEffect,useState } from 'react';
 import { Navigate,useLocation,useNavigate } from 'react-router-dom';
 import { FeatureBoundary } from '../../components/FeatureBoundary';
 import { useAuth } from '../../hooks/useAuth';
+import { useTheme } from '../../hooks/useTheme';
+import { AccountMenu } from '../../components/AccountMenu';
+import { StatisticsSettings } from './StatisticsSettings';
 import { SettingsFrame } from '../../layouts/SettingsFrame';
-import { InlineNotice,TextLink,ToastProvider } from '../../ui';
+import { InlineNotice,TextLink,ToastProvider,TooltipProvider,Tabs } from '../../ui';
 import { resolveSetting } from '../../utils/module-settings';
 import AccountPage from './account/AccountPage';
 import { ContextEditor } from './context/ContextEditor';
@@ -26,15 +29,17 @@ import { SettingsActivity,SettingsStateProvider,useSettingsState } from './Setti
 const AdminModal = lazy(() => import('../../components/AdminModal').then(module => ({ default: module.AdminModal })));
 export default function SettingsWorkspace({ returnTo }: { returnTo?: string }) {
   const { user } = useAuth();
-  return <ToastProvider><SettingsStateProvider key={user?.id}><SettingsConfirmProvider><SettingsPages returnTo={returnTo} /></SettingsConfirmProvider></SettingsStateProvider></ToastProvider>;
+  return <TooltipProvider><ToastProvider><SettingsStateProvider key={user?.id}><SettingsConfirmProvider><SettingsPages returnTo={returnTo} /></SettingsConfirmProvider></SettingsStateProvider></ToastProvider></TooltipProvider>;
 }
 function SettingsPages({ returnTo }: { returnTo?: string }) {
-  const { user } = useAuth(), { authHeaders } = useSettingsState(), location = useLocation(), navigate = useNavigate();
+  const { user, logout } = useAuth(), { authHeaders } = useSettingsState(), location = useLocation(), navigate = useNavigate();
   const [adminOpen, setAdminOpen] = useState(false), [visited, setVisited] = useState<string[]>([]);
+  const { theme, toggleTheme } = useTheme();
   const profile = location.pathname === '/settings/account/profile';
-  const category = settingsCategories.find(item => location.pathname === item.to || profile && item.id === 'account');
+  const category = settingsCategories.find(item => location.pathname === item.to || item.children?.some(child => child.to === location.pathname));
   const id = new URLSearchParams(location.search).get('settings'), result = id ? resolveSetting(id, user?.role === 'admin') : null;
-  const active = profile ? 'profile' : category?.id || '';
+  const active = category?.id || '';
+  const accountTabs = settingsCategories.find(item => item.id === 'account')!.children!;
   useEffect(() => { if (active) setVisited(current => current.includes(active) ? current : [...current, active]); }, [active]);
   if (location.pathname === '/settings/profile') return <Navigate to={'/settings/account/profile' + location.search} replace state={location.state} />;
   if (result?.kind === 'known' && result.path !== location.pathname) return <Navigate to={result.path + location.search} replace state={location.state} />;
@@ -42,16 +47,16 @@ function SettingsPages({ returnTo }: { returnTo?: string }) {
     notifications: <NotificationSettings />,
     ai: <AiSettings authHeaders={authHeaders} isAdmin={user?.role === 'admin'} />,
     reports: <ReportsPage />,
+    statistics: <StatisticsSettings />,
     library: <LibraryIntegrationSettings authHeaders={authHeaders} />,
     integrations: <><CaldavSettings authHeaders={authHeaders} /><IntegrationGuideSettings authHeaders={authHeaders} /></>,
     data: <DataSettings authHeaders={authHeaders} />,
     advanced: <><ToolsSettings onOpenTools={() => navigate('/tools')} /><section className="oui-section"><h2>使用与帮助</h2><p className="oui-help">从常用任务开始，了解功能入口和操作边界。</p><TextLink to="/help">打开 Orbit 使用指南</TextLink></section>{user?.role === 'admin' && <AdminSettings onOpenAdmin={() => setAdminOpen(true)} />}</>,
   };
-  return <SettingsFrame fallbackReturnTo={returnTo} navigation={settingsCategories} category={category?.id} title={profile ? '个人资料' : category?.title || '设置'} description={profile ? '身份、背景与表达偏好，目前用于 Cloud 日报。' : category?.description || '按需要调整你的 Orbit。'} search={<SettingsSearch />}>
+  return <SettingsFrame fallbackReturnTo={returnTo} accountMenu={<AccountMenu theme={theme} onToggleTheme={toggleTheme} user={user} onLogout={logout} onOpenAdmin={() => setAdminOpen(true)} />} navigation={settingsCategories} category={category?.id} title={category?.title || '设置'} description={category?.description || '按需要调整你的 Orbit。'} search={<SettingsSearch />}>
     {result && result.kind !== 'known' && <InlineNotice tone="warning" title={result.kind === 'forbidden' ? '无权访问此设置项' : '设置项不存在'}>请通过分类或搜索选择可用设置。</InlineNotice>}
     {!category && location.pathname.replace(/\/$/, '') === '/settings' ? <SettingsHomePage /> : !category ? <InlineNotice tone="warning" title="设置分类不存在"><TextLink to="/settings">返回设置</TextLink></InlineNotice> : null}
-    {active === 'account' && <AccountPage />}
-    {profile && <ContextEditor mode="profile" />}
+    {active === 'account' && <Tabs label="账户设置分类" value={profile ? 'profile' : 'account'} onValueChange={value => navigate(accountTabs.find(item => item.id === value)!.to, {state: location.state})} items={accountTabs.map(item => ({value:item.id,label:item.title,content:item.id === 'profile' ? <ContextEditor mode="profile"/> : <AccountPage/>}))} />}
     {[...new Set([...visited, active])].filter(key => pages[key]).map(key => <div key={key} hidden={key !== active}><SettingsActivity active={key === active}><FeatureBoundary>{pages[key]}</FeatureBoundary></SettingsActivity></div>)}
     {adminOpen && <FeatureBoundary onClose={() => setAdminOpen(false)}><AdminModal visible onClose={() => setAdminOpen(false)} /></FeatureBoundary>}
   </SettingsFrame>;

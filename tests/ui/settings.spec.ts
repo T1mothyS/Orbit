@@ -18,10 +18,10 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     const capture = (name: string) => checkVisual(page, name, !!visualPolicy.settingsApproved);
     await page.goto(base + '/settings/account');
-    const topbar = page.locator('.settings-workspace-topbar'), back = topbar.getByRole('link', { name: '返回 Orbit', exact: true });
+    const topbar = page.locator('.settings-workspace-topbar'), back = page.getByRole('link', { name: '返回今日行动中心', exact: true });
     await expect(back).toBeVisible(); await expect(back).toHaveText('');
-    const brandBox = (await topbar.getByRole('link', { name: 'Orbit 首页', exact: true }).boundingBox())!, backBox = (await back.boundingBox())!;
-    expect(backBox.x).toBeGreaterThan(brandBox.x + brandBox.width);
+    const backBox = (await back.boundingBox())!;
+    expect(backBox.y).toBeLessThan((await page.getByRole('heading',{level:1}).boundingBox())!.y);
     await expect(page.locator('.settings-workspace-main').getByRole('combobox', { name: '搜索设置', exact: true })).toHaveCount(0);
     if (width < 768) {
       const trigger = topbar.getByRole('button', { name: '搜索设置', exact: true });
@@ -60,7 +60,7 @@ test('Cloud domains share one version, preserve cross-page drafts and stop on a 
   await page.getByRole('button', { name: '保存', exact: true }).click(); await expect(page.getByText('已保存，下一次 Cloud 日报读取时生效。', { exact: true }).filter({visible:true})).toBeVisible();
   let saved = (await (await context.request.get(base + '/api/daily-report/cloud-context', { headers })).json()).context;
   expect(saved.context.profile.background.career_context).toBe('saved profile'); expect(saved.context.preferences.target_reading_time_minutes).toBe(18); expect(saved.context.future).toEqual(seed.future);
-  await page.getByRole('navigation', { name: '设置分类' }).getByRole('link', { name: '账户与安全', exact: true }).click(); await page.getByRole('region',{name:'账号信息',exact:true}).getByRole('link', { name: '编辑个人资料', exact: true }).click();
+  await page.getByRole('navigation', { name: '设置分类' }).getByRole('link', { name: '账户与安全', exact: true }).click(); await page.getByRole('tab', { name: '个人资料', exact: true }).click();
   await expect(page.getByLabel('职业背景', { exact: true })).toHaveValue('draft profile'); await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect(page.getByRole('button', { name: '保存', exact: true })).toBeDisabled();
   saved = (await (await context.request.get(base + '/api/daily-report/cloud-context', { headers })).json()).context; expect(saved.version).toBe(3); expect(saved.context.profile.extension.keep).toBe(true);
@@ -87,7 +87,7 @@ for (const width of [390, 1440]) test(`header search ${width}: keyboard, empty r
   const id = new URL(page.url()).searchParams.get('settings')!;
   await expect(page.locator(`[id="${id}"]`)).toBeFocused();
   if (width < 768) await expect(input).toHaveCount(0);
-  await topbar.getByRole('link', { name: '返回 Orbit', exact: true }).click(); await expect(page).toHaveURL(base + '/library');
+  await page.getByRole('link', { name: '返回今日行动中心', exact: true }).click(); await expect(page).toHaveURL(base + '/today');
 });
 test('report email automatic save preserves notification drafts and the shared saved address', async ({ context, page }) => {
   const headers = await login(context, 'preview-notifications');
@@ -108,12 +108,12 @@ test('legacy URLs, global setting search, unknown targets and forbidden targets 
   await login(context);
   for (const [legacy, canonical] of [['/reports/settings', '/settings/reports'], ['/library/settings', '/settings/library'], ['/settings/profile', '/settings/account/profile'], ['/library/preferences', '/settings/reports'], ['/assistant?settings=setting-ai-1l45kwl', '/settings/ai?settings=setting-ai-1l45kwl']]) {
     await page.goto(base + legacy); await expect(page).toHaveURL(base + canonical);
-    if (legacy === '/reports/settings' || legacy === '/library/settings') await expect(page.getByRole('link', { name: '返回 Orbit', exact: true })).toHaveAttribute('href', legacy.split('/settings')[0]);
+    if (legacy === '/reports/settings' || legacy === '/library/settings') await expect(page.getByRole('link', { name: '返回今日行动中心', exact: true })).toHaveAttribute('href', '/today');
   }
   await page.goto(base + '/library/settings');
   await page.getByRole('navigation', { name: '设置分类' }).getByRole('link', { name: '账户与安全', exact: true }).click();
-  await page.getByRole('region', { name: '账号信息', exact: true }).getByRole('link', { name: '编辑个人资料', exact: true }).click();
-  await expect(page.getByRole('link', { name: '返回 Orbit', exact: true })).toHaveAttribute('href', '/library');
+  await page.getByRole('tab', { name: '个人资料', exact: true }).click();
+  await expect(page.getByRole('link', { name: '返回今日行动中心', exact: true })).toHaveAttribute('href', '/today');
   await page.goto(base + '/reports/settings?settings=settings-report-personalization');
   await expect(page).toHaveURL(base + '/settings/reports?settings=settings-report-personalization');
   await expect(page.getByRole('tab', { name: '个性化', exact: true })).toHaveAttribute('aria-selected', 'true');
@@ -123,7 +123,7 @@ test('legacy URLs, global setting search, unknown targets and forbidden targets 
 });
 test('leaving Settings protects ordinary drafts; returning to an AI category clears its secret input', async ({ context, page }) => {
   await login(context, 'preview-guards'); await page.goto(base + '/settings/account/profile'); await page.getByLabel('职业背景', { exact: true }).fill('unsaved profile');
-  page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('link', { name: '返回 Orbit', exact: true }).click(); await expect(page).toHaveURL(base + '/settings/account/profile');
+  page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('link', { name: '返回今日行动中心', exact: true }).click(); await expect(page).toHaveURL(base + '/settings/account/profile');
   await expect(page.getByLabel('职业背景', { exact: true })).toHaveValue('unsaved profile');
   await page.getByRole('navigation', { name: '设置分类' }).getByRole('link', { name: 'AI 与模型', exact: true }).click();
   await page.getByRole('button', { name: '配置 API Key', exact: true }).click(); await page.getByLabel('API Key（必填）', { exact: true }).fill('synthetic-secret-input-only');

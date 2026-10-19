@@ -41,8 +41,8 @@ function App() {
     if (!isAuthenticated) {
       document.title = 'Orbit - 登录 / Login';
     } else {
-      const titles:Record<string,string>={'/settings':'设置','/settings/account':'账户与安全','/settings/account/profile':'个人资料','/settings/notifications':'通知与提醒','/settings/ai':'AI 与模型','/settings/reports':'日报','/settings/library':'知识库','/settings/integrations':'同步与集成','/settings/data':'数据与备份','/settings/advanced':'高级','/help':'使用指南','/import':'邮箱导入'};
-      document.title='Orbit - '+(titles[location.pathname]||(location.pathname.startsWith('/reports')?'日报':location.pathname.startsWith('/library')?'知识库':location.pathname==='/assistant'?'对话':location.pathname==='/project'?'项目成长':'个人事务中心'));
+      const titles:Record<string,string>={'/settings':'设置','/settings/account':'账户与安全','/settings/account/profile':'个人资料','/settings/notifications':'通知与提醒','/settings/ai':'AI 与模型','/settings/reports':'日报','/settings/reports/delivery':'日报','/settings/statistics':'使用统计','/settings/statistics/history':'已保存报告','/settings/library':'知识库','/settings/integrations':'同步与集成','/settings/data':'数据与备份','/settings/advanced':'高级','/help':'使用指南','/import':'邮箱导入'};
+      document.title='Orbit - '+(titles[location.pathname]||(location.pathname.startsWith('/reports')?'日报':location.pathname.startsWith('/library')?'知识库':location.pathname==='/assistant'?'对话':location.pathname==='/project'?(new URLSearchParams(location.search).get('view')==='statistics'?'个人活动报告':'项目成长'):'个人事务中心'));
     }
   }, [isAuthenticated, isLoading, location.pathname,location.search]);
 
