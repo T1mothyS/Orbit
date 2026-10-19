@@ -316,7 +316,7 @@
 .schedule-ai-send-button { width: 34px; height: 34px; margin-bottom: 3px; border: 0; }
 .schedule-ai-composer-shortcut { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 .ai-message-timestamp { display: block; margin-top: 7px; color: var(--td-text-color-placeholder); font-size: 10px; font-variant-numeric: tabular-nums; line-height: 1.3; text-align: right; white-space: nowrap; }
-.ai-message-timestamp.is-user { color: rgba(255, 255, 255, .78); }
+.ai-message-timestamp.is-user { color: var(--orbit-text-secondary); }
 .ai-message-timestamp.is-error { color: #b91c1c; }
 .ai-assistant-workspace { position: relative; display: flex; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; background: var(--td-bg-color-container); }
 .ai-assistant-workspace > .schedule-ai-panel { min-width: 0; min-height: 0; flex: 1 1 auto; }
@@ -421,4 +421,3 @@
 @media (max-width: 767px) {
   .calendar-horizontal-hint { display: block; margin: 0; padding: var(--orbit-space-2) var(--orbit-space-4); font-size: var(--orbit-type-caption); color: var(--orbit-text-secondary); background: var(--orbit-surface-muted); }
 }
-.smart-time-panel { width: 220px; max-height: calc(100dvh - 16px); background: var(--orbit-elevated); border: 1px solid var(--orbit-border); }

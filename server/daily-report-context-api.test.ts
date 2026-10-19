@@ -50,6 +50,8 @@ test('authenticated versioned edits are isolated, preserve all groups, enter Clo
     const current = cloud.getDailyReportCloudContext('owner'); assert.equal(current.version, 2); assert.deepEqual(current.context.extension, { keep: true });
     const run = await digest.readDigestV2Inputs('owner', '2026-10-07');
     assert.deepEqual(run.context, updated); assert.equal(run.snapshot.contextVersion, 2);
+    for (const field of ['identity.language','background.education/career_context','professional_interests','research_projects','information_preferences','preferences.prefer','avoid','target_reading_time_minutes','evidence_policy','recent_interests.topics','watchlist.sectors','companies','stocks','thesis/monitor']) assert.ok(run.editorialGuidance.includes(field),field);
+    assert.match(run.editorialGuidance,/软性篇幅预算/); assert.match(run.editorialGuidance,/不能放宽/);
     assert.equal(run.snapshot.watchlist.status, 'complete'); assert.equal(run.snapshot.watchlist.items.length, 1);
     assert.match(run.snapshot.watchlist.items[0].detail, /合成框架/);
     assert.equal(activity.listAllDailyReports('owner').length, 0); assert.equal(activity.listDigestArtifacts('owner').length, 0);

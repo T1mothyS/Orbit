@@ -2,7 +2,7 @@
 
 - Status: CONTRACT（末尾为历史快照）
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last local verification: 2026-10-08，个人资料与日报设置入口归属；Cloud 完整 context 和版本保护合同不变。自动资料照的正式账号开关及瞬时下载恢复仍按 2026-10-07 的 `0.52.1-261007.1349` 验证时点使用；工程/运行分层结果见测试矩阵，正式自然触发与收件箱按真实时点记录。
+- Last local verification: 2026-10-19 补充逐字段消费审计及隔离 Context 新版本/指导验证，真实云端执行未验证；2026-10-08，个人资料与日报设置入口归属；Cloud 完整 context 和版本保护合同不变。自动资料照的正式账号开关及瞬时下载恢复仍按 2026-10-07 的 `0.52.1-261007.1349` 验证时点使用；工程/运行分层结果见测试矩阵，正式自然触发与收件箱按真实时点记录。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -341,3 +341,34 @@ Worker 只代下载字节，主应用仍执行签名检查、安全SVG检查、�
 ## 历史运行快照（不作为当前状态）
 
 逐次原始记录已归档到 [历史运行记录](archive/digest/CLOUD-RUN-HISTORY-20260909-20260914.md)。当前合同只维护上述章节，任务状态见 [TASKS](TASKS.md)。
+
+## Cloud 个性化字段消费审计（2026-10-19）
+
+权威入口：`src/utils/daily-report-context.ts` 的字段定义 → SettingsState/ContextEditor 完整读取并仅修改目标字段 → cloud-context PUT 的账号归属与 expectedVersion → `getDailyReportCloudContext` → `readDigestV2Inputs` 返回本次完整 context、snapshot.contextVersion、editorialGuidance → Cloud 工具消费与生产提示词 → validate/publish。只验证代码和隔离合成调用；未观察真实云端模型是否遵守，也未同步外部已保存定时任务指令。
+
+| 字段 | 代码消费与实际约束 | 审计分类/本轮结果 |
+|---|---|---|
+| profile.identity.language | 完整 Context 送入工具；明确要求输出语言 | 仅提示词，补齐映射 |
+| profile.identity.timezone | 帮助理解资料，真实 snapshot/date/cutoff/调度仍由原链路决定 | 部分生效，明确边界 |
+| profile.background.education、career_context | 调整背景解释深度 | 仅提示词，补齐映射 |
+| profile.professional_interests | 长期选题关联 | 仅提示词，补齐映射 |
+| profile.research_projects[].name、status、topics | 项目关联与主题选择，不推断项目事实 | 仅提示词，补齐映射 |
+| profile.information_preferences.answer_style | 表达风格 | 仅提示词，补齐映射 |
+| profile.information_preferences.finance_analysis | 金融分析方法取舍 | 仅提示词，补齐映射 |
+| profile.information_preferences.technology_preferences | 技术解释和方案取舍 | 仅提示词，补齐映射 |
+| preferences.prefer | 候选排序、解释关联 | 仅提示词，补齐映射 |
+| preferences.avoid | 减少低价值选题，不删已纳入输入或重大事实 | 仅提示词，补齐边界 |
+| preferences.target_reading_time_minutes | 软性篇幅预算，无机械字数/时间硬校验 | 仅提示词，明确软约束 |
+| preferences.evidence_policy | 证据优先级，不放宽服务端硬闸门 | 仅提示词，补齐映射 |
+| recent_interests.topics[].topic、priority、recency、keywords | 近期检索、排序，新鲜度描述不充当已核实事实 | 仅提示词，补齐映射 |
+| watchlist.sectors[].name、priority、focus | 选题与行业关注角度，完整 context 可见 | 仅提示词，补齐映射 |
+| watchlist.companies[].name、symbol、priority、sectors、focus | 公司方向与关注角度；不冒充股票逐项快照 | 部分生效，明确边界 |
+| watchlist.stocks[].name、symbol | 投影为逐项股票输入；验证覆盖与证据 | 已生效，保留硬约束 |
+| watchlist.stocks[].priority、sectors | 完整框架时进入 detail；同时完整 context 可见 | 部分生效，补齐提示 |
+| watchlist.stocks[].focus | 完整 context 提供，未进入股票 detail 投影 | 仅提示词，补齐映射 |
+| 旧 watchlist 数组、内嵌 thesis、thesis_file 引用 | 由共用解析器兼容读取；未知扩展原样保留 | 已生效，不迁移数据 |
+| thesis.status、priority、thesis.one_liner/pillars/positive_signals/risks/valuation_framework/disconfirming_evidence、monitor.earnings/industry/narrative | 合法完整框架进入逐项 detail（上限 4000 字符），不完整明确 partial；提供研究问题/反证/监测线索 | 部分生效，框架硬检查与编辑指导分层 |
+
+未发现上述已保存字段在 Cloud 输入序列化时丢失；不能据此宣称模型每次实际采用全部偏好。原有编辑指导只笼统提及关注方向，本轮在 read_inputs_v2 返回值和仓库生产提示词补齐显式映射。主观偏好不新增关键词硬过滤；日程/邮件/逐项关注覆盖、事实 evidence、安全和媒体完整性保持硬闸门。仅配置 companies/sectors 而缺 stocks 的既有输入警告仍按当前合同处理，不擅自把股票核查范围扩大到全部公司。
+
+Local 的外部 YAML 与独立 Shadow 有各自输入和规则，不能由本站 Context 保存自动推导成已同步、已采用或未使用。其端到端字段使用本轮证据不足，只记录差异，不改变业务或排程。普通对话与经历复盘不自动消费这些个人资料。仓库提示词更新不代表外部已保存任务更新；未执行真实生成、发布、媒体或邮件。

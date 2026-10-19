@@ -1,4 +1,5 @@
 import { createContext,useContext,type ComponentProps } from 'react';
+import { useLocation } from 'react-router-dom';
 import { SettingRow as Row,Section } from '../../ui';
 import { settingDefinition } from '../../utils/settings-registry';
 import { settingId } from '../../utils/settings-search';
@@ -6,7 +7,8 @@ import { settingId } from '../../utils/settings-search';
 const SectionId = createContext('');
 /** Semantic setting IDs are a feature concern; visuals belong exclusively to src/ui. */
 export function SettingSection({ id, ...props }: ComponentProps<typeof Section> & { id: string }) {
-  return <SectionId.Provider value={id}><Section {...props} id={`settings-${id}`} /></SectionId.Provider>;
+  const category = useLocation().pathname.split('/')[2];
+  return <SectionId.Provider value={id}><Section hideTitle={id === category} {...props} id={`settings-${id}`} /></SectionId.Provider>;
 }
 export function SettingRow({ id, keywords: _keywords, searchDescription: _search, ...props }: ComponentProps<typeof Row> & { keywords?: string[]; searchDescription?: string }) {
   const section = useContext(SectionId);

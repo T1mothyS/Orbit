@@ -44,9 +44,9 @@
   transition: background-color var(--orbit-motion-press), color var(--orbit-motion-press), border-color var(--orbit-motion-press);
 }
 .oui-button svg { flex: 0 0 auto; }
-.oui-button--primary { color: var(--orbit-on-brand); background: var(--orbit-brand); }
-.oui-button--primary:hover { background: var(--orbit-brand-hover); }
-.oui-button--primary:active { background: var(--orbit-brand-active); }
+.oui-button--primary { color: var(--orbit-action-text); background: var(--orbit-action); }
+.oui-button--primary:hover { background: var(--orbit-action-hover); }
+.oui-button--primary:active { background: var(--orbit-action-active); }
 .oui-button--secondary { color: var(--orbit-text); background: var(--orbit-elevated); border-color: var(--orbit-input-border); }
 .oui-button--secondary:hover { background: var(--orbit-muted); }
 .oui-button--secondary:active { background: var(--orbit-hover); }
@@ -220,3 +220,23 @@
 .oui-nav-item span { font-size: var(--orbit-type-caption); line-height: 1.3; }
 
 @media (max-width:1099px) { .oui-nav-item span { display:none; } }
+
+.oui-time { position: relative; min-width: 0; flex: 1; width: 100%; }
+.oui-time-input { position: relative; }
+.oui-time-input > input { width: 100%; padding-inline-end: var(--orbit-space-10); font-variant-numeric: tabular-nums; }
+.oui-time-trigger { position: absolute; inset-inline-end: 0; top: 0; height: 100%; min-width: var(--orbit-touch-target); display: grid; place-items: center; border: 0; border-radius: var(--orbit-radius-control); color: var(--orbit-text-secondary); background: transparent; cursor: pointer; }
+.oui-time-trigger:hover { background: var(--orbit-hover); }
+.oui-time-trigger:disabled { color: var(--orbit-text-disabled); cursor: default; }
+.oui-time-panel { position: fixed; z-index: var(--orbit-z-popover); width: 216px; max-height: calc(100dvh - 16px); overflow: auto; padding: var(--orbit-space-3); background: var(--orbit-elevated); color: var(--orbit-text); border: 1px solid var(--orbit-input-border); border-radius: var(--orbit-radius-panel); }
+.oui-time-lists, .oui-time-actions { display: flex; gap: var(--orbit-space-2); }
+.oui-time-lists > label { flex: 1; text-align: center; font-size: var(--orbit-type-secondary); }
+.oui-time-lists select { display: block; width: 100%; height: 140px; margin-block: var(--orbit-space-2); border: 1px solid var(--orbit-input-border); border-radius: var(--orbit-radius-control); background: var(--orbit-surface); color: var(--orbit-text); text-align: center; font-variant-numeric: tabular-nums; }
+.oui-time-lists option { padding: var(--orbit-space-1); }
+.oui-time-actions > button { flex: 1; }
+.oui-datetime { display: flex; flex-wrap: wrap; gap: var(--orbit-space-2); }
+.oui-datetime > * { flex: 1 1 130px; min-width: 0; }
+.oui-root .oui-input.oui-input--border-focus:focus { outline: none; border-color: var(--orbit-brand); box-shadow: inset 0 0 0 1px var(--orbit-brand); }
+.oui-setting-label { display:flex; align-items:center; gap:var(--orbit-space-2); }
+.oui-visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+.oui-help-trigger { display:grid; place-items:center; min-width:var(--orbit-space-8); min-height:var(--orbit-space-8); padding:0; border:0; border-radius:var(--orbit-radius-control); background:transparent; color:var(--orbit-text-secondary); cursor:pointer; }
+.oui-help-trigger:hover { color:var(--orbit-text); background:var(--orbit-hover); }

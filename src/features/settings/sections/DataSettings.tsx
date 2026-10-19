@@ -167,8 +167,8 @@ export function DataSettings({ authHeaders }: {
         <div className="settings-actions"><Button variant="secondary" disabled={!!exportBusy} loading={exportBusy === 'json'} onClick={() => downloadReadableExport('json')}>下载 JSON</Button><Button variant="secondary" disabled={!!exportBusy} loading={exportBusy === 'csv'} onClick={() => downloadReadableExport('csv')}>下载 CSV</Button></div>
       </SettingRow>
       <SettingRow label="备份密码" htmlFor="settings-backup-password" description="至少 8 位。密码遗失后无法解密，服务器不会保存该密码。">
-        <PasswordInput id="settings-backup-password" value={backupPassword} disabled={backupBusy} onChange={(event) => { setBackupPassword(String(event.target.value)); setBackupPreview(null); setBackupFile(null); }} autoComplete="new-password" placeholder="设置或输入备份密码（至少 8 位）"/>
-        <div className="settings-actions"><Button loading={backupBusy} disabled={backupBusy} onClick={exportBackup}>导出加密备份</Button></div>
+        <div className="settings-inline-save"><PasswordInput id="settings-backup-password" value={backupPassword} disabled={backupBusy} onChange={(event) => { setBackupPassword(String(event.target.value)); setBackupPreview(null); setBackupFile(null); }} autoComplete="new-password" placeholder="设置或输入备份密码（至少 8 位）"/>
+        <div className="settings-actions"><Button loading={backupBusy} disabled={backupBusy} onClick={exportBackup}>导出加密备份</Button></div></div>
       </SettingRow>
       <SettingRow label="选择备份文件" htmlFor="settings-backup-file" description="先填写该备份的密码，再选择文件检查内容。">
         <FilePicker id="settings-backup-file" label="选择备份文件" disabled={backupBusy} accept=".aicalendar-backup,application/octet-stream" onFile={file => void inspectBackup(file)} />

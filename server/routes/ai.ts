@@ -1,3 +1,5 @@
+import { activityReportChatText } from '../activity-report-chat.js';
+import { chatTimelinePage } from '../chat-timeline.js';
 import { getNotification } from '../activity-store.js';
 import { notificationObject, notificationContinuation } from '../notification-chat.js';
 import { ORBIT_AI_QUERY_POLICY } from '../orbit-ai-policy.js';
@@ -64,7 +66,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
   const app = Router();
   const user = (req: any) => req.user.userId as string;
   const safe = (fn: (req: any, res: any) => any) => (req: any, res: any) => { try { fn(req, res); } catch (error: any) { res.status(400).json({ error: error.message }); } };
-  const requestView = (row: orbit.ChatRequest) => ({ id: row.id, conversationId: row.conversation_id, state: row.state, text: JSON.parse(row.body).text, error: row.error, createdAt: row.created_at,steps:queryAll('SELECT id,label,state,query,at FROM orbit_request_steps WHERE user_id=? AND request_id=? ORDER BY at',[row.user_id,row.id]) });
+  const requestView = (row: orbit.ChatRequest) => ({ id: row.id, conversationId: row.conversation_id, userMessageId: `orbit-user:${row.user_id}:${row.id}`, state: row.state, text: JSON.parse(row.body).text, error: row.error, createdAt: row.created_at,steps:queryAll('SELECT id,label,state,query,at FROM orbit_request_steps WHERE user_id=? AND request_id=? ORDER BY at',[row.user_id,row.id]) });
   app.get('/api/orbit/conversations', authenticate, safe((req,res) => res.json({ conversations: orbit.listConversations(user(req)) })));
   app.get('/api/orbit/providers',authenticate,safe((req,res)=>res.json({providers:[{id:'workbuddy',name:'WorkBuddy',connected:!!resolveCodeBuddyCredential(user(req))},{id:'chatgpt',name:'ChatGPT',...chatGPTStatus(user(req))}]})));
   app.get('/api/orbit/search',authenticate,safe((_req,res)=>res.json(searchStatus())));
@@ -126,9 +128,12 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       cleanupAiScheduleHistory(payload.userId);
       const cid = String(req.query.conversationId || orbit.ensureDefaultConversation(payload.userId));
       orbit.conversation(payload.userId,cid);
-      const messages = queryAll<dbModule.DbAiScheduleMessage>('SELECT * FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? ORDER BY created_at,rowid',[payload.userId,cid]);
+      const page = req.query.limit ? chatTimelinePage(payload.userId, cid, req.query) : undefined;
+      const messageIds = page?.entries.filter(entry => entry.kind === 'message').map(entry => entry.id);
+      const messages = queryAll<dbModule.DbAiScheduleMessage>(`SELECT * FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? ${messageIds ? `AND id IN (${messageIds.map(() => '?').join(',') || 'NULL'})` : ''} ORDER BY created_at,rowid`,[payload.userId,cid,...(messageIds || [])]);
+      const timelineRequests = page?.entries.filter(entry => entry.kind === 'request').flatMap(entry => { const row = orbit.getRequest(payload.userId, entry.id); return row ? [requestView(row)] : []; });
       hydratePendingAiSchedulePlans(payload.userId, messages);
-      res.json({ messages: messages.map(m => {const view=toAiScheduleHistoryMessage(m);if(view.plan?.id)view.plan=buildAiPlanSnapshot(resolveAiPlan(payload.userId,view.plan.id)!);if(view.orbitMeta?.notificationId)Object.assign(view.orbitMeta,notificationView(payload.userId,view.orbitMeta.notificationId));if(view.orbitMeta?.eventId){const event=proactiveEventView(payload.userId,view.orbitMeta.eventId);if(!view.orbitMeta.notificationId||event.state==='handled')Object.assign(view.orbitMeta,event);}if(Array.isArray(view.scheduleItems)) view.scheduleItems=view.scheduleItems.flatMap((item:any)=>{const live=scheduleStore.getSchedule(item.id);return live?.user_id===payload.userId?[live]:[];});return view;}) });
+      res.json({ ...(page ? {requests:timelineRequests,nextBefore:page.nextBefore,start:page.start} : {}), messages: messages.map(m => {const view=toAiScheduleHistoryMessage(m);if(view.plan?.id)view.plan=buildAiPlanSnapshot(resolveAiPlan(payload.userId,view.plan.id)!);if(view.orbitMeta?.notificationId){Object.assign(view.orbitMeta,notificationView(payload.userId,view.orbitMeta.notificationId));const notice=getNotification(view.orbitMeta.notificationId,payload.userId);if(notice?.sourceType==='activity_report'&&notice.kind==='weekly_report')view.text=notice.title+'\n\n'+activityReportChatText(payload.userId,notice.sourceId);}if(view.orbitMeta?.eventId){const event=proactiveEventView(payload.userId,view.orbitMeta.eventId);if(!view.orbitMeta.notificationId||event.state==='handled')Object.assign(view.orbitMeta,event);}if(Array.isArray(view.scheduleItems)) view.scheduleItems=view.scheduleItems.flatMap((item:any)=>{const live=scheduleStore.getSchedule(item.id);return live?.user_id===payload.userId?[live]:[];});return view;}) });
     } catch (error: any) {
       console.error("[AI History] Error:", error);
       res.status(400).json({ error: '无法读取这个会话' });

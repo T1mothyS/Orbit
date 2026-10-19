@@ -3,136 +3,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { SCHEDULE_CATEGORIES } from '../../utils/scheduleCategories';
 import { CATEGORY_COLORS, formatScheduleDate, formatTime, PRIORITY_COLORS, toDateKey, shiftDateKey, linkedEndTime } from './schedule-presentation';
 import type { Schedule } from './schedule-types';
+import { TimePicker, isClockTime } from '../../ui';
 import { useDialogLifecycle } from '../../hooks/useDialogLifecycle';
-
-function SmartTimePicker({
-  value,
-  onChange,
-  label,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  label?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const hours = Array.from({ length: 24 }, (_, i) => i);
-  const minutes = Array.from({ length: 60 }, (_, i) => i);
-
-  const currentHour = parseInt(value?.split(':')[0] || '0');
-  const currentMinute = parseInt(value?.split(':')[1] || '0');
-  const [selHour, setSelHour] = useState(currentHour);
-  const [selMinute, setSelMinute] = useState(currentMinute);
-  const hourRef = useRef<HTMLSelectElement>(null);
-  const minRef = useRef<HTMLSelectElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const confirmRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [panelPosition, setPanelPosition] = useState({ left: 8, top: 8 });
-  useLayoutEffect(() => {
-    if (!open) return;
-    const trigger = triggerRef.current?.getBoundingClientRect(), panel = panelRef.current?.getBoundingClientRect();
-    if (trigger && panel) setPanelPosition({
-      left: Math.max(8, Math.min(trigger.left, innerWidth - panel.width - 8)),
-      top: trigger.bottom + panel.height + 4 <= innerHeight - 8 ? trigger.bottom + 4 : Math.max(8, trigger.top - panel.height - 4),
-    });
-    hourRef.current?.focus({ preventScroll: true });
-  }, [open]);
-  const dismiss = () => { setOpen(false); triggerRef.current?.focus({ preventScroll: true }); };
-
-  const handleConfirm = () => {
-    onChange(`${String(selHour).padStart(2, '0')}:${String(selMinute).padStart(2, '0')}`);
-    dismiss();
-  };
-
-  return (
-    <div className="smart-time-picker relative flex-1" onBlur={event => {
-      if (open && event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-    }} onKeyDown={event => {
-      if (open && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismiss(); }
-    }}>
-      <button
-        type="button"
-        ref={triggerRef}
-        aria-expanded={open}
-        onClick={() => {
-          if (open) dismiss();
-          else { setSelHour(currentHour); setSelMinute(currentMinute); setOpen(true); }
-        }}
-        className="w-full px-3 py-2 rounded-lg text-sm text-left flex items-center justify-between transition-all"
-        style={{
-          backgroundColor: 'var(--td-bg-color-component)',
-          color: 'var(--td-text-color-primary)',
-          border: `1.5px solid ${open ? 'var(--td-brand-color)' : 'var(--td-component-stroke)'}`,
-        }}
-      >
-        <div className="flex items-center gap-2">
-          {label && <span className="text-xs" style={{ color: 'var(--td-text-color-secondary)' }}>{label}</span>}
-          <span className="font-mono">{value || '00:00'}</span>
-        </div>
-        <Clock aria-hidden="true" className="w-4 h-4" style={{ color: 'var(--td-text-color-secondary)' }} />
-      </button>
-
-      {open && (
-        <div
-          ref={panelRef}
-          role="group"
-          aria-label={`${label || ''}时间选择`}
-          className="smart-time-panel fixed z-50 rounded-xl shadow-2xl overflow-auto"
-          style={panelPosition}
-        >
-          <div className="flex">
-            {/* 小时滚轮 */}
-            <div className="flex-1 border-r" style={{ borderColor: 'var(--td-component-stroke)' }}>
-              <div className="px-2 py-1.5 text-xs text-center font-medium" style={{ color: 'var(--td-text-color-secondary)', borderBottom: '1px solid var(--td-component-stroke)' }}>
-                时
-              </div>
-              <select ref={hourRef} size={5} aria-label={`${label || ''}时间：小时`} value={selHour}
-                className="smart-time-list" onChange={event => setSelHour(Number(event.target.value))}
-                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); minRef.current?.focus(); } }}>
-                {hours.map(h => (
-                  <option key={h} value={h}>{String(h).padStart(2, '0')}</option>
-                ))}
-              </select>
-            </div>
-            {/* 分钟滚轮 */}
-            <div className="flex-1">
-              <div className="px-2 py-1.5 text-xs text-center font-medium" style={{ color: 'var(--td-text-color-secondary)', borderBottom: '1px solid var(--td-component-stroke)' }}>
-                分
-              </div>
-              <select ref={minRef} size={5} aria-label={`${label || ''}时间：分钟`} value={selMinute}
-                className="smart-time-list" onChange={event => setSelMinute(Number(event.target.value))}
-                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); confirmRef.current?.focus(); } }}>
-                {minutes.map(m => (
-                  <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          {/* 确认按钮 */}
-          <div className="px-3 py-2 border-t flex gap-2" style={{ borderColor: 'var(--td-component-stroke)' }}>
-            <button
-              type="button"
-              onClick={dismiss}
-              className="flex-1 py-1.5 rounded-lg text-xs font-medium"
-              style={{ backgroundColor: 'var(--td-bg-color-component)', color: 'var(--td-text-color-secondary)' }}
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              ref={confirmRef}
-              onClick={handleConfirm}
-              className="flex-1 py-1.5 rounded-lg text-xs font-medium"
-              style={{ backgroundColor: 'var(--td-brand-color)', color: '#fff' }}
-            >
-              确定
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function ReminderPicker({
   value,
@@ -328,6 +200,7 @@ export function ScheduleFormModal({
 
   const handleSave = async () => {
     if (savingRef.current || !form.title.trim()) return;
+    if (!isUnscheduled && !form.all_day && (!isClockTime(form.startTime) || (form.type === 'event' && !isClockTime(form.endTime)))) { setError('请输入有效的时间（00:00–23:59）'); return; }
     if (!isUnscheduled && (!/^\d{4}-\d{2}-\d{2}$/.test(form.date) || Number.isNaN(Date.parse(form.date)))) {
       setError('请选择执行日期'); return;
     }
@@ -515,16 +388,16 @@ export function ScheduleFormModal({
               </label>
               {!form.all_day && (
                 <div className="flex gap-3 items-center">
-                  <SmartTimePicker
+                  <TimePicker
                     value={form.startTime}
                     onChange={v => {
                       setError('');
-                      setForm(prev => ({ ...prev, startTime: v, ...linkedEndTime(prev.date, v, prev.endDate, prev.endTime) }));
+                      setForm(prev => ({ ...prev, startTime: v, ...(isClockTime(v) ? linkedEndTime(prev.date, v, prev.endDate, prev.endTime) : {}) }));
                     }}
                     label="开始"
                   />
                   <span style={{ color: 'var(--td-text-color-secondary)', fontSize: '12px' }}>至</span>
-                  <SmartTimePicker
+                  <TimePicker
                     value={form.endTime}
                     onChange={v => set('endTime', v)}
                     label="结束"
@@ -543,7 +416,7 @@ export function ScheduleFormModal({
                 待办时间点
               </div>
               <div className="flex gap-3 items-center">
-                <SmartTimePicker
+                <TimePicker
                   value={form.startTime}
                   onChange={v => set('startTime', v)}
                   label="时间点"

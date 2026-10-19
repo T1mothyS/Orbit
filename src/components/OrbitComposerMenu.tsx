@@ -35,7 +35,7 @@ export function OrbitComposerMenu({ ai, onClose, onAttach, onNew, children, busy
           <button type="button" onClick={() => setView('history')}><MessageSquare size={20} /><span><strong>历史对话</strong><small>继续对话、管理历史和提醒偏好</small></span><ChevronRight size={16} /></button>
           <button type="button" disabled={busy} onClick={onNew}><Plus size={20} /><span><strong>新建对话</strong><small>当前输入会保留为草稿</small></span><ChevronRight size={16} /></button>
         </div> : view === 'models' ? <div className="orbit-composer-models">
-          <p>{ai.provider === 'chatgpt' ? 'ChatGPT' : 'Work Buddy'} · 记住上次选择</p>
+          <p>{ai.provider === 'chatgpt' ? 'ChatGPT' : 'WorkBuddy'} · 记住上次选择</p>
           <label htmlFor="orbit-concrete-model">具体模型</label>
           <select id="orbit-concrete-model" value={ai.model} disabled={ai.loading || ai.saving || !ai.models.length} onChange={event => void ai.chooseModel(event.target.value)}>
             {!ai.models.some(model => model.id === ai.model) && <option value={ai.model}>{ai.model ? `${ai.model} · 暂不可用` : '请选择模型'}</option>}

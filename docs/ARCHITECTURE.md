@@ -2,7 +2,7 @@
 
 - Status: LIVING
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Source review: 2026-10-18 核对 Settings V3、共享状态、Shell/搜索与帮助；其他领域按对应日期记录解释。版本源为 package.json，验证结果见 TEST-MATRIX；不据本地源码推断真实服务、设备或生产。
+- Source review: 2026-10-19 补充独立 /import、联合游标历史和周报聊天显示；2026-10-18 核对 Settings V3、共享状态、Shell/搜索与帮助；其他领域按对应日期记录解释。版本源为 package.json，验证结果见 TEST-MATRIX；不据本地源码推断真实服务、设备或生产。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
@@ -359,3 +359,13 @@ Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓�
 - `orbit_profiles` 只存账号头像附件 ID。JPEG/PNG/WebP ≤5 MB，复用图片签名/配额/文件存储，sharp 转 256px WebP 并清除 EXIF。`GET /api/orbit/profile` 和头像 GET/POST/DELETE 必须认证；响应 private/no-store。
 - 账号备份 orbit.connected 保存事件/报告/偏好/头像映射/通知消息映射，文件沿现有 attachments 备份。旧备份缺字段兼容；跨账号恢复保留历史证据并停用原账号链接，自动周报保持关闭；未发送通知转 suppressed。删除/清空账号清理所有新表。
 - 首次新增报告表前在运行数据目录 migration-backups 保存既有 SQLite 文件；正常跨库事务保留 undo 恢复。回滚需停服务、保留当前新增数据，再恢复对应四库快照并切回原代码；不能以恢复旧数据库保留升级后新数据。生产迁移、部署、真实 AI/SMTP 与收件箱验收分别授权。
+
+## 对话历史与邮箱工具路由（2026-10-19）
+
+`/import` 是 AppShell/PageFrame 下的独立邮箱导入页，不装载对话工具栏或记事板；头像菜单直接进入。`/assistant?tool=email-import` 使用 replace 兼容跳转并移除 tool 参数，保留其余查询参数；站内安全来源用于“返回”，直接访问回退到 /assistant。邮箱识别、草稿确认与账号级 API 不变。
+
+`GET /api/ai-schedule/history` 保留无 limit 时的旧响应；新 UI 传 limit（默认 60，最大 100）使用消息与请求联合游标分页，包含尚未产生日志消息的失败/中断请求。响应附 requests、start、nextBefore；before 加载更早页，after 重新读取已加载的当前窗口（含边界时刻全部记录，防止排队后迟到的用户消息丢失）并合并新记录，不能与 before 同用。游标包含排序时间、记录类型和已有 ID，账号/会话所有权仍先验证。时间以首次提交为准；复用确定性的 orbit-user:<userId>:<requestId> 用户消息 ID，不新增持久关联字段。重试保持 request ID/createdAt，步骤与状态更新不重新追加卡片。
+
+客户端保留已加载消息/请求并按原提交位置排序；最新 40 条请求端点仍用于队列恢复，不是完整历史的唯一来源。更早记录由按钮按需加载并补偿滚动高度；消息深链接按页读取直到目标可见，保持按需读取；清空、切换和删除不能被未完成旧读取回填。只有新增消息序列在读者跟随底部时触发滚动，状态刷新不滚动。历史窗口的扩大由用户加载或当前新消息驱动，不在首次进入加载全会话。
+
+已识别个人周报的站内正文基于通知关联、当前账号拥有的冻结快照生成，事项以标题链接显示，日期和事实摘要保留。历史 DB 原文、邮件文本和用户普通消息不改写；快照已删除时显示不可访问状态，不回显旧的 ID/裸链接。站内不再用字符 slice 截断 Markdown。

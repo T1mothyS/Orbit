@@ -90,13 +90,14 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
       }
       await arm(automated, '测试：下次日程取消放弃'); await newSchedule(automated);
       await automated.getByLabel('日程标题', { exact: true }).fill(`合成自动化时间 ${width}`);
-      await automated.getByRole('button', { name: /^开始\s*09:00$/ }).click();
+      await automated.getByRole('button', { name: '选择开始', exact: true }).click();
       await automated.getByLabel('开始时间：小时', { exact: true }).press('ArrowDown');
       await automated.getByLabel('开始时间：小时', { exact: true }).press('Enter');
       await automated.getByLabel('开始时间：分钟', { exact: true }).press('ArrowDown');
       await automated.getByLabel('开始时间：分钟', { exact: true }).press('Space');
-      await automated.locator('.smart-time-panel').getByRole('button', { name: '确定', exact: true }).press('Enter');
-      assert.ok(await automated.getByRole('button', { name: /^开始\s*10:01$/ }).evaluate(el => el === document.activeElement));
+      await automated.locator('.oui-time-panel').getByRole('button', { name: '确定', exact: true }).press('Enter');
+      assert.ok(await automated.getByRole('button', { name: '选择开始', exact: true }).evaluate(el => el === document.activeElement));
+      assert.equal(await automated.getByLabel('开始', { exact: true }).inputValue(), '10:01');
       await automated.getByLabel('关闭日程编辑', { exact: true }).click(); assert.equal(await automated.getByRole('dialog', { name: '新增日程', exact: true }).count(), 1);
       await automated.getByRole('dialog', { name: '新增日程', exact: true }).getByRole('button', { name: '添加日程', exact: true }).click();
       await automated.getByRole('dialog', { name: '新增日程', exact: true }).waitFor({ state: 'detached' });

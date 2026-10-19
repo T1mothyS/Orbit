@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 export interface OrbitConversation {
     id: string;
     title: string;
@@ -9,6 +9,7 @@ export interface OrbitConversation {
 }
 export interface OrbitRequest {
     id: string;
+    userMessageId?: string;
     text: string;
     state: string;
     error?: string;
@@ -17,9 +18,14 @@ export interface OrbitRequest {
 }
 export function useOrbitChat(authHeaders: () => Record<string, string>, authenticated: boolean) {
     const [params, setParams] = useSearchParams();
+    const location = useLocation(), navigationState = useRef(location.state);
+    navigationState.current = location.state;
     const [conversations, setConversations] = useState<OrbitConversation[]>([]);
     const [requests, setRequests] = useState<OrbitRequest[]>([]);
     const [history, setHistory] = useState<any[]>([]);
+    const [nextBefore, setNextBefore] = useState<string | null>(null), [loadingOlder, setLoadingOlder] = useState(false);
+    const startCursor = useRef<string | null>(null), olderBusy = useRef(false);
+    const merge = <T extends {id:string}>(previous:T[], incoming:T[]) => { const rows = new Map(previous.map(row => [row.id,row])); for (const row of incoming) rows.set(row.id,row); const next = [...rows.values()]; return JSON.stringify(next) === JSON.stringify(previous) ? previous : next; };
     const [error, setError] = useState('');
     const [refreshError, setRefreshError] = useState('');
     const [autoKnowledge, setAutoKnowledge] = useState(false);
@@ -37,7 +43,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
         id: string;
     } | null>(null);
     const cid = params.get('conversation') || '';
-    const refreshRevision = useRef(0);
+    const refreshRevision = useRef(0), historyEpoch = useRef(0);
     const current = useRef(cid);
     current.current = cid;
     const api = useCallback(async (path: string, method = 'GET', body?: unknown) => {
@@ -49,21 +55,34 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     }, [authHeaders]);
     const select = useCallback((id: string) => {
         current.current = id;
-        setParams(previous => { const next = new URLSearchParams(previous); next.set('conversation', id); return next; });
+        setParams(previous => { const next = new URLSearchParams(previous); next.set('conversation', id); return next; }, { state: navigationState.current });
     }, [setParams]);
     const refresh = useCallback(async () => {
         if (!cid || mutatingRef.current)
             return;
         const revision = ++refreshRevision.current;
-        const [messages, jobs, list] = await Promise.all([api(`/api/ai-schedule/history?conversationId=${encodeURIComponent(cid)}`), api(`/api/orbit/requests?conversationId=${encodeURIComponent(cid)}`),api('/api/orbit/conversations')]);
+        const [messages, jobs, list] = await Promise.all([api(`/api/ai-schedule/history?conversationId=${encodeURIComponent(cid)}&limit=60${startCursor.current ? `&after=${encodeURIComponent(startCursor.current)}` : ''}`), api(`/api/orbit/requests?conversationId=${encodeURIComponent(cid)}`),api('/api/orbit/conversations')]);
         if (current.current !== cid || refreshRevision.current !== revision)
             return;
         setRefreshError('');
-        setHistory(previous => JSON.stringify(previous) === JSON.stringify(messages.messages) ? previous : messages.messages);
-        setRequests(previous => JSON.stringify(previous) === JSON.stringify(jobs.requests) ? previous : jobs.requests);
+        setHistory(previous => merge(previous, messages.messages));
+        startCursor.current = messages.start || startCursor.current; setNextBefore(messages.nextBefore || null);
+        setRequests(previous => merge(previous, [...jobs.requests, ...(messages.requests || [])]));
         setConversations(previous=>JSON.stringify(previous)===JSON.stringify(list.conversations)?previous:list.conversations);
         if(document.visibilityState==='visible' && list.conversations.some((c:OrbitConversation)=>c.id===cid && c.unread)) await api(`/api/orbit/conversations/${encodeURIComponent(cid)}/read`,'POST',{observedAt:messages.messages.at(-1)?.timestamp});
     }, [api, cid]);
+    const loadOlder = useCallback(async () => {
+        if (!nextBefore || olderBusy.current) return;
+        olderBusy.current = true; setLoadingOlder(true);
+        const selected = cid, epoch = historyEpoch.current;
+        try { const page = await api(`/api/ai-schedule/history?conversationId=${encodeURIComponent(cid)}&limit=60&before=${encodeURIComponent(nextBefore)}`);
+            if (current.current !== selected || historyEpoch.current !== epoch || mutatingRef.current) return;
+            ++refreshRevision.current;
+            setHistory(previous => merge(page.messages, previous));
+            setRequests(previous => merge(page.requests || [], previous));
+            startCursor.current = page.start || startCursor.current; setNextBefore(page.nextBefore || null);
+        } finally { olderBusy.current = false; setLoadingOlder(false); }
+    }, [api, cid, nextBefore]);
     const refreshConversations = useCallback(async () => {
         const data = await api('/api/orbit/conversations');
         setConversations(data.conversations);
@@ -89,6 +108,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     useEffect(() => {
         if (!authenticated || !cid)
             return;
+        startCursor.current = null; setNextBefore(null);
         setHistory([]);
         setRequests([]);
         setError(''); setRefreshError('');
@@ -151,7 +171,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     const rename = useCallback(async (title: string, id=cid) => { await api(`/api/orbit/conversations/${encodeURIComponent(id)}`, 'PATCH', { title }); await refreshConversations(); }, [api, cid, refreshConversations]);
     const remove = useCallback(async (id=cid) => {
         if (mutatingRef.current || creatingRef.current || submittingRef.current) throw new Error('请等待当前操作结束');
-        mutatingRef.current = true; setMutating(true); ++refreshRevision.current;
+        mutatingRef.current = true; setMutating(true); ++refreshRevision.current; ++historyEpoch.current;
         try {
             const result = await api(`/api/orbit/conversations/${encodeURIComponent(id)}`, 'DELETE');
             if (result.attachmentCleanupPending) setError('对话已删除，部分附件文件清理失败，请联系管理员检查存储权限。');
@@ -163,16 +183,16 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     }, [api, cid, conversations, refreshConversations, select]);
     const clear = useCallback(async (id=cid) => {
         if (!id || mutatingRef.current || creatingRef.current || submittingRef.current) throw new Error('请等待当前操作结束');
-        mutatingRef.current = true; setMutating(true); ++refreshRevision.current;
+        mutatingRef.current = true; setMutating(true); ++refreshRevision.current; ++historyEpoch.current;
         try {
             const result = await api(`/api/ai-schedule/history?conversationId=${encodeURIComponent(id)}`, 'DELETE');
             if (result.attachmentCleanupPending) setError('历史已清空，部分附件文件清理失败，请联系管理员检查存储权限。');
-            if (current.current === id) { pendingSubmission.current = null; setHistory([]); setRequests([]); }
+            if (current.current === id) { pendingSubmission.current = null; startCursor.current = null; setNextBefore(null); setHistory([]); setRequests([]); }
         } finally { mutatingRef.current = false; setMutating(false); }
         try { await refresh(); } catch { setRefreshError('历史已清空，状态暂时无法刷新；正在重新连接…'); }
     }, [api, cid, refresh]);
     const preference = useCallback(async (value: boolean) => { await api('/api/orbit/preferences', 'PATCH', { autoKnowledge: value }); setAutoKnowledge(value); }, [api]);
     const proactivePreference=useCallback(async(value:boolean)=>{await api('/api/orbit/preferences','PATCH',{proactiveEnabled:value});setProactiveEnabled(value);},[api]);
     const reminderAction=useCallback(async(id:string,action:string)=>{await api(`/api/orbit/reminders/${encodeURIComponent(id)}/${action}`,'POST',{});await refresh();},[api,refresh]);
-    return { cid, conversations, requests, history, error, refreshError, setError, autoKnowledge,proactiveEnabled,runnerEnabled, submitting, creating, mutating, select, create, send, action, rename, remove, clear, preference,proactivePreference,reminderAction, refresh };
+    return { cid, conversations, requests, history, nextBefore, loadingOlder, loadOlder, error, refreshError, setError, autoKnowledge,proactiveEnabled,runnerEnabled, submitting, creating, mutating, select, create, send, action, rename, remove, clear, preference,proactivePreference,reminderAction, refresh };
 }

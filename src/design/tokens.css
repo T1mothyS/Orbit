@@ -24,6 +24,10 @@
   --orbit-border-strong: #b5b5b5;
   --orbit-input-border: #949494;
   --orbit-brand: rgb(var(--orbit-brand-rgb));
+  --orbit-action: var(--orbit-brand);
+  --orbit-action-text: var(--orbit-on-brand);
+  --orbit-action-hover: var(--orbit-brand-hover);
+  --orbit-action-active: var(--orbit-brand-active);
   --orbit-brand-hover: #1d4ed8;
   --orbit-brand-active: #1e40af;
   --orbit-brand-soft: #eff4ff;
@@ -69,6 +73,10 @@
 #root { isolation: isolate; }
 
 .dark {
+  --orbit-action: #344f78;
+  --orbit-action-text: #f1f5fc;
+  --orbit-action-hover: #3d5c8b;
+  --orbit-action-active: #2c4366;
   color-scheme: dark;
   --orbit-background-rgb: 18 18 18;
   --orbit-foreground-rgb: 245 245 245;

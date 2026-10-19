@@ -92,17 +92,17 @@ for (const width of [390, 1440]) test(`header search ${width}: keyboard, empty r
 test('report email automatic save preserves notification drafts and the shared saved address', async ({ context, page }) => {
   const headers = await login(context, 'preview-notifications');
   await page.goto(base + '/settings/notifications'); await page.getByLabel('提醒收件邮箱', { exact: true }).fill('draft@example.invalid');
-  await page.getByRole('switch', { name: '免打扰时段', exact: true }).click(); await page.getByLabel('免打扰开始时间').fill('23:00');
+  await page.getByRole('switch', { name: '免打扰时段', exact: true }).click(); await page.getByLabel('免打扰开始时间', {exact:true}).fill('23:00');
   await page.getByRole('navigation', { name: '设置分类' }).getByRole('link', { name: '日报', exact: true }).click();
   await page.getByRole('tab',{name:'接收与邮件',exact:true}).click(); await page.getByRole('switch', { name: '日报邮件', exact: true }).click(); await expect(page.getByRole('region',{name:'日报邮件',exact:true}).getByText('设置已保存并回读确认。', { exact: true })).toBeVisible();
   let preference = (await (await context.request.get(base + '/api/notification-preferences', { headers })).json()).preference;
   expect(preference.reminderEmail).not.toBe('draft@example.invalid'); expect(preference.reportEmailEnabled).toBe(true);
   await page.getByRole('navigation', { name: '设置分类' }).getByRole('link', { name: '通知与提醒', exact: true }).click();
-  await expect(page.getByLabel('提醒收件邮箱', { exact: true })).toHaveValue('draft@example.invalid'); await expect(page.getByLabel('免打扰开始时间')).toHaveValue('23:00');
+  await expect(page.getByLabel('提醒收件邮箱', { exact: true })).toHaveValue('draft@example.invalid'); await expect(page.getByLabel('免打扰开始时间', {exact:true})).toHaveValue('23:00');
   await page.getByRole('button', { name: '保存邮箱', exact: true }).click(); await expect(page.getByRole('button', { name: '保存邮箱', exact: true })).toBeEnabled();
   preference = (await (await context.request.get(base + '/api/notification-preferences', { headers })).json()).preference;
   expect(preference.reminderEmail).toBe('draft@example.invalid'); expect(preference.reportEmailEnabled).toBe(true); expect(preference.quietStart).not.toBe('23:00');
-  await expect(page.getByLabel('免打扰开始时间')).toHaveValue('23:00');
+  await expect(page.getByLabel('免打扰开始时间', {exact:true})).toHaveValue('23:00');
 });
 test('legacy URLs, global setting search, unknown targets and forbidden targets stay explicit', async ({ context, page }) => {
   await login(context);
@@ -133,7 +133,7 @@ test('leaving Settings protects ordinary drafts; returning to an AI category cle
 });
 test('help only appends a controlled question to the existing conversation and never sends it', async ({ context, page }) => {
   await login(context); await page.goto(base + '/assistant'); const input = page.getByLabel('AI 助手输入框', { exact: true }); await input.fill('existing draft'); await expect(page).toHaveURL(/conversation=/);
-  let sends = 0; page.on('request', request => { if (request.method() === 'POST' && /\/api\/(?:ai-chat|orbit\/conversations\/[^/]+\/requests)$/.test(request.url())) sends++; });
+  let sends = 0; page.on('request', request => { if (request.method() === 'POST' && /\/api\/(?:ai-chat|orbit\/requests|orbit\/conversations\/[^/]+\/requests)$/.test(request.url())) sends++; });
   await page.getByRole('button', { name: '个人菜单', exact: true }).click(); await page.getByRole('menuitem', { name: '使用指南', exact: true }).or(page.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '使用指南', exact: true })).click();
   await page.getByRole('button', { name: '询问 AI：提醒与通知', exact: true }).click();
   await expect(input).toHaveValue(/^existing draft\n\nOrbit 的邮件/); expect(sends).toBe(0); await page.reload(); await expect(input).toHaveValue(/^existing draft\n\nOrbit 的邮件/); expect(sends).toBe(0);

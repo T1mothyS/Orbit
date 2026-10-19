@@ -1,3 +1,4 @@
+import { TimePicker, isClockTime } from '../ui';
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clipboard, Mail, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { ActionRow, Button, Input } from '../ui';
@@ -83,6 +84,7 @@ export function AiImportPage() {
   const update = (key: keyof Draft, value: any) => setDraft(current => current ? { ...current, [key]: value } : current);
 
   const confirm = async () => {
+    if (draft?.dueTime && !isClockTime(draft.dueTime)) { setNotice({type:'error', message:'请输入有效的提醒时间（00:00–23:59）'}); return; }
     if (!record || !draft) return;
     setBusy(true);
     try {
@@ -170,7 +172,6 @@ export function AiImportPage() {
   return <div className="oui-root ai-import-page">
     <header className="ai-import-header">
       <div>
-        <div className="eyebrow">AI INBOX · EMAIL IMPORT</div>
         <h1>邮箱导入</h1>
         <p>把邮箱里收到的账单、通知和待办内容交给 AI，生成待确认草稿。</p>
       </div>
@@ -236,7 +237,7 @@ export function AiImportPage() {
           <label className={lowConfidence('title') ? 'low-confidence' : ''}>标题<Input value={draft.title} onChange={event => update('title', event.target.value)} /></label>
           <label>创建为<select value={draft.kind} onChange={event => update('kind', event.target.value)}><option value="schedule">待办日程</option><option value="recurring">周期事务</option></select></label>
           <label className={lowConfidence('dueDate') ? 'low-confidence' : ''}>到期日期<Input type="date" value={draft.dueDate} onChange={event => update('dueDate', event.target.value)} /></label>
-          <label>时间<Input type="time" value={draft.dueTime || ''} onChange={event => update('dueTime', event.target.value || null)} /></label>
+          <label>时间<TimePicker label="导入提醒时间" required={false} value={draft.dueTime || ''} onChange={value => update('dueTime', value || null)} /></label>
           {draft.kind === 'recurring' && <><label>事务类型<select value={draft.templateKey} onChange={event => update('templateKey', event.target.value)}><option value="subscription">订阅续费</option><option value="insurance">保险</option><option value="document">证件</option><option value="membership">会员</option><option value="rent">房租</option><option value="utilities">水电账单</option><option value="vehicle_inspection">车辆年检</option><option value="custom">自定义</option></select></label><label>周期<select value={draft.recurrence.frequency} onChange={event => update('recurrence', { ...draft.recurrence, frequency: event.target.value })}><option value="once">单次</option><option value="monthly">每月</option><option value="yearly">每年</option><option value="interval">固定间隔</option></select></label></>}
           <label className="full">提醒提前天数<Input value={draft.reminderOffsets.join(',')} onChange={event => update('reminderOffsets', event.target.value.split(/[,，\s]+/).map(Number).filter(Number.isFinite))} /></label>
           <label className="full">下一步操作<Input value={draft.actionGuide} onChange={event => update('actionGuide', event.target.value)} /></label>

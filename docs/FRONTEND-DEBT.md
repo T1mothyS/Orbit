@@ -124,3 +124,5 @@ C1–C4 checkpoint依次为ea8bca1、84d0f9e、86aed95、0b4ffaf，C5独立收�
 ### 第二阶段布局接纳与发布（2026-10-18）
 
 用户在统一发布任务中明确接纳第二阶段布局，并授权复核后更新 Windows/Linux 帮助页批准基线。各平台仅更新四尺寸明暗共8张 `help-*` 图片；平台来源与哈希记录在 `tests/ui/visual-policy.json` 和 `tests/ui/baselines/linux-provenance.json`。此前 C1–C5 的候选结果和待批准状态保留为当时证据；本次接纳关闭用户视觉批准待办，不自动将旧的失败运行改为通过。发布前仍须执行严格比较，不改变阈值、重试、账号隔离或业务断言；运行与服务器验收结果见本次发布记录。
+
+第三轮 B—F（2026-10-19）：用户已接纳阶段 A Demo；共享时刻迁移、消息正文、安全边界、时间线分页、独立邮箱、设置布局及 Cloud 字段指导已落地。原 SmartTimePicker 已移入 src/ui，时长/日期语义不合并；消息/请求使用既有 ID。新增图片为候选，整轮视觉需审阅，既有批准基线保持。详情以 UI-GUIDELINES / ARCHITECTURE / CHATGPT-WORK-CLOUD 为准。

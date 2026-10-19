@@ -11,6 +11,7 @@ import { moduleSettingsPath } from './utils/module-settings';
 
 const AdminModal = lazy(() => import('./components/AdminModal').then(module => ({ default: module.AdminModal })));
 const SchedulePage = lazy(() => import('./pages/SchedulePage').then(module => ({ default: module.SchedulePage })));
+const ImportPage = lazy(() => import('./pages/ImportPage').then(module => ({ default: module.ImportPage })));
 const AiAssistantPage = lazy(() => import('./pages/AiAssistantPage').then(module => ({ default: module.AiAssistantPage })));
 const ReminderPage = lazy(() => import('./components/ReminderPage').then(module => ({ default: module.ReminderPage })));
 const DailyReportsPage = lazy(() => import('./components/DailyReportsPage').then(module => ({ default: module.DailyReportsPage })));
@@ -40,7 +41,7 @@ function App() {
     if (!isAuthenticated) {
       document.title = 'Orbit - 登录 / Login';
     } else {
-      const titles:Record<string,string>={'/settings':'设置','/settings/account':'账户与安全','/settings/account/profile':'个人资料','/settings/notifications':'通知与提醒','/settings/ai':'AI 与模型','/settings/reports':'日报','/settings/library':'知识库','/settings/integrations':'同步与集成','/settings/data':'数据与备份','/settings/advanced':'高级','/help':'使用指南'};
+      const titles:Record<string,string>={'/settings':'设置','/settings/account':'账户与安全','/settings/account/profile':'个人资料','/settings/notifications':'通知与提醒','/settings/ai':'AI 与模型','/settings/reports':'日报','/settings/library':'知识库','/settings/integrations':'同步与集成','/settings/data':'数据与备份','/settings/advanced':'高级','/help':'使用指南','/import':'邮箱导入'};
       document.title='Orbit - '+(titles[location.pathname]||(location.pathname.startsWith('/reports')?'日报':location.pathname.startsWith('/library')?'知识库':location.pathname==='/assistant'?'对话':location.pathname==='/project'?'项目成长':'个人事务中心'));
     }
   }, [isAuthenticated, isLoading, location.pathname,location.search]);
@@ -58,6 +59,8 @@ function App() {
 
   if (isAuthenticated && new URLSearchParams(location.search).has('settings') && !location.pathname.startsWith('/settings') && !['/reports/settings','/library/settings','/library/preferences'].includes(location.pathname)) return <FeatureBoundary><SettingsRedirect /></FeatureBoundary>;
 
+  if (isAuthenticated && location.pathname === '/assistant' && new URLSearchParams(location.search).get('tool') === 'email-import') { const next = new URLSearchParams(location.search); next.delete('tool'); return <Navigate to={'/import' + (next.size ? '?' + next : '')} replace state={{ ...location.state, importReturnTo: '/assistant' + (next.size ? '?' + next : '') }} />; }
+
   return (
     <Routes>
       {!isAuthenticated ? (
@@ -71,7 +74,7 @@ function App() {
           <Route path="/schedule" element={<AppContent />} />
           <Route path="/assistant" element={<AppContent />} />
           <Route path="/reminders" element={<AppContent />} />
-          <Route path="/import" element={<Navigate to="/assistant?tool=email-import" replace />} />
+          <Route path="/import" element={<AppContent />} />
           <Route path="/reports" element={<AppContent />} />
           <Route path="/reports/settings" element={<FeatureBoundary><SettingsRedirect target="/settings/reports" /></FeatureBoundary>} />
           <Route path="/settings/*" element={<FeatureBoundary><SettingsWorkspace returnTo={settingsOrigin.current} /></FeatureBoundary>} />
@@ -100,13 +103,14 @@ function LegacyPreferencesRedirect() {
 function AppContent() {
   const {theme,toggleTheme}=useTheme(), {user,logout}=useAuth(), location=useLocation(), navigate=useNavigate();
   const [showAdmin,setShowAdmin]=useState(false);
+  const isImportPage=location.pathname==='/import';
   const isHelpPage=location.pathname==='/help', isToolsPage=location.pathname==='/tools', isProjectPage=location.pathname==='/project', isResearchPage=location.pathname==='/research';
   const isLibraryReader=/^\/library\/[^/]+\/?$/.test(location.pathname)&&location.pathname!=='/library/experience';
-  const activeSection: 'today'|'schedule'|'assistant'|'reminders'|'reports'|'library'|null=isHelpPage||isToolsPage||isProjectPage?null:isResearchPage||location.pathname.startsWith('/reports')?'reports':location.pathname.startsWith('/library')?'library':location.pathname==='/schedule'?'schedule':location.pathname==='/assistant'?'assistant':location.pathname==='/reminders'?'reminders':'today';
+  const activeSection: 'today'|'schedule'|'assistant'|'reminders'|'reports'|'library'|null=isHelpPage||isToolsPage||isProjectPage||isImportPage?null:isResearchPage||location.pathname.startsWith('/reports')?'reports':location.pathname.startsWith('/library')?'library':location.pathname==='/schedule'?'schedule':location.pathname==='/assistant'?'assistant':location.pathname==='/reminders'?'reminders':'today';
   useEffect(()=>{if(!(location.state as {settingsFocusReturn?:boolean}|null)?.settingsFocusReturn)return;const frame=requestAnimationFrame(()=>document.querySelector<HTMLElement>('[data-account-menu-trigger]')?.focus());return()=>cancelAnimationFrame(frame);},[location.key,location.state]);
   return <><AppShell mobileReader={isLibraryReader} activeSection={activeSection} onSectionChange={section=>navigate('/'+section)} theme={theme} onToggleTheme={toggleTheme} onOpenSettings={()=>navigate('/settings',{state:{settingsReturnTo:location.pathname+location.search}})} onOpenAdmin={()=>setShowAdmin(true)} user={user} onLogout={logout}>
-    <FeatureBoundary key={activeSection==='library'?location.pathname:activeSection||(isHelpPage?'help':isProjectPage?'project':'tools')} navigation={isLibraryReader?<Link className="feature-reader-back" to="/library" aria-label="返回知识库">←</Link>:undefined}>
-      {isHelpPage?<HelpPage/>:isProjectPage?<ProjectEvolutionPage/>:activeSection===null?<ToolsPage/>:activeSection==='today'?<ActionCenterPage/>:activeSection==='schedule'?<SchedulePage user={user}/>:activeSection==='assistant'?<AiAssistantPage/>:activeSection==='reminders'?<ReminderPage/>:isResearchPage?<ResearchPage/>:activeSection==='reports'?<DailyReportsPage/>:activeSection==='library'?<LibraryPage/>:<ActionCenterPage/>}
+    <FeatureBoundary key={activeSection==='library'?location.pathname:activeSection||(isHelpPage?'help':isImportPage?'import':isProjectPage?'project':'tools')} navigation={isLibraryReader?<Link className="feature-reader-back" to="/library" aria-label="返回知识库">←</Link>:undefined}>
+      {isImportPage?<ImportPage/>:isHelpPage?<HelpPage/>:isProjectPage?<ProjectEvolutionPage/>:activeSection===null?<ToolsPage/>:activeSection==='today'?<ActionCenterPage/>:activeSection==='schedule'?<SchedulePage user={user}/>:activeSection==='assistant'?<AiAssistantPage/>:activeSection==='reminders'?<ReminderPage/>:isResearchPage?<ResearchPage/>:activeSection==='reports'?<DailyReportsPage/>:activeSection==='library'?<LibraryPage/>:<ActionCenterPage/>}
     </FeatureBoundary></AppShell>
     {showAdmin&&<FeatureBoundary onClose={()=>setShowAdmin(false)}><AdminModal visible onClose={()=>setShowAdmin(false)}/></FeatureBoundary>}
   </>;

@@ -10,3 +10,4 @@ export { TextLink, ButtonLink, IconLink, ExternalLink, NavigationItem } from './
 export { FilePicker } from './FilePicker';
 export { Avatar } from './Avatar';
 export { ActionRow } from './ActionRow';
+export { TimePicker, DateTimePicker, isClockTime } from './TimePicker';

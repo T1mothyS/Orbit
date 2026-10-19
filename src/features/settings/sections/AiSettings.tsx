@@ -172,7 +172,7 @@ export function AiSettings({ authHeaders, isAdmin = false }: {
           <Button variant="secondary" loading={loadingConfig} disabled={loadingConfig || savingEnv} onClick={async () => { if (await loadUserApiKey())
             setShowEnvConfig(true); }}>{loginStatus.hasApiKey && !loginStatus.usingSharedApi ? '修改 API Key' : '配置 API Key'}</Button>
           <ExternalLink href="https://www.workbuddy.cn/profile/keys" target="_blank" rel="noopener noreferrer">打开 WorkBuddy API 管理</ExternalLink>
-        </div> : (<div className="settings-stack">
+        </div> : (<div className="settings-credential-form">
             <p className="settings-help">在 <a href="https://www.workbuddy.cn/profile/keys" target="_blank" rel="noopener noreferrer">WorkBuddy API 管理页面</a> 创建或复制 Key，然后粘贴到下方。</p>
             <label className="settings-field-label" htmlFor="settings-api-key">API Key（必填）</label>
             <PasswordInput id="settings-api-key" className="settings-monospace" value={envConfig.apiKey} onChange={(event) => setEnvConfig(prev => ({ ...prev, apiKey: String(event.target.value) }))} placeholder={loginStatus.hasApiKey ? '输入新的 API Key 以覆盖当前配置' : '输入 API Key'} autoComplete="new-password" disabled={savingEnv}/>

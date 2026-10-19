@@ -1,3 +1,4 @@
+import { TimePicker } from '../ui';
 import { requestError } from '../utils/request-error';
 import { OrbitDialog } from './OrbitDialog';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
@@ -434,7 +435,7 @@ export function ReminderPage() {
           </div>
           <div className="reminder-setup-grid reminder-setup-identity">
             <label className="form-label">任务名称<Input required value={form.name} onChange={event => updateForm('name', event.target.value)} placeholder="例如：房租、水费或会员续费" /></label>
-            <label className="form-label">提醒时间<Input type="time" value={form.reminderTime} onChange={event => updateForm('reminderTime', event.target.value)} /></label>
+            <label className="form-label">提醒时间<TimePicker label="提醒时间" value={form.reminderTime} onChange={value => updateForm('reminderTime', value)} /></label>
           </div>
           {form.type === 'credit_card' ? <div>
             <div className="reminder-setup-grid reminder-setup-credit">

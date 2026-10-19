@@ -1,3 +1,4 @@
+import { Button, TimePicker, isClockTime } from '../ui';
 import { composerDraftKey, readComposerDraft, updateComposerDraft, snapshotComposerDraft, consumeComposerDraft, subscribeComposerDraft, type NotificationContext } from '../utils/composer-draft';
 import type { NoteImage } from '../utils/note-images';
 import { NoteImageGallery, NoteImageInput, useNoteImageUpload } from './NoteImages';
@@ -201,11 +202,12 @@ function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, 
     try {
       if (operation.type === 'create_recurring') {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(form.anchorDate)) return window.alert('请填写有效的起始日期');
-        if (!/^\d{2}:\d{2}$/.test(form.reminderTime)) return window.alert('请填写有效的提醒时间');
+        if (!isClockTime(form.reminderTime)) return window.alert('请填写有效的提醒时间');
         await onSave({ title: form.title.trim(), anchorDate: form.anchorDate, reminderTime: form.reminderTime, actionGuide: form.actionGuide });
         return;
       }
       if (!form.isUnscheduled && !/^\d{4}-\d{2}-\d{2}$/.test(form.startDate)) return window.alert('请填写有效的开始日期');
+      if (!form.isUnscheduled && !form.allDay && (!isClockTime(form.startTime) || (form.endTime && !isClockTime(form.endTime)))) return window.alert('请填写有效的时间（00:00–23:59）');
       const startTime = form.isUnscheduled ? undefined : `${form.startDate}T${form.allDay ? '00:00' : (form.startTime || '09:00')}:00`;
       const endTime = form.isUnscheduled || form.allDay || !form.endDate || !form.endTime
         ? ''
@@ -248,22 +250,22 @@ function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, 
           {['create','create_recurring'].includes(operation.type) && <button type="button" className="ai-plan-edit-button ai-plan-remove-button" disabled={saving} onClick={event => { event.stopPropagation(); void onRemove(); }} aria-label={`删除待创建条目 ${operation.title}`}><Trash2 size={13} /> 删除</button>}
         </div>}
       </div>
-      <div className="text-[11px] mt-0.5" style={{ color: 'var(--td-text-color-secondary)' }}>{actionLabel[operation.type] || '处理'} · {timeLabel}</div>
-      {operation.before && <div className="text-[11px] mt-1" style={{color:'var(--td-text-color-secondary)'}}>原事项：{operation.before.title} · {operation.before.startTime?.replace('T',' ')} → {operation.startTime?.replace('T',' ') || '保留原时间'}{operation.scheduleId?.startsWith('reminder-cycle:') ? '（仅本周期安排日期）' : ''}</div>}
-      {operation.location && <div className="text-[11px] mt-0.5" style={{ color: 'var(--td-text-color-secondary)' }}>地点：{operation.location}</div>}
-      {operation.notes && <div className="text-[11px] mt-0.5 whitespace-pre-line" style={{ color: 'var(--td-text-color-secondary)' }}>备注：{operation.notes}</div>}
-      {operation.type === 'delete' && <div className="text-[11px] mt-1" style={{ color: '#B45309' }}>删除计划不能编辑；如需调整，请取消后重新描述。</div>}
+      <div className="text-xs mt-0.5" style={{ color: 'var(--td-text-color-secondary)' }}>{actionLabel[operation.type] || '处理'} · {timeLabel}</div>
+      {operation.before && <div className="text-xs mt-1" style={{color:'var(--td-text-color-secondary)'}}>原事项：{operation.before.title} · {operation.before.startTime?.replace('T',' ')} → {operation.startTime?.replace('T',' ') || '保留原时间'}{operation.scheduleId?.startsWith('reminder-cycle:') ? '（仅本周期安排日期）' : ''}</div>}
+      {operation.location && <div className="text-xs mt-0.5" style={{ color: 'var(--td-text-color-secondary)' }}>地点：{operation.location}</div>}
+      {operation.notes && <div className="text-xs mt-0.5 whitespace-pre-line" style={{ color: 'var(--td-text-color-secondary)' }}>备注：{operation.notes}</div>}
+      {operation.type === 'delete' && <div className="text-xs mt-1" style={{ color: '#B45309' }}>删除计划不能编辑；如需调整，请取消后重新描述。</div>}
     </> : <div className="ai-plan-operation-editor">
       <div className="ai-plan-editor-head"><strong>编辑计划项</strong><button type="button" className="icon-button" onClick={onCancel} disabled={saving} aria-label="取消编辑"><X size={14} /></button></div>
       {operation.type === 'create_recurring' ? <>
         <label>标题<input value={form.title} onChange={event => update('title', event.target.value)} autoFocus /></label>
-        <div className="ai-plan-editor-grid"><label>起始日期<input type="date" value={form.anchorDate} onChange={event => update('anchorDate', event.target.value)} /></label><label>提醒时间<input type="time" value={form.reminderTime} onChange={event => update('reminderTime', event.target.value)} /></label></div>
+        <div className="ai-plan-editor-grid"><label>起始日期<input type="date" value={form.anchorDate} onChange={event => update('anchorDate', event.target.value)} /></label><label>提醒时间<TimePicker label="提醒时间" value={form.reminderTime} onChange={value => update('reminderTime', value)} /></label></div>
         <label>操作说明<textarea rows={2} value={form.actionGuide} onChange={event => update('actionGuide', event.target.value)} /></label>
       </> : <>
         <label>标题<input value={form.title} onChange={event => update('title', event.target.value)} autoFocus /></label>
         <label>类型<select value={form.type} onChange={event => update('type', event.target.value as PlanOperationForm['type'])} disabled={form.isUnscheduled}><option value="event">日程</option><option value="todo">待办</option></select></label>
-        <div className="ai-plan-editor-grid"><label>开始日期<input type="date" value={form.startDate} onChange={event => update('startDate', event.target.value)} disabled={form.isUnscheduled} /></label><label>开始时间<input type="time" value={form.startTime} onChange={event => update('startTime', event.target.value)} disabled={form.isUnscheduled || form.allDay} /></label></div>
-        <div className="ai-plan-editor-grid"><label>结束日期<input type="date" value={form.endDate} onChange={event => update('endDate', event.target.value)} disabled={form.isUnscheduled || form.allDay} /></label><label>结束时间<input type="time" value={form.endTime} onChange={event => update('endTime', event.target.value)} disabled={form.isUnscheduled || form.allDay} /></label></div>
+        <div className="ai-plan-editor-grid"><label>开始日期<input type="date" value={form.startDate} onChange={event => update('startDate', event.target.value)} disabled={form.isUnscheduled} /></label><label>开始时间<TimePicker label="开始时间" value={form.startTime} onChange={value => update('startTime', value)} disabled={form.isUnscheduled || form.allDay} /></label></div>
+        <div className="ai-plan-editor-grid"><label>结束日期<input type="date" value={form.endDate} onChange={event => update('endDate', event.target.value)} disabled={form.isUnscheduled || form.allDay} /></label><label>结束时间<TimePicker required={false} label="结束时间" value={form.endTime} onChange={value => update('endTime', value)} disabled={form.isUnscheduled || form.allDay} /></label></div>
         <div className="ai-plan-editor-checks"><label><input type="checkbox" checked={form.allDay} onChange={event => update('allDay', event.target.checked)} disabled={form.isUnscheduled} /> 全天</label><label><input type="checkbox" checked={form.isUnscheduled} onChange={event => update('isUnscheduled', event.target.checked)} /> 无固定期限待办</label></div>
         <label>地点<input value={form.location} onChange={event => update('location', event.target.value)} /></label>
         <label>备注<textarea rows={2} value={form.notes} onChange={event => update('notes', event.target.value)} /></label>
@@ -429,9 +431,8 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
       <div id={"orbit-message-"+msg.id} className="flex justify-end mb-3">
         <div
           className="orbit-user-message px-3 py-2 rounded-2xl rounded-tr-sm max-w-[88%] leading-relaxed whitespace-pre-line"
-          style={{ backgroundColor: 'var(--td-brand-color)', color: '#fff' }}
         >
-          {msg.text}
+          <ChatMarkdown text={msg.text || ''}/>
           {msg.attachments?.map(file=><ChatAttachmentCard key={file.id} file={file} authHeaders={authHeaders}/>)}
           {messageTime}
         </div>
@@ -465,7 +466,7 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
 
         {msg.type === 'error' ? (
           <div className="orbit-message-error px-3 py-2 rounded-lg" role="alert" style={{ backgroundColor: 'var(--td-error-color-light)', color: 'var(--td-error-color)', border: '1px solid var(--td-error-color)' }}>
-            {msg.text}
+            <ChatMarkdown text={msg.text || ''}/>
             {messageTime}
           </div>
         ) : (
@@ -593,7 +594,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const savingNotesRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const followBottom=useRef(true),seenMessages=useRef(new Set<string>());
+  const followBottom=useRef(true),seenMessages=useRef(new Set<string>()),seenNewestTime=useRef(0);
   const [hasNewReply,setHasNewReply]=useState(false);
   const orbit = useOrbitChat(authHeaders,isAuthenticated);
   const activeConversation = useRef(orbit.cid); activeConversation.current = orbit.cid;
@@ -652,21 +653,26 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const closeComposerMenu = () => { confirmation.reset(); setComposerMenuOpen(false); };
 
   useEffect(() => {
+    const messageTime = (message: any) => Date.parse(message.timestamp || message.created_at || '') || 0;
+    if (!orbit.history.length) { seenNewestTime.current = 0; followBottom.current = true; setHasNewReply(false); }
+    const isNew = (message: any) => seenMessages.current.size > 0 && !seenMessages.current.has(message.id) && messageTime(message) > seenNewestTime.current;
     setMessages(orbit.history.map(m => ({
       id: m.id, role: m.role, type: m.type || 'text', text: m.text || m.content || '',
       intent: m.intent, scheduleItems: m.scheduleItems, plan: m.plan, knowledgeSources: m.knowledgeSources,orbitMeta:m.orbitMeta,attachments:m.attachments,
       timestamp: m.timestamp || m.created_at || null,
-      isNew:seenMessages.current.size>0&&!seenMessages.current.has(m.id),
+      isNew:isNew(m),
     })));
-    if(seenMessages.current.size>0&&!followBottom.current&&orbit.history.some(m=>m.role==='assistant'&&!seenMessages.current.has(m.id)))setHasNewReply(true);
+    if(seenMessages.current.size>0&&!followBottom.current&&orbit.history.some(m=>m.role==='assistant'&&isNew(m)))setHasNewReply(true);
+    seenNewestTime.current = Math.max(seenNewestTime.current, ...orbit.history.map(messageTime));
     seenMessages.current=new Set(orbit.history.map(m=>m.id));
   }, [orbit.history]);
 
-  // 自动滚到底部
+  // State refreshes do not scroll; only a changed message sequence may follow the bottom.
+  const messageSequence = messages.map(message => message.id).join('\n');
   useEffect(() => {
     const container = messagesContainerRef.current;
     if(followBottom.current)container?.scrollTo({ top: container.scrollHeight, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth' });
-  }, [messages, isLoading]);
+  }, [messageSequence]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -805,8 +811,8 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
 
   useImperativeHandle(ref, () => ({ clearCurrentConversation: () => clearConversation(orbit.cid), refresh: orbit.refresh,startConversation:(id:string,title:string)=>orbit.create(id,title) }), [clearConversation,orbit.cid,orbit.create,orbit.refresh]);
 
-  const jumpedMessage=useRef('');
-  useEffect(()=>{const id=new URLSearchParams(location.search).get('message');if(!id||jumpedMessage.current===location.search)return;const element=document.getElementById('orbit-message-'+id);if(element){followBottom.current=false;element.scrollIntoView({block:'center'});element.classList.add('setting-search-target');jumpedMessage.current=location.search;}},[location.search,messages]);
+  const jumpedMessage=useRef(''), jumpPageAttempt=useRef('');
+  useEffect(()=>{const id=new URLSearchParams(location.search).get('message');if(!id||jumpedMessage.current===location.search)return;followBottom.current=false;const element=document.getElementById('orbit-message-'+id);if(element){element.scrollIntoView({block:'center'});element.classList.add('setting-search-target');jumpedMessage.current=location.search;}else if(orbit.nextBefore&&!orbit.loadingOlder&&jumpPageAttempt.current!==location.search+':'+orbit.nextBefore){jumpPageAttempt.current=location.search+':'+orbit.nextBefore;void orbit.loadOlder().catch(error=>orbit.setError(error.message));}},[location.search,messages,orbit.nextBefore,orbit.loadingOlder,orbit.loadOlder]);
   const EXAMPLES = [
     '今天上午去车站接人，下午两点开会，晚上约朋友吃饭',
     '把晚饭时间改成7点',
@@ -830,6 +836,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
         })}</div>
 
   </>;
+  const requestTimes = new Map(orbit.requests.map(request => [request.userMessageId,request.createdAt]));
   return (
     <div className="ai-assistant-workspace orbit-workspace">
       <aside className="orbit-conversations" aria-label="对话列表">{conversationContent}</aside>
@@ -895,10 +902,15 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
         )}
 
         {/* 消息列表 */}
-        {messages.map(msg => (
+        {orbit.nextBefore && <Button disabled={orbit.loadingOlder} onClick={() => { const container = messagesContainerRef.current; const oldHeight = container?.scrollHeight || 0, oldTop = container?.scrollTop || 0; followBottom.current = false; void orbit.loadOlder().then(() => requestAnimationFrame(() => requestAnimationFrame(() => { if (container) container.scrollTop = oldTop + container.scrollHeight - oldHeight; }))).catch(e => orbit.setError(e.message)); }}>{orbit.loadingOlder ? '加载中…' : '加载更早记录'}</Button>}
+        {[
+          ...messages.map(msg => ({ id: 'message:'+msg.id, at: requestTimes.get(msg.id) || msg.timestamp || '', msg, request: undefined })),
+          ...orbit.requests.map(request => ({ id: 'request:'+request.id, at: request.createdAt || '', msg: undefined, request })),
+        ].sort((a,b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).map(entry => entry.msg ? (
+
           <MessageBubble
-            key={msg.id}
-            msg={msg}
+            key={entry.id}
+            msg={entry.msg}
             onOpenSchedule={onOpenSchedule}
             onNotificationRefresh={()=>{void orbit.refresh();window.dispatchEvent(new Event('orbit:data-change'));}}
             onReminderAction={orbit.reminderAction}
@@ -909,14 +921,14 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
             confirmingPlanId={confirmingPlanId}
             savingPlanOperationKey={savingPlanOperationKey}
           />
-        ))}
+        ) : entry.request ? <OrbitRequestStatus key={entry.id} request={entry.request} onAction={verb => { void orbit.action(entry.request!.id,verb).catch(e => orbit.setError(e.message)); }}/> : null)}
 
         {/* 加载中 */}
         {hasNewReply&&<button type="button" className="orbit-new-reply" onClick={()=>{followBottom.current=true;setHasNewReply(false);const el=messagesContainerRef.current;el?.scrollTo({top:el.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}}>有新回复 · 滚动到底部</button>}
 
           </div>
 
-            <div className="orbit-request-list" aria-live="polite">{orbit.requests.filter(r=>!['completed','cancelled'].includes(r.state)).map(r=><OrbitRequestStatus key={r.id} request={r} onAction={verb=>{void orbit.action(r.id,verb).catch(e=>orbit.setError(e.message));}}/>)}</div>
+
           </div>
 
           {/* 输入框 */}

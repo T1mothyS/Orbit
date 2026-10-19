@@ -4,7 +4,7 @@
 
 ## Orbit UI 统一迁移与 Agent Change Playbook
 
-Status: 第一轮本地收口；2026-10-18 用户确认 A/B/C 及页头调整后继续验收。`src/design/` 是 token 值来源，`src/ui/` 是新基础控件唯一入口；`/dev/ui` 是不读取账号数据的开发 Gallery，正式构建不包含。下方历史 TDesign/class 规则仅适用于未迁移区域。迁移去向及退出条件见 [前端台账](FRONTEND-DEBT.md)，平台截图和发布闸门见 [测试矩阵](archive/engineering/TEST-MATRIX-20261018.md#2026-10-18-批准基线与第一轮收口)。
+Status: 第三轮 B—F 已实施，候选图待审阅；第一轮本地收口；2026-10-18 用户确认 A/B/C 及页头调整后继续验收。`src/design/` 是 token 值来源，`src/ui/` 是新基础控件唯一入口；`/dev/ui` 是不读取账号数据的开发 Gallery，正式构建不包含。下方历史 TDesign/class 规则仅适用于未迁移区域。迁移去向及退出条件见 [前端台账](FRONTEND-DEBT.md)，平台截图和发布闸门见 [测试矩阵](archive/engineering/TEST-MATRIX-20261018.md#2026-10-18-批准基线与第一轮收口)。
 
 1. **先定位：** 阅读 [PROJECT-MAP](../PROJECT-MAP.md)、本文、目标领域合同和测试。普通改动应只需 ui 与目标 feature，不以通读 App/全部 CSS 为前提。
 2. **控件入口：** 从 `src/ui` 引用，不直接依赖 Base UI/TDesign 或它们的类型，不复制控件和浮层生命周期。
@@ -200,3 +200,25 @@ Tools 中心每个应用仅有一个链接入口；独立应用保持原有视�
 
 
 日程时间选择器仍由原生业务弹窗持有，浮层按触发位置与视口高度选择上下方，避免被表单滚动区裁切；不将浮层移到原生顶层外。低高度与200%缩放需确认小时/分钟、取消/确定完整可见及Escape返回焦点。
+
+## 第三轮公共交互（2026-10-19）
+
+阶段 A 周期提醒真实 Demo 已获用户确认，后续组件沿用现有视觉系统。Settings 分类页已有页头时，重复的同级分区标题仅保留可访问结构，不重复视觉显示。显式保存通过 `settings-inline-save` 关联对应控件，窄屏自然换行；多字段凭据保留分组和既有保存所有权。次要解释通过 SettingRow.help 复用 Popover，支持悬停、点击和键盘；时区、风险、校验及错误保持可见。主要操作使用独立 `orbit-action` 语义色，暗色降低亮度但不改变链接/选中品牌色。全局搜索使用 Input 的 border focus 模式，其余控件保留外轮廓焦点。
+
+时间迁移前搜索 `src` 全部时间控件，按业务语义分类如下。`src/ui/TimePicker.tsx` 只处理分钟级 HH:mm，不处理日期、时区或存储。列表选择在确定前不写回，取消/Escape/离开丢弃选择草稿；直接输入非法值显示错误并阻止对应提交。保留 0–59 分钟，不按五分钟取整。浮层留在原生 dialog 顶层内，按视口定位并滚到当前值。
+
+| 调用点 | 语义与存储 | 迁移范围 |
+|---|---|---|
+| ScheduleFormModal | 本地日期 + HH:mm + :00、跨日 linkedEndTime、全天/无期限 | 开始、结束、待办时间点 |
+| AiSchedulePanel | 周期时刻及日期组合，原全天/无期限分支 | reminderTime、startTime、endTime |
+| ReminderPage | 周期时刻 HH:mm | reminderTime |
+| AiImportPage | 可空时刻；空值 null，日期单独保存 | dueTime |
+| NotificationSettings | UTC+8 的 hour/minute 整数；免打扰 HH:mm 跨夜规则 | 每日、免打扰开始/结束 |
+| WeeklySettings | 服务端 timezone、weekday、hour/minute | 周报时刻 |
+| UsageStatisticsView | 设备时区、本地 datetime 转 ISO；左闭右开范围 | 日期 + 共享时刻；非法/不完整范围不请求 |
+| 各 date-only 控件 | YYYY-MM-DD，日期本身不新增时区转换 | 保留原日期控件 |
+| 提前/稍后提醒、自定义分钟、间隔/提前天数 | 时长或周期，数字/单位具有业务含义 | 保留，禁止变成时刻 |
+
+独立 Tools 内容不属于 Orbit 时间字段，本轮不修改各工具业务语义。迁移后再次搜索旧实现核对遗漏。
+
+普通对话正文（用户、AI、error）统一通过 ChatMarkdown 渲染 GFM：标题层级、表格、有序/无序嵌套列表、引用、强调、代码和链接。原始 HTML 不渲染，Markdown 图片替换为文字占位，不创建 img 或发出图片请求；仅允许安全站内路径和无凭据 HTTP(S) 链接。表格/代码局部横滚。计划、事项、知识来源、通知操作、请求状态与附件仍由独立组件持有。周报显示适配只识别所属账号的系统通知快照，不全局剥离用户文字或外部链接。

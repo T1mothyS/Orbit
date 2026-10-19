@@ -5,7 +5,7 @@ import { getAllSchedules } from './schedule-store.js';
 import { scheduleDateInTimezone } from './schedule-time.js';
 import { readUserMail } from './user-mail-service.js';
 import { getDailyReportCloudContext } from './daily-report-cloud-store.js';
-import { stockContextDetail } from '../src/utils/daily-report-context.js';
+import { stockContextDetail, CLOUD_CONTEXT_EDITORIAL_GUIDANCE } from '../src/utils/daily-report-context.js';
 import { isValidDateKey } from './date-key.js';
 import { DIGEST_V2_VERSION, DIGEST_V2_GENERATION, DIGEST_V2_ILLUSTRATED_GENERATIONS, DIGEST_V2_SCHEMA, digestHash, digestSnapshotWarnings, validateDigestV2, type DigestSnapshot, type DigestV2, type InputSection } from './digest-v2-contract.js';
 import { prepareDigestMedia, configuredMediaRules } from './digest-v2-media.js';
@@ -32,7 +32,7 @@ export function createDigestSnapshotRun(userId: string, snapshot: DigestSnapshot
   if (digestSourcesEnabled(userId)) Object.assign(manifest, { sourcePreparation: { tool: 'daily_report.prepare_sources_v2', schema: NEWSLETTER_INPUT_SCHEMA, guidance: DIGEST_SOURCE_GUIDANCE } });
   if (digestPhotosEnabled(userId)) Object.assign(manifest, { photoPreparation: { tool: 'daily_report.find_photos_v2', schema: PHOTO_REQUEST_SCHEMA, guidance: '为每条新闻用具体人物、地点、设施或产品名称找资料照。支持原文pageUrls、Commons、Openverse及Bing/百度公开搜索发现；原站逐图核对许可，NC仅限服务端明确启用账号。搜索发现不等于许可批准；可用返回的Google/Bing/百度和图库链接经浏览器补查后再提交原页面。服务端经代理下载并托管。把选中图片 pageUrl 加入 evidence，media.url 使用 imageUrl。此能力限已启用账号，正式发布另需生产开关；日期未知不猜，不把资料照称为现场。逐条配图完整性为硬闸门，不能用类别占位图掩盖失败。' } });
   store.createDigestRun({ id, user_id: userId, report_date: snapshot.date, snapshot_json: JSON.stringify(snapshot), manifest_json: JSON.stringify(manifest), created_at: now.toISOString(), expires_at: new Date(now.getTime() + 7 * 86400000).toISOString() });
-  return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA, editorialGuidance: '仅在正文中用 **原文短词组** 标重点；每句一到两处，优先关键对象、数字、结论或行动。标题不加标记，不能整句加粗。邮件逐封保留服务或事项名称、具体动作和已知期限；同一事项突出各封新增事实，未知期限不猜。关注正文面向读者：标的名称、窗口时间：月日至月日、每条以 • 起一行的一句客观事实；参考内容：后按evidence_ids顺序写等量原文标题，可保留已确认的日期，链接由渲染器生成。检索/重试/PDF报错留在执行记录，不放正文。check/change如实保留，未配置、读取失败、未研究不可写成无变化。新闻说明具体事实、关注关系与下一步；候选、排除及失败另留有界记录。图片须贴合具体新闻，不能把类别图形当贴题插画。图片是否为现场只在图注说明，正文不重复。来源和发布时间由服务端生成角标与文末引用，不要写入摘要。' };
+  return { runId: id, snapshot, manifest, schema: DIGEST_V2_SCHEMA, editorialGuidance: CLOUD_CONTEXT_EDITORIAL_GUIDANCE + '\n' + '仅在正文中用 **原文短词组** 标重点；每句一到两处，优先关键对象、数字、结论或行动。标题不加标记，不能整句加粗。邮件逐封保留服务或事项名称、具体动作和已知期限；同一事项突出各封新增事实，未知期限不猜。关注正文面向读者：标的名称、窗口时间：月日至月日、每条以 • 起一行的一句客观事实；参考内容：后按evidence_ids顺序写等量原文标题，可保留已确认的日期，链接由渲染器生成。检索/重试/PDF报错留在执行记录，不放正文。check/change如实保留，未配置、读取失败、未研究不可写成无变化。新闻说明具体事实、关注关系与下一步；候选、排除及失败另留有界记录。图片须贴合具体新闻，不能把类别图形当贴题插画。图片是否为现场只在图注说明，正文不重复。来源和发布时间由服务端生成角标与文末引用，不要写入摘要。' };
 }
 export function digestWatchlistInput(context: ReturnType<typeof getDailyReportCloudContext>): InputSection {
   if (context.readFailed) return { status: 'failed', items: [] };

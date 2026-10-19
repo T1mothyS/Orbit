@@ -87,8 +87,8 @@ export function Tooltip({ children, content }: { children: ReactElement; content
     <PrimitiveTooltip.Portal><PrimitiveTooltip.Positioner sideOffset={6} className="oui-positioner"><PrimitiveTooltip.Popup className="oui-tooltip">{content}</PrimitiveTooltip.Popup></PrimitiveTooltip.Positioner></PrimitiveTooltip.Portal>
   </PrimitiveTooltip.Root></PrimitiveTooltip.Provider>;
 }
-export function Popover({ trigger, title, children }: { trigger: ReactElement; title: string; children: ReactNode }) {
-  return <PrimitivePopover.Root><PrimitivePopover.Trigger render={trigger} />
+export function Popover({ trigger, title, children, openOnHover = false }: { trigger: ReactElement; title: string; children: ReactNode; openOnHover?: boolean }) {
+  return <PrimitivePopover.Root><PrimitivePopover.Trigger render={trigger} openOnHover={openOnHover} />
     <PrimitivePopover.Portal><PrimitivePopover.Positioner sideOffset={8} className="oui-positioner">
       <PrimitivePopover.Popup className="oui-menu oui-popover"><PrimitivePopover.Title className="oui-label">{title}</PrimitivePopover.Title>{children}</PrimitivePopover.Popup>
     </PrimitivePopover.Positioner></PrimitivePopover.Portal>

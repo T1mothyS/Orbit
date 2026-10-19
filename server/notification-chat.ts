@@ -1,3 +1,4 @@
+import { activityReportChatText } from './activity-report-chat.js';
 import { randomUUID } from 'node:crypto';
 import { queryAll, queryOne, run } from './database/connection.js';
 import { getReminder, getUserById, upsertReminder } from './db.js';
@@ -42,7 +43,7 @@ export function deliverInApp(item:activity.NotificationDelivery,eventId?:string,
     const schedule=ref?.type==='schedule'?getSchedule(ref.id):undefined;
     const linkedSchedule=schedule||(ref?.type==='reminder'&&ref.instanceId?getSchedule(`reminder-cycle:${ref.instanceId}`):undefined);
     const meta={sourceLabel:({schedule:'日程',reminder:'周期提醒',activity_report:'个人周报',digest:'每日行动提醒'} as Record<string,string>)[item.sourceType]||'用户通知',origin:'notification',notificationId:item.id,eventId,enhanced,object:ref,expectedState:linkedSchedule?scheduleFingerprint(linkedSchedule):undefined,href:item.sourceType==='digest'?'/today':ref?orbitObjectPath(ref):undefined};
-    const body=item.kind==='weekly_report'?item.body.slice(0,500):item.body;
+    const body=item.kind==='weekly_report' && item.sourceType==='activity_report' ? activityReportChatText(item.userId,item.sourceId) : item.body;
     run('INSERT INTO ai_schedule_messages (id,user_id,role,type,content,schedule_items,created_at,conversation_id,orbit_meta) VALUES (?,?,?,?,?,?,?,?,?)',[id,item.userId,'assistant','text',`${item.title}\n\n${body}`,linkedSchedule?JSON.stringify([linkedSchedule]):null,at,cid,JSON.stringify(meta)]);
     run('INSERT INTO orbit_notification_messages (notification_id,user_id,message_id,delivery_key) VALUES (?,?,?,?)',[item.id,item.userId,id,deliveryKey]);
     run('UPDATE orbit_conversations SET updated_at=? WHERE id=? AND user_id=?',[at,cid,item.userId]);

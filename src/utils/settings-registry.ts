@@ -51,7 +51,7 @@ const definitions = [
   {
     "id": "setting-ai-ixhew3",
     "section": "ai",
-    "label": "Work Buddy 默认解析模型",
+    "label": "WorkBuddy 默认解析模型",
     "description": "用于未指定模型的日程解析。Orbit 聊天的具体模型在输入栏“＋”中选择，并单独记忆。",
     "admin": false
   },

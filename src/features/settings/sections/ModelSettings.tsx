@@ -80,12 +80,12 @@ export function ModelSettings({ authHeaders }: {
             setSaving(false);
         }
     };
-    return (<SettingRow label="Work Buddy 默认解析模型" description="用于未指定模型的日程解析。Orbit 聊天的具体模型在输入栏“＋”中选择，并单独记忆。">
+    return (<SettingRow label="WorkBuddy 默认解析模型" description="用于未指定模型的日程解析。Orbit 聊天的具体模型在输入栏“＋”中选择，并单独记忆。">
       {loadError && <div className="settings-status" role="alert">{loadError}<Button variant="secondary" onClick={loadSelection}>重试模型设置</Button></div>}
-      <Select label="日程 AI 模型" value={String(selectedModel)} disabled={!loaded || saving || !!loadError} onValueChange={value => setSelectedModel(String(value))} options={(options.map(model => ({ value: model.modelId, label: model.name || model.modelId }))).map(option => ({ ...option, value: String(option.value) }))}/>
+      <div className="settings-inline-save"><Select label="日程 AI 模型" value={String(selectedModel)} disabled={!loaded || saving || !!loadError} onValueChange={value => setSelectedModel(String(value))} options={(options.map(model => ({ value: model.modelId, label: model.name || model.modelId }))).map(option => ({ ...option, value: String(option.value) }))}/>
       <div className="settings-actions">
         <Button onClick={saveModel} loading={saving} disabled={!loaded || saving || !!loadError}>保存模型</Button>
         <Button variant="secondary" loading={refreshing} disabled={refreshing || saving} onClick={() => void loadModels(true)}>刷新模型列表</Button>
-      </div>
+      </div></div>
     </SettingRow>);
 }

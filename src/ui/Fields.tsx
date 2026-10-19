@@ -5,8 +5,8 @@ import { Switch as PrimitiveSwitch } from '@base-ui/react/switch';
 import { Select as PrimitiveSelect } from '@base-ui/react/select';
 import { IconButton } from './Button';
 
-export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className = '', ...props }, ref) {
-  return <input {...props} ref={ref} className={`oui-input ${className}`} />;
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { focusIndicator?: 'ring' | 'border' }>(function Input({ className = '', focusIndicator = 'ring', ...props }, ref) {
+  return <input {...props} ref={ref} className={`oui-input${focusIndicator === 'border' ? ' oui-input--border-focus' : ''} ${className}`} />;
 });
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement> & { compact?: boolean; autoGrow?: boolean }>(function Textarea({ className = '', compact = false, autoGrow = false, ...props }, ref) {
   return <textarea {...props} ref={ref} className={`oui-input oui-textarea${compact ? ' oui-textarea--compact' : ''}${autoGrow ? ' oui-textarea--grow' : ''} ${className}`} />;

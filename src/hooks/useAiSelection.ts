@@ -28,7 +28,7 @@ export function useAiSelection(authHeaders: () => Record<string, string>, authen
   }, [api]);
   const loadCatalog = useCallback(async (value: AiSelection, statuses: ProviderStatus[], epoch: number) => {
     setModels([]); setError(''); setSaveError('');
-    if (!statuses.find(item => item.id === value.provider)?.connected) { setError(`${value.provider === 'chatgpt' ? 'ChatGPT' : 'Work Buddy'} 尚未连接，请在设置中连接后重试。`); return; }
+    if (!statuses.find(item => item.id === value.provider)?.connected) { setError(`${value.provider === 'chatgpt' ? 'ChatGPT' : 'WorkBuddy'} 尚未连接，请在设置中连接后重试。`); return; }
     const data = await api(value.provider === 'chatgpt' ? '/api/orbit/chatgpt/models' : '/api/models');
     const defaultModel = value.provider === 'workbuddy' && !value.models.workbuddy ? (await api('/api/schedule-model')).model : undefined;
     if (epoch !== revision.current) return;

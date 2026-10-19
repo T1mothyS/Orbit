@@ -48,14 +48,14 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const navigate=useNavigate(), location=useLocation();
-  const go=(to:string)=>()=>navigate(to,{state:{settingsReturnTo:location.pathname+location.search,helpReturnTo:location.pathname+location.search}});
+  const go=(to:string)=>()=>navigate(to,{state:{settingsReturnTo:location.pathname+location.search,helpReturnTo:location.pathname+location.search,importReturnTo:location.pathname+location.search}});
   const items:MenuItem[]=[
     {id:'settings',label:'设置',icon:<Settings size={16}/>,onSelect:onOpenSettings},
     {id:'account',label:'账户与头像',icon:<UserRound size={16}/>,onSelect:go('/settings/account')},
     {id:'profile',label:'个人资料',icon:<UserRound size={16}/>,onSelect:go('/settings/account/profile')},
     {id:'statistics',label:'使用统计',icon:<ChartNoAxesCombined size={16}/>,onSelect:go('/project?view=statistics')},
     {id:'theme',label:'切换主题',icon:theme==='light'?<Moon size={16}/>:<Sun size={16}/>,onSelect:onToggleTheme},
-    {id:'import',label:'邮箱导入',icon:<Mail size={16}/>,separatorBefore:true,onSelect:go('/assistant?tool=email-import')},
+    {id:'import',label:'邮箱导入',icon:<Mail size={16}/>,separatorBefore:true,onSelect:go('/import')},
     {id:'research',label:'研究与观点',icon:<FlaskConical size={16}/>,onSelect:go('/research')},{id:'tools',label:'Tools 工具中心',icon:<Wrench size={16}/>,onSelect:go('/tools')},
     {id:'growth',label:'项目成长',icon:<TrendingUp size={16}/>,onSelect:go('/project?view=growth')},{id:'help',label:'使用指南',icon:<HelpCircle size={16}/>,onSelect:go('/help')},
     ...(user?.role==='admin'?[{id:'admin',label:'管理面板',icon:<Shield size={16}/>,onSelect:()=>onOpenAdmin?.()}]:[]),

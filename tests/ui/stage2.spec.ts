@@ -142,7 +142,7 @@ test('round3 reminder demo validation, failed save and pending save retain the f
 
 for (const [width,height] of [[430,520],[705,402]]) test(`stage2 C5 time picker fits ${width}x${height} without clipping or writing a draft`, async ({context,page})=>{
   const token=await fixtureToken(context,'preview-guards@example.invalid');await context.addInitScript(value=>localStorage.setItem('aicalendar_token',value),token);await page.setViewportSize({width,height});await page.goto(base+'/schedule');await page.getByRole('button',{name:'添加日程',exact:true}).click();
-  const form=page.getByRole('dialog',{name:'新增日程',exact:true}),trigger=form.locator('.smart-time-picker').first().getByRole('button').first();await trigger.scrollIntoViewIfNeeded();await trigger.click();
+  const form=page.getByRole('dialog',{name:'新增日程',exact:true}),trigger=form.locator('.oui-time').first().getByRole('button').first();await trigger.scrollIntoViewIfNeeded();await trigger.click();
   const panel=form.getByRole('group',{name:'开始时间选择',exact:true});await expect(panel).toBeInViewport({ratio:1});await expect(form.getByLabel('开始时间：小时',{exact:true})).toBeFocused();await expect(panel.getByRole('button',{name:'确定',exact:true})).toBeInViewport({ratio:1});
   await checkVisual(page,`stage2-time-picker-${width}x${height}.png`,false,false);await page.keyboard.press('Escape');await expect(panel).toHaveCount(0);await expect(trigger).toBeFocused();await expect(form).toBeVisible();await page.getByRole('button',{name:'关闭日程编辑',exact:true}).click();
 });
@@ -435,7 +435,7 @@ for (const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (c
     await page.setViewportSize({width,height});const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
     const capture=async(name:string)=>{expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await checkVisual(page,`stage2-${name}-${width}-${theme}.png`,false,false);};
     await page.goto(base+'/login');await expect(page.getByRole('button',{name:'登录',exact:true})).toBeVisible();
-    await expect.poll(()=>page.locator('form button[type=submit]').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe(theme==='dark'?'rgb(147, 183, 255)':'rgb(37, 99, 235)');await capture('login');
+    await expect.poll(()=>page.locator('form button[type=submit]').evaluate(el=>getComputedStyle(el).backgroundColor)).toBe(theme==='dark'?'rgb(52, 79, 120)':'rgb(37, 99, 235)');await capture('login');
     await page.getByRole('tab',{name:'注册',exact:true}).click();await expect(page.getByLabel('确认密码',{exact:true})).toBeVisible();await capture('register');
     await page.getByRole('button',{name:'完成注册',exact:true}).scrollIntoViewIfNeeded();await expect(page.getByRole('button',{name:'完成注册',exact:true})).toBeInViewport({ratio:1});
     const token=await fixtureToken(context,'preview@example.invalid');await context.addInitScript(value=>localStorage.setItem('aicalendar_token',value),token);

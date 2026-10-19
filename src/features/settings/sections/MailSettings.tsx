@@ -117,12 +117,12 @@ export function MailSettings({ authHeaders }: {
       {loadError && <div className="settings-status" role="alert">{loadError}<Button variant="secondary" onClick={loadUserMailAccount}>重试邮箱设置</Button></div>}
       {!mailAccount && !loadError && <p className="settings-help" role="status">加载邮箱设置中…</p>}
       <SettingRow label="QQ 邮箱账号" htmlFor="settings-mail-username"><Input id="settings-mail-username" value={mailUsername} onChange={(event) => setMailUsername(String(event.target.value))} autoComplete="email" placeholder="例如：name@qq.com" disabled={disabled}/></SettingRow>
-      <SettingRow label="客户端授权码" htmlFor="settings-mail-auth-code" description="在 QQ 邮箱中开启 IMAP 并获取客户端授权码。"><PasswordInput id="settings-mail-auth-code" value={mailAuthCode} onChange={(event) => setMailAuthCode(String(event.target.value))} autoComplete="new-password" placeholder={mailAccount?.configured ? '留空表示沿用已保存授权码' : '首次保存必须填写'} disabled={disabled}/></SettingRow>
+      <SettingRow label="客户端授权码" htmlFor="settings-mail-auth-code" description="在 QQ 邮箱中开启 IMAP 并获取客户端授权码。"><div className="settings-inline-save"><PasswordInput id="settings-mail-auth-code" value={mailAuthCode} onChange={(event) => setMailAuthCode(String(event.target.value))} autoComplete="new-password" placeholder={mailAccount?.configured ? '留空表示沿用已保存授权码' : '首次保存必须填写'} disabled={disabled}/><Button loading={mailAccountBusy} disabled={disabled || !mailAccount?.encryptionConfigured} onClick={saveUserMailAccount}>保存邮箱配置</Button></div></SettingRow>
       <SettingRow label="启用日报读取"><Switch label="启用日报读取" checked={mailEnabled} onCheckedChange={value => setMailEnabled(Boolean(value))} disabled={disabled}/></SettingRow>
       <SettingRow label="配置状态">
         <p className="settings-help" role="status">{mailAccount?.configured ? `当前账号：${mailAccount.username} · ${mailAccount.enabled ? '已启用' : '已停用'}${mailAccount.updatedAt ? ` · 更新于 ${new Date(mailAccount.updatedAt).toLocaleString('zh-CN')}` : ''}` : '尚未配置 QQ 邮箱。'}{mailAccount && !mailAccount.encryptionConfigured && ' 服务器尚未配置邮箱凭据加密密钥，暂时无法保存。'}</p>
         <div className="settings-actions">
-          <Button loading={mailAccountBusy} disabled={disabled || !mailAccount?.encryptionConfigured} onClick={saveUserMailAccount}>保存邮箱配置</Button>
+
           {mailAccount?.configured && <Button variant="secondary" loading={mailAccountBusy} disabled={disabled} onClick={testUserMailAccount}>测试读取</Button>}
           {mailAccount?.configured && <Button loading={mailAccountBusy} disabled={disabled} onClick={deleteUserMailAccount} variant="danger">删除配置</Button>}
         </div>
