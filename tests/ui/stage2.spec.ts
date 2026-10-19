@@ -259,19 +259,14 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
     await expect(page.locator('.library-card').first()).toBeVisible(); await expect(page.locator('.library-page')).toHaveAttribute('aria-busy', 'false');
     const heights = await page.locator('.library-card h2').evaluateAll(nodes => nodes.map(el => ({ height: el.getBoundingClientRect().height, line: parseFloat(getComputedStyle(el).lineHeight) })));
     expect(heights.every(item => item.height <= 3 * item.line + 2)).toBe(true); await capture('library');
-    if (width < 768) {
-      await page.getByRole('button', { name: /^筛选/ }).click();
-      const sheet = page.getByRole('dialog', { name: '知识库筛选', exact: true });
-      await sheet.getByRole('combobox', { name: '筛选内容形态', exact: true }).click(); await page.getByRole('option', { name: '知识碎片', exact: true }).click();
-      await capture('library-filter'); await sheet.getByRole('button', { name: '取消', exact: true }).click();
-      await expect(page.locator('.library-card.article').first()).toBeVisible();
-      await page.getByRole('button', { name: /^筛选/ }).click();
-      await sheet.getByRole('combobox', { name: '筛选内容形态', exact: true }).click(); await page.getByRole('option', { name: '知识碎片', exact: true }).click();
-      await sheet.getByRole('button', { name: '应用', exact: true }).click(); await expect(page.locator('.library-card.article')).toHaveCount(0);
-    }
+    await page.getByRole('button', { name: '筛选与排序', exact: true }).click();
+    const libraryFilters = page.getByRole('dialog', { name: '筛选与排序', exact: true });
+    await libraryFilters.getByRole('combobox', { name: '筛选内容形态', exact: true }).click(); await page.getByRole('option', { name: '知识碎片', exact: true }).click();
+    await expect(page.locator('.library-card.article')).toHaveCount(0); await capture('library-filter');
+    await page.keyboard.press('Escape'); await expect(libraryFilters).toHaveCount(0);
     await page.locator('.library-card-open').first().click(); await expect(page.locator('.library-document')).toBeVisible(); await capture('library-reader');
     await page.getByRole('button', { name: /返回知识库/, exact: true }).filter({ visible: true }).first().click();
-    await expect(page.locator('.library-card').first()).toBeVisible(); if (width < 768) await expect(page.locator('.library-card.article')).toHaveCount(0);
+    await expect(page.locator('.library-card').first()).toBeVisible(); await expect(page.locator('.library-card.article')).toHaveCount(0);
     await page.goto(base + '/reports'); await expect(page.locator('.daily-report-featured')).toBeVisible(); await capture('reports');
     await page.locator('.daily-report-featured-open').click(); await expect(page.locator('.daily-report-reader-markdown')).toBeVisible(); await capture('report-reader');
     await page.goto(base + '/project'); await expect(page.locator('.evolution-detail h2')).toBeVisible(); await capture('growth');
@@ -326,12 +321,14 @@ test('stage2 C2 compact filters remain reachable in a low-height viewport', asyn
   const token = await fixtureToken(context, 'preview@example.invalid');
   await context.addInitScript(value => localStorage.setItem('aicalendar_token', value), token);
   await page.setViewportSize({ width: 430, height: 520 }); await page.goto(base + '/library');
-  const trigger = page.getByRole('button', { name: /^筛选/ }); await trigger.click();
-  const sheet = page.getByRole('dialog', { name: '知识库筛选', exact: true });
-  await expect(sheet.getByRole('button', { name: '应用', exact: true })).toBeInViewport({ ratio: 1 });
+  const trigger = page.getByRole('button', { name: '筛选与排序', exact: true }); await trigger.click();
+  const sheet = page.getByRole('dialog', { name: '筛选与排序', exact: true });
+  await expect(sheet).toBeInViewport({ ratio: 1 });
+  await sheet.getByRole('button', { name: '重置', exact: true }).scrollIntoViewIfNeeded();
+  await expect(sheet.getByRole('button', { name: '重置', exact: true })).toBeInViewport({ ratio: 1 });
   const sort = sheet.getByRole('combobox', { name: '知识库排序', exact: true }); await sort.click();
   await expect(page.getByRole('option', { name: '名称正序', exact: true })).toBeVisible();
-  await page.keyboard.press('Escape'); await sheet.getByRole('button', { name: '取消', exact: true }).click();
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
 });
 

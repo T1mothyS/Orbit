@@ -200,11 +200,7 @@
 }
 .schedule-form-details { margin-top: 2px; }
 
-.ai-plan-edit-button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; border: 1px solid #BFDBFE; border-radius: 6px; color: #1D4ED8; background: #EFF6FF; font-size: 10px; cursor: pointer; }
-.ai-plan-edit-button:hover, .ai-plan-edit-button:focus-visible { border-color: #60A5FA; outline: none; }
 .ai-plan-item-actions { display:flex; flex:0 0 auto; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
-.ai-plan-remove-button { color:var(--td-error-color); background:var(--td-error-color-1); border-color:var(--td-error-color-3); }
-.ai-plan-edit-button:disabled { opacity:.5; cursor:default; }
 @media (max-width:640px) { .ai-plan-item-actions button { min-height:44px; min-width:44px; } }
 .ai-plan-operation-editor { display: flex; flex-direction: column; gap: 8px; }
 .ai-plan-editor-head { display: flex; align-items: center; justify-content: space-between; color: var(--td-text-color-primary); font-size: 11px; }
@@ -413,7 +409,7 @@
 .orbit-conversation-actions button { padding:7px; color:var(--td-text-color-secondary); border:0; background:none; border-radius:6px; }
 .orbit-conversation-row:hover .orbit-conversation-actions,.orbit-conversation-row:focus-within .orbit-conversation-actions,.orbit-conversation-row.active .orbit-conversation-actions { visibility:visible; }
 @media (hover:none), (max-width:1100px) { .orbit-conversation-actions { visibility:visible; } }
-.orbit-reminder-actions{display:flex;flex-direction:column;gap:8px;margin-top:12px}.orbit-reminder-actions>div{display:flex;flex-wrap:wrap;gap:8px}.orbit-reminder-actions button{border:1px solid var(--td-component-border);border-radius:6px;background:var(--td-bg-color-container);color:var(--td-text-color-primary);padding:6px 10px;font-size:12px;cursor:pointer}.orbit-reminder-actions button:disabled{opacity:.5}
+.orbit-reminder-actions{display:flex;flex-direction:column;gap:8px;margin-top:12px}.orbit-reminder-actions>div{display:flex;flex-wrap:wrap;gap:8px}
 .orbit-reminder-settings{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:15px 0;padding:12px;border:1px solid var(--td-component-border);border-radius:8px;font-size:12px}.orbit-reminder-settings strong,.orbit-reminder-settings small{width:100%}.orbit-reminder-settings input[type=number]{width:65px;background:var(--td-bg-color-container);color:var(--td-text-color-primary);border:1px solid var(--td-component-border)}.orbit-reminder-settings button,.orbit-scope-chat{padding:6px 10px;border-radius:6px;background:var(--td-brand-color-light);color:var(--td-brand-color)}.orbit-scope-chat{width:100%;margin-bottom:12px}
 
 @media (max-width: 767px) { .schedule-context-menu button { min-height: var(--orbit-touch-target); } }

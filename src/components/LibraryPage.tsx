@@ -1,6 +1,5 @@
 import { BookOpen, RefreshCw, SlidersHorizontal } from 'lucide-react';
-import { Button, ButtonLink, Select } from '../ui';
-import { CompactFilterSheet } from './CompactFilterSheet';
+import { Button, IconButton, Popover, Select } from '../ui';
 import { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ExperiencePage } from './library/ExperiencePage';
@@ -22,7 +21,7 @@ function LibraryHomePage() {
   const [status, setStatus] = useState<'active' | 'all' | 'draft' | 'archived'>('active');
   const [sort, setSort] = useState<LibrarySort>(DEFAULT_LIBRARY_SORT);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [pendingFilters, setPendingFilters] = useState({ kind, type, status, sort });
+  type Filters = { kind: typeof kind; type: typeof type; status: typeof status; sort: typeof sort };
   const [sortPreferenceReady, setSortPreferenceReady] = useState(false);
   const [sortSaving, setSortSaving] = useState(false);
   const [preferenceError, setPreferenceError] = useState<string | null>(null);
@@ -102,8 +101,12 @@ function LibraryHomePage() {
     }
   };
 
+  const changeFilters = (value: Filters) => {
+    setKind(value.kind); setType(value.type); setStatus(value.status);
+    void saveSortPreference(value.sort);
+  };
   const filterCount = Number(type !== 'all') + Number(kind !== 'all') + Number(status !== 'active') + Number(sort !== DEFAULT_LIBRARY_SORT);
-  const filterFields = (value: typeof pendingFilters, change: (value: typeof pendingFilters) => void, disabled = false) => <>
+  const filterFields = (value: Filters, change: (value: Filters) => void, disabled = false) => <>
     <label>类型<Select label="筛选内容类型" value={value.type} disabled={disabled} onValueChange={next => change({ ...value, type: (next || 'all') as typeof type })} options={[{value:'all',label:'全部类型'}, ...(Object.keys(typeLabels) as LibraryType[]).map(value => ({value,label:typeLabels[value]}))]} /></label>
     <label>形态<Select label="筛选内容形态" value={value.kind} disabled={disabled} onValueChange={next => change({ ...value, kind: (next || 'all') as typeof kind })} options={[{value:'all',label:'全部形态'},{value:'article',label:'正式知识'},{value:'fragment',label:'知识碎片'}]} /></label>
     <label>状态<Select label="筛选内容状态" value={value.status} disabled={disabled} onValueChange={next => change({ ...value, status: (next || 'active') as typeof status })} options={[{value:'active',label:'有效内容'},{value:'draft',label:'草稿'},{value:'archived',label:'已归档'},{value:'all',label:'全部状态'}]} /></label>
@@ -118,17 +121,16 @@ function LibraryHomePage() {
           <p>阅读、回顾，连接你的知识。</p>
         </div>
         <div className="library-header-actions">
-          <ButtonLink variant="primary" to="/library/experience">记录经历</ButtonLink>
-          <ButtonLink variant="quiet" to="/library/settings">知识库设置</ButtonLink>
-          <Button className="mobile-filter-trigger" disabled={!sortPreferenceReady || sortSaving} onClick={() => { setPendingFilters({ kind, type, status, sort }); setFiltersOpen(true); }}><SlidersHorizontal size={16} />筛选{filterCount > 0 && <span className="filter-count">{filterCount}</span>}</Button>
+          <div className="library-filter-control"><Popover title="筛选与排序" open={filtersOpen} onOpenChange={setFiltersOpen} align="end" className="library-filter-popover" trigger={<IconButton label="筛选与排序" title="筛选与排序" variant="quiet" disabled={!sortPreferenceReady || sortSaving}><SlidersHorizontal size={16} strokeWidth={1.8} aria-hidden="true" /></IconButton>}>
+            <div className="library-filters">{filterFields({ kind, type, status, sort }, changeFilters, !sortPreferenceReady || sortSaving)}</div>
+            {preferenceError && <p role="alert">{preferenceError}</p>}
+            <div className="library-filter-footer"><Button size="small" variant="quiet" disabled={!filterCount || sortSaving} onClick={() => changeFilters({kind:'all',type:'all',status:'active',sort:DEFAULT_LIBRARY_SORT})}>重置</Button><span role="status">{filterCount ? `${filterCount} 项非默认条件` : '默认条件'}</span></div>
+          </Popover>{filterCount > 0 && <span className="library-filter-count" aria-label={`${filterCount} 项非默认条件`}>{filterCount}</span>}</div>
         </div>
       </header>
 
       {preferenceError && <div className="library-notice error" role="alert">{preferenceError}<button type="button" onClick={() => void loadPreference()}>重试排序偏好</button></div>}
       {error && <div className="library-notice error" role="alert">{error}<button type="button" onClick={() => void load()}>重试</button></div>}
-
-      <section className="library-toolbar desktop-filters" aria-label="知识库筛选"><div className="library-filters">{filterFields({ kind, type, status, sort }, value => { setKind(value.kind); setType(value.type); setStatus(value.status); void saveSortPreference(value.sort); }, !sortPreferenceReady || sortSaving)}</div></section>
-      {filtersOpen && <CompactFilterSheet title="知识库筛选" busy={sortSaving} error={preferenceError} onClose={() => setFiltersOpen(false)} onReset={() => setPendingFilters({ kind: 'all', type: 'all', status: 'active', sort: DEFAULT_LIBRARY_SORT })} onApply={() => { void saveSortPreference(pendingFilters.sort).then(success => { if (success) { setKind(pendingFilters.kind); setType(pendingFilters.type); setStatus(pendingFilters.status); setFiltersOpen(false); } }); }}>{filterFields(pendingFilters, setPendingFilters)}</CompactFilterSheet>}
 
       <div className="library-list-meta"><span>{loading ? '正在加载…' : `显示 ${entries.length} 条，共 ${total} 条`}</span><span>当前按{sortLabels[sort]}</span></div>
       {loading && !entries.length ? (

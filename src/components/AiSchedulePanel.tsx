@@ -3,6 +3,7 @@ import { composerDraftKey, readComposerDraft, updateComposerDraft, snapshotCompo
 import type { NoteImage } from '../utils/note-images';
 import { NoteImageGallery, NoteImageInput, useNoteImageUpload } from './NoteImages';
 import { OrbitNotificationCard, type NotificationMeta } from './OrbitNotificationCard';
+import { ReminderActionButtons } from './ReminderActionButtons';
 import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle } from 'react';
 import { Bot, BookOpen, Send, Loader2, Check, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus } from 'lucide-react';
 import type { InlineConfirmation } from '../hooks/useInlineConfirmation';
@@ -71,6 +72,11 @@ interface AiSchedulePlan {
   operations: AiPlanOperation[];
   revision?: number;
   state?: string;
+}
+
+function planOutcomeLabel(plan: AiSchedulePlan): string {
+  const kinds = new Set(plan.operations.map(operation => operation.type === 'create_recurring' ? 'create' : operation.type));
+  return kinds.size === 1 ? ({ create: '已创建', update: '已更新', delete: '已删除' }[Array.from(kinds)[0]]) : '已执行';
 }
 
 interface KnowledgeSource {
@@ -246,8 +252,8 @@ function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, 
       <div className="flex items-start justify-between gap-2">
         <div className="text-xs font-medium" style={{ color: 'var(--td-text-color-primary)' }}>{operation.title}</div>
         {!disabled && <div className="ai-plan-item-actions">
-          {operation.type !== 'delete' && <button type="button" className="ai-plan-edit-button" disabled={saving} onClick={event => { event.stopPropagation(); onStartEdit(); }} aria-label={`编辑计划项 ${operation.title}`}><Edit3 size={13} /> 编辑</button>}
-          {['create','create_recurring'].includes(operation.type) && <button type="button" className="ai-plan-edit-button ai-plan-remove-button" disabled={saving} onClick={event => { event.stopPropagation(); void onRemove(); }} aria-label={`删除待创建条目 ${operation.title}`}><Trash2 size={13} /> 删除</button>}
+          {operation.type !== 'delete' && <Button variant="quiet" size="small" className="ai-plan-edit-button" disabled={saving} onClick={event => { event.stopPropagation(); onStartEdit(); }} aria-label={`编辑计划项 ${operation.title}`}><Edit3 size={13} /> 编辑</Button>}
+          {['create','create_recurring'].includes(operation.type) && <Button variant="quiet" size="small" className="ai-plan-edit-button ai-plan-remove-button" disabled={saving} onClick={event => { event.stopPropagation(); void onRemove(); }} aria-label={`删除待创建条目 ${operation.title}`}><Trash2 size={13} /> 删除</Button>}
         </div>}
       </div>
       <div className="text-xs mt-0.5" style={{ color: 'var(--td-text-color-secondary)' }}>{actionLabel[operation.type] || '处理'} · {timeLabel}</div>
@@ -500,7 +506,7 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
 
             {msg.type === 'plan' && msg.plan && (
               <div className="mt-2 rounded-lg p-2.5 orbit-plan" style={{ backgroundColor: 'var(--td-brand-color-light)', border: '1px solid var(--td-component-stroke)' }}>
-                <div className="text-xs font-medium mb-2" style={{ color: 'var(--td-brand-color)' }}>{({pending:'待确认',suspended:'已挂起',expired:'已过期',cancelled:'已取消',completed:'已完成',partially_completed:'部分完成',failed:'执行失败'} as Record<string,string>)[msg.plan.state||'pending']}执行计划 · {msg.plan.operations.length} 项 · 版本 {msg.plan.revision||1}</div>
+                <div className="text-xs font-medium mb-2" style={{ color: 'var(--td-brand-color)' }}>执行计划 · {({pending:'待确认',suspended:'已挂起',expired:'已过期',cancelled:'已取消',completed:planOutcomeLabel(msg.plan),partially_completed:'部分操作已执行',failed:'执行失败'} as Record<string,string>)[msg.plan.state||'pending']} · {msg.plan.operations.length} 项 · 版本 {msg.plan.revision||1}</div>
                 {msg.plan.warnings.map((warning, index) => (
                   <div key={`${warning}-${index}`} className="text-xs mb-1" style={{ color: '#B45309' }}>需核对：{warning}</div>
                 ))}
@@ -551,10 +557,10 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
             )}
             {msg.orbitMeta?.origin==='notification'&&<OrbitNotificationCard meta={msg.orbitMeta} title={(msg.text||'Orbit 通知').split('\n')[0]} onRefresh={onNotificationRefresh}/>}
             {navigation.map(action=><Link className="orbit-setting-card" key={action.settingId} to={navigationHref(action,user?.role === 'admin')!}>{settingAction(action.settingId,user?.role === 'admin')!.label} →</Link>)}
-            {msg.orbitMeta?.origin==='proactive' && <div className={`orbit-reminder-actions ${msg.orbitMeta.state==='handled'?'is-handled':''}`}><small>{msg.orbitMeta.enhanced?'Orbit 主动提醒':'Orbit 主动提醒 · 基于事项信息'}</small>{msg.orbitMeta.state==='sent' && <div>{[['complete','完成'],['snooze','15 分钟后'],['tomorrow','明天 09:00 再提醒']].map(([action,label])=><button type="button" key={action} disabled={reminderBusy} onClick={()=>{setReminderBusy(true);setReminderError('');void onReminderAction?.(msg.orbitMeta!.eventId!,action).catch(e=>setReminderError(e.message)).finally(()=>setReminderBusy(false));}}>{label}</button>)}</div>}{msg.orbitMeta.state==='handled'&&<span>{msg.orbitMeta.handledAction==='complete'?'✓ 已完成':msg.orbitMeta.nextReminderAt?`已延后 · ${new Date(msg.orbitMeta.nextReminderAt).toLocaleString()}`:'已处理'}{msg.orbitMeta.handledAt&&<small> · {new Date(msg.orbitMeta.handledAt).toLocaleString()}</small>}</span>}{msg.orbitMeta.state==='discarded'&&<span>提醒已失效，请查看当前事项</span>}{reminderError&&<p role="alert">{reminderError}</p>}</div>}
+            {msg.orbitMeta?.origin==='proactive' && <div className={`orbit-reminder-actions ${msg.orbitMeta.state==='handled'?'is-handled':''}`}><small>{msg.orbitMeta.enhanced?'Orbit 主动提醒':'Orbit 主动提醒 · 基于事项信息'}</small>{msg.orbitMeta.state==='sent' && <div><ReminderActionButtons busy={reminderBusy} onAction={action=>{setReminderBusy(true);setReminderError('');void onReminderAction?.(msg.orbitMeta!.eventId!,action).catch(e=>setReminderError(e.message)).finally(()=>setReminderBusy(false));}} /></div>}{msg.orbitMeta.state==='handled'&&<span>{msg.orbitMeta.handledAction==='complete'?'✓ 已完成':msg.orbitMeta.nextReminderAt?`已延后 · ${new Date(msg.orbitMeta.nextReminderAt).toLocaleString()}`:'已处理'}{msg.orbitMeta.handledAt&&<small> · {new Date(msg.orbitMeta.handledAt).toLocaleString()}</small>}</span>}{msg.orbitMeta.state==='discarded'&&<span>提醒已失效，请查看当前事项</span>}{reminderError&&<p role="alert">{reminderError}</p>}</div>}
             {!!(msg.orbitMeta as any)?.sources?.length&&<details className="orbit-message-sources"><summary>联网来源 · {(msg.orbitMeta as any).sources.length}</summary>{(msg.orbitMeta as any).sources.map((source:any)=><a key={source.url} href={safeChatHref(source.url)} target="_blank" rel="noopener noreferrer"><strong>{source.title}</strong><small>{source.source} · {source.publishedAt?new Date(source.publishedAt).toLocaleString():'发布时间未知'} · 获取 {new Date(source.retrievedAt).toLocaleString()}</small></a>)}</details>}
             {!!(msg.orbitMeta as any)?.steps?.length&&<details className="orbit-message-steps"><summary>处理步骤</summary>{(msg.orbitMeta as any).steps.map((s:any)=><p key={s.id}>{s.state==='completed'?'✓':s.state==='failed'?'!':'…'} {s.label} · {s.query}</p>)}</details>}
-            {msg.plan?.state&&['completed','partially_completed','failed'].includes(msg.plan.state)&&<div className="orbit-outcome"><p role="status">{msg.plan.state==='completed'?'✓ 已完成':msg.plan.state==='partially_completed'?'部分事项已完成，请核对未执行项目':'执行失败，正式结果请核对失败原因'}</p>{msg.plan.state!=='completed'&&<button type="button" className="secondary-button" disabled={!!savingPlanOperationKey} onClick={()=>void onUpdatePlanOperation?.(msg.plan!.id,'retry',{}).catch(e=>setReminderError(e.message))}>为失败项创建新草稿</button>}</div>}
+            {msg.plan?.state&&['completed','partially_completed','failed'].includes(msg.plan.state)&&<div className="orbit-outcome"><p role="status">{msg.plan.state==='completed'?`✓ ${planOutcomeLabel(msg.plan)}`:msg.plan.state==='partially_completed'?'部分操作已执行，请核对未执行项':'执行失败，正式结果请核对失败原因'}</p>{msg.plan.state!=='completed'&&<button type="button" className="secondary-button" disabled={!!savingPlanOperationKey} onClick={()=>void onUpdatePlanOperation?.(msg.plan!.id,'retry',{}).catch(e=>setReminderError(e.message))}>为失败项创建新草稿</button>}</div>}
             {msg.plan&&reminderError&&<p role="alert">{reminderError}</p>}
             {messageTime}
           </div>

@@ -27,6 +27,13 @@
 .library-header h1 { margin: 6px 0 5px; font-size: clamp(28px, 3vw, 40px); letter-spacing: -.04em; }
 .library-header p { margin: 0; color: var(--td-text-color-secondary); font-size: 13px; line-height: 1.7; }
 .library-header-actions { min-width: 0; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.library-filter-control { position:relative; }
+.library-filter-count { position:absolute; inset-block-start:0; inset-inline-end:0; display:grid; place-items:center; min-width:16px; height:16px; padding-inline:var(--orbit-space-1); border-radius:var(--orbit-radius-full); background:var(--orbit-brand-soft); color:var(--orbit-text); font-size:var(--orbit-type-caption); pointer-events:none; }
+.library-filter-popover { width:360px; }
+.library-filter-popover .library-filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--orbit-space-4); margin-top:var(--orbit-space-4); }
+.library-filter-popover .library-filters > label { display:grid; min-width:0; gap:var(--orbit-space-2); font-size:var(--orbit-type-secondary); }
+.library-filter-footer { display:flex; align-items:center; justify-content:space-between; gap:var(--orbit-space-3); margin-top:var(--orbit-space-4); color:var(--orbit-text-secondary); font-size:var(--orbit-type-caption); }
+@media (max-width:360px) { .library-filter-popover .library-filters { grid-template-columns:minmax(0,1fr); } }
 .library-primary-button,
 .library-secondary-button,
 .library-danger-button,

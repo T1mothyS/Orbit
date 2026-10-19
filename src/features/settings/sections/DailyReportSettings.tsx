@@ -160,7 +160,7 @@ export function DailyReportSettings({authHeaders}:{authHeaders:SettingsAuthHeade
           {dailyReportStatus?.active && <Button loading={dailyReportBusy} disabled={dailyReportBusy} onClick={revokeReportToken} variant="danger">撤销令牌</Button>}
         </div>
       </SettingRow>
-      <SettingRow label="来源接收与转发" description="只控制哪些已写入生产服务器的日报进入正式网页和邮件；不会暂停本地或 Work Cloud 任务。保存后从下一次正式发布生效，不追溯发送。">
+      <SettingRow label="来源接收与转发" description="只控制哪些已写入生产服务器的日报进入正式网页和邮件；不会暂停本地或 Work Cloud 任务。保存后从下一次正式发布生效，不追溯发送。未勾选的有效日报仍会保存为候选，可在日报页查看对照；两边都勾选时会分别发送两封邮件。">
         <div className="settings-stack">
           {deliveryPolicyError && <div className="settings-status" role="alert"><strong className="settings-error-text">{deliveryPolicyError}</strong><Button variant="secondary" onClick={() => void loadDeliveryPolicy()}>重试来源设置</Button></div>}
           {!deliveryPolicy && !deliveryPolicyError && <p className="settings-help" role="status">加载来源接收设置中…</p>}
@@ -177,7 +177,7 @@ export function DailyReportSettings({authHeaders}:{authHeaders:SettingsAuthHeade
           <div className="settings-actions">
             <Button loading={deliveryPolicyBusy} disabled={!deliveryPolicy || !deliveryPolicyDirty || deliveryPolicyBusy} onClick={() => void saveDeliveryPolicy()}>保存来源设置</Button>
           </div>
-          {deliveryPolicy && <p className="settings-note">当前选择：{deliveryPolicy.sources.length ? deliveryPolicy.sources.map(source => source === 'local' ? '本地' : 'Cloud').join('、') : '不接收任何来源'}。未勾选的有效日报仍会保存为候选，可在日报页查看对照；两边都勾选时会分别发送两封邮件。最近保存：{deliveryPolicy.updatedAt ? new Date(deliveryPolicy.updatedAt).toLocaleString('zh-CN') : '尚未保存'}。</p>}
+          {deliveryPolicy && <p className="settings-note">当前选择：{deliveryPolicy.sources.length ? deliveryPolicy.sources.map(source => source === 'local' ? '本地' : 'Cloud').join('、') : '不接收任何来源'}。最近保存：{deliveryPolicy.updatedAt ? new Date(deliveryPolicy.updatedAt).toLocaleString('zh-CN') : '尚未保存'}。</p>}
           <div className="settings-guide-card">
             <h3>正式切换步骤</h3>
             <ol>

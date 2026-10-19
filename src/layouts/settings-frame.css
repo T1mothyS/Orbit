@@ -18,7 +18,8 @@
 .settings-workspace-mobile-back { display: none; }
 .settings-workspace-mobile-back a { display: inline-flex; align-items: center; gap: var(--orbit-space-1); min-height: var(--orbit-touch-target); text-decoration: none; }
 .settings-category-list { display: grid; }
-.settings-category-list > a { display: flex; align-items: center; justify-content: space-between; gap: var(--orbit-space-4); min-height: 76px; border-bottom: 1px solid var(--orbit-border); padding-block: var(--orbit-space-4); color: var(--orbit-text); text-decoration: none; }
+.settings-category-entry { display:flex; align-items:center; gap:var(--orbit-space-3); border-bottom:1px solid var(--orbit-border); }
+.settings-category-entry > a { flex:1; display:flex; align-items:center; justify-content:space-between; gap:var(--orbit-space-4); min-height:var(--orbit-touch-target); padding-block:var(--orbit-space-4); color:var(--orbit-text); text-decoration:none; }
 .settings-category-list strong { font-size: var(--orbit-type-body); font-weight: 600; }
 .settings-category-list p { margin: var(--orbit-space-1) 0 0; color: var(--orbit-text-secondary); font-size: var(--orbit-type-secondary); }
 .settings-category-list svg { flex-shrink: 0; color: var(--orbit-text-secondary); }

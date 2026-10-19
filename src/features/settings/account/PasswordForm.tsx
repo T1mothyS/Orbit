@@ -34,10 +34,9 @@ export function PasswordForm({ onCancel }: { onCancel: () => void }) {
   };
   return <form className="settings-password-form" onSubmit={submit} noValidate aria-label="修改登录密码" aria-busy={busy || undefined}>
     <FormField id="account-current-password" label="当前密码" error={errors.current}><PasswordInput id="account-current-password" name="current-password" ref={currentInput} aria-label="当前密码" autoComplete="current-password" value={current} onChange={event => setCurrent(event.target.value)} disabled={busy} aria-invalid={!!errors.current} aria-describedby={errors.current ? 'account-current-password-description' : undefined} /></FormField>
-    <FormField id="account-new-password" label="新密码" hint="至少 8 位；中文等字符会占用多个字节，总计最多 72 字节。" error={errors.next}><PasswordInput id="account-new-password" name="new-password" ref={newInput} aria-label="新密码" autoComplete="new-password" value={next} onChange={event => setNext(event.target.value)} disabled={busy} aria-invalid={!!errors.next} aria-describedby="account-new-password-description" /></FormField>
+    <FormField id="account-new-password" label="新密码" help="至少 8 位；中文等字符会占用多个字节，总计最多 72 字节。" error={errors.next}><PasswordInput id="account-new-password" name="new-password" ref={newInput} aria-label="新密码" autoComplete="new-password" value={next} onChange={event => setNext(event.target.value)} disabled={busy} aria-invalid={!!errors.next} aria-describedby={errors.next ? "account-new-password-description" : undefined} /></FormField>
     <FormField id="account-confirm-password" label="确认新密码" error={errors.confirm}><PasswordInput id="account-confirm-password" name="confirm-password" ref={confirmInput} aria-label="确认新密码" autoComplete="new-password" value={confirm} onChange={event => setConfirm(event.target.value)} disabled={busy} aria-invalid={!!errors.confirm} aria-describedby={errors.confirm ? 'account-confirm-password-description' : undefined} /></FormField>
     {message && <InlineNotice tone="danger" title={message} />}
-    <p className="oui-help">更新后，所有设备上的 Orbit 登录都会失效。日报、知识库令牌和外部授权仍然保留。</p>
     <div className="settings-account-actions"><Button type="submit" variant="primary" loading={busy}>更新并重新登录</Button><Button disabled={busy} onClick={onCancel}>取消</Button></div>
   </form>;
 }

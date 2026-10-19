@@ -23,7 +23,7 @@ export function AvatarEditor({ email }: { email: string }) {
     finally { locked.current = false; if (mounted.current) setBusy(false); }
   };
   return <div className="settings-avatar-editor"><div className="settings-account-actions"><AccountAvatar email={email} size={48} /><FilePicker label={busy ? '保存中…' : '上传或更换'} accept="image/jpeg,image/png,image/webp" disabled={busy} onFile={file => void update(file)} /><Button variant="quiet" disabled={busy} onClick={() => { setError(''); setConfirm(true); }}>恢复默认头像</Button></div>
-    <p className="oui-help">JPEG、PNG 或 WebP，最大 5 MB。</p>{error && <InlineNotice tone="danger" title={error} />}
+    {error && <InlineNotice tone="danger" title={error} />}
     <ConfirmDialog open={confirm} onOpenChange={setConfirm} busy={busy} title="恢复默认头像？" description="当前头像将被移除，之后可以重新上传。" confirmLabel="恢复默认头像" onConfirm={() => void update()}><p className="oui-help">账号信息和其他设置保持不变。</p>{error && <InlineNotice tone="danger" title={error} />}</ConfirmDialog>
   </div>;
 }

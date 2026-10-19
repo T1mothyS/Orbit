@@ -4,6 +4,7 @@ import { Checkbox as PrimitiveCheckbox } from '@base-ui/react/checkbox';
 import { Switch as PrimitiveSwitch } from '@base-ui/react/switch';
 import { Select as PrimitiveSelect } from '@base-ui/react/select';
 import { IconButton } from './Button';
+import { HelpPopover } from './Surface';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { focusIndicator?: 'ring' | 'border' }>(function Input({ className = '', focusIndicator = 'ring', ...props }, ref) {
   return <input {...props} ref={ref} className={`oui-input${focusIndicator === 'border' ? ' oui-input--border-focus' : ''} ${className}`} />;
@@ -71,8 +72,11 @@ export function Select({ id, label, options, placeholder = '请选择', invalid,
   </PrimitiveSelect.Root>;
 }
 
-export function FormField({ id, label, hint, error, children }: { id: string; label: string; hint?: ReactNode; error?: string; children: ReactNode }) {
-  return <div className="oui-field"><label htmlFor={id} className="oui-label">{label}</label>
+export function RequiredMark() {
+  return <span className="oui-required-mark" aria-hidden="true" />;
+}
+export function FormField({ id, label, hint, help, error, required = false, children }: { id: string; label: string; hint?: ReactNode; help?: ReactNode; error?: string; required?: boolean; children: ReactNode }) {
+  return <div className="oui-field"><div className="oui-heading-with-help"><label htmlFor={id} className="oui-label">{label}{required && <RequiredMark />}</label>{help && <HelpPopover label={label}>{help}</HelpPopover>}</div>
     {children}
     {error ? <p className="oui-field-error" id={`${id}-description`} role="alert">{error}</p>
       : hint ? <p className="oui-help" id={`${id}-description`}>{hint}</p> : null}

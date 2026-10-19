@@ -1,6 +1,6 @@
 import { requestError } from '../utils/request-error';
 import { OrbitDialog } from './OrbitDialog';
-import { ArrowUpRight, CalendarClock, CheckCircle2, ChevronDown, Edit3, Mail, MoreVertical, Paperclip, RefreshCw, Trash2, X } from 'lucide-react';
+import { ArrowUpRight, CalendarClock, CheckCircle2, ChevronDown, Edit3, MoreVertical, Paperclip, RefreshCw, Trash2, X } from 'lucide-react';
 import { KeyboardEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { ActionRow, IconButton, Menu } from '../ui';
 import { useNavigate } from 'react-router-dom';
@@ -134,7 +134,7 @@ function ActionList({ title, hint, items, tone, menuScope, headerControl, onComp
             {completingId === item.id ? <RefreshCw size={17} className="spin" aria-hidden="true" /> : <CheckCircle2 size={17} aria-hidden="true" />}
           </IconButton>
         </div>
-        {item.sourceType === 'schedule' ? <ActionRow compact className="action-row-main" aria-label={`编辑日程：${item.title}`} title={item.title} onClick={() => onEdit(item)} description={<><span className={'priority-dot ' + item.priority} aria-hidden="true" />{{high:'高',medium:'中',low:'低'}[item.priority]}优先级 · {item.itemType === 'recurring' ? '周期事务' : item.itemType === 'todo' ? '待办' : '日程'} · {item.plannedAt ? `安排 ${formatDate(item.plannedAt, true)} · 到期 ${formatDate(item.dueAt,true)}` : formatDate(item.dueAt, item.allDay)}{item.nextAction && ` · ${item.nextAction}`}</>} /> : <div className="action-row-label"><strong>{item.title}</strong><span>{<><span className={'priority-dot ' + item.priority} aria-hidden="true" />{{high:'高',medium:'中',low:'低'}[item.priority]}优先级 · {item.itemType === 'recurring' ? '周期事务' : item.itemType === 'todo' ? '待办' : '日程'} · {item.plannedAt ? `安排 ${formatDate(item.plannedAt, true)} · 到期 ${formatDate(item.dueAt,true)}` : formatDate(item.dueAt, item.allDay)}{item.nextAction && ` · ${item.nextAction}`}</>}</span></div>}
+        {item.sourceType === 'schedule' ? <ActionRow compact className="action-row-main" aria-label={`编辑日程：${item.title}`} title={item.title} onClick={() => onEdit(item)} description={<><span aria-label={`${{high:'高',medium:'中',low:'低'}[item.priority]}优先级`}><span className={'priority-dot ' + item.priority} aria-hidden="true" />{{high:'高',medium:'中',low:'低'}[item.priority]}</span> · {item.itemType === 'recurring' ? '周期事务' : item.itemType === 'todo' ? '待办' : '日程'} · {item.plannedAt ? `安排 ${formatDate(item.plannedAt, true)} · 到期 ${formatDate(item.dueAt,true)}` : formatDate(item.dueAt, item.allDay)}{item.nextAction && ` · ${item.nextAction}`}</>} /> : <div className="action-row-label"><strong>{item.title}</strong><span>{<><span aria-label={`${{high:'高',medium:'中',low:'低'}[item.priority]}优先级`}><span className={'priority-dot ' + item.priority} aria-hidden="true" />{{high:'高',medium:'中',low:'低'}[item.priority]}</span> · {item.itemType === 'recurring' ? '周期事务' : item.itemType === 'todo' ? '待办' : '日程'} · {item.plannedAt ? `安排 ${formatDate(item.plannedAt, true)} · 到期 ${formatDate(item.dueAt,true)}` : formatDate(item.dueAt, item.allDay)}{item.nextAction && ` · ${item.nextAction}`}</>}</span></div>}
         <ActionItemMenu item={item} open={openMenuId === menuId} onToggle={() => setOpenMenuId(openMenuId === menuId ? null : menuId)} onAction={action => { setOpenMenuId(null); onMenuAction(item, action); }} />
       </article>;
       })}
@@ -179,7 +179,7 @@ function SuspendedTodoSection({ items, onViewAll, onComplete, onEdit, onMenuActi
             {completingId === item.id ? <RefreshCw size={17} className="spin" aria-hidden="true" /> : <CheckCircle2 size={17} aria-hidden="true" />}
           </IconButton>
         </div>
-        <ActionRow compact className="action-row-main" aria-label={`编辑待办：${item.title}`} title={item.title} onClick={() => onEdit(item)} description={<><span className={'priority-dot ' + item.priority} aria-hidden="true" />{{high:'高',medium:'中',low:'低'}[item.priority]}优先级 · 无固定期限{item.nextAction && ` · ${item.nextAction}`}</>} />
+        <ActionRow compact className="action-row-main" aria-label={`编辑待办：${item.title}`} title={item.title} onClick={() => onEdit(item)} description={<><span aria-label={`${{high:'高',medium:'中',low:'低'}[item.priority]}优先级`}><span className={'priority-dot ' + item.priority} aria-hidden="true" />{{high:'高',medium:'中',low:'低'}[item.priority]}</span> · 无固定期限{item.nextAction && ` · ${item.nextAction}`}</>} />
         <ActionItemMenu item={item} open={openMenuId === menuId} onToggle={() => setOpenMenuId(openMenuId === menuId ? null : menuId)} onAction={action => { setOpenMenuId(null); onMenuAction(item, action); }} />
       </article>;
       })}
@@ -203,9 +203,6 @@ export function ActionCenterPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showUnscheduled, setShowUnscheduled] = useState(false);
-  const [showSendDialog, setShowSendDialog] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState(false);
-  const [sendNotice, setSendNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const [completionEditTarget, setCompletionEditTarget] = useState<ActionItem | null>(null);
   const [completionExistingFiles, setCompletionExistingFiles] = useState<NonNullable<ActionItem['proof']>['attachments']>([]);
   const [completionRemovedFileIds, setCompletionRemovedFileIds] = useState<string[]>([]);
@@ -230,24 +227,11 @@ export function ActionCenterPage() {
   }, [authHeaders, days]);
 
   useEffect(() => { loadActions(); }, [loadActions]);
-
-  const sendTodayEmail = async () => {
-    if (sendingEmail) return;
-    setSendingEmail(true);
-    setSendNotice(null);
-    try {
-      const response = await fetch('/api/action-center/send-email', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(30000),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || '邮件发送失败');
-      setShowSendDialog(false);
-      setSendNotice({ tone: 'success', text: result.message || '今天的安排已发送。' });
-    } catch (error) {
-      setSendNotice({ tone: 'error', text: requestError(error, '邮件发送失败，请稍后重试。', true) });
-    } finally { setSendingEmail(false); }
-  };
+  useEffect(() => {
+    const refresh = () => { void loadActions(false); };
+    window.addEventListener('orbit:data-change', refresh);
+    return () => window.removeEventListener('orbit:data-change', refresh);
+  }, [loadActions]);
 
   const complete = async (item: ActionItem) => {
     if (completingId) return;
@@ -499,14 +483,10 @@ export function ActionCenterPage() {
   return <div className="action-center-page">
     <header className="action-center-header">
       <div><div className="eyebrow">TODAY COMMAND CENTER</div><h1>今日行动中心</h1></div>
-      <div className="action-header-tools">
-        <button className="secondary-button send-schedule-button" onClick={() => { setSendNotice(null); setShowSendDialog(true); }}><Mail size={15} /> 一键发送日程</button>
-        <button className="secondary-button" onClick={() => loadActions()}><RefreshCw size={15} /> 刷新</button>
-      </div>
+
     </header>
 
     {actionError && <div className="action-inline-notice error" role="alert">{actionError}<button type="button" onClick={() => void loadActions(false)}>重新读取</button></div>}
-    {sendNotice && <div className={'action-inline-notice ' + sendNotice.tone}>{sendNotice.text}</div>}
     {showUnscheduled && <UnscheduledTodoDrawer onClose={() => setShowUnscheduled(false)} onChanged={() => void loadActions(false)} />}
 
     {loading && ![...data.today, ...data.tomorrow, ...data.upcoming, ...data.overdue, ...data.completedToday, ...data.unscheduled].length ? <div className="empty-panel"><div className="loading-dot" />正在整理今天的行动</div> : <>
@@ -559,7 +539,6 @@ export function ActionCenterPage() {
       </section>
     </>}
 
-    {showSendDialog && <OrbitDialog label="发送今天的日程" busy={sendingEmail} error={sendNotice?.tone === 'error' ? sendNotice.text : undefined} onClose={() => setShowSendDialog(false)}>{close => <div className="complete-modal send-schedule-modal"><button className="icon-button modal-close" onClick={close} disabled={sendingEmail} aria-label="关闭发送确认"><X size={16} /></button><h2>发送今天的日程？</h2><p>确认后会立即把今天的日程和今天的待办发送到你绑定的通知邮箱。</p>{sendNotice?.tone === 'error' && <p className="orbit-inline-error" role="alert">{sendNotice.text}</p>}<div className="modal-foot"><button className="secondary-button" onClick={close} disabled={sendingEmail}>取消</button><button className="primary-button" onClick={sendTodayEmail} disabled={sendingEmail}>{sendingEmail ? '发送中…' : '确认发送'}</button></div></div>}</OrbitDialog>}
 
     {completionEditTarget && <OrbitDialog label="编辑完成记录" busy={!!completingId} error={actionError} onClose={() => setCompletionEditTarget(null)} canClose={() => (JSON.stringify([completionNote, completionAmount, completionBillDate]) === completionBaseline.current && !completionFiles.length && !completionRemovedFileIds.length) || window.confirm('有未保存的完成记录，确定放弃吗？')}>{close => <>
       <div className="complete-modal completion-proof-modal">

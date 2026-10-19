@@ -7,15 +7,18 @@ import { Popover } from './Overlay';
 export function Card({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div {...props} className={`oui-card ${className}`} />;
 }
-export function Section({ title, description, children, id, action, hideTitle = false }: { title: string; description?: ReactNode; children: ReactNode; id?: string; action?: ReactNode; hideTitle?: boolean }) {
+export function HelpPopover({ label, children }: { label: string; children: ReactNode }) {
+  return <Popover openOnHover title={label} trigger={<button type="button" className="oui-help-trigger" aria-label={`了解${label}`}><CircleHelp size={16} aria-hidden="true" /></button>}><div className="oui-help-content">{children}</div></Popover>;
+}
+export function Section({ title, description, help, children, id, action, hideTitle = false }: { title: string; description?: ReactNode; help?: ReactNode; children: ReactNode; id?: string; action?: ReactNode; hideTitle?: boolean }) {
   return <section className="oui-section" id={id} aria-label={title} tabIndex={id ? -1 : undefined}>
-    <header className="oui-section-heading"><div><h2 className={hideTitle ? 'oui-visually-hidden' : undefined}>{title}</h2>{description && <p>{description}</p>}</div>{action}</header>
+    {hideTitle && !description && !help && !action ? <h2 className="oui-visually-hidden">{title}</h2> : <header className="oui-section-heading"><div><div className="oui-heading-with-help"><h2 className={hideTitle ? 'oui-visually-hidden' : undefined}>{title}</h2>{help && <HelpPopover label={title}>{help}</HelpPopover>}</div>{description && <p>{description}</p>}</div>{action}</header>}
     <div>{children}</div>
   </section>;
 }
-export function SettingRow({ label, description, help, children, htmlFor, id }: { label: string; description?: ReactNode; help?: string; children: ReactNode; htmlFor?: string; id?: string }) {
+export function SettingRow({ label, description, help, children, htmlFor, id }: { label: string; description?: ReactNode; help?: ReactNode; children: ReactNode; htmlFor?: string; id?: string }) {
   return <div className="oui-setting-row" id={id} tabIndex={id ? -1 : undefined}>
-    <div className="oui-setting-copy"><div className="oui-setting-label">{htmlFor ? <label htmlFor={htmlFor}>{label}</label> : <h3>{label}</h3>}{help && <Popover openOnHover title={label} trigger={<button type="button" className="oui-help-trigger" aria-label={`了解${label}`}><CircleHelp size={16} /></button>}><p>{help}</p></Popover>}</div>{description && <p>{description}</p>}</div>
+    <div className="oui-setting-copy"><div className="oui-setting-label">{htmlFor ? <label htmlFor={htmlFor}>{label}</label> : <h3>{label}</h3>}{help && <HelpPopover label={label}>{help}</HelpPopover>}</div>{description && <p>{description}</p>}</div>
     <div className="oui-setting-control">{children}</div>
   </div>;
 }

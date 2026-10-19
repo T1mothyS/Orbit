@@ -4,9 +4,9 @@ import { ArrowLeft, ArrowUpRight, Bell, Check, ChevronRight, Copy, HelpCircle, L
 import { useTheme } from '../hooks/useTheme';
 import { ActionRow, Avatar, Badge, Button, Card, Checkbox, ConfirmDialog, Dialog, EmptyState, ErrorState, FilePicker, FormField, IconButton, InlineNotice, Input, LoadingState, Menu, PasswordInput, Popover, Section, Select, SettingRow, Sheet, Skeleton, Switch, Tabs, Textarea, TextLink, ToastProvider, Tooltip, useToast } from '../ui';
 import './ui-gallery.css';
-import { IconLink, NavigationItem } from '../ui';
+import { IconLink, NavigationItem, TooltipProvider } from '../ui';
 
-export default function UiGallery() { return <ToastProvider><Gallery /></ToastProvider>; }
+export default function UiGallery() { return <TooltipProvider><ToastProvider><Gallery /></ToastProvider></TooltipProvider>; }
 
 function Gallery() {
   const { theme, toggleTheme } = useTheme();

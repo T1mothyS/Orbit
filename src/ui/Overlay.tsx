@@ -1,4 +1,4 @@
-import { cloneElement, useEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react';
+import { cloneElement, useEffect, useId, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react';
 import { X } from 'lucide-react';
 import { Dialog as PrimitiveDialog } from '@base-ui/react/dialog';
 import { Menu as PrimitiveMenu } from '@base-ui/react/menu';
@@ -82,15 +82,19 @@ export function Menu({ trigger, label, items, header, footer, navigation = false
     </PrimitiveMenu.Positioner></PrimitiveMenu.Portal>
   </PrimitiveMenu.Root>;
 }
-export function Tooltip({ children, content }: { children: ReactElement; content: string }) {
-  return <PrimitiveTooltip.Provider delay={400}><PrimitiveTooltip.Root><PrimitiveTooltip.Trigger render={children} />
-    <PrimitiveTooltip.Portal><PrimitiveTooltip.Positioner sideOffset={6} className="oui-positioner"><PrimitiveTooltip.Popup className="oui-tooltip">{content}</PrimitiveTooltip.Popup></PrimitiveTooltip.Positioner></PrimitiveTooltip.Portal>
-  </PrimitiveTooltip.Root></PrimitiveTooltip.Provider>;
+export function TooltipProvider({ children }: { children: ReactNode }) {
+  return <PrimitiveTooltip.Provider delay={400}>{children}</PrimitiveTooltip.Provider>;
 }
-export function Popover({ trigger, title, children, openOnHover = false }: { trigger: ReactElement; title: string; children: ReactNode; openOnHover?: boolean }) {
-  return <PrimitivePopover.Root><PrimitivePopover.Trigger render={trigger} openOnHover={openOnHover} />
-    <PrimitivePopover.Portal><PrimitivePopover.Positioner sideOffset={8} className="oui-positioner">
-      <PrimitivePopover.Popup className="oui-menu oui-popover"><PrimitivePopover.Title className="oui-label">{title}</PrimitivePopover.Title>{children}</PrimitivePopover.Popup>
+export function Tooltip({ children, content }: { children: ReactElement; content: string }) {
+  const id = useId(), [open, setOpen] = useState(false);
+  return <PrimitiveTooltip.Root open={open} onOpenChange={setOpen}><PrimitiveTooltip.Trigger render={children} aria-describedby={open ? id : undefined} />
+    <PrimitiveTooltip.Portal><PrimitiveTooltip.Positioner sideOffset={6} className="oui-positioner"><PrimitiveTooltip.Popup id={id} role="tooltip" aria-hidden={!open || undefined} className="oui-tooltip">{content}</PrimitiveTooltip.Popup></PrimitiveTooltip.Positioner></PrimitiveTooltip.Portal>
+  </PrimitiveTooltip.Root>;
+}
+export function Popover({ trigger, title, children, openOnHover = false, open, onOpenChange, align = 'center', className = '' }: { trigger: ReactElement; title: string; children: ReactNode; openOnHover?: boolean; open?: boolean; onOpenChange?: (open: boolean) => void; align?: 'start' | 'center' | 'end'; className?: string }) {
+  return <PrimitivePopover.Root open={open} onOpenChange={onOpenChange}><PrimitivePopover.Trigger render={trigger} openOnHover={openOnHover} />
+    <PrimitivePopover.Portal><PrimitivePopover.Positioner side="bottom" align={align} sideOffset={8} className="oui-positioner">
+      <PrimitivePopover.Popup className={`oui-menu oui-popover ${className}`}><PrimitivePopover.Title className="oui-label">{title}</PrimitivePopover.Title>{children}</PrimitivePopover.Popup>
     </PrimitivePopover.Positioner></PrimitivePopover.Portal>
   </PrimitivePopover.Root>;
 }

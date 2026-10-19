@@ -1,5 +1,5 @@
 import { useCallback,useEffect,useState } from 'react';
-import { Button } from '../../../ui';
+import { Button, HelpPopover } from '../../../ui';
 import { SettingRow,SettingSection } from "../SettingFields";
 import { useSettingsFeedback,useSettingsRequest } from '../SettingsState';
 import type { SettingsAuthHeaders } from '../types';
@@ -70,26 +70,26 @@ export function IntegrationGuideSettings({ authHeaders }: {
         </div>
         <div className="settings-guide-grid">
           {guide.items.map(item => (<article className="settings-guide-card" key={item.id}>
-              <h3>{item.title}</h3>
+              <div className="settings-heading-with-help"><h3>{item.title}</h3><HelpPopover label={item.title}>
               <p><strong>用途：</strong>{item.purpose}</p>
               <p><strong>配置位置：</strong>{item.configuration}</p>
               <div className="settings-guide-block"><strong>首次配置</strong><ol>{item.steps.map(step => <li key={step}>{step}</li>)}</ol></div>
               <p><strong>测试入口：</strong>{item.test}</p>
               <div className="settings-guide-block"><strong>常见失败</strong><ul>{item.commonFailures.map(reason => <li key={reason}>{reason}</li>)}</ul></div>
-              <p className="settings-guide-boundary"><strong>权限边界：</strong>{item.boundary}</p>
+              <p className="settings-guide-boundary"><strong>权限边界：</strong>{item.boundary}</p></HelpPopover></div>
             </article>))}
         </div>
-        <SettingRow label="稳定联动规则" description="该版本规则同时注入日程助手和结构化导入，避免设置页文案与实际行为漂移。">
+        <SettingRow label="稳定联动规则" description="该版本规则同时注入日程助手和结构化导入，避免设置页文案与实际行为漂移。可复制到 AI 对话或项目提示词。">
           <div className="settings-guide-rules">
-            <div className="settings-guide-rules-head"><span>可复制到 AI 对话或项目提示词中的稳定规则</span><Button variant="secondary" onClick={() => void copyPrompt(guide.rules.map(rule => `${rule.title}：${rule.rule}`).join('\n'))}>复制全部规则</Button></div>
-            {guide.rules.map(rule => <div key={rule.id}><strong>{rule.title}</strong><p>{rule.rule}</p></div>)}
+            <div className="settings-guide-rules-head"><Button variant="secondary" onClick={() => void copyPrompt(guide.rules.map(rule => `${rule.title}：${rule.rule}`).join('\n'))}>复制全部规则</Button></div>
+            {guide.rules.map(rule => <div key={rule.id}><div className="settings-heading-with-help"><strong>{rule.title}</strong><HelpPopover label={rule.title}>{rule.rule}</HelpPopover></div></div>)}
           </div>
         </SettingRow>
         <SettingRow label="示例提示词" description="示例只读展示，可复制到 AI 对话中；提示词不会写入系统配置。">
           <div className="settings-guide-examples">{guide.examples.map(example => <article key={example.title} className="settings-guide-example">
             <div className="settings-guide-example-head"><strong>{example.title}</strong><Button variant="secondary" onClick={() => void copyPrompt(example.prompt)}>复制提示词</Button></div>
             <pre><code>{example.prompt}</code></pre>
-            <p>{example.expected}</p>
+            <HelpPopover label={`${example.title}预期结果`}>{example.expected}</HelpPopover>
           </article>)}</div>
         </SettingRow>
       </>}

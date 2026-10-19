@@ -1,6 +1,6 @@
 import { useEffect,useId,useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Button,Checkbox,Input,Select,Textarea } from '../../../ui';
+import { Button,Checkbox,HelpPopover,Input,Select,Textarea } from '../../../ui';
 import {
 CONTEXT_GROUPS,THESIS_FIELDS,contextAt,contextFieldErrors,contextInputWarnings,contextStockPaths,
 createContextThesis,isContextObject,resolveContextThesis,
@@ -53,16 +53,16 @@ export function ContextEditor({mode = 'report'}: {mode?: 'profile' | 'report'}) 
   return <div className="context-page" id={mode==='profile'?'library-personal-preferences':'setting-daily-report-17lgo36'} tabIndex={-1} aria-busy={loading}>
     <div className="context-shell">
       <div className="context-savebar">
-        <span role="status">{loading ? '正在读取资料…' : saved ? dirty ? '有未保存修改' : saved.version ? `已保存 · v${saved.version}` : '尚未配置' : '资料读取失败'}{saving && ' · 正在保存…'}</span>
+        <div className="settings-heading-with-help"><span role="status">{loading ? '正在读取资料…' : saved ? dirty ? '有未保存修改' : saved.version ? `已保存 · v${saved.version}` : '尚未配置' : '资料读取失败'}{saving && ' · 正在保存…'}</span><HelpPopover label="资料保存">保存不触发日报生成或邮件发送。资料时区不改变实际任务时间。</HelpPopover></div>
         <div className="context-buttons"><Button type="button"  disabled={loading || saving || !saved || !dirty} onClick={() => { owner.reset(mode); }}>取消</Button>
           <Button type="button" variant="primary" disabled={loading || saving || !dirty || conflict || !!fieldsErrors.length} onClick={() => void save()}>{saving ? '保存中…' : '保存'}</Button></div>
       </div>
       {error && <div className="context-notice error" role="alert"><p>{error}</p><Button type="button" disabled={saving || loading}  onClick={reload}>{conflict ? '重新加载并核对' : '重试读取'}</Button></div>}
       {notice && <p role="status" className="context-notice">{notice}</p>}
-      {saved && <p className="context-help">{saved.updatedAt && `最近保存：${new Date(saved.updatedAt).toLocaleString('zh-CN')}。`}保存不触发日报生成或邮件发送。资料时区不改变实际任务时间。</p>}
+      {saved?.updatedAt && <p className="context-help" role="status">最近保存：{new Date(saved.updatedAt).toLocaleString('zh-CN')}</p>}
       {saved && !loading && <>
         {!!fieldsErrors.length && <div className="context-notice error" role="alert">{fieldsErrors.map((message, i) => <p key={i}>{message}</p>)}</div>}
-        {mode === 'report' && <><p className="context-help">个人资料：{profileSummary} · 仅用于 Cloud 日报。<Link to="/settings/account/profile">编辑个人资料</Link></p>
+        {mode === 'report' && <><p className="context-help">个人资料：{profileSummary}<HelpPopover label="个人资料用途">个人资料目前仅用于 Cloud 日报。</HelpPopover><Link to="/settings/account/profile">编辑个人资料</Link></p>
         <details className="context-warnings"><summary>Cloud 关注输入状态{warnings.length ? ` · ${warnings.length} 项提示` : ' · 完整'}</summary>
           {warnings.length ? warnings.map((message, i) => <p key={i}>{message}</p>) : <p>股票资料和研究框架满足输入规则；实际研究结果以日报运行记录为准。</p>}</details>
         </>}
@@ -76,7 +76,7 @@ export function ContextEditor({mode = 'report'}: {mode?: 'profile' | 'report'}) 
           </details>)}
           {mode === 'report' && <details className="context-section" open={!!openGroups.theses} onToggle={event => {
             const open = event.currentTarget.open; setOpenGroups(current => current.theses === open ? current : { ...current, theses: open });
-          }}><summary>研究框架</summary><p className="context-help">从关注对象建立或编辑研究框架。这里的修改用于日报参考；正式研究观点仍在“研究与观点”中确认。</p>
+          }}><summary>研究框架</summary><HelpPopover label="研究框架">从关注对象建立或编辑研究框架。这里的修改用于日报参考；正式研究观点仍在“研究与观点”中确认。</HelpPopover>
             {frameworks.length ? frameworks.map(({ path, value, target }, i) => <section className="context-item" tabIndex={-1} id={fieldId(path)} key={JSON.stringify(path)} aria-label={`研究框架第${i + 1}项`}>
               <h3>{typeof value.name === 'string' && value.name || typeof value.symbol === 'string' && value.symbol || `研究框架 ${i + 1}`}</h3>
               {!target && <p className="context-help">当前没有有效关联的关注对象，内容仍保留。</p>}

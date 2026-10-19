@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Link2, Reply } from 'lucide-react';
+import { ArrowUpRight, MessageCircle } from 'lucide-react';
+import { IconButton, IconLink, Tooltip } from '../ui';
+import { ReminderActionButtons } from './ReminderActionButtons';
 import { useAuth } from '../hooks/useAuth';
 import type { NavigationAction } from '../utils/navigation-actions';
 export interface NotificationMeta {origin:string;sourceLabel?:string;eventId?:string;notificationId?:string;enhanced?:boolean;state?:string;canContinue?:boolean;readAt?:string|null;href?:string|null;actionable?:boolean;handledAction?:string;handledAt?:string;nextReminderAt?:string;settingRefs?:Array<{id:string;label:string}>;actions?:NavigationAction[]}
@@ -12,7 +13,7 @@ export function OrbitNotificationCard({meta,title,onRefresh}:{meta:NotificationM
   const validId=typeof meta.notificationId==='string'&&meta.notificationId.length>0;
   const canContinue=validId&&meta.state!=='discarded'&&meta.canContinue!==false;
   return <div ref={ref} className="orbit-notification-actions"><small>来源：{meta.sourceLabel||'Orbit'}</small><span className="orbit-notification-state">{meta.state==='handled'?'事项已处理':meta.state==='discarded'?'事项已变化或不可用':read?'已读':'未读'}{meta.nextReminderAt&&` · 再提醒 ${new Date(meta.nextReminderAt).toLocaleString()}`}</span><div>
-    {validId&&meta.state!=='discarded'&&meta.href&&<Link className="orbit-notification-action" to={meta.href} title="查看原对象" aria-label="查看原对象"><Link2 size={16} aria-hidden="true"/><span className="notification-action-label">查看原对象</span></Link>}
-    {canContinue&&<button className="orbit-notification-action" type="button" title="就此继续聊" aria-label="就此继续聊" onClick={()=>window.dispatchEvent(new CustomEvent('orbit:continue-notification',{detail:{notificationId:meta.notificationId,title}}))}><Reply size={16} aria-hidden="true"/><span className="notification-action-label">就此继续聊</span></button>}
-    {meta.actionable&&meta.state==='sent'&&[['complete','完成'],['snooze','15 分钟后'],['tomorrow','明天 09:00']].map(([action,label])=><button type="button" key={action} disabled={busy} onClick={()=>void act(action)}>{label}</button>)}</div>{error&&<p role="alert">{error}</p>}</div>;
+    {validId&&meta.state!=='discarded'&&meta.href&&<Tooltip content="查看原对象"><IconLink to={meta.href} label="查看原对象"><ArrowUpRight size={16} strokeWidth={1.8} aria-hidden="true" /></IconLink></Tooltip>}
+    {canContinue&&<Tooltip content="就此继续聊"><IconButton label="就此继续聊" variant="quiet" size="small" onClick={()=>window.dispatchEvent(new CustomEvent('orbit:continue-notification',{detail:{notificationId:meta.notificationId,title}}))}><MessageCircle size={16} strokeWidth={1.8} aria-hidden="true" /></IconButton></Tooltip>}
+    {meta.actionable&&meta.state==='sent'&&<ReminderActionButtons busy={busy} onAction={action => void act(action)} />}</div>{error&&<p role="alert">{error}</p>}</div>;
 }

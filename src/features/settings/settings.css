@@ -65,6 +65,9 @@
 .settings-workspace .context-text-item > button { white-space: nowrap; }
 
 .settings-workspace .settings-inline-save { display:flex; flex-wrap:wrap; align-items:start; gap:var(--orbit-space-2); width:100%; }
+.settings-heading-with-help { display:flex; align-items:center; gap:var(--orbit-space-2); }
+.settings-notification-group { display:grid; gap:var(--orbit-space-5); width:100%; }
+.settings-notification-group .settings-time-pair { margin-top:var(--orbit-space-2); }
 .settings-workspace .settings-inline-save > :first-child { flex:1 1 180px; min-width:0; }
 .settings-workspace .settings-inline-save .settings-actions { margin-top:0; }
 .settings-workspace .settings-credential-form { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:var(--orbit-space-2) var(--orbit-space-3); align-items:start; width:100%; }

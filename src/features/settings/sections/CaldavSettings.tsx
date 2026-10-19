@@ -153,9 +153,8 @@ export function CaldavSettings({ authHeaders }: {
         {!!summary.issues.length && <details><summary>查看 {summary.issues.length} 个提示或待处理项</summary><ul>{summary.issues.map((issue, i) => <li key={i}>{explain(issue.code)} · {issue.sourceId}</li>)}</ul></details>}
       </div>}
     </SettingRow>
-    {status && <SettingRow label="自动同步">
-      <p className="settings-help">首次启用前，请确认手机能收到新增、修改、删除、完成/恢复及周期历史（完成是否保留按当前策略核对），只读操作不影响后续同步。提醒另行验证，尚未通过的类型保持关闭。</p>
-      {!status.enabled && status.verifiedScope !== status.scopeVersion && <label className="settings-help"><Checkbox checked={phoneVerified} onCheckedChange={(value) => setPhoneVerified(value)} label="我已完成上述手机核心验证"/> 我已完成上述手机核心验证</label>}
+    {status && <SettingRow label="自动同步" description="首次启用前，请确认手机能收到新增、修改、删除、完成/恢复及周期历史（完成是否保留按当前策略核对），只读操作不影响后续同步。提醒另行验证，尚未通过的类型保持关闭。">
+      {!status.enabled && status.verifiedScope !== status.scopeVersion && <label className="settings-help"><Checkbox checked={phoneVerified} onCheckedChange={(value) => setPhoneVerified(value)} label="我已完成手机核心验证"/> 我已完成手机核心验证</label>}
       <div className="settings-actions"><Button variant="secondary" disabled={busy || (!status.enabled && (!status.automationAvailable || status.confirmedScope !== status.scopeVersion || (!phoneVerified && status.verifiedScope !== status.scopeVersion)))} onClick={() => act('automation', { enabled: !status.enabled, scopeVersion: status.scopeVersion, phoneVerified })}>{status.enabled ? '暂停自动同步' : '启用自动同步'}</Button></div>
       {!status.automationAvailable && <p className="settings-help">自动任务尚未获服务器启用；可继续手动同步。</p>}
     </SettingRow>}

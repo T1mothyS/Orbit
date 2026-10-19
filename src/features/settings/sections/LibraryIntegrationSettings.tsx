@@ -98,8 +98,7 @@ export function LibraryIntegrationSettings({ authHeaders }: {
     };
     return (<SettingSection id="library" title="知识库" description="导出与本地知识库发布集成。">
       <SettingRow id="library-full-export" label="导出全库" description="下载当前账号的完整知识库 JSON。"><Button loading={exportBusy} disabled={exportBusy} onClick={exportLibrary}>导出全库</Button>{exportError && <p role="alert" className="orbit-inline-error">{exportError}</p>}</SettingRow>
-      <SettingRow label="知识库发布令牌">
-        <p className="settings-help">令牌仅用于本地知识库 V2 发布和更新；不能登录或访问其他账号及功能。服务器只保存哈希。</p>
+      <SettingRow label="知识库发布令牌" description="令牌仅用于本地知识库 V2 发布和更新；不能登录或访问其他账号及功能。服务器只保存哈希。">
         <div className="settings-status" role="status">
           <strong>{loadError || (status?.active ? '已启用' : status?.exists ? '已撤销' : status ? '尚未生成' : '加载状态中…')}</strong>
           {status?.prefix && <span>令牌前缀：{status.prefix}…</span>}

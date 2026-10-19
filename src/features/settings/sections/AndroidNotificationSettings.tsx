@@ -27,12 +27,12 @@ export function AndroidNotificationSettings() {
     } };
     const method = (name: string, params: Record<string, unknown> = {}) => act(async () => { setNative(await androidCall(name, params)); });
     return <div aria-label="Android 手机提醒设置">
-    <SettingRow label="Android 手机提醒" description="独立账号开关，默认关闭。普通日程和周期事务通过 FCM 发送标题与时间。">
+    <SettingRow label="Android 手机提醒" description="独立账号开关，默认关闭。普通日程和周期事务通过 FCM 发送标题与时间。请安装 Orbit Android 客户端后，在这里授权手机通知。">
       <Switch label="Android 手机提醒" checked={enabled} disabled={busy} onCheckedChange={v => void act(async () => { const r = await settingsFetch('/api/android-push/preferences', { method: 'PUT', headers: { ...getStoredAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: Boolean(v) }) }); if (!r.ok)
         throw new Error('手机提醒设置保存失败'); })}/>
       {!configured && <p className="settings-help">服务端 FCM 未配置。</p>}{enabled && !scanner && <p className="settings-help">服务端 Push 扫描未启用，真实事项暂不投递。</p>}
     </SettingRow>
-    {!isAndroid() ? <p className="settings-note">请安装 Orbit Android 客户端后，在这里授权手机通知。</p> : <>
+    {!isAndroid() ? <p className="settings-note" role="status">当前设备：Web</p> : <>
       <SettingRow label="系统权限与注册" description="权限拒绝不会影响登录和聊天。">
         <p className="settings-help" role="status">通知：{native?.notificationPermission ? '已允许' : '未允许'}{native?.developerTools && <> · 精确提醒：{native.exactAlarmPermission ? '已允许' : '未允许'}</>}<br />FCM：{native?.fcmConfigured ? native.fcmState : '客户端未配置'} · 设备：{native?.binding ? '已绑定' : '未绑定'}{native?.pendingRevocations ? ` · 待补偿解绑 ${native.pendingRevocations} 项` : ''}</p>
         <div className="settings-actions"><Button disabled={busy} onClick={() => void method('permission')}>授权系统通知</Button>{native?.developerTools && <Button variant="secondary" disabled={busy} onClick={() => void method('exactPermission')}>开启闹钟和提醒</Button>}<Button variant="secondary" disabled={busy} onClick={() => void act(async () => { setNative(await syncAndroid()); })}>刷新注册状态</Button></div>

@@ -128,7 +128,7 @@ test('old account deep links, mobile index and sensitive form cleanup remain nav
   await page.getByRole('link', { name: '设置', exact: true }).click();
   await expect(page.getByRole('navigation', { name: '设置入口' })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('account-index-390-light.png'), fullPage: true, animations: 'disabled' });
-  await page.getByRole('link', { name: '账户与安全 登录信息、头像与密码' }).click();
+  await page.getByRole('link', { name: '账户与安全', exact: true }).click();
   await page.getByRole('button', { name: '修改密码', exact: true }).click();
   await expect(page.getByLabel('当前密码', { exact: true })).toBeEmpty();
   await page.reload(); await expect(page.getByRole('button', { name: '修改密码', exact: true })).toBeVisible();
@@ -164,7 +164,7 @@ test('settings returns to its original work page with keyboard focus restored', 
   await login(context); await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base + '/schedule'); await page.locator('[data-account-menu-trigger]').click();
   await page.getByRole('menuitem', { name: '设置', exact: true }).or(page.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '设置', exact: true })).click();
-  await page.getByRole('link', { name: '账户与安全 登录信息、头像与密码' }).click();
+  await page.getByRole('link', { name: '账户与安全', exact: true }).click();
   await page.getByRole('link', { name: '返回 Orbit', exact: true }).click();
   await expect(page).toHaveURL(base + '/schedule');
   await expect(page.locator('[data-account-menu-trigger]')).toBeFocused();

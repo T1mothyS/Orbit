@@ -1,13 +1,16 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
-import { IconButton, IconLink, TextLink } from '../ui';
+import { HelpPopover, IconButton, IconLink, TextLink } from '../ui';
 import './settings-frame.css';
+
+export const SettingsHeadingHelp = createContext<(help: ReactNode) => void>(() => {});
 
 export function SettingsFrame({ category, title, description, navigation, children, search, fallbackReturnTo }: { category?: string; title: string; description?: string; navigation: { id: string; title: string; to: string }[]; children: ReactNode; search?: ReactNode; fallbackReturnTo?: string }) {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation(), heading = useRef<HTMLHeadingElement>(null);
+  const [sectionHelp, setSectionHelp] = useState<ReactNode>();
   const origin = useRef<string>();
   const requested = (location.state as { settingsReturnTo?: unknown } | null)?.settingsReturnTo || (!origin.current ? fallbackReturnTo : undefined);
   let returnTo = origin.current || '/assistant';
@@ -43,8 +46,8 @@ export function SettingsFrame({ category, title, description, navigation, childr
       <nav aria-label="设置分类">{navigation.map(item => <Link key={item.id} to={item.to} state={navigationState} aria-current={category === item.id ? 'page' : undefined}>{item.title}</Link>)}</nav>
     </aside><main className="settings-workspace-main">
       {category && <div className="settings-workspace-mobile-back"><TextLink to="/settings" state={navigationState}><ArrowLeft size={16} aria-hidden="true" />设置</TextLink></div>}
-      <header className="settings-workspace-heading"><h1 tabIndex={-1} ref={heading}>{title}</h1>{description && <p>{description}</p>}</header>
-      {children}
+      <header className="settings-workspace-heading"><div className="settings-heading-with-help"><h1 tabIndex={-1} ref={heading}>{title}</h1>{(description || sectionHelp) && <HelpPopover label={title}>{description && <p>{description}</p>}{sectionHelp}</HelpPopover>}</div></header>
+      <SettingsHeadingHelp.Provider value={setSectionHelp}>{children}</SettingsHeadingHelp.Provider>
     </main></div>
   </div>;
 }

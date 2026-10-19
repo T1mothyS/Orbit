@@ -94,3 +94,106 @@ test('round3 standalone import resumes after login and global search has border-
   for(const mode of ['mouse','keyboard']){if(mode==='mouse')await input.click();else {await input.press('Tab');await expect(page.getByRole('button',{name:'关闭统一搜索',exact:true})).toBeFocused();await page.keyboard.press('Shift+Tab');}await expect(input).toBeFocused();expect(await input.evaluate(el=>getComputedStyle(el).outlineStyle)).toBe('none');expect(await input.evaluate(el=>getComputedStyle(el).boxShadow)).not.toBe('none');}
   await context.close();
 });
+
+for (const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (const theme of ['light','dark']) {
+  test(`round3 review ${width} ${theme}: help, compact filters, entries and required fields`,async({page,context})=>{
+    test.setTimeout(90_000);
+    await context.addInitScript(value=>localStorage.setItem('theme',value),theme);
+    await page.setViewportSize({width,height}); const errors:string[]=[]; page.on('pageerror',e=>errors.push(e.message));
+    await page.goto(base+'/settings/ai');
+    const keyHelp='仅保存到当前账号，服务器不使用全局默认 Key。在 WorkBuddy API 管理页面创建或复制 Key，然后粘贴到配置表单。';
+    await expect(page.getByText(keyHelp,{exact:true})).toHaveCount(0);
+    await expect(page.locator('.oui-setting-copy > p')).toHaveCount(0);
+    const help=page.getByRole('button',{name:'了解个人 API Key',exact:true}); await help.focus(); await page.keyboard.press('Enter');
+    await expect(page.getByText(keyHelp,{exact:true})).toBeVisible(); await page.keyboard.press('Escape'); await expect(help).toBeFocused();
+    await checkVisual(page,`round3-review-ai-${width}-${theme}.png`,false,false);
+    await page.goto(base+'/settings/notifications');
+    await expect(page.locator('#setting-notifications-1q1t6v5')).toHaveCount(1); await expect(page.locator('#setting-notifications-1tv1uzi')).toHaveCount(1);
+    const group=page.locator('.oui-setting-row').filter({has:page.getByRole('button',{name:'了解通知渠道与免打扰',exact:true})});
+    await expect(group.getByRole('switch')).toHaveCount(4); await expect(group.getByRole('button',{name:'保存通知设置',exact:true})).toBeVisible();
+    await expect(group.locator('.oui-setting-row')).toHaveCount(0);
+    await checkVisual(page,`round3-review-notifications-${width}-${theme}.png`,false,false);
+    await page.goto(base+'/library'); await expect(page.locator('.library-page')).toHaveAttribute('aria-busy','false');
+    await expect(page.getByRole('link',{name:'知识库设置',exact:true})).toHaveCount(0); await expect(page.getByRole('link',{name:'记录经历',exact:true})).toHaveCount(0);
+    await expect(page.getByRole('combobox',{name:'筛选内容类型',exact:true})).toHaveCount(0);
+    const trigger=page.getByRole('button',{name:'筛选与排序',exact:true}); await trigger.click();
+    const popup=page.getByRole('dialog',{name:'筛选与排序',exact:true}); await expect(popup).toBeInViewport({ratio:1});
+    await expect(popup.getByRole('combobox')).toHaveCount(4); await expect(popup.getByRole('button',{name:'应用',exact:true})).toHaveCount(0);
+    await checkVisual(page,`round3-review-library-${width}-${theme}.png`,false,false); await page.keyboard.press('Escape'); await expect(trigger).toBeFocused();
+    await page.getByRole('button',{name:'个人菜单',exact:true}).click();
+    await page.getByRole('menuitem',{name:'记录经历',exact:true}).or(page.getByRole('dialog',{name:'个人菜单',exact:true}).getByRole('button',{name:'记录经历',exact:true})).click();
+    await expect(page).toHaveURL(base+'/library/experience'); await expect(page.getByRole('heading',{name:'记录经历',exact:true})).toBeVisible(); await page.reload();
+    await expect(page.getByRole('heading',{name:'记录经历',exact:true})).toBeVisible(); await page.goBack();
+    await page.goto(base+'/reports'); await expect(page.getByRole('link',{name:'日报设置',exact:true})).toHaveCount(0);
+    await page.goto(base+'/today'); await expect(page.getByRole('button',{name:'一键发送日程',exact:true})).toHaveCount(0); await expect(page.getByRole('button',{name:'刷新',exact:true})).toHaveCount(0);
+    await checkVisual(page,`round3-review-today-${width}-${theme}.png`,false,false);
+    await page.goto(base+'/reminders'); await expect(page.locator('.stats-grid')).toHaveCount(0);
+    await page.getByRole('button',{name:'+ 新建提醒',exact:true}).click();
+    const form=page.getByRole('dialog',{name:'新建周期提醒',exact:true});
+    for(const [tab,count] of [['信用卡',4],['SIM 卡',6],['生活事务',3]] as const){
+      await form.getByRole('button',{name:tab,exact:true}).click(); await expect(form.locator('.oui-required-mark')).toHaveCount(count);
+      expect(await form.locator('input[required]').evaluateAll(inputs=>inputs.every(input=>input.closest('label')?.querySelector('.oui-required-mark')))).toBe(true);
+    }
+    await checkVisual(page,`round3-review-reminder-${width}-${theme}.png`,false,false);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true); expect(errors).toEqual([]);
+  });
+}
+
+test('round3 review notification save includes all four switches without saving another row draft',async({page,context})=>{
+  const token=await fixtureToken(context,'preview-guards@example.invalid'),headers={Authorization:`Bearer ${token}`};
+  const before=(await (await context.request.get(base+'/api/notification-preferences',{headers})).json()).preference;
+  await page.goto(base+'/settings/notifications'); await page.getByLabel('提醒收件邮箱',{exact:true}).fill('unsaved-row@example.invalid');
+  const expected:Record<string,boolean>={};
+  for(const [label,key] of [['邮件通知','emailEnabled'],['站内通知','inAppEnabled'],['浏览器前台通知','browserEnabled']] as const){
+    const control=page.getByRole('switch',{name:label,exact:true}); expected[key]=await control.getAttribute('aria-checked')!=='true'; await control.click();
+  }
+  const quiet=page.getByRole('switch',{name:'免打扰时段',exact:true}); if(await quiet.getAttribute('aria-checked')!=='true')await quiet.click();
+  await page.getByLabel('免打扰开始时间',{exact:true}).fill('23:37'); await page.getByLabel('免打扰结束时间',{exact:true}).fill('07:13');
+  const response=page.waitForResponse(r=>r.request().method()==='PUT'&&new URL(r.url()).pathname==='/api/notification-preferences');
+  await page.getByRole('button',{name:'保存通知设置',exact:true}).click(); expect((await response).ok()).toBe(true);
+  const after=(await (await context.request.get(base+'/api/notification-preferences',{headers})).json()).preference;
+  expect(after).toMatchObject({...expected,quietHoursEnabled:true,quietStart:'23:37',quietEnd:'07:13',reminderEmail:before.reminderEmail});
+  await expect(page.getByLabel('提醒收件邮箱',{exact:true})).toHaveValue('unsaved-row@example.invalid');
+});
+
+test('round3 review filters apply immediately, retain saved sort on failure, reset and return focus',async({page})=>{
+  let sort='created_desc',reject=false; const queries:string[]=[];
+  await page.route('**/api/library/preferences',async route=>{
+    if(route.request().method()==='PUT') {if(reject)return route.fulfill({status:503,json:{error:'合成保存失败'}}); sort=route.request().postDataJSON().sort;}
+    return route.fulfill({json:{preference:{sort}}});
+  });
+  await page.route(/\/api\/library\?/,route=>{queries.push(route.request().url());return route.fulfill({json:{items:[],total:0}});});
+  await page.goto(base+'/library'); const trigger=page.getByRole('button',{name:'筛选与排序',exact:true}); await trigger.click();
+  const popup=page.getByRole('dialog',{name:'筛选与排序',exact:true}); await popup.getByRole('combobox',{name:'筛选内容形态',exact:true}).click(); await page.getByRole('option',{name:'知识碎片',exact:true}).click();
+  await expect.poll(()=>queries.some(url=>url.includes('kind=fragment'))).toBe(true);
+  reject=true; await popup.getByRole('combobox',{name:'知识库排序',exact:true}).click(); await page.getByRole('option',{name:'名称正序',exact:true}).click();
+  await expect(popup.getByRole('alert')).toContainText('合成保存失败'); await expect(popup.getByRole('combobox',{name:'知识库排序',exact:true})).not.toHaveText('名称正序');
+  reject=false; await popup.getByRole('button',{name:'重置',exact:true}).click(); await expect.poll(()=>queries.some(url=>url.includes('kind=all'))).toBe(true);
+  await page.keyboard.press('Escape'); await expect(trigger).toBeFocused();
+});
+
+test('round3 review plan outcomes describe operations and notification controls share icon actions',async({page,context})=>{
+  await context.addInitScript(()=>localStorage.setItem('theme','dark'));
+  const at=new Date().toISOString(),op=(type:string)=>({key:type,type,title:'合成计划项',startTime:'2026-10-20T09:00:00',endTime:'2026-10-20T10:00:00'});
+  const cases=[['create',['create'],'已创建'],['recurring',['create_recurring'],'已创建'],['update',['update'],'已更新'],['delete',['delete'],'已删除'],['mixed',['create','update'],'已执行']] as const;
+  const messages:any[]=[{id:'draft',role:'assistant',type:'plan',text:'请确认',timestamp:at,plan:{id:'draft',state:'pending',operations:[op('create')],warnings:[]}},...cases.map(([id,types])=>({id,role:'assistant',type:'plan',text:'执行结果',timestamp:at,plan:{id,state:'completed',operations:types.map(op),warnings:[]}})),{id:'partial',role:'assistant',type:'plan',text:'部分结果',timestamp:at,plan:{id:'partial',state:'partially_completed',operations:[op('create')],warnings:[]}}, {id:'notice',role:'assistant',type:'text',text:'合成通知',timestamp:at,orbitMeta:{origin:'notification',notificationId:'synthetic-notice',state:'sent',actionable:true,href:'/today'}},{id:'proactive',role:'assistant',type:'text',text:'主动提醒',timestamp:at,orbitMeta:{origin:'proactive',eventId:'synthetic-event',state:'sent'}}];
+  await page.route('**/api/ai-schedule/history?*',route=>route.fulfill({json:{messages,requests:[],nextBefore:null}}));
+  await page.route('**/api/orbit/requests?*',route=>route.fulfill({json:{requests:[]}}));
+  const actions:string[]=[]; await page.route('**/api/orbit/notifications/synthetic-notice/*',route=>{actions.push(new URL(route.request().url()).pathname.split('/').pop()!);return route.fulfill({json:{ok:true}});});
+  await page.goto(base+'/assistant');
+  for(const [id,,label] of cases) {await expect(page.locator(`#orbit-message-${id} .orbit-outcome`)).toHaveText(`✓ ${label}`); await expect(page.locator(`#orbit-message-${id} .orbit-plan`)).toContainText('执行计划 · '+label);}
+  await expect(page.locator('#orbit-message-partial .orbit-outcome')).toContainText('部分操作已执行');
+  const edit=page.getByRole('button',{name:'编辑计划项 合成计划项',exact:true}); await edit.scrollIntoViewIfNeeded(); await expect(edit).toHaveClass(/oui-button--quiet/);
+  expect(await edit.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  await checkVisual(page,'round3-review-plan-dark.png',false,false);
+  const card=page.locator('#orbit-message-notice .orbit-notification-actions'); await card.scrollIntoViewIfNeeded();
+  for(const label of ['查看原对象','就此继续聊','完成事项','延后 15 分钟','明天 09:00 再提醒']) {
+    const control=card.getByRole(label==='查看原对象'?'link':'button',{name:label,exact:true}); await expect(control).toBeVisible(); await expect(control).toHaveText('');
+    await control.hover(); await expect(page.getByRole('tooltip')).toContainText(label); await page.keyboard.press('Escape');
+  }
+  const continueChat=card.getByRole('button',{name:'就此继续聊',exact:true}); await continueChat.focus(); await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Tab');
+  await expect(continueChat).toBeFocused(); await expect(page.getByRole('tooltip')).toHaveText('就此继续聊'); await expect(continueChat).toHaveAttribute('aria-describedby',await page.getByRole('tooltip').getAttribute('id') || ''); await page.keyboard.press('Escape');
+  for(const label of ['完成事项','延后 15 分钟','明天 09:00 再提醒'])await card.getByRole('button',{name:label,exact:true}).click();
+  expect(actions).toEqual(['complete','snooze','tomorrow']); await expect(page.locator('#orbit-message-proactive').getByRole('button',{name:'明天 09:00 再提醒',exact:true})).toBeVisible();
+  await checkVisual(page,'round3-review-notification-dark.png',false,false);
+});

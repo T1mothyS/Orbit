@@ -109,6 +109,12 @@
 .oui-label, .oui-setting-copy :is(label, h3) { margin: 0; color: var(--orbit-text); font-size: var(--orbit-type-body); font-weight: 600; line-height: 1.5; }
 .oui-help, .oui-setting-copy p { margin: 0; color: var(--orbit-text-secondary); font-size: var(--orbit-type-secondary); line-height: 1.6; overflow-wrap: anywhere; }
 .oui-field-error { margin: 0; color: var(--orbit-destructive); font-size: var(--orbit-type-secondary); }
+.oui-required-mark { color: var(--orbit-destructive); font-weight: 600; }
+.oui-required-mark::before { content: ' *'; }
+.oui-heading-with-help { display: flex; align-items: center; gap: var(--orbit-space-2); }
+.oui-help-content { color: var(--orbit-text-secondary); font-size: var(--orbit-type-secondary); line-height: 1.6; overflow-wrap: anywhere; }
+.oui-help-content > :first-child { margin-top: 0; }
+.oui-help-content > :last-child { margin-bottom: 0; }
 .oui-select { display: flex; align-items: center; justify-content: space-between; gap: var(--orbit-space-3); text-align: left; cursor: pointer; }
 .oui-select > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oui-select > :last-child { flex: 0 0 auto; }
