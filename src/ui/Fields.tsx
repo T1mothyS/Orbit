@@ -53,13 +53,14 @@ export interface SelectProps {
   disabled?: boolean;
   invalid?: boolean;
   describedBy?: string;
+  portalContainer?: HTMLElement | null;
 }
-export function Select({ id, label, options, placeholder = '请选择', invalid, describedBy, ...props }: SelectProps) {
+export function Select({ id, label, options, placeholder = '请选择', invalid, describedBy, portalContainer, ...props }: SelectProps) {
   return <PrimitiveSelect.Root {...props} items={options}>
     <PrimitiveSelect.Trigger id={id} className="oui-input oui-select" aria-label={label} aria-invalid={invalid || undefined} aria-describedby={describedBy}>
       <PrimitiveSelect.Value placeholder={placeholder} /><PrimitiveSelect.Icon><ChevronDown size={16} /></PrimitiveSelect.Icon>
     </PrimitiveSelect.Trigger>
-    <PrimitiveSelect.Portal><PrimitiveSelect.Positioner sideOffset={6} className="oui-positioner" alignItemWithTrigger={false}>
+    <PrimitiveSelect.Portal container={portalContainer}><PrimitiveSelect.Positioner sideOffset={6} className="oui-positioner" alignItemWithTrigger={false}>
       <PrimitiveSelect.Popup className="oui-menu"><PrimitiveSelect.List>
         {options.map(option => <PrimitiveSelect.Item key={option.value} value={option.value} disabled={option.disabled} className="oui-option">
           <PrimitiveSelect.ItemText>{option.label}</PrimitiveSelect.ItemText>

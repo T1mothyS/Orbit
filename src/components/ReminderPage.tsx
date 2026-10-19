@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   BellRing,
   CalendarClock,
+  ChevronDown,
   CheckCircle2,
   CreditCard,
   Edit3,
@@ -21,6 +22,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import type { CreditCardConfig, GenericReminderConfig, ReminderStats, ReminderTask, ReminderTaskType, SimConfig,ReminderCycle } from '../reminder-types';
 import { useLocation } from 'react-router-dom';
+import { Button, Input, Select } from '../ui';
 
 interface ReminderPageProps {
   theme?: string;
@@ -181,6 +183,7 @@ export function ReminderPage() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [formContainer, setFormContainer] = useState<HTMLFormElement | null>(null);
   const formBaseline = useRef(JSON.stringify(initialForm));
   const savingRef = useRef(false);
   const [pendingTask, setPendingTask] = useState<string | null>(null);
@@ -405,47 +408,69 @@ export function ReminderPage() {
         )}
       </main>
 
-      {formOpen && <OrbitDialog label={editing ? '编辑周期提醒' : '新建周期提醒'} onClose={() => setFormOpen(false)} busy={saving} error={notice?.type === 'error' ? notice.message : undefined} canClose={() => JSON.stringify(form) === formBaseline.current || window.confirm('有未保存的修改，确定放弃吗？')}>{close => <>
-        <form className="reminder-modal" onSubmit={saveTask}>
-          <div className="modal-head"><div><span className="eyebrow">REMINDER SETUP</span><h2>{editing ? '编辑提醒' : '新建提醒'}</h2></div><button type="button" className="icon-button" onClick={close} disabled={saving} aria-label="关闭周期提醒编辑"><X size={17} /></button></div>
+      {formOpen && <OrbitDialog className="reminder-setup-dialog" label={editing ? '编辑周期提醒' : '新建周期提醒'} onClose={() => setFormOpen(false)} busy={saving} error={notice?.type === 'error' ? notice.message : undefined} canClose={() => JSON.stringify(form) === formBaseline.current || window.confirm('有未保存的修改，确定放弃吗？')}>{close => <>
+        <form ref={setFormContainer} className="reminder-modal reminder-setup" onSubmit={saveTask} onInvalidCapture={event => {
+          const details = (event.target as HTMLElement).closest('details');
+          if (details) details.open = true;
+        }}>
+          <div className="modal-head"><h2>{editing ? '编辑周期提醒' : '新建周期提醒'}</h2><button type="button" className="icon-button" onClick={close} disabled={saving} aria-label="关闭周期提醒编辑"><X size={17} /></button></div>
+          <div className="reminder-setup-body">
           {notice?.type === 'error' && <p className="orbit-inline-error" role="alert">{notice.message}</p>}
           <fieldset className="orbit-form-fields" disabled={saving}>
-          <label className="form-label">任务名称<input required value={form.name} onChange={event => updateForm('name', event.target.value)} placeholder="例如：房租、水费或会员续费" /></label>
-          <div className="type-switch">
-            <button type="button" className={form.type === 'credit_card' ? 'type-option active' : 'type-option'} onClick={() => updateForm('type', 'credit_card')}><CreditCard size={16} /> 信用卡</button>
-            <button type="button" className={form.type === 'sim' ? 'type-option active' : 'type-option'} onClick={() => updateForm('type', 'sim')}><Smartphone size={16} /> SIM 卡</button>
-            <button type="button" className={form.type === 'generic' ? 'type-option active' : 'type-option'} onClick={() => updateForm('type', 'generic')}><Repeat2 size={16} /> 生活事务</button>
+          <div className="reminder-setup-types" role="group" aria-label="任务类型" onKeyDown={event => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            const types: ReminderTaskType[] = ['credit_card', 'sim', 'generic'];
+            const buttons = Array.from(event.currentTarget.querySelectorAll('button'));
+            const focused = buttons.indexOf(event.target as HTMLButtonElement);
+            const index = focused < 0 ? types.indexOf(form.type) : focused;
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowRight' ? 1 : 2)) % 3;
+            event.preventDefault();
+            updateForm('type', types[next]);
+            buttons[next]?.focus();
+          }}>
+            <Button variant="quiet" disabled={saving} aria-pressed={form.type === 'credit_card'} onClick={() => updateForm('type', 'credit_card')}>信用卡</Button>
+            <Button variant="quiet" disabled={saving} aria-pressed={form.type === 'sim'} onClick={() => updateForm('type', 'sim')}>SIM 卡</Button>
+            <Button variant="quiet" disabled={saving} aria-pressed={form.type === 'generic'} onClick={() => updateForm('type', 'generic')}>生活事务</Button>
           </div>
-          {form.type === 'credit_card' ? <div className="form-grid">
-            <label className="form-label">每月账单日<input type="number" min="1" max="31" required value={form.statementDay} onChange={event => updateForm('statementDay', event.target.value)} /><small>没有该日期的月份按最后一天计算</small></label>
-            <label className="form-label">还款日<input type="number" min="1" max="31" required value={form.paymentDay} onChange={event => updateForm('paymentDay', event.target.value)} /></label>
-            <label className="form-label full">还款日属于<select value={form.paymentMonthOffset} onChange={event => updateForm('paymentMonthOffset', event.target.value)}><option value="1">出账次月</option><option value="0">出账当月</option></select></label>
-          </div> : form.type === 'sim' ? <div className="form-grid">
-            <label className="form-label">运营商<input required value={form.provider} onChange={event => updateForm('provider', event.target.value)} placeholder="例如：中国移动" /></label>
-            <label className="form-label">号码（建议脱敏）<input required value={form.numberMasked} onChange={event => updateForm('numberMasked', event.target.value)} placeholder="例如：138****1234" /></label>
-            <label className="form-label">国家/地区<input value={form.region} onChange={event => updateForm('region', event.target.value)} placeholder="例如：中国大陆" /></label>
-            <label className="form-label">周期天数<input type="number" min="1" max="3650" required value={form.intervalDays} onChange={event => updateForm('intervalDays', event.target.value)} /></label>
-            <label className="form-label full">上一次有效操作日期<input type="date" required value={form.lastOperationDate} onChange={event => updateForm('lastOperationDate', event.target.value)} /><small>下一周期会从实际完成日期重新计算</small></label>
-            <label className="form-label full">建议操作<input value={form.actionGuide} onChange={event => updateForm('actionGuide', event.target.value)} /></label>
-          </div> : <div className="form-grid">
-            <label className="form-label">事务模板<select value={form.templateKey} onChange={event => updateForm('templateKey', event.target.value)}>{templates.map(item => <option key={item.key} value={item.key}>{item.name}</option>)}</select></label>
-            <label className="form-label">周期类型<select value={form.frequency} onChange={event => updateForm('frequency', event.target.value)}><option value="once">单次</option><option value="monthly">每月</option><option value="yearly">每年</option><option value="interval">固定间隔</option></select></label>
-            <label className="form-label">本期到期日<input type="date" required value={form.anchorDate} onChange={event => updateForm('anchorDate', event.target.value)} /></label>
-            {form.frequency === 'monthly' && <label className="form-label">每月几号<input type="number" min="1" max="31" value={form.dayOfMonth} onChange={event => updateForm('dayOfMonth', event.target.value)} /><small>不存在该日时按月末</small></label>}
-            {form.frequency === 'yearly' && <><label className="form-label">月份<input type="number" min="1" max="12" value={form.month} onChange={event => updateForm('month', event.target.value)} /></label><label className="form-label">日期<input type="number" min="1" max="31" value={form.dayOfMonth} onChange={event => updateForm('dayOfMonth', event.target.value)} /></label></>}
-            {form.frequency === 'interval' && <><label className="form-label">间隔<input type="number" min="1" max="120" value={form.ruleInterval} onChange={event => updateForm('ruleInterval', event.target.value)} /></label><label className="form-label">单位<select value={form.intervalUnit} onChange={event => updateForm('intervalUnit', event.target.value)}><option value="day">天</option><option value="month">月</option><option value="year">年</option></select></label></>}
-            {form.frequency !== 'once' && <label className="form-label">下一周期依据<select value={form.advancePolicy} onChange={event => updateForm('advancePolicy', event.target.value)}><option value="calendar">按原定日历</option><option value="completion">按实际完成日</option></select></label>}
-            <label className="form-label">提醒时间<input type="time" value={form.reminderTime} onChange={event => updateForm('reminderTime', event.target.value)} /></label>
-            <label className="form-label">提前提醒天数<input value={form.reminderOffsets} onChange={event => updateForm('reminderOffsets', event.target.value)} placeholder="例如：30,7,1" /></label>
-            <label className="form-label">优先级<select value={form.priority} onChange={event => updateForm('priority', event.target.value)}><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
-            <label className="form-label full">建议操作<input value={form.actionGuide} onChange={event => updateForm('actionGuide', event.target.value)} /></label>
+          <div className="reminder-setup-grid reminder-setup-identity">
+            <label className="form-label">任务名称<Input required value={form.name} onChange={event => updateForm('name', event.target.value)} placeholder="例如：房租、水费或会员续费" /></label>
+            <label className="form-label">提醒时间<Input type="time" value={form.reminderTime} onChange={event => updateForm('reminderTime', event.target.value)} /></label>
+          </div>
+          {form.type === 'credit_card' ? <div>
+            <div className="reminder-setup-grid reminder-setup-credit">
+              <label className="form-label reminder-setup-number">每月账单日<Input type="number" min="1" max="31" required value={form.statementDay} onChange={event => updateForm('statementDay', event.target.value)} /></label>
+              <label className="form-label reminder-setup-number">还款日<Input type="number" min="1" max="31" required value={form.paymentDay} onChange={event => updateForm('paymentDay', event.target.value)} /></label>
+              <div className="form-label"><span>还款日属于</span><Select label="还款日属于" portalContainer={formContainer} disabled={saving} value={form.paymentMonthOffset} onValueChange={value => updateForm('paymentMonthOffset', value || '0')} options={[{ value: '1', label: '出账次月' }, { value: '0', label: '出账当月' }]} /></div>
+            </div>
+            <p className="reminder-setup-hint">没有该日期的月份按最后一天计算。</p>
+          </div> : form.type === 'sim' ? <div>
+            <div className="reminder-setup-grid">
+              <label className="form-label">运营商<Input required value={form.provider} onChange={event => updateForm('provider', event.target.value)} placeholder="例如：中国移动" /></label>
+              <label className="form-label">号码（建议脱敏）<Input required value={form.numberMasked} onChange={event => updateForm('numberMasked', event.target.value)} placeholder="例如：138****1234" /></label>
+              <label className="form-label reminder-setup-number">周期天数<Input type="number" min="1" max="3650" required value={form.intervalDays} onChange={event => updateForm('intervalDays', event.target.value)} /></label>
+              <label className="form-label">上一次有效操作日期<Input type="date" required value={form.lastOperationDate} onChange={event => updateForm('lastOperationDate', event.target.value)} /></label>
+            </div>
+            <p className="reminder-setup-hint">下一周期会从实际完成日期重新计算。</p>
+          </div> : <div className="reminder-setup-grid">
+            <div className="form-label"><span>周期类型</span><Select label="周期类型" portalContainer={formContainer} disabled={saving} value={form.frequency} onValueChange={value => updateForm('frequency', value || 'once')} options={[{ value: 'once', label: '单次' }, { value: 'monthly', label: '每月' }, { value: 'yearly', label: '每年' }, { value: 'interval', label: '固定间隔' }]} /></div>
+            <label className="form-label">本期到期日<Input type="date" required value={form.anchorDate} onChange={event => updateForm('anchorDate', event.target.value)} /></label>
+            {form.frequency === 'monthly' && <label className="form-label reminder-setup-number">每月几号<Input aria-label="每月几号" type="number" min="1" max="31" value={form.dayOfMonth} onChange={event => updateForm('dayOfMonth', event.target.value)} /><small>不存在该日时按月末</small></label>}
+            {form.frequency === 'yearly' && <div className="reminder-setup-grid reminder-setup-date-pair"><label className="form-label reminder-setup-number">月份<Input type="number" min="1" max="12" value={form.month} onChange={event => updateForm('month', event.target.value)} /></label><label className="form-label reminder-setup-number">日期<Input type="number" min="1" max="31" value={form.dayOfMonth} onChange={event => updateForm('dayOfMonth', event.target.value)} /></label></div>}
+            {form.frequency === 'interval' && <div className="reminder-setup-grid reminder-setup-date-pair"><label className="form-label reminder-setup-number">间隔<Input type="number" min="1" max="120" value={form.ruleInterval} onChange={event => updateForm('ruleInterval', event.target.value)} /></label><div className="form-label"><span>单位</span><Select label="单位" portalContainer={formContainer} disabled={saving} value={form.intervalUnit} onValueChange={value => updateForm('intervalUnit', value || 'day')} options={[{ value: 'day', label: '天' }, { value: 'month', label: '月' }, { value: 'year', label: '年' }]} /></div></div>}
+            {form.frequency !== 'once' && <div className="form-label"><span>下一周期依据</span><Select label="下一周期依据" portalContainer={formContainer} disabled={saving} value={form.advancePolicy} onValueChange={value => updateForm('advancePolicy', value || 'calendar')} options={[{ value: 'calendar', label: '按原定日历' }, { value: 'completion', label: '按实际完成日' }]} /></div>}
           </div>}
-          {form.type !== 'generic' && <div className="form-grid">
-            <label className="form-label">提醒时间<input type="time" value={form.reminderTime} onChange={event => updateForm('reminderTime', event.target.value)} /></label>
-            <label className="form-label">提前提醒天数<input value={form.reminderOffsets} onChange={event => updateForm('reminderOffsets', event.target.value)} placeholder="例如：30,7,1" /><small>用逗号分隔，填 0 表示当天提醒</small></label>
-            <label className="form-label full">优先级<select value={form.priority} onChange={event => updateForm('priority', event.target.value)}><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
-          </div>}
+          <details className="reminder-setup-more">
+            <summary><span>更多设置</span><span className="reminder-setup-summary">提前 {form.reminderOffsets || '未设置'} 天 · {{ high: '高', medium: '中', low: '低' }[form.priority]}优先级{form.type === 'generic' ? ` · ${templates.find(item => item.key === form.templateKey)?.name}` : ''}</span><ChevronDown size={16} aria-hidden="true" /></summary>
+            <div className="reminder-setup-grid">
+              {form.type === 'generic' && <div className="form-label reminder-setup-full"><span>事务模板</span><Select label="事务模板" portalContainer={formContainer} disabled={saving} value={form.templateKey} onValueChange={value => updateForm('templateKey', value || 'custom')} options={templates.map(item => ({ value: item.key, label: item.name }))} /></div>}
+              <label className="form-label">提前提醒天数<Input aria-label="提前提醒天数" value={form.reminderOffsets} onChange={event => updateForm('reminderOffsets', event.target.value)} placeholder="例如：30,7,1" /><small>逗号分隔，0 表示当天提醒</small></label>
+              <div className="form-label"><span>优先级</span><Select label="优先级" portalContainer={formContainer} disabled={saving} value={form.priority} onValueChange={value => updateForm('priority', value || 'medium')} options={[{ value: 'high', label: '高' }, { value: 'medium', label: '中' }, { value: 'low', label: '低' }]} /></div>
+              {form.type === 'sim' && <label className="form-label reminder-setup-full">国家/地区<Input value={form.region} onChange={event => updateForm('region', event.target.value)} placeholder="例如：中国大陆" /></label>}
+              {form.type !== 'credit_card' && <label className="form-label reminder-setup-full">建议操作<Input value={form.actionGuide} onChange={event => updateForm('actionGuide', event.target.value)} /></label>}
+            </div>
+          </details>
           </fieldset>
+          </div>
           <div className="modal-foot"><button type="button" className="secondary-button" onClick={close} disabled={saving}>取消</button><button className="primary-button" disabled={saving}>{saving ? '保存中…' : editing ? '保存修改' : '创建提醒'}</button></div>
         </form>
       </>}</OrbitDialog>}

@@ -34,6 +34,8 @@ build 已包含 Tools、项目成长和帮助生成，不再额外调用同一�
 
 Full/Release 的 UI 覆盖 390×844、430×932、768×1024、1440×900 明暗主题，包含长文本、键盘、错误/加载/禁用、焦点返回与无横向溢出；低高度 Sheet、对比度与 reduced-motion 由 Gallery 保护。业务矩阵不能由 Gallery 代替。
 
+周期提醒紧凑 Demo 的 `round3 reminder demo` 回归覆盖四尺寸明暗下三种类型与生活事务四种周期的默认主区无内部滚动、可见字段和提交区；展开更多设置及420px低高度检查正文滚动、关闭/提交可达和未保存取消。另通过隔离真实 API 验证三类型创建/编辑后折叠配置、原分钟值不变，以及原生校验、保存失败保留、保存中关闭/重复保护。Select 浮层须位于所属原生 Dialog 内并可实际选择。截图为候选，不能在用户确认 Demo 前批准基线或推进后续阶段。
+
 批准状态以 tests/ui/visual-policy.json 为准，平台基线与 Linux 来源分别位于 tests/ui/baselines/ 和 linux-provenance.json。普通比较缺图或差异必须失败；CI 不更新或批准基线。候选采集保留失败状态，只供审阅，不作为通过。保留 threshold/maxDiffPixelRatio，不增加盲目重试；可变账户/设置测试仍禁止重试。`node scripts/verify-ui-build.mjs` 验证开发 Gallery 未进入公开产物。
 
 ### 合成浏览器与原生弹窗

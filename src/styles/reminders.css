@@ -198,3 +198,58 @@
   .card-actions .complete-button { flex: 1 1 150px; }
   .card-actions .icon-button.small { width: 40px; height: 40px; flex: 0 0 40px; }
 }
+
+/* Creation/editing demo: keep changes inside this dialog until design review. */
+.orbit-dialog-frame.reminder-setup-dialog {
+  --reminder-setup-inset: clamp(12px, 2vw, 20px);
+  height: 100dvh;
+  padding: max(var(--reminder-setup-inset), env(safe-area-inset-top)) max(var(--reminder-setup-inset), env(safe-area-inset-right)) max(var(--reminder-setup-inset), env(safe-area-inset-bottom)) max(var(--reminder-setup-inset), env(safe-area-inset-left));
+  overflow: hidden;
+}
+.reminder-setup-dialog .orbit-dialog-content { display: flex; min-height: 0; }
+.orbit-dialog-frame.reminder-setup-dialog .orbit-dialog-content > .reminder-setup {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100dvh - max(var(--reminder-setup-inset), env(safe-area-inset-top)) - max(var(--reminder-setup-inset), env(safe-area-inset-bottom)));
+  padding: 0;
+  overflow: hidden;
+}
+.reminder-setup-dialog .reminder-setup .modal-head {
+  position: static;
+  flex: 0 0 auto;
+  gap: var(--orbit-space-3);
+  margin: 0;
+  padding: var(--orbit-space-4) var(--orbit-space-5) var(--orbit-space-3);
+}
+.reminder-setup-dialog .reminder-setup .modal-head h2 { margin: 0; padding: 0; }
+.reminder-setup .modal-head .icon-button { width: var(--orbit-touch-target); height: var(--orbit-touch-target); flex: 0 0 auto; }
+.reminder-setup-body { min-width: 0; min-height: 0; padding: 0 var(--orbit-space-5) var(--orbit-space-4); overflow-y: auto; overscroll-behavior: contain; }
+.reminder-setup .orbit-form-fields { display: grid; gap: var(--orbit-space-4); }
+.reminder-setup-types { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--orbit-space-1); }
+.reminder-setup-types > button { min-width: 0; }
+.reminder-setup-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--orbit-space-3); min-width: 0; align-items: start; }
+.reminder-setup-identity { grid-template-columns: minmax(0, 1fr) minmax(112px, .6fr); }
+.reminder-setup-credit { grid-template-columns: minmax(72px, .7fr) minmax(72px, .7fr) minmax(120px, 1.2fr); }
+.reminder-setup .form-label { min-width: 0; gap: var(--orbit-space-1); margin: 0; color: var(--orbit-text-secondary); }
+.reminder-setup .form-label :is(input, select) { min-width: 0; min-height: 40px; font-size: var(--orbit-type-input); }
+.reminder-setup .form-label > button { min-height: 40px; }
+.reminder-setup-number input { max-width: 104px; }
+.reminder-setup-date-pair { gap: var(--orbit-space-2); }
+.reminder-setup-full { grid-column: 1 / -1; }
+.reminder-setup .form-label small, .reminder-setup-hint { color: var(--orbit-text-secondary); font-size: var(--orbit-type-secondary); font-weight: 400; line-height: 1.5; }
+.reminder-setup-hint { margin-top: var(--orbit-space-2); }
+.reminder-setup-more { border-top: 1px solid var(--orbit-border); min-width: 0; }
+.reminder-setup-more > summary { display: flex; align-items: center; min-height: var(--orbit-touch-target); gap: var(--orbit-space-2); color: var(--orbit-text); font-size: var(--orbit-type-secondary); cursor: pointer; list-style: none; }
+.reminder-setup-more > summary::-webkit-details-marker { display: none; }
+.reminder-setup-more > summary > :first-child, .reminder-setup-more > summary > svg { flex: 0 0 auto; }
+.reminder-setup-summary { min-width: 0; margin-left: auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--orbit-text-secondary); }
+.reminder-setup-more[open] > summary > svg { transform: rotate(180deg); }
+.reminder-setup-more > .reminder-setup-grid { padding-top: var(--orbit-space-2); }
+.reminder-setup-dialog .reminder-setup .modal-foot { position: static; flex: 0 0 auto; margin: 0; padding: var(--orbit-space-3) var(--orbit-space-5) var(--orbit-space-4); border-top: 1px solid var(--orbit-border); }
+.reminder-setup .orbit-inline-error { margin-bottom: var(--orbit-space-3); }
+@media (max-width: 767px), (pointer: coarse) {
+  .reminder-setup .form-label :is(input, select), .reminder-setup .form-label > button, .reminder-setup-types > button, .reminder-setup .modal-foot > button { min-height: var(--orbit-touch-target); }
+  .reminder-setup-dialog .reminder-setup .modal-head, .reminder-setup-dialog .reminder-setup .modal-foot { padding-inline: var(--orbit-space-4); }
+  .reminder-setup-body { padding-inline: var(--orbit-space-4); }
+}

@@ -1,9 +1,144 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { fixtureToken } from './auth-fixture';
 import { checkVisual } from './visual-check';
 
 const base = 'http://127.0.0.1:4187';
 test.describe.configure({ retries: 0 });
+
+async function selectReminderOption(page: Page, dialog: Locator, label: string, option: string) {
+  await dialog.getByRole('combobox', { name: label, exact: true }).click();
+  await expect(page.getByRole('listbox')).toBeInViewport({ ratio: 1 });
+  await page.getByRole('option', { name: option, exact: true }).click();
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+}
+
+for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]) for (const theme of ['light', 'dark']) {
+  test(`round3 reminder demo ${width} ${theme}: core fields fit and expanded settings scroll safely`, async ({ context, page }) => {
+    test.setTimeout(60_000);
+    const token = await fixtureToken(context, 'preview-guards@example.invalid');
+    await context.addInitScript(({ token, theme }) => { localStorage.setItem('aicalendar_token', token); localStorage.setItem('theme', theme); }, { token, theme });
+    await page.setViewportSize({ width, height }); await page.goto(base + '/reminders');
+    const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+    const trigger = page.getByRole('button', { name: '+ 新建提醒', exact: true }); await trigger.click();
+    const dialog = page.getByRole('dialog', { name: '新建周期提醒', exact: true });
+    const body = dialog.locator('.reminder-setup-body');
+    await expect(dialog.getByLabel('任务名称', { exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: 'SIM 卡', exact: true }).focus(); await page.keyboard.press('ArrowRight');
+    await expect(dialog.getByRole('button', { name: '生活事务', exact: true })).toBeFocused();
+    await page.keyboard.press('Home'); await expect(dialog.getByRole('button', { name: '信用卡', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    for (const type of ['信用卡', 'SIM 卡', '生活事务']) {
+      await dialog.getByRole('button', { name: type, exact: true }).click();
+      await dialog.getByLabel('任务名称', { exact: true }).fill(type + '布局演示');
+      if (type === 'SIM 卡') {
+        await dialog.getByLabel('运营商', { exact: true }).fill('合成运营商');
+        await dialog.getByLabel('号码（建议脱敏）', { exact: true }).fill('138****1234');
+      }
+      for (const frequency of type === '生活事务' ? ['once', 'monthly', 'yearly', 'interval'] : ['']) {
+        if (frequency) await selectReminderOption(page, dialog, '周期类型', ({ once: '单次', monthly: '每月', yearly: '每年', interval: '固定间隔' } as Record<string, string>)[frequency]);
+        expect(await body.evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+        await expect(dialog.getByRole('button', { name: '创建提醒', exact: true })).toBeInViewport({ ratio: 1 });
+        expect(await dialog.evaluate(element => {
+          const top = element.querySelector('.modal-head')!.getBoundingClientRect().bottom;
+          const bottom = element.querySelector('.modal-foot')!.getBoundingClientRect().top;
+          return Array.from(element.querySelectorAll('input, select, [role="combobox"]')).filter(field => field.getClientRects().length && field.getAttribute('aria-hidden') !== 'true' && !field.closest('details:not([open])')).every(field => {
+            const rect = field.getBoundingClientRect();
+            return rect.top >= top && rect.bottom <= bottom && rect.left >= 0 && rect.right <= innerWidth;
+          });
+        })).toBe(true);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      }
+      await checkVisual(page, `round3-recurring-${type}-${width}-${theme}.png`, false, false);
+    }
+    const cyclePicker = dialog.getByRole('combobox', { name: '周期类型', exact: true });
+    await cyclePicker.click(); await expect(page.getByRole('listbox')).toBeVisible(); await page.keyboard.press('Escape');
+    await expect(page.getByRole('listbox')).toHaveCount(0); await expect(dialog).toBeVisible(); await expect(cyclePicker).toBeFocused();
+    await dialog.locator('.reminder-setup-more > summary').click();
+    await dialog.getByLabel('提前提醒天数', { exact: true }).fill('30,7,0');
+    await selectReminderOption(page, dialog, '优先级', '高');
+    await dialog.locator('.reminder-setup-more > summary').click();
+    await expect(dialog.locator('.reminder-setup-more > summary')).toContainText('30,7,0');
+    await page.setViewportSize({ width, height: 420 });
+    await dialog.locator('.reminder-setup-more > summary').click();
+    expect(await body.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+    await expect(dialog.getByRole('button', { name: '关闭周期提醒编辑', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(dialog.getByRole('button', { name: '创建提醒', exact: true })).toBeInViewport({ ratio: 1 });
+    await dialog.getByLabel('优先级', { exact: true }).scrollIntoViewIfNeeded();
+    await expect(dialog.getByRole('combobox', { name: '优先级', exact: true })).toContainText('高');
+    page.once('dialog', native => native.dismiss()); await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(dialog.getByLabel('提前提醒天数', { exact: true })).toHaveValue('30,7,0');
+    page.once('dialog', native => native.accept()); await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(dialog).toHaveCount(0); await expect(trigger).toBeFocused(); expect(errors).toEqual([]);
+  });
+}
+
+for (const [type, label] of [['credit_card', '信用卡'], ['sim', 'SIM 卡'], ['generic', '生活事务']]) {
+  test(`round3 reminder demo ${type}: real create and edit preserve folded configuration`, async ({ context, page }) => {
+    const token = await fixtureToken(context, 'preview-guards@example.invalid'), headers = { Authorization: `Bearer ${token}` };
+    await context.addInitScript(value => localStorage.setItem('aicalendar_token', value), token);
+    await page.setViewportSize({ width: 390, height: 844 }); await page.goto(base + '/reminders');
+    await page.getByRole('button', { name: '+ 新建提醒', exact: true }).click();
+    let dialog = page.getByRole('dialog', { name: '新建周期提醒', exact: true });
+    await dialog.getByRole('button', { name: label, exact: true }).click();
+    await dialog.getByLabel('任务名称', { exact: true }).fill('合成折叠保留 ' + type);
+    await dialog.getByLabel('提醒时间', { exact: true }).fill('09:37');
+    if (type === 'sim') {
+      await dialog.getByLabel('运营商', { exact: true }).fill('合成运营商');
+      await dialog.getByLabel('号码（建议脱敏）', { exact: true }).fill('138****9876');
+    }
+    if (type === 'generic') {
+      await selectReminderOption(page, dialog, '周期类型', '固定间隔');
+      await dialog.getByLabel('本期到期日', { exact: true }).fill('2030-01-15');
+      await dialog.getByLabel('间隔', { exact: true }).fill('2');
+      await selectReminderOption(page, dialog, '下一周期依据', '按实际完成日');
+    }
+    await dialog.locator('.reminder-setup-more > summary').click();
+    await dialog.getByLabel('提前提醒天数', { exact: true }).fill('3,0');
+    await selectReminderOption(page, dialog, '优先级', '高');
+    if (type === 'sim') await dialog.getByLabel('国家/地区', { exact: true }).fill('合成地区');
+    if (type !== 'credit_card') await dialog.getByLabel('建议操作', { exact: true }).fill('保留原有操作说明');
+    if (type === 'generic') await selectReminderOption(page, dialog, '事务模板', '保险');
+    await dialog.locator('.reminder-setup-more > summary').click();
+    const created = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/cycle-reminders');
+    await dialog.getByRole('button', { name: '创建提醒', exact: true }).click();
+    const response = await created; expect(response.ok()).toBe(true); const { task } = await response.json();
+    try {
+      expect(task.type).toBe(type); expect(task.config.reminderTime).toBe('09:37'); expect(task.config.reminderOffsets).toEqual([3, 0]); expect(task.config.priority).toBe('high');
+      await expect(dialog).toHaveCount(0); await page.goto(base + '/reminders?edit=' + encodeURIComponent(task.id));
+      dialog = page.getByRole('dialog', { name: '编辑周期提醒', exact: true });
+      await expect(dialog.locator('.reminder-setup-more')).not.toHaveAttribute('open');
+      await expect(dialog.getByLabel('提醒时间', { exact: true })).toHaveValue('09:37');
+      await dialog.getByLabel('任务名称', { exact: true }).fill('编辑后保留配置 ' + type);
+      const patched = page.waitForResponse(item => item.request().method() === 'PATCH' && new URL(item.url()).pathname === '/api/cycle-reminders/' + task.id);
+      await dialog.getByRole('button', { name: '保存修改', exact: true }).click(); const updated = await patched; expect(updated.ok()).toBe(true);
+      expect((await updated.json()).task.config).toEqual(task.config); await expect(dialog).toHaveCount(0);
+    } finally { await context.request.delete(base + '/api/cycle-reminders/' + task.id, { headers }); }
+  });
+}
+
+test('round3 reminder demo validation, failed save and pending save retain the form', async ({ context, page }) => {
+  const token = await fixtureToken(context, 'preview-guards@example.invalid'), headers = { Authorization: `Bearer ${token}` };
+  await context.addInitScript(value => localStorage.setItem('aicalendar_token', value), token);
+  await page.goto(base + '/reminders'); await page.getByRole('button', { name: '+ 新建提醒', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '新建周期提醒', exact: true }); let calls = 0, release!: () => void, taskId = '';
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/cycle-reminders', async route => {
+    if (route.request().method() !== 'POST') return route.continue();
+    calls++; if (calls === 1) return route.fulfill({ status: 503, json: { error: '合成保存失败，请重试' } });
+    await pending; const response = await route.fetch(); taskId = (await response.json()).task.id; await route.fulfill({ response });
+  });
+  try {
+    const submit = dialog.getByRole('button', { name: '创建提醒', exact: true }); await submit.click(); expect(calls).toBe(0);
+    await dialog.getByLabel('任务名称', { exact: true }).fill('合成失败保留'); await dialog.getByLabel('每月账单日', { exact: true }).fill('32');
+    await submit.click(); expect(calls).toBe(0); await expect(dialog.getByLabel('每月账单日', { exact: true })).toBeFocused();
+    await dialog.getByLabel('每月账单日', { exact: true }).fill('22'); await submit.click();
+    await expect(dialog.getByRole('alert')).toContainText('合成保存失败'); await expect(dialog.getByLabel('任务名称', { exact: true })).toHaveValue('合成失败保留');
+    await submit.click(); await expect(dialog.getByRole('button', { name: '保存中…', exact: true })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: '关闭周期提醒编辑', exact: true })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'SIM 卡', exact: true })).toBeDisabled();
+    await page.keyboard.press('Escape'); await expect(dialog).toBeVisible(); expect(calls).toBe(2);
+    release(); await expect(dialog).toHaveCount(0);
+  } finally { release(); if (taskId) await context.request.delete(base + '/api/cycle-reminders/' + taskId, { headers }); }
+});
 
 for (const [width,height] of [[430,520],[705,402]]) test(`stage2 C5 time picker fits ${width}x${height} without clipping or writing a draft`, async ({context,page})=>{
   const token=await fixtureToken(context,'preview-guards@example.invalid');await context.addInitScript(value=>localStorage.setItem('aicalendar_token',value),token);await page.setViewportSize({width,height});await page.goto(base+'/schedule');await page.getByRole('button',{name:'添加日程',exact:true}).click();
