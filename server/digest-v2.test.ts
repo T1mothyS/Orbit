@@ -190,8 +190,11 @@ test('watchlist distinguishes missing, malformed, partial, and researched states
   const generic = digest();
   generic.mail = [{ input_id: 'mail-1', summary: '这是一封没有具体服务名称和行动信息的泛化通知摘要。', action: '' }];
   generic.watchlist = [{ input_id: 'watch-1', summary: '这项关注尚未核对任何具体来源和时间窗口，仍不知道变化。', check: 'incomplete', change: 'unknown', evidence_ids: [] }];
-  assert.ok(validateDigestV2(generic).errors.some(issue => issue.path === '$.mail[0].summary' && issue.code === 'EMPHASIS_REQUIRED'));
-  assert.ok(validateDigestV2(generic).errors.some(issue => issue.path === '$.watchlist[0].summary' && issue.code === 'EMPHASIS_REQUIRED'));
+  const genericValidation = validateDigestV2(generic);
+  assert.equal(genericValidation.valid, true);
+  assert.ok(genericValidation.reviewIssues.some(issue => issue.path === '$.mail[0].summary' && issue.code === 'EMPHASIS_REQUIRED'));
+  assert.ok(genericValidation.reviewIssues.some(issue => issue.path === '$.watchlist[0].summary' && issue.code === 'EMPHASIS_REQUIRED'));
+  assert.deepEqual(genericValidation.warnings, ['EMPHASIS_REQUIRED']);
 });
 
 test('new digest layout gives the lead a large image, other stories side images, and shows missing images', () => {
@@ -314,11 +317,14 @@ test('editorial digest renders selective emphasis, one opening cover, numbered s
   assert.ok(digestV2Cover(p).excerpt.includes('Akamai与Anthropic'));
   assert.ok(!digestV2Cover(p).excerpt.includes('**'));
   const missing = structuredClone(d); missing.stories[0].summary = '这是一段足够长但完全没有标出重点的正文内容。';
-  assert.ok(validateDigestV2(missing).errors.some(issue => issue.code === 'EMPHASIS_REQUIRED'));
+  assert.equal(validateDigestV2(missing).valid, true);
+  assert.ok(validateDigestV2(missing).warnings.includes('EMPHASIS_REQUIRED'));
   const halfMarked = structuredClone(d); halfMarked.stories[0].summary = '第一句说明了**关键事实**。第二句足够长却完全没有标出任何重点内容，读者无法快速抓住核心变化。';
-  assert.ok(validateDigestV2(halfMarked).errors.some(issue => issue.code === 'EMPHASIS_REQUIRED'));
+  assert.equal(validateDigestV2(halfMarked).valid, true);
+  assert.ok(validateDigestV2(halfMarked).warnings.includes('EMPHASIS_REQUIRED'));
   const broken = structuredClone(d); broken.stories[0].summary = '这一段有**没有结束的标记';
-  assert.ok(validateDigestV2(broken).errors.some(issue => issue.code === 'EMPHASIS_INVALID'));
+  assert.equal(validateDigestV2(broken).valid, true);
+  assert.ok(validateDigestV2(broken).warnings.includes('EMPHASIS_INVALID'));
   const escaped = structuredClone(p); escaped.digest.stories[0].summary = '**<img src=x onerror=alert(1)>** 后续内容。';
   assert.ok(renderDigestV2(escaped).includes('<strong>&lt;img src=x onerror=alert(1)&gt;</strong>'));
   assert.ok(!renderDigestV2(escaped).includes('<img src=x'));
@@ -635,6 +641,65 @@ test('interrupted media-save, report-save and queue steps recover without duplic
       assert.equal(manifest.status, 'PUBLISHED');
     }
   } finally { delete process.env.DIGEST_PRODUCTION_CONTRACT; }
+});
+
+test('formatting warnings allow production publication and one automatic email without losing text', async () => {
+  const date = '2026-10-20';
+  const d = { ...digest(), date };
+  d.executive_signals = ['这一段足够长但没有加粗，仍应保留完整事实并继续发布日报。'];
+  d.calendar[0].text = '准备**资料与确认预约';
+  const snap = { ...snapshot(), date };
+  const run = service.createDigestSnapshotRun(userId, snap);
+  const validation = service.validateDigestRun(userId, run.runId, d);
+  assert.equal(validation.valid, true);
+  assert.deepEqual(validation.errors, []);
+  assert.deepEqual(validation.warnings, ['MAIL_READ_FAILED', 'EMPHASIS_REQUIRED', 'EMPHASIS_INVALID']);
+  assert.ok(validation.reviewIssues.some(issue => issue.path === '$.calendar[0].text' && issue.code === 'EMPHASIS_INVALID'));
+  assert.equal(validation.contentHash, digestHash({ digest: d, inputWarnings: ['MAIL_READ_FAILED'] }));
+  const unsafe = structuredClone(d); unsafe.calendar = [];
+  assert.ok(service.validateDigestRun(userId, run.runId, unsafe).errors.some(issue => issue.code === 'INPUT_OMITTED'));
+  const previousContract = process.env.DIGEST_PRODUCTION_CONTRACT;
+  process.env.DIGEST_PRODUCTION_CONTRACT = 'daily-digest.v2';
+  policy.setDailyReportDeliveryPolicy(userId, ['cloud']);
+  try {
+    const dryRun = await service.publishDigestV2(userId, run.runId, d, 'dry_run');
+    assert.equal(dryRun.status, 'VALIDATED_NOT_PUBLISHED');
+    const results = await Promise.all([1, 2].map(() => service.publishDigestV2(userId, run.runId, d, 'production')));
+    assert.ok(results.every(result => result.status === 'PUBLISHED'));
+    assert.equal(new Set(results.map(result => result.artifactId)).size, 1);
+    const report = activity.getDailyReport(userId, date, 'cloud')!;
+    assert.ok(report.emailNotificationId);
+    assert.equal(activity.exportUserActivity(userId).notifications.filter((n: any) => n.source_id === report.id).length, 1);
+    const publication = JSON.parse(activity.getDigestArtifact(userId, String(results[0].artifactId))!.payload_json).publication;
+    assert.ok(decodeDigestPublication(encodeDigestPublication(publication)));
+    for (const email of [false, true]) {
+      const html = renderDigestV2(publication, email);
+      assert.ok(html.includes(d.executive_signals[0]));
+      assert.ok(html.includes('准备资料与确认预约'));
+      assert.ok(!html.includes('EMPHASIS_'));
+      assert.ok(!html.includes('准备<strong'));
+    }
+    assert.ok(digestV2Text(publication).includes('准备资料与确认预约'));
+  } finally {
+    if (previousContract === undefined) delete process.env.DIGEST_PRODUCTION_CONTRACT;
+    else process.env.DIGEST_PRODUCTION_CONTRACT = previousContract;
+  }
+});
+
+test('invalid emphasis falls back to escaped plain text in web and email', () => {
+  for (const summary of ['**<img src=x onerror=alert(1)>', `**${'长'.repeat(81)}**`, '前文****后文']) {
+    const d = illustrated(); d.stories[0].summary = summary;
+    const validation = validateDigestV2(d);
+    assert.equal(validation.valid, true);
+    assert.ok(validation.warnings.includes('EMPHASIS_INVALID'));
+    const p = { digest: d, media: [], warnings: validation.warnings, renderer: DIGEST_V2_GENERATION };
+    for (const email of [false, true]) {
+      const html = renderDigestV2(p, email);
+      assert.ok(html.includes(summary.replace(/\*\*/g, '').replace(/</g, '&lt;').replace(/>/g, '&gt;')));
+      assert.ok(!html.includes('<img src=x'));
+      assert.ok(!html.includes('**'));
+    }
+  }
 });
 
 test('shadow is isolated, retry is idempotent, renderer escapes injection and backup includes media', async () => {

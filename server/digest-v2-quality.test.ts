@@ -63,6 +63,8 @@ test('D02 frozen 2026-09-27.1 behavior and editorial rendering stay readable', (
   assert.match(renderDigestV2(publication), /今日重点新闻/);
   assert.match(digestV2Text(publication), /发布时间/);
   const emphasis = digest(); emphasis.executive_signals = ['一段足够长但是完全没有标出重点的旧版正文内容。'];
-  assert.ok(validateDigestV2(emphasis, snapshot, '2026-09-27.1').errors.some(issue => issue.code === 'EMPHASIS_REQUIRED'));
+  const formatting = validateDigestV2(emphasis, snapshot, '2026-09-27.1');
+  assert.equal(formatting.valid, true);
+  assert.ok(formatting.warnings.includes('EMPHASIS_REQUIRED'));
   assert.notEqual(DIGEST_V2_GENERATION, '2026-09-27.1');
 });

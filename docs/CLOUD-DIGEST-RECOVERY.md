@@ -2,13 +2,15 @@
 
 - Status: RUNBOOK
 - Scope: 本文列明的源码结构、合同或验证方法；历史证据按时点使用。
-- Last verification: 2026-10-17，补充云端拒绝、连接失效和排程边界；V2 Run 阶段核对方法沿用 2026-10-08，历史媒体诊断与完整模板隔离测试仍按 2026-09-19 的 `0.27.2-260919.1711` 时点使用。
+- Last verification: 2026-10-20，补充排版非阻塞排障；2026-10-17，补充云端拒绝、连接失效和排程边界；V2 Run 阶段核对方法沿用 2026-10-08，历史媒体诊断与完整模板隔离测试仍按 2026-09-19 的 `0.27.2-260919.1711` 时点使用。
 - Authority: 当前源码与自动化验证优先；文档职责见文档索引。
 - Update trigger: 本领域 API、数据归属、媒体策略或验收入口变化。
 - Supersedes: 原文中已纠正的漂移描述；保留历史快照时间边界。
 - Do not use for: 推断当前生产部署、Work 配置或邮件收件箱状态。
 
 本手册用于诊断生成端与服务端合同不一致。历史问题是定时提示遗漏邮件简报、金融与市场及观察名单；历史运行状态见 [Cloud 文档的快照区](CHATGPT-WORK-CLOUD.md#cloud-run-history)。修正实际云端提示词与可执行解析/渲染测试必须一起交付，不能只部署校验器。本手册不证明当前 Work 提示或生产版本已同步。
+
+排版提示按 [Cloud 渲染合同](CHATGPT-WORK-CLOUD.md#发布与阅读)处理：`EMPHASIS_REQUIRED` / `EMPHASIS_INVALID` 不阻断发布。核对回执的 `valid/errors` 与 `warnings/reviewIssues`；只剩加粗建议时可以直接继续发布，不因未修好而丢弃整期。若实际任务仍要求“强调查核全部通过”，须按同一发布授权同步仓库 production Prompt 并回读实际任务；先确认服务器也已采用非阻塞规则，不能把尚未部署的修改当作已生效。
 
 - 外部日报 V2 项目的 `prompts/cloud_scheduled_task.md` 与插件副本 `references/scheduled-task.md` 属于 V1 兼容完整模板；服务端合同以 `server/daily-digest-contract.ts` 和 `read_inputs.markdownContract` 为准。正式 `daily-digest.v2` 的提示来源为 [production Prompt](../prompts/daily-report-cloud-v2-production.md)，服务端使用 `digest-v2-contract.ts` 和 `read_inputs_v2` 返回的 schema/manifest。两种 Prompt 与服务端合同版本分别核对，不互相替代，也不从历史版本号推定当前一致。
 - 修改后须在实际云端任务保存并重新打开核对版本、全文及原频率，不能把本地文件更新视作云端已同步。

@@ -77,7 +77,11 @@ function digestDisplayTitle(p: DigestPublication): string {
   return [...p.digest.stories, ...p.digest.market, ...p.digest.macro].length ? '今日重点新闻' : '今日情报简报';
 }
 const plainEmphasis = (value: string): string => value.replace(/\*\*/g, '');
-const emphasis = (value: string, email = false): string => value.split('**').map((part, i) => i % 2 ? `<strong${email ? ' style="font-weight:600"' : ''}>${esc(part)}</strong>` : esc(part)).join('');
+const emphasis = (value: string, email = false): string => {
+  const parts = value.split('**');
+  if (parts.length % 2 === 0 || parts.some((part, i) => i % 2 === 1 && (!part.trim() || part.length > 80))) return esc(plainEmphasis(value));
+  return parts.map((part, i) => i % 2 ? `<strong${email ? ' style="font-weight:600"' : ''}>${esc(part)}</strong>` : esc(part)).join('');
+};
 function conciseImageCredit(image: PreparedImage): string {
   if (image.fallback || image.visualKind === 'illustration') return imageCredit(image);
   const c = validImageCredit(image);

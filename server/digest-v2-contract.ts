@@ -55,7 +55,7 @@ export interface DigestV2 {
 }
 type Schema = { type: 'object' | 'array' | 'string'; description?: string; properties?: Record<string, Schema>; required?: string[]; additionalProperties?: false; items?: Schema; maxItems?: number; minLength?: number; maxLength?: number; enum?: readonly string[]; format?: 'id' | 'url' | 'date' | 'timestamp' };
 const str = (maxLength = 2000): Schema => ({ type: 'string', maxLength });
-const prose = (maxLength = 2000): Schema => ({ ...str(maxLength), description: '正文每句选择一到两处短重点，用成对 ** 包围原文词组；优先对象、关键数字、结论和行动。不要整句加粗，不要加入 HTML 或其他 Markdown。' });
+const prose = (maxLength = 2000): Schema => ({ ...str(maxLength), description: '正文尽量选择短重点，用成对 ** 包围原文词组；优先对象、关键数字、结论和行动。不要整句加粗，不要加入 HTML 或其他 Markdown。加粗仅是排版建议，缺失或标记无效只返回非阻塞提示；无法修正时保留原文，以普通文字继续发布。' });
 const id: Schema = { ...str(100), minLength: 1, format: 'id' };
 const array = (items: Schema, maxItems = 100): Schema => ({ type: 'array', items, maxItems });
 const obj = (properties: Record<string, Schema>): Schema => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
@@ -108,7 +108,12 @@ export interface DigestIssue { path: string; code: string }
 export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, generationVersion = DIGEST_V2_GENERATION) {
   const errors: DigestIssue[] = [];
   const reviewIssues: DigestIssue[] = [];
+  const formattingWarnings: string[] = [];
   const issue = (path: string, code: string) => { if (errors.length < 100) errors.push({ path, code }); };
+  const formattingIssue = (path: string, code: string) => {
+    if (reviewIssues.length < 100) reviewIssues.push({ path, code });
+    if (!formattingWarnings.includes(code)) formattingWarnings.push(code);
+  };
   function visit(v: unknown, s: Schema, path: string): void {
     if (s.type === 'object') {
       if (!v || typeof v !== 'object' || Array.isArray(v)) return issue(path, 'TYPE_OBJECT');
@@ -133,14 +138,14 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
       if (/(?:\bBearer\s+[A-Za-z0-9._~-]{16,}|\b(?:password|api[_-]?key|secret)\s*[:=]\s*\S{8,}|[A-Za-z]:\\)/i.test(v)) issue(path, 'SENSITIVE_CONTENT');
       if (DIGEST_V2_EDITORIAL_GENERATIONS.includes(generationVersion) && s.description?.startsWith('正文')) {
         const parts = v.split('**');
-        if (parts.length % 2 === 0 || parts.some((part, i) => i % 2 === 1 && (!part.trim() || part.length > 80))) issue(path, 'EMPHASIS_INVALID');
-        if (v.split(/[。！？；!?\n]+/u).some(sentence => sentence.replace(/\*\*/g, '').trim().length >= 20 && !sentence.includes('**'))) issue(path, 'EMPHASIS_REQUIRED');
+        if (parts.length % 2 === 0 || parts.some((part, i) => i % 2 === 1 && (!part.trim() || part.length > 80))) formattingIssue(path, 'EMPHASIS_INVALID');
+        if (v.split(/[。！？；!?\n]+/u).some(sentence => sentence.replace(/\*\*/g, '').trim().length >= 20 && !sentence.includes('**'))) formattingIssue(path, 'EMPHASIS_REQUIRED');
       }
     }
   }
   if (Buffer.byteLength(JSON.stringify(value) || '') > 750_000) issue('$', 'SIZE_LIMIT');
   else visit(value, digestV2Schema(generationVersion), '$');
-  if (errors.length) return { valid: false, errors, warnings: [] as string[], reviewIssues, contentHash: null };
+  if (errors.length) return { valid: false, errors, warnings: formattingWarnings, reviewIssues, contentHash: null };
   const d = value as DigestV2;
   const unique = (ids: string[], path: string) => { if (new Set(ids).size !== ids.length) issue(path, 'DUPLICATE_ID'); };
   const stories = [...d.market, ...d.macro, ...d.stories];
@@ -197,6 +202,8 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
       if (supplied.some(id => !expected.includes(id))) issue(`$.${section}`, 'UNKNOWN_INPUT');
     }
   }
-  const warnings = snapshot ? digestSnapshotWarnings(snapshot, generationVersion) : [];
-  return { valid: errors.length === 0, errors, warnings, reviewIssues, contentHash: errors.length ? null : digestHash({ digest: d, inputWarnings: warnings }) };
+  const inputWarnings = snapshot ? digestSnapshotWarnings(snapshot, generationVersion) : [];
+  // Formatting advice must not change the input-warning hash contract or block publication.
+  const warnings = [...inputWarnings, ...formattingWarnings];
+  return { valid: errors.length === 0, errors, warnings, reviewIssues, contentHash: errors.length ? null : digestHash({ digest: d, inputWarnings }) };
 }
