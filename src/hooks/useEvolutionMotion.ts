@@ -12,13 +12,13 @@ export function useVisibleMotion(ref:RefObject<HTMLElement|null>) {
   return visible&&foreground;
 }
 /** Preserve the remaining dwell time when the map or browser is hidden. */
-export function useEvolutionAdvance(key:string,enabled:boolean,duration:number,advance:()=>void) {
+export function useEvolutionAdvance(key:string,enabled:boolean,duration:number,advance:()=>void,rate=1) {
   const state=useRef({key:'',remaining:duration}),callback=useRef(advance);callback.current=advance;
   useEffect(()=>{
     if(state.current.key!==key)state.current={key,remaining:duration};
     if(!enabled)return;
     const started=performance.now();
-    const timer=setTimeout(()=>{state.current.remaining=duration;callback.current();},state.current.remaining);
-    return()=>{clearTimeout(timer);state.current.remaining=Math.max(0,state.current.remaining-(performance.now()-started));};
-  },[key,enabled,duration]);
+    const timer=setTimeout(()=>{state.current.remaining=duration;callback.current();},state.current.remaining/rate);
+    return()=>{clearTimeout(timer);state.current.remaining=Math.max(0,state.current.remaining-(performance.now()-started)*rate);};
+  },[key,enabled,duration,rate]);
 }

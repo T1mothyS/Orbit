@@ -74,7 +74,7 @@ const errors = [], checks = [];
         await page.screenshot({ path: path.join(output, `${width}-${theme}-focus.png`) });
         await page.getByRole('button', { name: '完整架构', exact: true }).click();
         await page.getByRole('button', { name: '缩小架构图' }).click();
-        await page.getByRole('button', { name: '复位', exact: true }).click();
+        await page.getByRole('button', { name: '适应画布', exact: true }).click();
         await noOverflow(`${width} ${theme} full map`);
         await page.getByRole('button', { name: '简明架构', exact: true }).click();
         await page.getByText('趋势、测试与工程证据', {exact:true}).click(); await page.locator('.evolution-metrics').scrollIntoViewIfNeeded();

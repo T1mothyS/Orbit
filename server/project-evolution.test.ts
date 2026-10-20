@@ -8,10 +8,25 @@ import { createApp } from './app.js';
 import { createAuth } from './auth.js';
 import { createProjectEvolutionRouter, validateEvolution } from './project-evolution.js';
 import { architectureChanges, type EvolutionData } from '../src/types/project-evolution.js';
-import { architectureFocus, architectureGroups, storySnapshots, evolutionSequence, relationChange } from '../src/utils/evolution-presentation.js';
+import { architectureFocus, architectureGroups, compactArchitecture, compactNode, storySnapshots, evolutionSequence, relationChange } from '../src/utils/evolution-presentation.js';
 import { collectFact, isSource, nonemptyLines } from '../scripts/project-evolution-lib.js';
 
 const readData = () => JSON.parse(fs.readFileSync('project-evolution/generated.json', 'utf8')) as EvolutionData;
+test('compact display preserves every historical node, relation and original coordinate without overlaps', () => {
+  const data = readData(), original = JSON.stringify(data);
+  for (const snapshot of data.snapshots) for (const width of [360, 1000, 1440, 2200]) {
+    const layout = compactArchitecture(snapshot.nodes, width);
+    assert.deepEqual(new Set(layout.nodes.map(n => n.id)), new Set(snapshot.nodes.map(n => n.id)));
+    for (const node of layout.nodes) {
+      assert.ok(node.x >= 0 && node.y >= 0 && node.x + compactNode.width <= layout.width && node.y + compactNode.height <= layout.height);
+      assert.ok(snapshot.nodes.some(old => old.id === node.id && old.label === node.label && old.group === node.group && old.description === node.description));
+      for (const other of layout.nodes.filter(n => n.id !== node.id)) assert.ok(node.x + compactNode.width <= other.x || other.x + compactNode.width <= node.x || node.y + compactNode.height <= other.y || other.y + compactNode.height <= node.y);
+    }
+    assert.ok(snapshot.edges.every(edge => layout.nodes.some(n => n.id === edge.source) && layout.nodes.some(n => n.id === edge.target)));
+  }
+  assert.equal(JSON.stringify(data), original);
+  assert.ok(compactArchitecture(data.snapshots.at(-1)!.nodes, 1000).height < 800);
+});
 test('evolution curated record validates and metrics retain unknown tests', () => {
   const data = readData(); validateEvolution(data);
   assert.ok(data.milestones.length >= 15, 'The original growth history must remain available');

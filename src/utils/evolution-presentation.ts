@@ -1,4 +1,4 @@
-import type { EvolutionData, EvolutionSnapshot } from '../types/project-evolution';
+import type { EvolutionData, EvolutionNode, EvolutionSnapshot } from '../types/project-evolution';
 import { architectureChanges } from '../types/project-evolution';
 
 /** Presentation references only: all labels, facts and relations stay in historical snapshots. */
@@ -11,6 +11,27 @@ export function evolutionSequence(data: EvolutionData, mode: 'story' | 'history'
 }
 export function relationChange(counts: Record<'added' | 'changed' | 'removed' | 'unchanged', number>) {
   return counts.added ? 'added' : counts.changed ? 'changed' : counts.removed ? 'removed' : 'unchanged';
+}
+export const compactNode = { width: 164, height: 62, gap: 14, groupGap: 30 };
+/** Display-only lanes: historical coordinates, order, node IDs and relations remain untouched. */
+export function compactArchitecture<T extends EvolutionNode>(nodes: T[], availableWidth: number) {
+  const ids = ['client', 'server', 'data', 'external'] as const;
+  const lanes = ids.map(id => ({ id, nodes: nodes.filter(node => node.group === id), columns: 1 }));
+  const budget = Math.max(6, Math.floor((availableWidth / .9 - 48 - compactNode.groupGap * 3 + compactNode.gap * 4) / (compactNode.width + compactNode.gap)));
+  for (let count = 4; count < budget; count++) {
+    const lane = [...lanes].sort((a, b) => Math.ceil(b.nodes.length / b.columns) - Math.ceil(a.nodes.length / a.columns))[0];
+    if (lane.columns >= lane.nodes.length) break;
+    lane.columns++;
+  }
+  let left = 24;
+  const projected: T[] = [], labels: Array<{ id: typeof ids[number]; left: number; width: number }> = [];
+  for (const lane of lanes) {
+    const width = lane.columns * (compactNode.width + compactNode.gap) - compactNode.gap;
+    labels.push({ id: lane.id, left, width });
+    lane.nodes.forEach((node, index) => projected.push({ ...node, x: left + index % lane.columns * (compactNode.width + compactNode.gap), y: 48 + Math.floor(index / lane.columns) * (compactNode.height + compactNode.gap) }));
+    left += width + compactNode.groupGap;
+  }
+  return { nodes: projected, labels, width: left - compactNode.groupGap + 24, height: Math.max(160, ...projected.map(node => node.y + compactNode.height + 24)) };
 }
 export type OverviewBounds = { x: number; y: number; left: number; right: number; top: number; bottom: number };
 /** Separate the two diagonal routes so counts and change colors remain readable. */
