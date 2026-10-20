@@ -35,6 +35,8 @@
 
 [2026-10-04 UI / Motion 实施验收](archive/engineering/ORBIT-UI-MOTION-VERIFICATION-20261004.md)：后续 1–7 项实现、逐态证据、发布和设备边界。
 
+[2026-10-20 记事、成长与确认专项审计](archive/engineering/ORBIT-SPECIAL-UI-AUDIT-20261020.md)记录本轮调用清单、保留例外与本地验证边界；当前交互规则以UI规范和成长合同为准。
+
 ## 当前领域合同与操作
 
 | 文档 | 范围 |
