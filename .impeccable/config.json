@@ -37,6 +37,15 @@
         ],
         "createdAt": "2026-10-18T08:07:04.420Z",
         "reason": "Agent reviewed: the only detected occurrence is .research-version-list li, a neutral component-stroke separator in the ordered confirmed-viewpoint history with timestamps. It predates stage two in f9a3ebb1 and is not a colored card accent."
+      },
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "files": [
+          "server/digest-v2-render.ts"
+        ],
+        "createdAt": "2026-10-20T11:16:47.380Z",
+        "reason": "Agent: Arial predates this change in commit 630e604 and is intentionally retained only in the existing HTML email templates for stable client font fallback; this task changes emphasis tolerance, not typography."
       }
     ]
   }
