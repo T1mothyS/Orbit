@@ -1,9 +1,9 @@
 .settings-workspace { --settings-nav-width: 184px; min-height: 100dvh; background: var(--orbit-background); }
-.settings-workspace-topbar { min-height: 64px; display: grid; grid-template-columns: max(var(--settings-nav-width), calc((100vw - var(--orbit-content-max)) / 2 + var(--settings-nav-width) + var(--orbit-space-8))) minmax(0, 1fr) auto; align-items: center; gap: var(--orbit-space-4); padding: var(--orbit-space-3) var(--orbit-space-8); border-bottom: 1px solid var(--orbit-border); }
+.settings-workspace-topbar { min-height: 64px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 480px) minmax(0, 1fr); align-items: center; gap: var(--orbit-space-4); padding: var(--orbit-space-3) var(--orbit-space-8); border-bottom: 1px solid var(--orbit-border); }
 .settings-workspace-start { display: flex; align-items: center; gap: var(--orbit-space-8); min-width: 0; }
 .settings-workspace-brand { display: inline-flex; align-items: center; gap: var(--orbit-space-3); color: var(--orbit-text); text-decoration: none; font-size: var(--orbit-type-section-title); }
 .settings-workspace-brand img { width: 30px; height: 30px; }
-.settings-workspace-actions { display: flex; align-items: center; gap: var(--orbit-space-5); font-size: var(--orbit-type-secondary); }
+.settings-workspace-actions { justify-content: end; display: flex; align-items: center; gap: var(--orbit-space-5); font-size: var(--orbit-type-secondary); }
 .settings-workspace-layout { display: grid; grid-template-columns: var(--settings-nav-width) minmax(0, 1fr); gap: var(--orbit-space-12); width: min(var(--orbit-content-max), 100%); margin-inline: auto; padding: var(--orbit-space-10) var(--orbit-space-8) var(--orbit-space-12); }
 .settings-workspace-sidebar { align-self: start; position: sticky; top: var(--orbit-space-8); }
 .settings-workspace-nav-title { display: inline-flex; align-items: center; min-height: var(--orbit-touch-target); margin-bottom: var(--orbit-space-3); color: var(--orbit-text); font-size: var(--orbit-type-section-title); font-weight: 600; text-decoration: none; }

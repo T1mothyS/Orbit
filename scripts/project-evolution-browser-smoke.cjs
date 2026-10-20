@@ -59,7 +59,7 @@ const errors = [], checks = [];
       await page.setViewportSize({ width, height });
       for (const theme of ['light', 'dark']) {
         await page.evaluate(theme => localStorage.setItem('theme', theme), theme);
-        await page.goto(base + '/project?view=architecture&milestone=' + latest); await page.locator('#evolution-milestone').waitFor();
+        await page.goto(base + '/project?view=architecture&milestone=' + latest); await page.locator('.evolution-timeline').waitFor();
         assert.equal(await page.title(), 'Orbit - 项目成长');
         assert.equal(await page.locator('html').evaluate(e => e.classList.contains('dark')), theme === 'dark');
         await noOverflow(`${width} ${theme} overview`);
@@ -67,34 +67,34 @@ const errors = [], checks = [];
         assert.ok(await page.locator('.evolution-overview').evaluate(e => e.scrollWidth <= e.clientWidth + 1));
         await page.locator('.evolution-overview').scrollIntoViewIfNeeded();
         await page.screenshot({ path: path.join(output, `${width}-${theme}-architecture.png`) });
-        await page.locator('#evolution-milestone').selectOption('retrieval');
-        await page.locator('.evolution-node-list button').filter({ hasText: '知识检索' }).click();
+        await page.locator('[data-milestone="' + 'retrieval' + '"]').click();
+        await page.getByText('全部模块与连接说明', {exact:true}).click(); await page.locator('.evolution-node-list button').filter({ hasText: '知识检索' }).click();
         assert.match(await page.locator('.evolution-node-detail').innerText(), /知识检索/);
         assert.ok(await page.locator('.evolution-related-list button').count() > 0);
         await page.screenshot({ path: path.join(output, `${width}-${theme}-focus.png`) });
-        await page.getByRole('button', { name: '查看完整架构', exact: true }).click();
+        await page.getByRole('button', { name: '完整架构', exact: true }).click();
         await page.getByRole('button', { name: '缩小架构图' }).click();
         await page.getByRole('button', { name: '复位', exact: true }).click();
         await noOverflow(`${width} ${theme} full map`);
-        await page.getByRole('button', { name: '返回概览', exact: true }).click();
-        await page.locator('.evolution-metrics').scrollIntoViewIfNeeded();
+        await page.getByRole('button', { name: '简明架构', exact: true }).click();
+        await page.getByText('趋势、测试与工程证据', {exact:true}).click(); await page.locator('.evolution-metrics').scrollIntoViewIfNeeded();
         assert.equal(await page.locator('.evolution-test-evidence li').count(), data.milestones.filter(m => m.tests).length);
         await page.screenshot({ path: path.join(output, `${width}-${theme}-metrics.png`) });
         const scroller = page.locator('.evolution-page'); await scroller.hover(); await page.mouse.wheel(0, 600);
         await scroller.evaluate(e => { e.tabIndex = 0; e.focus(); }); await page.keyboard.press('Control+End');
         await page.waitForFunction(() => { const e = document.querySelector('.evolution-page'); return e.scrollTop + e.clientHeight >= e.scrollHeight - 2; });
         checks.push(`${width} ${theme} wheel and keyboard bottom reachable`);
-        await page.reload(); await page.locator('#evolution-milestone').waitFor();
-        assert.equal(await page.locator('#evolution-milestone').inputValue(), 'retrieval');
+        await page.reload(); await page.locator('.evolution-timeline').waitFor();
+        assert.equal(await page.locator('.evolution-page').getAttribute('data-current-milestone'), 'retrieval');
       }
     }
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.getByRole('button', { name: '查看完整架构', exact: true }).click();
+    await page.getByRole('button', { name: '完整架构', exact: true }).click();
     for (const snapshot of data.snapshots) {
-      await page.locator('#evolution-milestone').selectOption(snapshot.milestone);
-      const prior = data.snapshots[data.snapshots.indexOf(snapshot) - 1];
+      await page.locator('[data-milestone="' + snapshot.milestone + '"]').click();
+      const priorMilestone = data.milestones[data.milestones.findIndex(item => item.id === snapshot.milestone) - 1], prior = data.snapshots.find(item => item.id === priorMilestone?.snapshot);
       // Select full history so the comparison always uses the adjacent historical snapshot.
-      await page.getByRole('button', { name: `完整历史 · ${data.snapshots.length} 个快照`, exact: true }).click();
+      await page.getByRole('button', { name: `完整历史 · ${data.milestones.length} 个里程碑`, exact: true }).click();
       const expected = new Set([...snapshot.nodes, ...(prior?.nodes || [])].map(n => n.id)).size;
       assert.equal(await page.locator('.evolution-map [data-node]').count(), expected);
       const geometry = await page.locator('.evolution-map').evaluate(map => {
@@ -104,21 +104,20 @@ const errors = [], checks = [];
       });
       assert.deepEqual(geometry, { overlap: false, invalid: false }); checks.push(`snapshot ${snapshot.id}: nodes and edges`);
     }
-    await page.getByRole('button', { name: '返回概览', exact: true }).click();
-    await page.locator('#evolution-milestone').selectOption('retrieval'); await page.waitForURL('**milestone=retrieval'); await page.waitForFunction(() => document.querySelector('#evolution-milestone')?.value === 'retrieval');
-    await page.locator('#evolution-milestone').selectOption('cloud'); await page.waitForURL('**milestone=cloud'); await page.waitForFunction(() => document.querySelector('#evolution-milestone')?.value === 'cloud');
-    await page.goBack(); await page.waitForFunction(() => document.querySelector('#evolution-milestone')?.value === 'retrieval'); assert.equal(await page.locator('#evolution-milestone').inputValue(), 'retrieval');
-    await page.goForward(); await page.waitForFunction(() => document.querySelector('#evolution-milestone')?.value === 'cloud'); assert.equal(await page.locator('#evolution-milestone').inputValue(), 'cloud'); checks.push('history navigation and deep link');
-    await page.locator('#evolution-milestone').selectOption('baseline');
-    await page.getByText('工程细节与证据', { exact: false }).click();
+    await page.getByRole('button', { name: '简明架构', exact: true }).click();
+    await page.locator('[data-milestone="' + 'retrieval' + '"]').click(); await page.waitForURL('**milestone=retrieval'); await page.waitForFunction(() => document.querySelector('.evolution-page')?.getAttribute('data-current-milestone') === 'retrieval');
+    await page.locator('[data-milestone="' + 'cloud' + '"]').click(); await page.waitForURL('**milestone=cloud'); await page.waitForFunction(() => document.querySelector('.evolution-page')?.getAttribute('data-current-milestone') === 'cloud');
+    await page.goBack(); await page.waitForFunction(() => document.querySelector('.evolution-page')?.getAttribute('data-current-milestone') === 'retrieval'); assert.equal(await page.locator('.evolution-page').getAttribute('data-current-milestone'), 'retrieval');
+    await page.goForward(); await page.waitForFunction(() => document.querySelector('.evolution-page')?.getAttribute('data-current-milestone') === 'cloud'); assert.equal(await page.locator('.evolution-page').getAttribute('data-current-milestone'), 'cloud'); checks.push('history navigation and deep link');
+    await page.locator('[data-milestone="' + 'baseline' + '"]').click();
+    await page.getByText('趋势、测试与工程证据', { exact: true }).click();
     assert.match(await page.locator('.evolution-detail').innerText(), /本地测试数量未记录/);
-    await page.locator('.evolution-day-toggle').first().click(); assert.equal(await page.locator('.evolution-day-toggle').first().getAttribute('aria-expanded'), 'false');
-    await page.locator('.evolution-day-toggle').first().click(); checks.push('same-day grouping remains available');
+    const dates = new Map(); for(const fact of data.facts) { const key = fact.date.slice(0,10); dates.set(key,[...(dates.get(key)||[]),fact.id]); } const sameDay = [...dates.values()].sort((a,b)=>b.length-a.length)[0]; for(const id of sameDay) { await page.locator('[data-milestone="'+id+'"]').click(); assert.equal(await page.locator('.evolution-page').getAttribute('data-current-milestone'),id); } checks.push('every same-day milestone remains individually selectable');
     await page.goto(base + '/project?view=invalid&milestone=missing'); await page.getByText('链接中的选择无效', { exact: false }).waitFor();
     await page.getByRole('button', { name: '重置链接' }).click(); checks.push('invalid query reset');
     const touchContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
     await touchContext.addInitScript(() => localStorage.setItem('aicalendar_token', 'synthetic-only')); await touchContext.route('**/*', api);
-    const touchPage = await touchContext.newPage(); await touchPage.goto(base + '/project'); await touchPage.locator('#evolution-milestone').waitFor();
+    const touchPage = await touchContext.newPage(); await touchPage.goto(base + '/project'); await touchPage.locator('.evolution-timeline').waitFor();
     const cdp = await touchContext.newCDPSession(touchPage); await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 190, y: 700 }] });
     for (const y of [600, 450, 300, 180]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 190, y }] });
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
@@ -128,14 +127,14 @@ const errors = [], checks = [];
       if (state === 'error') { await page.getByText('暂时没有读到成长记录', { exact: true }).waitFor(); mode = 'normal'; await page.getByRole('button', { name: '重新加载' }).click(); }
       if (state === 'empty') await page.getByText('还没有可展示的里程碑。', { exact: true }).waitFor();
       if (state === 'slow') await page.getByText('正在读取项目历史…', { exact: true }).waitFor();
-      if (state !== 'empty') await page.locator('#evolution-milestone').waitFor(); await noOverflow(state);
+      if (state !== 'empty') await page.locator('.evolution-timeline').waitFor(); await noOverflow(state);
     }
     mode = 'normal';
     const loginContext = await browser.newContext({ reducedMotion: 'reduce' }); await loginContext.route('**/*', api);
     const login = await loginContext.newPage(); login.on('pageerror', e => errors.push(e.message));
     await login.goto(base + '/project?view=architecture&milestone=cloud'); await login.getByPlaceholder('请输入邮箱地址').fill('test@example.invalid');
     await login.locator('input[type=password]').fill('synthetic-password'); await login.locator('form button[type=submit]').click();
-    await login.locator('#evolution-milestone').waitFor(); assert.equal(await login.locator('#evolution-milestone').inputValue(), 'cloud');
+    await login.locator('.evolution-timeline').waitFor(); assert.equal(await login.locator('.evolution-page').getAttribute('data-current-milestone'), 'cloud');
     assert.ok(login.url().includes('view=architecture')); checks.push('login retains deep link'); await loginContext.close();
 
     assert.deepEqual(errors, []);

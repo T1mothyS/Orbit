@@ -8,7 +8,7 @@ import { createApp } from './app.js';
 import { createAuth } from './auth.js';
 import { createProjectEvolutionRouter, validateEvolution } from './project-evolution.js';
 import { architectureChanges, type EvolutionData } from '../src/types/project-evolution.js';
-import { architectureFocus, architectureGroups, storySnapshots } from '../src/utils/evolution-presentation.js';
+import { architectureFocus, architectureGroups, storySnapshots, evolutionSequence, relationChange } from '../src/utils/evolution-presentation.js';
 import { collectFact, isSource, nonemptyLines } from '../scripts/project-evolution-lib.js';
 
 const readData = () => JSON.parse(fs.readFileSync('project-evolution/generated.json', 'utf8')) as EvolutionData;
@@ -93,6 +93,8 @@ test('story projection preserves chronological references and accounts for every
     const diff = architectureChanges(data.snapshots[index - 1], snapshot), projection = architectureGroups(diff);
     assert.equal(projection.groups.reduce((sum, group) => sum + group.nodes.length, 0), diff.nodes.length);
     assert.equal(projection.relations.reduce((sum, edge) => sum + edge.count, 0), diff.edges.length);
+    for (const relation of projection.relations) assert.equal(Object.values(relation.changes).reduce((sum, count) => sum + count, 0), relation.count);
+    for (const change of ['added', 'changed', 'removed', 'unchanged'] as const) assert.equal(projection.relations.reduce((sum, relation) => sum + relation.changes[change], 0), diff.edges.filter(edge => edge.change === change).length);
     for (const node of diff.nodes) {
       const focus = architectureFocus(diff, node.id), grouped = architectureGroups(diff, node.id);
       assert.ok(focus.nodes.has(node.id));
@@ -101,4 +103,16 @@ test('story projection preserves chronological references and accounts for every
     }
   });
   assert.equal(JSON.stringify(data), before, 'Presentation cannot rewrite historical facts or positions');
+});
+
+test('milestone playback preserves every story and reused snapshot; mixed connections retain all statuses', () => {
+  const data = readData(), before = JSON.stringify(data), history = evolutionSequence(data, 'history');
+  assert.deepEqual(history, data.milestones);
+  assert.equal(history.filter(item => !data.snapshots.some(snapshot => snapshot.milestone === item.id)).length, 23);
+  assert.deepEqual(evolutionSequence(data, 'story').map(item => item.snapshot), storySnapshots(data).map(item => item.id));
+  assert.equal(relationChange({ added: 1, changed: 2, removed: 3, unchanged: 4 }), 'added');
+  assert.equal(relationChange({ added: 0, changed: 2, removed: 3, unchanged: 4 }), 'changed');
+  assert.equal(relationChange({ added: 0, changed: 0, removed: 3, unchanged: 4 }), 'removed');
+  assert.equal(relationChange({ added: 0, changed: 0, removed: 0, unchanged: 4 }), 'unchanged');
+  assert.equal(JSON.stringify(data), before);
 });

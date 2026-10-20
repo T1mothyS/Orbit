@@ -273,9 +273,9 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
     await expect(page.locator('.library-card').first()).toBeVisible(); await expect(page.locator('.library-card.article')).toHaveCount(0);
     await page.goto(base + '/reports'); await expect(page.locator('.daily-report-featured')).toBeVisible(); await capture('reports');
     await page.locator('.daily-report-featured-open').click(); await expect(page.locator('.daily-report-reader-markdown')).toBeVisible(); await capture('report-reader');
-    await page.goto(base + '/project'); await expect(page.locator('.evolution-detail h2')).toBeVisible(); await capture('growth');
-    await page.locator('#evolution-milestone').selectOption('retrieval'); await expect(page).toHaveURL(/milestone=retrieval/);
-    await page.locator('#evolution-architecture').scrollIntoViewIfNeeded(); await expect(page.locator('.evolution-node-list')).toBeVisible(); await capture('architecture');
+    await page.goto(base + '/project'); await expect(page.locator('.evolution-story-copy h2')).toBeVisible(); await capture('growth');
+    await page.locator('[data-milestone="' + 'retrieval' + '"]').click(); await expect(page).toHaveURL(/milestone=retrieval/);
+    await page.locator('#evolution-architecture').scrollIntoViewIfNeeded(); await expect(page.locator('.evolution-node-list')).toBeHidden(); await page.getByText('全部模块与连接说明',{exact:true}).click(); await expect(page.locator('.evolution-node-list')).toBeVisible(); await capture('architecture');
     await page.locator('.evolution-node-list button').first().click(); await expect(page.locator('.evolution-node-detail h3')).toBeVisible();
     await page.goto(base + '/project?view=statistics'); await expect(page.getByRole('heading', { name: '执行趋势', exact: true })).toBeVisible(); await capture('statistics');
     await expect(page.locator('.activity-filter-controls,.activity-date')).toHaveCount(0);
