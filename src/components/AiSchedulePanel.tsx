@@ -980,20 +980,12 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
                 aria-label={noteMode ? '记事输入框' : 'AI 助手输入框'}
               />
               <span className="schedule-ai-composer-shortcut">{noteMode ? 'Enter 换行 · Ctrl+Enter 保存' : 'Enter 换行 · Ctrl+Enter 发送'}</span>
-              <button
+              <Button
                 type="button"
                 onClick={noteMode ? () => { void handleSaveNotes(); } : handleSubmit}
                 disabled={cannotSend}
                 className="schedule-ai-send-button flex items-center justify-center rounded-lg text-xs font-medium transition-all"
-                style={{
-                  backgroundColor: cannotSend
-                    ? 'var(--td-bg-color-component)'
-                    : 'var(--td-brand-color)',
-                  color: cannotSend
-                    ? 'var(--td-text-color-disabled)'
-                    : '#fff',
-                  cursor: cannotSend ? 'not-allowed' : 'pointer',
-                }}
+                aria-busy={orbit.submitting || savingNotes || undefined}
                 aria-label={noteMode ? '保存记事' : '发送'}
                 title={noteMode ? 'Ctrl+Enter 保存记事' : 'Ctrl+Enter 发送'}
               >
@@ -1002,7 +994,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
                   : noteMode ? <Save className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />
                 }
                 <span>{noteMode ? '保存' : '发送'}</span>
-              </button>
+              </Button>
             </div>
             </div>
           </div>

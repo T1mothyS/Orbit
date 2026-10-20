@@ -127,19 +127,35 @@ function ProjectEvolutionContent() {
 }
 
 function Metrics({ data, selectedId }: { data: EvolutionData; selectedId: string }) {
+  const facts = new Map(data.facts.map(f => [f.id, f]));
   const series = [
-    { title: '源码非空行', values: data.facts.map(f => f.sourceLoc) },
-    { title: 'Git 跟踪文件', values: data.facts.map(f => f.trackedFiles) },
-    { title: '能力领域', values: data.milestones.map(m => m.featureAreas.length) },
-    { title: '有记录的本地测试', values: data.milestones.map(m => m.tests?.count ?? null) },
+    { title: '源码非空行', description: '含注释与测试；沿用源码排除规则', values: data.milestones.map(m => facts.get(m.id)!.sourceLoc) },
+    { title: 'Git 跟踪文件', description: '完整 Git 文件树，不限于源码', values: data.milestones.map(m => facts.get(m.id)!.trackedFiles) },
+    { title: '能力领域', description: '该里程碑明确记录的领域集合', values: data.milestones.map(m => m.featureAreas.length) },
   ];
-  const metricSection=useRef<HTMLElement>(null),visible=useVisibleMotion(metricSection),reduced=useReducedMotion();
+  const records = data.milestones.filter(m => m.tests !== null);
   const selected = data.milestones.findIndex(m => m.id === selectedId);
-  return <section ref={metricSection} className={`evolution-metrics${visible&&!reduced?' is-drawing':''}`}><h2>成长的刻度</h2><p className="evolution-muted">按里程碑顺序展示；规模是记录，不代表质量。缺失测试数据不补零。</p><div className="evolution-chart-grid">{series.map(series => {
-    const max = Math.max(1, ...series.values.filter((n): n is number => n !== null));
-    const point = (n: number, i: number) => [10 + i * 260 / Math.max(1, series.values.length - 1), 85 - n / max * 65];
-    return <figure key={series.title}><figcaption>{series.title}<strong>{series.values[selected]?.toLocaleString() ?? '—'}</strong></figcaption><svg key={visible?'visible':'hidden'} viewBox="0 0 280 100" role="img" aria-label={`${series.title}趋势；详细数值见下方数据表`}><path d="M10 85 H270" className="chart-axis" />{series.values.map((n, i) => { if (n === null) return null; const [x, y] = point(n, i); const before = series.values[i - 1]; const previous = before != null ? point(before, i - 1) : null; return <g key={i}>{previous && <line x1={previous[0]} y1={previous[1]} x2={x} y2={y} className="chart-line" pathLength="1" style={{animationDelay:`${i*35}ms`}} />}<circle cx={x} cy={y} r={i === selected ? 4 : 2.5} className="chart-dot" style={{animationDelay:`${i*35}ms`}}><title>{data.milestones[i].title}：{n}</title></circle></g>; })}</svg></figure>;
-  })}</div><details><summary>查看数据表与统计口径</summary><p>源码统计 src、server、electron、scripts 内支持扩展名的非空行（含注释和测试），排除依赖、构建、运行数据、压缩文件及本功能自身。文件数为完整 Git 文件树；规则版本：{data.metricRules}。</p><div className="evolution-table-scroll"><table><thead><tr><th>里程碑</th>{series.map(s => <th key={s.title}>{s.title}</th>)}</tr></thead><tbody>{data.milestones.map((m, i) => <tr key={m.id}><th scope="row">{m.title}</th>{series.map(s => <td key={s.title}>{s.values[i]?.toLocaleString() ?? '—'}</td>)}</tr>)}</tbody></table></div></details></section>;
+  const milestone = data.milestones[selected];
+  const metricSection = useRef<HTMLElement>(null), visible = useVisibleMotion(metricSection), reduced = useReducedMotion();
+  return <section ref={metricSection} className={`evolution-metrics${visible && !reduced ? ' is-drawing' : ''}`}>
+    <h2>成长的刻度</h2><p className="evolution-muted">按里程碑顺序展示，各图使用独立尺度；规模是记录，不代表质量。</p>
+    <div className="evolution-metric-layout"><div className="evolution-chart-grid">{series.map(series => {
+      const max = Math.max(1, ...series.values);
+      const point = (n: number, i: number) => [10 + i * 260 / Math.max(1, series.values.length - 1), 85 - n / max * 65];
+      return <figure key={series.title}><figcaption>{series.title}<strong>{series.values[selected]?.toLocaleString() ?? '未记录'}</strong><small>{series.description}</small></figcaption>
+        <svg key={visible ? 'visible' : 'hidden'} viewBox="0 0 280 100" role="img" aria-label={`${series.title}趋势；起止日期及详细数值见数据表`}><path d="M10 85 H270" className="chart-axis" />{series.values.map((n, i) => {
+          const [x, y] = point(n, i), previous = i ? point(series.values[i - 1], i - 1) : null, fact = facts.get(data.milestones[i].id)!;
+          return <g key={i}>{previous && <line x1={previous[0]} y1={previous[1]} x2={x} y2={y} className="chart-line" pathLength="1" style={{ animationDelay: `${i * 15}ms` }} />}<circle cx={x} cy={y} r={i === selected ? 4 : 2.5} className="chart-dot"><title>{day(fact.date)} · V{fact.version ?? '未记录'} · {data.milestones[i].title}：{n.toLocaleString()}</title></circle></g>;
+        })}</svg><div className="evolution-chart-dates"><span>{data.facts[0] && day(data.facts[0].date)}</span><span>{data.facts.at(-1) && day(data.facts.at(-1)!.date)}</span></div>
+      </figure>;
+    })}</div><article className="evolution-test-evidence"><h3>有记录的本地测试</h3><p><strong>已记录 {records.length}/{data.milestones.length}</strong><span>{milestone?.tests ? `本里程碑记录 ${milestone.tests.count} 项` : '本里程碑未记录'}</span></p>
+      <ol>{records.map(m => { const fact = facts.get(m.id)!; return <li key={m.id} data-milestone={m.id} aria-current={m.id === selectedId ? 'true' : undefined}><div><time dateTime={fact.date}>{day(fact.date)}</time><strong>{m.tests!.count} 项</strong></div><span>V{fact.version ?? '未记录'}</span><p>{m.tests!.evidence}</p></li>; })}</ol>
+      <small>未记录不等于 0。每条记录独立保留，验证范围不同，不相加或推算缺失数量。</small>
+    </article></div>
+    <details><summary>查看数据表与统计口径</summary><p>源码统计 src、server、electron、scripts 内支持扩展名的非空行（含注释和测试），排除依赖、构建、运行数据、压缩文件及本功能自身。文件数为完整 Git 文件树；能力领域取显式集合。规则版本：{data.metricRules}。测试数来自各提交的验证证据，未记录不补零。</p>
+      <div className="evolution-table-scroll"><table><thead><tr><th>日期</th><th>版本</th><th>里程碑</th>{series.map(s => <th key={s.title}>{s.title}</th>)}<th>有记录的本地测试</th></tr></thead><tbody>{data.milestones.map((m, i) => { const fact = facts.get(m.id)!; return <tr key={m.id}><td>{day(fact.date)}</td><td>{fact.version ?? '未记录'}</td><th scope="row">{m.title}</th>{series.map(s => <td key={s.title}>{s.values[i].toLocaleString()}</td>)}<td>{m.tests?.count.toLocaleString() ?? '未记录'}</td></tr>; })}</tbody></table></div>
+    </details>
+  </section>;
 }
 
 function Architecture({ data, current, previous, playing, motionActive, onPause }: { data: EvolutionData; current: EvolutionSnapshot; previous?: EvolutionSnapshot; playing:boolean;motionActive:boolean;onPause:()=>void }) {

@@ -1,8 +1,5 @@
 /* ===== AI 记事板重构与助手输入 ===== */
 .schedule-ai-composer { display: grid; grid-template-columns: 36px minmax(0, 1fr) 40px; align-items: end; gap: 4px; }
-.schedule-ai-composer.is-note-mode { border-color: rgba(124, 58, 237, .38); background: linear-gradient(135deg, rgba(124, 58, 237, .13), rgba(168, 85, 247, .08)); }
-.schedule-ai-composer.is-note-mode:focus-within { border-color: rgba(124, 58, 237, .64); box-shadow: 0 0 0 3px rgba(124, 58, 237, .13); }
-.dark .schedule-ai-composer.is-note-mode { background: linear-gradient(135deg, rgba(124, 58, 237, .25), rgba(168, 85, 247, .14)); }
 .schedule-ai-note-toggle { width: 32px; height: 34px; display: grid; place-items: center; position: relative; margin-bottom: 3px; border: 0; border-radius: 9px; color: var(--td-text-color-secondary); background: transparent; }
 .schedule-ai-note-toggle:hover:not(:disabled) { color: #8b5cf6; background: rgba(124, 58, 237, .11); }
 .schedule-ai-note-toggle[aria-pressed="true"] { color: #7c3aed; background: rgba(124, 58, 237, .16); }

@@ -49,7 +49,7 @@
 .evolution-page dd button { color: var(--td-brand-color); padding: 0 12px; }
 .evolution-muted { font-size: 12px; color: var(--td-text-color-secondary); line-height: 1.8; }
 .evolution-metrics { margin-top: 36px; }
-.evolution-chart-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.evolution-chart-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-content: start; }
 .evolution-chart-grid figure { margin: 0; border: 1px solid var(--td-component-stroke); padding: 16px; border-radius: 8px; }
 .evolution-chart-grid figcaption { font-size: 12px; color: var(--td-text-color-secondary); }
 .evolution-chart-grid strong { display: block; margin-top: 8px; font-size: 23px; color: var(--td-text-color-primary); }
@@ -164,3 +164,18 @@
 .evolution-node-list button > span { display:flex;justify-content:space-between;gap:8px;width:100%;font-size:inherit; }.evolution-node > span { margin:0; }.evolution-node-list button > span > span { font-size:var(--orbit-type-caption); }
 
 .evolution-page .change-added { color:var(--orbit-success); }.evolution-page .change-changed { color:var(--orbit-warning); }.evolution-page .change-removed { color:var(--orbit-destructive); }
+
+.evolution-metric-layout { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr); gap:24px; margin-top:18px; align-items:start; }
+.evolution-chart-grid figcaption small { display:block; margin-top:8px; line-height:1.6; }
+.evolution-chart-dates { display:flex; justify-content:space-between; gap:8px; color:var(--orbit-text-secondary); font-size:10px; font-variant-numeric:tabular-nums; }
+.evolution-test-evidence { min-width:0; border-top:1px solid var(--orbit-border); }
+.evolution-test-evidence h3 { margin:14px 0 8px; font-size:15px; }
+.evolution-test-evidence > p { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; font-size:12px; }
+.evolution-test-evidence > p span,.evolution-test-evidence small { color:var(--orbit-text-secondary); }
+.evolution-test-evidence ol { margin:0; padding:0; list-style:none; }
+.evolution-test-evidence li { padding:10px 0; border-top:1px solid var(--orbit-border); font-size:12px; }
+.evolution-test-evidence li > div { display:flex; justify-content:space-between; gap:12px; font-variant-numeric:tabular-nums; }
+.evolution-test-evidence li > span { display:block; margin-top:3px; color:var(--orbit-text-secondary); }
+.evolution-test-evidence li p { margin:4px 0 0; line-height:1.6; overflow-wrap:anywhere; }
+.evolution-test-evidence > small { display:block; font-size:12px; line-height:1.7; margin-top:10px; }
+@media(max-width:1023px) { .evolution-metric-layout { grid-template-columns:1fr; }.evolution-chart-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.evolution-chart-grid figure:last-child { grid-column:1 / -1; }.evolution-chart-grid figure:last-child svg { max-height:100px; }.evolution-test-evidence { width:100%; } }
