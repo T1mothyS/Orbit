@@ -1,4 +1,4 @@
-import { Button, TimePicker, isClockTime } from '../ui';
+import { Button, Input, TimePicker, isClockTime } from '../ui';
 import { composerDraftKey, readComposerDraft, updateComposerDraft, snapshotComposerDraft, consumeComposerDraft, subscribeComposerDraft, type NotificationContext } from '../utils/composer-draft';
 import type { NoteImage } from '../utils/note-images';
 import { NoteImageGallery, NoteImageInput, useNoteImageUpload } from './NoteImages';
@@ -6,7 +6,7 @@ import { OrbitNotificationCard, type NotificationMeta } from './OrbitNotificatio
 import { ReminderActionButtons } from './ReminderActionButtons';
 import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle } from 'react';
 import { Bot, BookOpen, Send, Loader2, Check, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus } from 'lucide-react';
-import type { InlineConfirmation } from '../hooks/useInlineConfirmation';
+import type { ActionConfirmation } from '../ui';
 import {safeChatHref} from '../utils/chat-markdown';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { appendHelpQuestion, helpQuestion } from '../features/help/topics';
@@ -119,7 +119,7 @@ interface AiSchedulePanelProps {
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
   onSaveNote: (content: string, imageIds?: string[]) => Promise<void>;
-  confirmation: InlineConfirmation;
+  confirmation: ActionConfirmation;
   onChatStateChange?: (state: { hasMessages: boolean; busy: boolean; clearDisabled: boolean }) => void;
 }
 
@@ -193,6 +193,10 @@ function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, 
   onRemove: () => Promise<void>;
   disabled?:boolean;
 }) {
+  const editor = useRef<HTMLDivElement>(null);
+  const [fieldError, setFieldError] = useState<{field: string; message: string} | null>(null);
+  const reject = (field: string, message: string) => { setFieldError({field,message}); queueMicrotask(() => editor.current?.querySelector<HTMLElement>(`[data-plan-field="${field}"] input`)?.focus()); };
+  const errorFor = (field: string) => fieldError?.field === field ? <small className="oui-field-error">{fieldError.message}</small> : null;
   const [form, setForm] = useState<PlanOperationForm>(() => operationToForm(operation));
 
   useEffect(() => {
@@ -204,16 +208,17 @@ function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, 
   };
 
   const save = async () => {
-    if (!form.title.trim()) return window.alert('标题不能为空');
+    if (!form.title.trim()) return reject('title','标题不能为空');
+    setFieldError(null);
     try {
       if (operation.type === 'create_recurring') {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(form.anchorDate)) return window.alert('请填写有效的起始日期');
-        if (!isClockTime(form.reminderTime)) return window.alert('请填写有效的提醒时间');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(form.anchorDate)) return reject('anchorDate','请填写有效的起始日期');
+        if (!isClockTime(form.reminderTime)) return reject('reminderTime','请填写有效的提醒时间');
         await onSave({ title: form.title.trim(), anchorDate: form.anchorDate, reminderTime: form.reminderTime, actionGuide: form.actionGuide });
         return;
       }
-      if (!form.isUnscheduled && !/^\d{4}-\d{2}-\d{2}$/.test(form.startDate)) return window.alert('请填写有效的开始日期');
-      if (!form.isUnscheduled && !form.allDay && (!isClockTime(form.startTime) || (form.endTime && !isClockTime(form.endTime)))) return window.alert('请填写有效的时间（00:00–23:59）');
+      if (!form.isUnscheduled && !/^\d{4}-\d{2}-\d{2}$/.test(form.startDate)) return reject('startDate','请填写有效的开始日期');
+      if (!form.isUnscheduled && !form.allDay && (!isClockTime(form.startTime) || (form.endTime && !isClockTime(form.endTime)))) return reject(!isClockTime(form.startTime) ? 'startTime' : 'endTime','请填写有效的时间（00:00–23:59）');
       const startTime = form.isUnscheduled ? undefined : `${form.startDate}T${form.allDay ? '00:00' : (form.startTime || '09:00')}:00`;
       const endTime = form.isUnscheduled || form.allDay || !form.endDate || !form.endTime
         ? ''
@@ -229,7 +234,7 @@ function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, 
         notes: form.notes,
       });
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : '保存计划项失败');
+      setFieldError({field:'save',message:error instanceof Error ? error.message : '保存计划项失败'});
     }
   };
 
@@ -244,7 +249,7 @@ function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, 
       ? `每 ${operation.recurrence.interval || 1} ${recurrenceUnit} · 起始 ${operation.recurrence.anchorDate || '待确认'}`
       : operation.startTime ? `${formatDate(operation.startTime)} ${operation.allDay ? '全天' : formatTime(operation.startTime)}` : '时间待确认';
 
-  return <div
+  return <div ref={editor}
     className="rounded-md px-2 py-1.5"
     style={{ backgroundColor: 'var(--td-bg-color-container)', border: '1px solid var(--td-component-stroke)' }}
   >
@@ -264,18 +269,19 @@ function PlanOperationCard({ operation, editing, saving, onStartEdit, onCancel, 
     </> : <div className="ai-plan-operation-editor">
       <div className="ai-plan-editor-head"><strong>编辑计划项</strong><button type="button" className="icon-button" onClick={onCancel} disabled={saving} aria-label="取消编辑"><X size={14} /></button></div>
       {operation.type === 'create_recurring' ? <>
-        <label>标题<input value={form.title} onChange={event => update('title', event.target.value)} autoFocus /></label>
-        <div className="ai-plan-editor-grid"><label>起始日期<input type="date" value={form.anchorDate} onChange={event => update('anchorDate', event.target.value)} /></label><label>提醒时间<TimePicker label="提醒时间" value={form.reminderTime} onChange={value => update('reminderTime', value)} /></label></div>
+        <label data-plan-field="title">标题<Input aria-invalid={fieldError?.field === 'title' || undefined} value={form.title} onChange={event => update('title', event.target.value)} autoFocus />{errorFor('title')}</label>
+        <div className="ai-plan-editor-grid"><label data-plan-field="anchorDate">起始日期<Input aria-invalid={fieldError?.field === 'anchorDate' || undefined} type="date" value={form.anchorDate} onChange={event => update('anchorDate', event.target.value)} />{errorFor('anchorDate')}</label><label data-plan-field="reminderTime">提醒时间<TimePicker label="提醒时间" value={form.reminderTime} onChange={value => update('reminderTime', value)} />{errorFor('reminderTime')}</label></div>
         <label>操作说明<textarea rows={2} value={form.actionGuide} onChange={event => update('actionGuide', event.target.value)} /></label>
       </> : <>
-        <label>标题<input value={form.title} onChange={event => update('title', event.target.value)} autoFocus /></label>
+        <label data-plan-field="title">标题<Input aria-invalid={fieldError?.field === 'title' || undefined} value={form.title} onChange={event => update('title', event.target.value)} autoFocus />{errorFor('title')}</label>
         <label>类型<select value={form.type} onChange={event => update('type', event.target.value as PlanOperationForm['type'])} disabled={form.isUnscheduled}><option value="event">日程</option><option value="todo">待办</option></select></label>
-        <div className="ai-plan-editor-grid"><label>开始日期<input type="date" value={form.startDate} onChange={event => update('startDate', event.target.value)} disabled={form.isUnscheduled} /></label><label>开始时间<TimePicker label="开始时间" value={form.startTime} onChange={value => update('startTime', value)} disabled={form.isUnscheduled || form.allDay} /></label></div>
-        <div className="ai-plan-editor-grid"><label>结束日期<input type="date" value={form.endDate} onChange={event => update('endDate', event.target.value)} disabled={form.isUnscheduled || form.allDay} /></label><label>结束时间<TimePicker required={false} label="结束时间" value={form.endTime} onChange={value => update('endTime', value)} disabled={form.isUnscheduled || form.allDay} /></label></div>
+        <div className="ai-plan-editor-grid"><label data-plan-field="startDate">开始日期<Input aria-invalid={fieldError?.field === 'startDate' || undefined} type="date" value={form.startDate} onChange={event => update('startDate', event.target.value)} disabled={form.isUnscheduled} />{errorFor('startDate')}</label><label data-plan-field="startTime">开始时间<TimePicker label="开始时间" value={form.startTime} onChange={value => update('startTime', value)} disabled={form.isUnscheduled || form.allDay} />{errorFor('startTime')}</label></div>
+        <div className="ai-plan-editor-grid"><label>结束日期<input type="date" value={form.endDate} onChange={event => update('endDate', event.target.value)} disabled={form.isUnscheduled || form.allDay} /></label><label data-plan-field="endTime">结束时间<TimePicker required={false} label="结束时间" value={form.endTime} onChange={value => update('endTime', value)} disabled={form.isUnscheduled || form.allDay} />{errorFor('endTime')}</label></div>
         <div className="ai-plan-editor-checks"><label><input type="checkbox" checked={form.allDay} onChange={event => update('allDay', event.target.checked)} disabled={form.isUnscheduled} /> 全天</label><label><input type="checkbox" checked={form.isUnscheduled} onChange={event => update('isUnscheduled', event.target.checked)} /> 无固定期限待办</label></div>
         <label>地点<input value={form.location} onChange={event => update('location', event.target.value)} /></label>
         <label>备注<textarea rows={2} value={form.notes} onChange={event => update('notes', event.target.value)} /></label>
       </>}
+      {fieldError && <p role="alert" className="orbit-inline-error">{fieldError.message}</p>}
       <div className="ai-plan-editor-actions"><button type="button" className="secondary-button" onClick={onCancel} disabled={saving}>取消</button><button type="button" className="primary-button" onClick={save} disabled={saving}><Save size={13} />{saving ? '保存中…' : '保存这项'}</button></div>
     </div>}
   </div>;
@@ -656,7 +662,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     await orbit.clear(id);
     if (id === activeConversation.current) { attachments.clear(); updateComposerDraft(activeDraftKey.current, { notificationContext: undefined }); setHasNewReply(false); }
   }, [destructiveBlocked, isLoading, orbit.cid, orbit.clear, attachments.clear]);
-  const closeComposerMenu = () => { confirmation.reset(); setComposerMenuOpen(false); };
+  const closeComposerMenu = () => {  setComposerMenuOpen(false); };
 
   useEffect(() => {
     const messageTime = (message: any) => Date.parse(message.timestamp || message.created_at || '') || 0;
@@ -830,13 +836,13 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
         <div className="orbit-sidebar-head"><strong>Orbit</strong></div>
         <button type="button" className="primary-button" disabled={orbit.creating || mutationBusy} onClick={() => {void orbit.create().catch(e=>orbit.setError(e.message));closeComposerMenu();}}>{orbit.creating?'正在创建…':'＋ 新对话'}</button>
         <div className="orbit-conversation-list">{orbit.conversations.map(c => {
-          const key = `delete:${c.id}`, armed = confirmation.pending === key, busy = confirmation.busy === key;
+          const key = `delete:${c.id}`, busy = confirmation.busy === key;
           const label = `${c.is_main ? '清理主对话历史' : '删除对话'}：${c.title}`;
           return <div key={c.id} className={`orbit-conversation-row${c.id===orbit.cid?' active':''}`}>
-            <button type="button" className="orbit-conversation-select" disabled={mutationBusy || orbit.creating} onClick={() => {confirmation.reset();orbit.select(c.id);setConversationDrawer(false);}} title={c.title}>{c.is_main ? <Pin size={13} aria-hidden="true"/> : null}<span>{c.title}</span>{!!c.unread && <em aria-label={`${c.unread} 条未读提醒`}>{c.unread}</em>}</button>
+            <Button type="button" className="orbit-conversation-select" disabled={mutationBusy || orbit.creating} onClick={() => {orbit.select(c.id);setConversationDrawer(false);}} title={c.title}>{c.is_main ? <Pin size={13} aria-hidden="true"/> : null}<span>{c.title}</span>{!!c.unread && <em aria-label={`${c.unread} 条未读提醒`}>{c.unread}</em>}</Button>
             <div className="orbit-conversation-actions">{!c.is_main && <button type="button" disabled={mutationBusy || orbit.creating} aria-label={`重命名对话：${c.title}`} title="重命名" onClick={()=>{setTargetConversation(c.id);setRenameTitle(c.title);closeComposerMenu();}}><Edit3 size={14}/></button>}
-              <button type="button" data-confirm-action={key} aria-pressed={armed} disabled={mutationBusy || destructiveBlocked || (c.id===orbit.cid && isLoading)} aria-label={`${armed?'确认':''}${label}`} title={busy?'正在处理…':armed?`确认${label}`:label}
-                onClick={()=>{void confirmation.confirm(key,async()=>{orbit.setError('');if(c.is_main)await clearConversation(c.id);else await orbit.remove(c.id);closeComposerMenu();}).catch(e=>orbit.setError(e.message));}}>{busy?<Loader2 size={14} className="animate-spin"/>:armed?<Check size={14}/>:<Trash2 size={14}/>}</button>
+              <Button type="button" data-confirm-action={key} disabled={mutationBusy || destructiveBlocked || (c.id===orbit.cid && isLoading)} aria-label={label} title={busy?'正在处理…':label}
+                onClick={()=>{void confirmation.run({ key, title: c.is_main ? '清理主对话历史？' : '删除对话？', description: `将清除“${c.title}”的对话记录，此操作无法撤销。`, confirmLabel: c.is_main ? '清理历史' : '删除对话' }, async()=>{orbit.setError('');if(c.is_main)await clearConversation(c.id);else await orbit.remove(c.id);closeComposerMenu();});}}>{busy?<Loader2 size={14} className="animate-spin"/>:<Trash2 size={14}/>}</Button>
             </div>
           </div>;
         })}</div>

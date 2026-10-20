@@ -61,7 +61,7 @@ export function OrbitScheduleEditor({ id, onClose, onSaved,onChat }: {
     };
     if (linked || !schedule)
         return <OrbitDialog label="本周期安排日期" busy={saving} error={error} onClose={onClose}
-          canClose={() => date === initialDate.current || window.confirm('有未保存的安排日期，确定放弃吗？')}>
+          discardMessage="放弃修改后，尚未保存的内容将丢失。是否继续？" canClose={() => date === initialDate.current}>
           {close => <section className="orbit-modal">
             <button type="button" className="orbit-modal-close" aria-label="关闭" onClick={close} disabled={saving}>×</button>
             <h3>{schedule?.title || '打开事项'}</h3>

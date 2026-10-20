@@ -248,3 +248,12 @@ AI 对话的俏皮话独立于真实步骤显示，三秒换句，队列终态�
 
 
 记事 composer 使用局部 note 语义色控制边框、按钮、caret及键盘焦点，明暗主题分别取 token；指令恢复品牌色。成长规模曲线保留独立尺度及日期范围，稀疏测试数量使用独立证据列表，缺失明确为“未记录”，不能补零、求和或推断历史质量。
+
+
+## 提示与分层确认
+
+普通结果使用Toast/就近反馈，表单校验贴近字段并聚焦错误输入。普通单条删除、归档和日期转换可使用ConfirmPopover；周期及历史删除、账号危险操作、经历永久删除、对话历史清理、观点正式决定、邮件重发和未保存放弃使用ConfirmDialog。
+
+useActionConfirmation固定打开时的目标和回调，同一时刻只持有一项请求。确认后执行一次，busy期间禁用关闭/重复确认，失败保留内容和重试；false结果视为未完成。Dialog/Popover的portalContainer可指向所属原生HTML dialog，缺省使用body，不传null阻止挂载。Escape只处理当前层，取消返回原控件。失去锚点时采用Dialog，菜单项不能作为关闭后即消失的确认锚点。
+
+OrbitDialog的canClose继续同步判断，dirty时返回false并由discardMessage启动应用内确认，确认才调用原关闭回调。Settings站内导航的同步confirm及dirty-only beforeunload为具名保留边界；系统通知及权限不能改为页面Toast。Tools保持独立页面风格和本地格式，通过工具内HTML dialog处理输入和危险确认，不引入主站框架。

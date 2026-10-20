@@ -395,6 +395,16 @@
   button:focus-visible{outline:3px solid #635bff;outline-offset:3px}
   @media(max-width:767px){.btn,.tab,.tab-add,.tab-del,.modal-close{min-width:44px;min-height:44px}.header-actions{flex-wrap:wrap}}
   @media(prefers-reduced-motion:reduce){.card{transition:none}.card:hover{transform:none}}
+
+.tool-app-dialog { width:min(460px,calc(100vw - 24px)); max-height:calc(100dvh - 32px); margin:auto; overflow:auto; padding:22px; border:1px solid var(--line,#dce0e8); border-radius:12px; background:var(--panel,#fff); color:var(--text,inherit); font:inherit; }
+.tool-app-dialog::backdrop { background:rgba(0,0,0,.45); }
+.tool-app-dialog h2 { font-size:18px; margin:0 0 12px; }
+.tool-app-dialog p { font-size:13px; line-height:1.7; white-space:pre-wrap; margin:8px 0; }
+.tool-app-dialog :is(input,textarea) { display:block; width:100%; padding:10px; border:1px solid var(--line,#aeb7c5); border-radius:6px; font:inherit; color:inherit; background:var(--bg,#fff); }
+.tool-dialog-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+.tool-dialog-actions button { min-height:44px; padding:8px 14px; }
+.tool-dialog-error { color:var(--red,#b42318); }
+
 </style>
 </head>
 <body>
@@ -467,6 +477,38 @@
 </dialog>
 
 <script>
+
+// Application-owned input/confirmation; local data formats and actions stay in the owning tool.
+let toolDialogOpen = false;
+function toolDialog({ title, message = '', value = '', input = false, multiline = false, readOnly = false, confirmLabel = '确定' }) {
+  if (toolDialogOpen) return Promise.resolve(null);
+  toolDialogOpen = true;
+  const previous = document.activeElement;
+  return new Promise(resolve => {
+    const dialog = document.createElement('dialog'), form = document.createElement('form');
+    dialog.className = 'tool-app-dialog'; form.method = 'dialog';
+    const heading = document.createElement('h2'); heading.id = 'tool-dialog-title'; heading.textContent = title; dialog.setAttribute('aria-labelledby', heading.id);
+    const description = document.createElement('p'); description.textContent = message;
+    form.append(heading, description);
+    let field;
+    if (input) {
+      field = document.createElement(multiline ? 'textarea' : 'input'); field.value = value; field.readOnly = readOnly;
+      field.setAttribute('aria-label', title); field.required = !readOnly; if (multiline) field.rows = 8;
+      form.append(field);
+    }
+    const error = document.createElement('p'); error.setAttribute('role', 'alert'); error.className = 'tool-dialog-error'; form.append(error);
+    const actions = document.createElement('div'); actions.className = 'tool-dialog-actions';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn'; cancel.textContent = '取消';
+    const confirm = document.createElement('button'); confirm.type = 'submit'; confirm.className = 'btn primary'; confirm.textContent = confirmLabel;
+    actions.append(cancel, confirm); form.append(actions); dialog.append(form); document.body.append(dialog);
+    let settled = false;
+    const finish = result => { if (settled) return; settled = true; confirm.disabled = true; dialog.close(); dialog.remove(); toolDialogOpen = false; if (previous?.isConnected) previous.focus({preventScroll:true}); resolve(result); };
+    cancel.onclick = () => finish(null); dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); });
+    form.addEventListener('submit', event => { event.preventDefault(); if (field && !readOnly && !field.value.trim()) { error.textContent = '请输入内容'; field.focus(); return; } finish(field ? field.value : true); });
+    dialog.showModal(); if (field) { field.focus(); if (readOnly) field.select(); } else cancel.focus();
+  });
+}
+
   // ===== 常量 =====
   const SUITS = [
     { id: 'diamond', symbol: '♦', name: '方片',   badgeClass: 'diamond' },
@@ -552,8 +594,8 @@
     if (restoreFocus) Array.from(document.querySelectorAll('[data-card-id]')).find(element => element.getAttribute('data-card-id') === cardId)?.focus({preventScroll:true});
   }
 
-  function createProfile() {
-    const name = prompt('请输入新档案名称：');
+  async function createProfile() {
+    const name = await toolDialog({title:'新建档案',input:true,confirmLabel:'创建档案'});
     if (!name || !name.trim()) return;
     const p = { id: genId(), name: name.trim(), collected: [], createdAt: Date.now() };
     state.profiles.push(p);
@@ -563,10 +605,10 @@
     showToast('已创建档案「' + p.name + '」');
   }
 
-  function renameProfile() {
+  async function renameProfile() {
     const profile = getCurrentProfile();
     if (!profile) return;
-    const name = prompt('请输入新的档案名称：', profile.name);
+    const name = await toolDialog({title:'重命名档案',input:true,value:profile.name,confirmLabel:'保存名称'});
     if (!name || !name.trim()) return;
     profile.name = name.trim();
     saveState();
@@ -574,14 +616,14 @@
     showToast('已重命名为「' + profile.name + '」');
   }
 
-  function deleteProfile(id) {
+  async function deleteProfile(id) {
     const profile = state.profiles.find(p => p.id === id);
     if (!profile) return;
     if (state.profiles.length <= 1) {
       showToast('至少需要保留一个档案');
       return;
     }
-    if (!confirm('确定删除档案「' + profile.name + '」吗？\n该档案的收集记录将全部丢失，不可撤销。')) return;
+    if (!await toolDialog({title:'删除档案？',message:'确定删除档案「' + profile.name + '」吗？\n该档案的收集记录将全部丢失，不可撤销。',confirmLabel:'删除档案'})) return;
     state.profiles = state.profiles.filter(p => p.id !== id);
     if (state.currentId === id) state.currentId = state.profiles[0].id;
     saveState();
@@ -613,14 +655,14 @@
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
       try {
         const data = JSON.parse(e.target.result);
         if (!data.profiles || !Array.isArray(data.profiles)) {
           showToast('文件格式不正确');
           return;
         }
-        if (!confirm('导入将覆盖当前所有档案数据，确定继续吗？')) return;
+        if (!await toolDialog({title:'覆盖全部档案？',message:'导入将覆盖当前所有档案数据，确定继续吗？',confirmLabel:'确认覆盖'})) return;
         state = data;
         if (!state.currentId) state.currentId = state.profiles[0].id;
         saveState();

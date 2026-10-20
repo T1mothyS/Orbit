@@ -2,7 +2,7 @@ import { requestError } from '../utils/request-error';
 import { OrbitDialog } from './OrbitDialog';
 import { ArrowUpRight, CalendarClock, CheckCircle2, ChevronDown, Edit3, MoreVertical, Paperclip, RefreshCw, Trash2, X } from 'lucide-react';
 import { KeyboardEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { ActionRow, IconButton, Menu } from '../ui';
+import { ActionRow, IconButton, Menu, useActionConfirmation } from '../ui';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import type { Schedule } from './calendar/schedule-types';
@@ -96,7 +96,7 @@ function ActionItemMenu({ item, open, onToggle, onAction }: {
     { action: 'delete', label: '删除', icon: Trash2, danger: true },
   ];
 
-  return <Menu label={`${item.title} 的更多设置`} open={open} onOpenChange={next => { if (next !== open) onToggle(); }} trigger={<IconButton label={`打开 ${item.title} 的更多操作`} variant="quiet"><MoreVertical size={19} aria-hidden="true" /></IconButton>} items={entries.map(entry => ({ id: entry.action, label: entry.label, danger: entry.danger, icon: entry.icon ? <entry.icon size={16} /> : undefined, onSelect: () => onAction(entry.action) }))} />;
+  return <Menu label={`${item.title} 的更多设置`} open={open} onOpenChange={next => { if (next !== open) onToggle(); }} trigger={<IconButton data-confirm-anchor={item.sourceType + ':' + item.sourceId} label={`打开 ${item.title} 的更多操作`} variant="quiet"><MoreVertical size={19} aria-hidden="true" /></IconButton>} items={entries.map(entry => ({ id: entry.action, label: entry.label, danger: entry.danger, icon: entry.icon ? <entry.icon size={16} /> : undefined, onSelect: () => onAction(entry.action) }))} />;
 }
 
 function ActionList({ title, hint, items, tone, menuScope, headerControl, onComplete, onEdit, onMenuAction, openMenuId, setOpenMenuId, completingId }: {
@@ -188,6 +188,7 @@ function SuspendedTodoSection({ items, onViewAll, onComplete, onEdit, onMenuActi
 }
 
 export function ActionCenterPage() {
+  const confirmation = useActionConfirmation();
   const { authHeaders } = useAuth();
   const navigate = useNavigate();
   const [data, setData] = useState<ActionCenterData>(emptyData);
@@ -345,14 +346,13 @@ export function ActionCenterPage() {
     }
   };
 
-  const handleMenuAction = async (item: ActionItem, action: ActionMenuAction) => {
+  const performMenuAction = async (item: ActionItem, action: ActionMenuAction) => {
     if (action === 'edit') {
       if (item.sourceType === 'schedule') await openScheduleEditor(item);
       else navigate('/reminders?edit=' + encodeURIComponent(item.sourceId));
       return;
     }
     if (action === 'delete') {
-      if (!window.confirm(`确定删除“${item.title}”吗？删除后无法从行动中心恢复。`)) return;
       const endpoint = item.sourceType === 'schedule'
         ? '/api/schedules/' + item.sourceId
         : '/api/cycle-reminders/' + item.sourceId;
@@ -362,12 +362,11 @@ export function ActionCenterPage() {
         if (!response.ok) throw new Error(result.error || '删除失败');
         await loadActions(false);
       } catch (error) {
-        setActionError(requestError(error, '删除失败', true));
+        setActionError(requestError(error, '删除失败', true)); return false;
       }
       return;
     }
     if (item.sourceType !== 'schedule') return;
-    if (action === 'convert-to-unscheduled' && !window.confirm(`将“${item.title}”转为无固定期限待办？原日期会被清除。`)) return;
     try {
       const response = await fetch('/api/schedules/' + item.sourceId + '/actions', {
         method: 'POST',
@@ -378,8 +377,13 @@ export function ActionCenterPage() {
       if (!response.ok) throw new Error(result.error || '操作失败');
       await loadActions(false);
     } catch (error) {
-      setActionError(requestError(error, '操作失败', true));
+      setActionError(requestError(error, '操作失败', true)); return false;
     }
+  };
+
+  const handleMenuAction = (item: ActionItem, action: ActionMenuAction) => {
+    if (action !== 'delete' && action !== 'convert-to-unscheduled') { void performMenuAction(item, action); return; }
+    void confirmation.run({ title: action === 'delete' ? '删除事项？' : '转为无固定期限待办？', description: action === 'delete' ? `确定删除“${item.title}”吗？${item.sourceType === 'schedule' ? '删除后无法从行动中心恢复。' : '周期事务及历史记录将被删除，无法撤销。'}` : `将“${item.title}”转为无固定期限待办？原日期会被清除。`, confirmLabel: action === 'delete' ? '删除事项' : '确认转换', kind: item.sourceType === 'schedule' ? 'popover' : 'dialog', anchor: document.querySelector<HTMLElement>(`[data-confirm-anchor="${CSS.escape(item.sourceType + ':' + item.sourceId)}"]`) }, () => performMenuAction(item, action));
   };
 
   const openCompletedDetails = async (item: ActionItem) => {
@@ -471,7 +475,7 @@ export function ActionCenterPage() {
 
   const openAttachment = async (attachment: { id: string; originalName: string }) => {
     const response = await fetch('/api/attachments/' + attachment.id, { headers: authHeaders() });
-    if (!response.ok) return window.alert('附件读取失败');
+    if (!response.ok) { setActionError('附件读取失败，请重试。'); return; }
     const url = URL.createObjectURL(await response.blob());
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -480,7 +484,7 @@ export function ActionCenterPage() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  return <div className="action-center-page">
+  return <div className="action-center-page">{confirmation.dialog}
     <header className="action-center-header">
       <div><div className="eyebrow">TODAY COMMAND CENTER</div><h1>今日行动中心</h1></div>
 
@@ -540,7 +544,7 @@ export function ActionCenterPage() {
     </>}
 
 
-    {completionEditTarget && <OrbitDialog label="编辑完成记录" busy={!!completingId} error={actionError} onClose={() => setCompletionEditTarget(null)} canClose={() => (JSON.stringify([completionNote, completionAmount, completionBillDate]) === completionBaseline.current && !completionFiles.length && !completionRemovedFileIds.length) || window.confirm('有未保存的完成记录，确定放弃吗？')}>{close => <>
+    {completionEditTarget && <OrbitDialog label="编辑完成记录" busy={!!completingId} error={actionError} onClose={() => setCompletionEditTarget(null)} discardMessage="放弃修改后，尚未保存的内容将丢失。是否继续？" canClose={() => (JSON.stringify([completionNote, completionAmount, completionBillDate]) === completionBaseline.current && !completionFiles.length && !completionRemovedFileIds.length)}>{close => <>
       <div className="complete-modal completion-proof-modal">
         <button type="button" className="icon-button modal-close" onClick={close} disabled={!!completingId} aria-label="关闭"><X size={16} /></button>
         <div className="complete-icon"><Edit3 size={24} /></div>

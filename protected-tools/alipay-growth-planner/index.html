@@ -698,7 +698,7 @@ function runSelfTests(cfg,res){
   const b=document.getElementById("selfTestBadge");b.textContent=`${pass}/${tests.length} 通过`;b.className="badge "+(pass===tests.length?"good":"bad");
 }
 
-function saveSettings(){ const o={};ids.forEach(id=>o[id]=v(id));localStorage.setItem(STORAGE_KEY,JSON.stringify(o));alert("参数已保存在当前浏览器（v4 独立配置）。");}
+function saveSettings(){ const o={};ids.forEach(id=>o[id]=v(id));localStorage.setItem(STORAGE_KEY,JSON.stringify(o));let notice=document.getElementById('settings-save-feedback');if(!notice){notice=document.createElement('p');notice.id='settings-save-feedback';notice.className='help';notice.setAttribute('role','status');document.querySelector('button[onclick="saveSettings()"]')?.after(notice);}notice.textContent="参数已保存在当前浏览器（v4 独立配置）。";}
 function loadSettings(){ try{const o=JSON.parse(localStorage.getItem(STORAGE_KEY));if(!o)return;ids.forEach(id=>{if(o[id]===undefined)return;const e=document.getElementById(id); if(e.type==="checkbox")e.checked=o[id];else e.value=o[id];});}catch(e){} }
 function exportSettings(){
   const o={};ids.forEach(id=>o[id]=v(id));

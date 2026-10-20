@@ -477,3 +477,7 @@ t-chat-sender::part(send-btn):disabled,
 .permission-card-pulse {
   animation: permission-pulse 2s ease-in-out infinite;
 }
+
+.oui-confirm-popover { width:min(340px,calc(100vw - 24px)); padding:var(--orbit-space-4); }
+.oui-confirm-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:var(--orbit-space-2); margin-top:var(--orbit-space-4); }
+.oui-confirm-error { color:var(--orbit-destructive); font-size:var(--orbit-type-secondary); line-height:1.7; overflow-wrap:anywhere; }

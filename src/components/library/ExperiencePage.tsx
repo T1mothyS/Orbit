@@ -1,3 +1,4 @@
+import { Button as ConfirmButton, useActionConfirmation } from '../../ui';
 import { ReturnToToday } from '../ReturnToToday';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -101,6 +102,7 @@ function ExperienceHome() {
   );
 }
 function ExperienceEditor({ id }: { id: string }) {
+  const confirmation = useActionConfirmation();
   const { user } = useAuth(),
     navigate = useNavigate();
   const [session, setSession] = useState<ExperienceSession | null>(null),
@@ -219,7 +221,7 @@ function ExperienceEditor({ id }: { id: string }) {
     if (editorKey)
       updateComposerDraft(editorKey, { text: JSON.stringify(value) });
   };
-  const perform = async (action: () => Promise<void>) => {
+  const perform = async (action: () => Promise<void>, propagate = false) => {
     if (lock.current) return;
     lock.current = true;
     setBusy(true);
@@ -231,6 +233,7 @@ function ExperienceEditor({ id }: { id: string }) {
         setError((e as Error).message);
         void load().catch(() => {});
       }
+      if (propagate) throw e;
     } finally {
       lock.current = false;
       if (alive.current) setBusy(false);
@@ -321,7 +324,7 @@ function ExperienceEditor({ id }: { id: string }) {
     );
   const latestLookup = session.data.lookups.at(-1);
   return (
-    <div className="library-page experience-page">
+    <div className="library-page experience-page">{confirmation.dialog}
       <div className="experience-shell">
         <Link className="library-back-button" to="/library/experience">
           ← 记录经历
@@ -602,31 +605,12 @@ function ExperienceEditor({ id }: { id: string }) {
             </section>
           )}
         </div>
-        <button
-          className="library-danger-button experience-discard"
-          disabled={disabled}
-          onClick={() => {
-            if (
-              !window.confirm(
-                session.entryId
-                  ? '将这条经历移入已归档？'
-                  : '永久删除这条未完成复盘和照片？',
-              )
-            )
-              return;
-            void perform(async () => {
-              await experienceApi('/' + id + '/lifecycle', 'POST', {
-                expectedRevision: session.revision,
-                action: session.entryId ? 'archive' : 'purge',
-                confirm: true,
-              });
-              if (editorKey) updateComposerDraft(editorKey, { text: '' });
-              navigate('/library/experience');
-            });
-          }}
-        >
-          {session.entryId ? '归档经历' : '删除未完成复盘'}
-        </button>
+        <ConfirmButton className="library-danger-button experience-discard" disabled={disabled} onClick={event => {
+          void confirmation.run({title:session.entryId ? '归档经历？' : '永久删除未完成复盘？',description:session.entryId ? '将这条经历移入已归档？' : '永久删除这条未完成复盘和照片？此操作无法撤销。',confirmLabel:session.entryId ? '归档经历' : '永久删除',kind:session.entryId ? 'popover' : 'dialog',anchor:event.currentTarget}, () => perform(async () => {
+            await experienceApi('/' + id + '/lifecycle', 'POST', { expectedRevision: session.revision, action: session.entryId ? 'archive' : 'purge', confirm: true });
+            if (editorKey) updateComposerDraft(editorKey, { text: '' }); navigate('/library/experience');
+          }, true));
+        }}>{session.entryId ? '归档经历' : '删除未完成复盘'}</ConfirmButton>
       </div>
     </div>
   );

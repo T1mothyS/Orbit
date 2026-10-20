@@ -3,7 +3,7 @@ export type { ButtonProps, IconButtonProps } from './Button';
 export { Input, PasswordInput, Textarea, Select, Checkbox, Switch, FormField, RequiredMark } from './Fields';
 export type { SelectOption, SelectProps } from './Fields';
 export { Card, Section, SettingRow, HelpPopover, Badge, InlineNotice, Skeleton, LoadingState, EmptyState, ErrorState, Tabs } from './Surface';
-export { Dialog, Sheet, ConfirmDialog, Menu, Tooltip, TooltipProvider, Popover } from './Overlay';
+export { Dialog, Sheet, ConfirmDialog, Menu, Tooltip, TooltipProvider, Popover, ConfirmPopover } from './Overlay';
 export type { DialogProps, MenuItem } from './Overlay';
 export { ToastProvider, useToast } from './Toast';
 export { TextLink, ButtonLink, IconLink, ExternalLink, NavigationItem } from './Navigation';
@@ -11,3 +11,6 @@ export { FilePicker } from './FilePicker';
 export { Avatar } from './Avatar';
 export { ActionRow } from './ActionRow';
 export { TimePicker, DateTimePicker, isClockTime } from './TimePicker';
+
+export { useActionConfirmation } from './ActionConfirmation';
+export type { ActionConfirmation, ActionConfirmationOptions } from './ActionConfirmation';

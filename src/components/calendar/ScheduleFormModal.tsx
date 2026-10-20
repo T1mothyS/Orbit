@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { SCHEDULE_CATEGORIES } from '../../utils/scheduleCategories';
 import { CATEGORY_COLORS, formatScheduleDate, formatTime, PRIORITY_COLORS, toDateKey, shiftDateKey, linkedEndTime } from './schedule-presentation';
 import type { Schedule } from './schedule-types';
-import { TimePicker, isClockTime } from '../../ui';
+import { TimePicker, isClockTime, useActionConfirmation } from '../../ui';
 import { useDialogLifecycle } from '../../hooks/useDialogLifecycle';
 
 function ReminderPicker({
@@ -178,12 +178,13 @@ export function ScheduleFormModal({
     repeat: (editingSchedule?.is_repeated ? (editingSchedule as any).repeat_rule || 'daily' : '') as '' | 'daily' | 'weekly' | 'monthly',
   });
 
+  const confirmation = useActionConfirmation();
   const initialForm = useRef(JSON.stringify(form));
   const saveFocus = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => { if (!saving && saveFocus.current?.isConnected) { saveFocus.current.focus({preventScroll:true}); saveFocus.current = null; } }, [saving]);
   const dismiss = () => {
     if (savingRef.current) return;
-    if (confirmDiscard && initialForm.current !== JSON.stringify(form) && !window.confirm('放弃本次未保存的编辑？')) return;
+    if (!confirmation.discard(confirmDiscard && initialForm.current !== JSON.stringify(form), onClose)) return;
     onClose();
   };
   const set = (k: string, v: any) => {
@@ -259,6 +260,7 @@ export function ScheduleFormModal({
       onCancel={event => { event.preventDefault(); event.stopPropagation(); dismiss(); }}
       onClick={event => { if (event.target === event.currentTarget) dismiss(); }}
     >
+      {confirmation.dialog}
       <div
         className="schedule-form-modal rounded-2xl p-6 w-full max-w-md shadow-2xl"
         style={{ backgroundColor: 'var(--td-bg-color-container)' }}

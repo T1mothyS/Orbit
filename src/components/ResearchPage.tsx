@@ -1,3 +1,4 @@
+import { useActionConfirmation } from '../ui';
 import { ReturnToToday } from './ReturnToToday';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
@@ -40,6 +41,7 @@ async function responseError(response: Response): Promise<Error> {
 }
 
 export function ResearchPage() {
+  const confirmation = useActionConfirmation();
   const { authHeaders } = useAuth();
   const reviewHeading = useRef<HTMLHeadingElement>(null);
   const [runs, setRuns] = useState<ResearchRun[]>([]);
@@ -91,30 +93,31 @@ export function ResearchPage() {
   const decide = async (proposal: ThesisProposal, decision: 'confirm' | 'reject') => {
     if (busy || !historyReady || proposal.status !== 'draft') return;
     const action = decision === 'confirm' ? '确认这份观点并写入正式观点历史' : '拒绝这份观点草稿';
-    if (!window.confirm(`${action}？`)) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/research/proposals/${encodeURIComponent(proposal.id)}/decision`, {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision, expectedBaseVersionId: proposal.baseVersionId, confirm: true }),
-      });
-      if (!response.ok) throw await responseError(response);
-      await load();
-      const historyResponse = await fetch(`/api/research/theses/${encodeURIComponent(proposal.subjectKey)}`, { headers: authHeaders() });
-      if (!historyResponse.ok) throw await responseError(historyResponse);
-      setVersions((await historyResponse.json()).versions || []);
-      setHistoryReady(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '观点决定失败'); }
-    finally { setBusy(false); }
+    await confirmation.run({ title: "确认观点决定？", description: `${action}？`, confirmLabel: "确认决定" }, async () => {
+      setBusy(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/research/proposals/${encodeURIComponent(proposal.id)}/decision`, {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision, expectedBaseVersionId: proposal.baseVersionId, confirm: true }),
+        });
+        if (!response.ok) throw await responseError(response);
+        await load();
+        const historyResponse = await fetch(`/api/research/theses/${encodeURIComponent(proposal.subjectKey)}`, { headers: authHeaders() });
+        if (!historyResponse.ok) throw await responseError(historyResponse);
+        setVersions((await historyResponse.json()).versions || []);
+        setHistoryReady(true);
+      } catch (cause) { setError(cause instanceof Error ? cause.message : '观点决定失败');  throw cause; }
+      finally { setBusy(false); }
+    });
   };
   useEffect(() => { if (selected) reviewHeading.current?.focus(); }, [selected]);
   const selectedProposal = proposals.find(item => item.id === selected);
   const selectedRun = runs.find(item => item.id === selectedProposal?.runId);
 
   return (
-    <div className="oui-root research-page">
+    <div className="oui-root research-page">{confirmation.dialog}
       <header className="research-header">
         <div>
           <ReturnToToday/>

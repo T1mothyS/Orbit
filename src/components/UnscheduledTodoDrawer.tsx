@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { CheckCircle2, Circle, Edit3, MoreHorizontal, Trash2 } from 'lucide-react';
-import { ActionRow, Button, Dialog, IconButton, Input, Menu, Select } from '../ui';
+import { ActionRow, Button, Dialog, IconButton, Input, Menu, Select, useActionConfirmation } from '../ui';
 import { useAuth } from '../hooks/useAuth';
 import { ScheduleFormModal } from './calendar/ScheduleFormModal';
 import type { Schedule } from './calendar/schedule-types';
@@ -9,6 +9,7 @@ import '../styles/unscheduled.css';
 interface Completion { id: string; completedAt: string; reopenedAt: string | null; note: string | null }
 
 export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
+  const confirmation = useActionConfirmation();
   const { authHeaders } = useAuth();
   const searchId = useId();
   const [rows, setRows] = useState<Schedule[]>([]);
@@ -24,7 +25,7 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
   const [historyLoading, setHistoryLoading] = useState(false);
   const dismissEditor = () => {
     if (busy) return;
-    if (window.confirm('放弃本次未保存的编辑？')) setEditing(null);
+    void confirmation.run({title:'放弃未保存的修改？',description:'放弃本次未保存的编辑？',confirmLabel:'放弃修改'}, () => setEditing(null));
   };
   const dismiss = () => {
     if (busy) return;
@@ -63,7 +64,7 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '操作失败');
       setEditing(null); setSelected(null); await load(); onChanged();
-    } catch (e) { if (editing) throw e; setError(e instanceof Error ? e.message : '操作失败'); }
+    } catch (e) { if (editing) throw e; setError(e instanceof Error ? e.message : '操作失败'); return false; }
     finally { setBusy(false); }
   };
   const completed = rows.filter(row => row.is_completed).length;
@@ -71,6 +72,7 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
     && [row.title, row.description, row.notes].some(text => (text || '').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())))
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id));
   return <Dialog open onOpenChange={open => { if (!open) dismiss(); }} title="无固定期限待办" description="没有执行期限；完成后仍可在这里查看和管理。" size="wide" busy={busy} footer={<><span className="oui-help">未完成 {rows.length - completed} 项 · 共 {rows.length} 项</span><Button disabled={busy} onClick={dismiss}>关闭</Button></>}>
+    {confirmation.dialog}
     <div className="unscheduled-workspace">
     <div className="unscheduled-filters">
       <label>状态<Select label="状态" value={filter} onValueChange={value => setFilter(value || 'all')} options={[{value:'all',label:`全部（${rows.length}）`},{value:'pending',label:`未完成（${rows.length - completed}）`},{value:'completed',label:`已完成（${completed}）`}]} /></label>
@@ -81,9 +83,9 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
       {loading && !rows.length ? <p role="status">正在加载待办…</p> : visible.length === 0 ? <p>没有符合条件的待办</p> : visible.map(row => <article key={row.id}>
         <div className="unscheduled-task-row"><IconButton label={`${row.is_completed ? '设为未完成' : '标记完成'}：${row.title}`} variant="quiet" aria-pressed={row.is_completed} disabled={busy} onClick={() => void mutate(row.id, 'POST', undefined, true)}>{row.is_completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}</IconButton>
         <ActionRow compact title={row.title} aria-label={`详情：${row.title}`} aria-expanded={selected === row.id} aria-controls={'todo-detail-' + row.id} onClick={() => setSelected(selected === row.id ? null : row.id)} description={`${row.is_completed ? '已完成' : '未完成'} · ${{ high: '高', medium: '中', low: '低' }[row.priority]}优先级`} />
-        <Menu label={`${row.title} 的更多操作`} trigger={<IconButton label={`更多操作：${row.title}`} variant="quiet" disabled={busy}><MoreHorizontal size={20}/></IconButton>} items={[
+        <Menu label={`${row.title} 的更多操作`} trigger={<IconButton data-confirm-anchor={'todo-' + row.id} label={`更多操作：${row.title}`} variant="quiet" disabled={busy}><MoreHorizontal size={20}/></IconButton>} items={[
           {id:'edit',label:'编辑',icon:<Edit3 size={16}/>,disabled:busy,onSelect:()=>setEditing(row)},
-          {id:'delete',label:'删除',icon:<Trash2 size={16}/>,danger:true,separatorBefore:true,disabled:busy,onSelect:()=>{if(window.confirm(`确定删除“${row.title}”吗？`))void mutate(row.id,'DELETE');}},
+          {id:'delete',label:'删除',icon:<Trash2 size={16}/>,danger:true,separatorBefore:true,disabled:busy,onSelect:()=>{void confirmation.run({title:'删除待办？',description:`确定删除“${row.title}”吗？此操作无法撤销。`,confirmLabel:'删除待办',kind:'popover',anchor:document.querySelector<HTMLElement>(`[data-confirm-anchor="${CSS.escape('todo-'+row.id)}"]`)},()=>mutate(row.id,'DELETE'));}},
         ]} /></div>
         {selected === row.id && <div className="unscheduled-details" id={'todo-detail-' + row.id}>
           <p>历史保存时间（不是执行期限）：{row.start_time}</p>
@@ -95,7 +97,7 @@ export function UnscheduledTodoDrawer({ onClose, onChanged }: { onClose: () => v
     </div>
     {editing && <div className="unscheduled-editor" aria-busy={busy}>
       {error && <p className="unscheduled-edit-error" role="alert">{error}</p>}
-      <ScheduleFormModal editingSchedule={editing} defaultDate={new Date()} onClose={dismissEditor} confirmDiscard={false} onSave={body => mutate(editing.id, 'PUT', body)} />
+      <ScheduleFormModal editingSchedule={editing} defaultDate={new Date()} onClose={dismissEditor} confirmDiscard={false} onSave={async body => { await mutate(editing.id, 'PUT', body); }} />
     </div>}
   </Dialog>;
 }

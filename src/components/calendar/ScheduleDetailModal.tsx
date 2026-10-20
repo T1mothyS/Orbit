@@ -1,3 +1,4 @@
+import { Button, useActionConfirmation } from '../../ui';
 import { Clock, Edit3, MapPin, Trash2, X } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_LABELS, formatTime, PRIORITY_COLORS } from './schedule-presentation';
 import type { CompletionProofDisplay, Schedule } from './schedule-types';
@@ -25,6 +26,7 @@ export function ScheduleDetailModal({
   onEditCompletion?: () => void;
   extraActions?:ReactNode;
 }) {
+  const confirmation = useActionConfirmation();
   const pColor = PRIORITY_COLORS[schedule.priority] || PRIORITY_COLORS.medium;
   const dialogRef=useRef<HTMLDialogElement>(null);
   useDialogLifecycle(dialogRef);
@@ -38,8 +40,8 @@ export function ScheduleDetailModal({
     if (actionRef.current) return;
     actionFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     actionRef.current = true; setBusy(true); setError('');
-    try { const result = await action(schedule.id); if (result === false) setError('操作未完成，事项已保留，请稍后重试。'); if (result !== false && closeAfterAction) onClose(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '操作失败，请重试。'); }
+    try { const result = await action(schedule.id); if (result === false) throw new Error('操作未完成，事项已保留，请稍后重试。'); if (closeAfterAction) onClose(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : '操作失败，请重试。'); return false; }
     finally { actionRef.current = false; setBusy(false); }
   };
 
@@ -52,6 +54,7 @@ export function ScheduleDetailModal({
       style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
       onClick={event => { if (event.target === event.currentTarget) dismiss(); }}
     >
+      {confirmation.dialog}
       <div
         className="schedule-detail-surface rounded-2xl p-5 w-full max-w-sm shadow-2xl"
 
@@ -121,14 +124,14 @@ export function ScheduleDetailModal({
         {error && <p className="orbit-inline-error" role="alert">{error}</p>}
         {extraActions}
         <div className="schedule-detail-actions flex gap-2">
-          <button
+          <Button
             disabled={busy}
-            onClick={() => { if (window.confirm(`确定删除“${schedule.title}”吗？`)) void runAction(onDelete); }}
+            onClick={event => void confirmation.run({ title: '删除日程？', description: `确定删除“${schedule.title}”吗？删除后无法撤销。`, confirmLabel: '删除日程', kind: 'popover', anchor: event.currentTarget, portalContainer: dialogRef.current }, () => runAction(onDelete))}
             className="flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-sm font-medium"
             style={{ backgroundColor: '#FEF2F2', color: '#EF4444' }}
           >
             <Trash2 className="w-3.5 h-3.5" />删除
-          </button>
+          </Button>
           <button
             disabled={busy}
             onClick={() => void runAction(onToggle)}

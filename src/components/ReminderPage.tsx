@@ -1,3 +1,4 @@
+import { useActionConfirmation } from '../ui';
 import { TimePicker } from '../ui';
 import { requestError } from '../utils/request-error';
 import { OrbitDialog } from './OrbitDialog';
@@ -175,6 +176,7 @@ function configToForm(task: ReminderTask): FormState {
 }
 
 export function ReminderPage() {
+  const confirmation = useActionConfirmation();
   const { authHeaders } = useAuth();
   const location = useLocation(), navigate = useNavigate();
   const [tasks, setTasks] = useState<ReminderTask[]>([]);
@@ -352,15 +354,16 @@ export function ReminderPage() {
 
   const deleteTask = async (task: ReminderTask) => {
     if (pendingTask) return;
-    if (!window.confirm('确定删除“' + task.name + '”及其历史记录吗？')) return;
-    setPendingTask(task.id);
-    try {
-      const response = await fetch('/api/cycle-reminders/' + task.id, { method: 'DELETE', headers: authHeaders() });
-      if (!response.ok) throw new Error('删除失败');
-      setNotice({ type: 'success', message: '提醒任务已删除' });
-      await loadTasks();
-    } catch (error) { setNotice({ type: 'error', message: requestError(error, '删除失败', true) }); }
-    finally { setPendingTask(null); }
+    await confirmation.run({ title: "删除周期事务及历史？", description: '确定删除“' + task.name + '”及其历史记录吗？', confirmLabel: "删除周期事务" }, async () => {
+      setPendingTask(task.id);
+      try {
+        const response = await fetch('/api/cycle-reminders/' + task.id, { method: 'DELETE', headers: authHeaders() });
+        if (!response.ok) throw new Error('删除失败');
+        setNotice({ type: 'success', message: '提醒任务已删除' });
+        await loadTasks();
+      } catch (error) { setNotice({ type: 'error', message: requestError(error, '删除失败', true) });  throw error; }
+      finally { setPendingTask(null); }
+    });
   };
 
   const sendTestEmail = async () => {
@@ -373,7 +376,7 @@ export function ReminderPage() {
   };
 
   return (
-    <div className="reminder-page">
+    <div className="reminder-page">{confirmation.dialog}
       <main className="reminder-content">
         <section className="reminder-hero"><div><div className="eyebrow">PERSONAL OPERATIONS</div><h1>周期提醒</h1></div><button className="primary-button" onClick={() => openCreate()}>+ 新建提醒</button></section>
 
@@ -401,7 +404,7 @@ export function ReminderPage() {
         )}
       </main>
 
-      {formOpen && <OrbitDialog className="reminder-setup-dialog" label={editing ? '编辑周期提醒' : '新建周期提醒'} onClose={() => setFormOpen(false)} busy={saving} error={notice?.type === 'error' ? notice.message : undefined} canClose={() => JSON.stringify(form) === formBaseline.current || window.confirm('有未保存的修改，确定放弃吗？')}>{close => <>
+      {formOpen && <OrbitDialog className="reminder-setup-dialog" label={editing ? '编辑周期提醒' : '新建周期提醒'} onClose={() => setFormOpen(false)} busy={saving} error={notice?.type === 'error' ? notice.message : undefined} discardMessage="放弃修改后，尚未保存的内容将丢失。是否继续？" canClose={() => JSON.stringify(form) === formBaseline.current}>{close => <>
         <form ref={setFormContainer} className="reminder-modal reminder-setup" onSubmit={saveTask} onInvalidCapture={event => {
           const details = (event.target as HTMLElement).closest('details');
           if (details) details.open = true;
@@ -468,7 +471,7 @@ export function ReminderPage() {
         </form>
       </>}</OrbitDialog>}
 
-      {completeTarget && <OrbitDialog label="登记完成" busy={saving} error={notice?.type === 'error' ? notice.message : undefined} onClose={() => { setCompleteTarget(null); if (registeredCompletion) void loadTasks(); }} canClose={() => !(completeNote || completeAmount || completeBillDate || completeFiles.length || completeDate !== today()) || window.confirm('有未保存的完成记录，确定放弃吗？')}>{close => <div className="complete-modal completion-proof-modal"><div className="complete-icon"><CheckCircle2 size={24} /></div><h2>登记“{completeTarget.name}”已完成</h2><p>{completeTarget.type === 'sim' ? '请填写实际充值、消费或其他有效操作日期。' : '可同时登记金额、账单日期和完成证明。'}</p>{notice?.type === 'error' && <p className="orbit-inline-error" role="alert">{notice.message}</p>}{registeredCompletion && <p role="status">完成已经登记；当前仅补传证明附件。</p>}<fieldset disabled={saving} className="orbit-form-fields completion-proof-grid"><label className="form-label">实际完成日期<input disabled={!!registeredCompletion} type="date" value={completeDate} onChange={event => setCompleteDate(event.target.value)} /></label><label className="form-label">金额（元，可选）<input disabled={!!registeredCompletion} inputMode="decimal" value={completeAmount} onChange={event => setCompleteAmount(event.target.value)} placeholder="例如 128.50" /></label><label className="form-label">账单日期（可选）<input disabled={!!registeredCompletion} type="date" value={completeBillDate} onChange={event => setCompleteBillDate(event.target.value)} /></label><label className="form-label full">备注（可选）<textarea disabled={!!registeredCompletion} value={completeNote} onChange={event => setCompleteNote(event.target.value)} placeholder="例如：已开启自动还款" rows={3} /></label><label className="form-label full completion-file-picker">完成证明附件<input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" onChange={event => setCompleteFiles(Array.from(event.target.files || []).slice(0, 5))} />{completeFiles.length > 0 && <small>{completeFiles.map(file => file.name).join('、')}</small>}</label></fieldset><div className="modal-foot"><button className="secondary-button" onClick={close} disabled={saving}>取消</button><button className="primary-button" onClick={completeTask} disabled={saving}>{saving ? '保存中…' : registeredCompletion ? '重试保存附件' : '确认完成'}</button></div></div>}</OrbitDialog>}
+      {completeTarget && <OrbitDialog label="登记完成" busy={saving} error={notice?.type === 'error' ? notice.message : undefined} onClose={() => { setCompleteTarget(null); if (registeredCompletion) void loadTasks(); }} discardMessage="放弃修改后，尚未保存的内容将丢失。是否继续？" canClose={() => !(completeNote || completeAmount || completeBillDate || completeFiles.length || completeDate !== today())}>{close => <div className="complete-modal completion-proof-modal"><div className="complete-icon"><CheckCircle2 size={24} /></div><h2>登记“{completeTarget.name}”已完成</h2><p>{completeTarget.type === 'sim' ? '请填写实际充值、消费或其他有效操作日期。' : '可同时登记金额、账单日期和完成证明。'}</p>{notice?.type === 'error' && <p className="orbit-inline-error" role="alert">{notice.message}</p>}{registeredCompletion && <p role="status">完成已经登记；当前仅补传证明附件。</p>}<fieldset disabled={saving} className="orbit-form-fields completion-proof-grid"><label className="form-label">实际完成日期<input disabled={!!registeredCompletion} type="date" value={completeDate} onChange={event => setCompleteDate(event.target.value)} /></label><label className="form-label">金额（元，可选）<input disabled={!!registeredCompletion} inputMode="decimal" value={completeAmount} onChange={event => setCompleteAmount(event.target.value)} placeholder="例如 128.50" /></label><label className="form-label">账单日期（可选）<input disabled={!!registeredCompletion} type="date" value={completeBillDate} onChange={event => setCompleteBillDate(event.target.value)} /></label><label className="form-label full">备注（可选）<textarea disabled={!!registeredCompletion} value={completeNote} onChange={event => setCompleteNote(event.target.value)} placeholder="例如：已开启自动还款" rows={3} /></label><label className="form-label full completion-file-picker">完成证明附件<input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" onChange={event => setCompleteFiles(Array.from(event.target.files || []).slice(0, 5))} />{completeFiles.length > 0 && <small>{completeFiles.map(file => file.name).join('、')}</small>}</label></fieldset><div className="modal-foot"><button className="secondary-button" onClick={close} disabled={saving}>取消</button><button className="primary-button" onClick={completeTask} disabled={saving}>{saving ? '保存中…' : registeredCompletion ? '重试保存附件' : '确认完成'}</button></div></div>}</OrbitDialog>}
     </div>
   );
 }
