@@ -8,6 +8,7 @@ import { createApp } from './app.js';
 import { createAuth } from './auth.js';
 import { createProjectEvolutionRouter, validateEvolution } from './project-evolution.js';
 import { architectureChanges, type EvolutionData } from '../src/types/project-evolution.js';
+import { architectureFocus, architectureGroups, storySnapshots } from '../src/utils/evolution-presentation.js';
 import { collectFact, isSource, nonemptyLines } from '../scripts/project-evolution-lib.js';
 
 const readData = () => JSON.parse(fs.readFileSync('project-evolution/generated.json', 'utf8')) as EvolutionData;
@@ -81,4 +82,23 @@ test('evolution API requires valid active account, shares only project facts and
     const failed = await request(auth.signUserToken(users[1])); assert.equal(failed.status, 503);
     assert.deepEqual(await failed.json(), { error: '项目成长记录暂不可用，请稍后重试' });
   } finally { listener.closeAllConnections(); await new Promise<void>(resolve => listener.close(() => resolve())); fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+test('story projection preserves chronological references and accounts for every historical relation', () => {
+  const data = readData(), before = JSON.stringify(data), sequence = storySnapshots(data);
+  assert.equal(sequence.length, 5);
+  assert.equal(sequence.at(-1)?.id, data.snapshots.at(-1)?.id);
+  assert.deepEqual(sequence.map(s => data.snapshots.indexOf(s)), [...sequence.map(s => data.snapshots.indexOf(s))].sort((a, b) => a - b));
+  data.snapshots.forEach((snapshot, index) => {
+    const diff = architectureChanges(data.snapshots[index - 1], snapshot), projection = architectureGroups(diff);
+    assert.equal(projection.groups.reduce((sum, group) => sum + group.nodes.length, 0), diff.nodes.length);
+    assert.equal(projection.relations.reduce((sum, edge) => sum + edge.count, 0), diff.edges.length);
+    for (const node of diff.nodes) {
+      const focus = architectureFocus(diff, node.id), grouped = architectureGroups(diff, node.id);
+      assert.ok(focus.nodes.has(node.id));
+      assert.ok(focus.edges.every(edge => edge.source === node.id || edge.target === node.id));
+      assert.equal(grouped.relations.reduce((sum, edge) => sum + edge.focused, 0), focus.edges.length);
+    }
+  });
+  assert.equal(JSON.stringify(data), before, 'Presentation cannot rewrite historical facts or positions');
 });

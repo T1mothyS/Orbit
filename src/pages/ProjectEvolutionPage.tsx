@@ -1,8 +1,9 @@
 import { ReturnToToday } from '../components/ReturnToToday';
 import { useEvolutionAdvance,useReducedMotion,useVisibleMotion } from '../hooks/useEvolutionMotion';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowUpRight, GitCommitHorizontal, Layers, Play, Pause } from 'lucide-react';
+import { ArrowUpRight, GitCommitHorizontal, Layers, Play, Pause, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { architectureFocus, architectureGroups, storySnapshots } from '../utils/evolution-presentation';
 import { APP_CONFIG } from '../config';
 import { getStoredAuthHeaders } from '../hooks/useAuth';
 import { architectureChanges, type EvolutionData, type EvolutionMilestone, type EvolutionSnapshot } from '../types/project-evolution';
@@ -33,6 +34,8 @@ function ProjectEvolutionContent() {
   const reduced=useReducedMotion();
   const [playing,setPlaying]=useState(()=>!params.has('milestone')&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [playbackRound,setPlaybackRound]=useState(0);
+  const [playbackMode, setPlaybackMode] = useState<'story' | 'history'>('story');
+  const sequence = useMemo(() => data ? playbackMode === 'story' ? storySnapshots(data) : data.snapshots : [], [data, playbackMode]);
   const [autoIndex,setAutoIndex]=useState(0),[selection,setSelection]=useState(params.get('milestone')||'');
   const mapSection=useRef<HTMLElement>(null),motionVisible=useVisibleMotion(mapSection),linked=useRef(false);
 
@@ -54,7 +57,7 @@ function ProjectEvolutionContent() {
   }, [attempt]);
   const selected = data?.milestones.find(m => m.id === params.get('milestone')) ?? data?.milestones.at(-1);
   const invalid = !!data && ((params.has('milestone') && !data.milestones.some(m => m.id === params.get('milestone'))) || (params.has('view') && !['growth', 'architecture'].includes(params.get('view')!)));
-  const milestone = invalid ? data?.milestones.at(-1) : playing ? data?.milestones.find(m=>m.id===data.snapshots[autoIndex]?.milestone) : data?.milestones.find(m=>m.id===selection)||selected;
+  const milestone = invalid ? data?.milestones.at(-1) : playing ? data?.milestones.find(m=>m.id===sequence[autoIndex]?.milestone) : data?.milestones.find(m=>m.id===selection)||selected;
   const select = (id:string) => {setPlaying(false);setSelection(id);setCopyStatus('');setParams({milestone:id});};
   useEffect(()=>{const id=params.get('milestone');if(id){setSelection(id);setPlaying(false);}},[params]);
   useEffect(()=>{if(reduced){setPlaying(false);setSelection(params.get('milestone')||data?.milestones.at(-1)?.id||'');}},[reduced,data]);
@@ -67,11 +70,23 @@ function ProjectEvolutionContent() {
   }, [data]);
   const snapshot = data?.snapshots.find(s => s.id === milestone?.snapshot);
   const snapshotIndex = data?.snapshots.findIndex(s => s.id === snapshot?.id) ?? 0;
-  const prior = data?.snapshots[snapshotIndex - 1];
-  const additions=snapshot?.nodes.filter(n=>!prior?.nodes.some(old=>old.id===n.id)).length||0;
-  useEvolutionAdvance(`${snapshot?.id||''}:${playbackRound}`,playing&&motionVisible,3000+(reduced?0:600+additions*180),()=>setAutoIndex(index=>data?(index+1)%data.snapshots.length:0));
-  const pause=()=>{setPlaying(false);if(milestone)setSelection(milestone.id);};
-  const togglePlayback=()=>{if(playing)pause();else{setAutoIndex(Math.max(0,snapshotIndex));setPlaybackRound(round=>round+1);setPlaying(true);const next=new URLSearchParams(params);next.delete('milestone');setParams(next,{replace:true});}};
+  const sequenceIndex = sequence.findIndex(item => item.id === snapshot?.id);
+  const prior = playbackMode === 'story' && sequenceIndex >= 0 ? sequence[sequenceIndex - 1] : data?.snapshots[snapshotIndex - 1];
+  const additions = snapshot?.nodes.filter(n => !prior?.nodes.some(old => old.id === n.id)).length || 0;
+  const pause = () => { setPlaying(false); if (milestone) setSelection(milestone.id); };
+  useEvolutionAdvance(`${snapshot?.id || ''}:${playbackRound}`, playing && motionVisible, 4000 + (reduced ? 0 : 600 + Math.min(additions, 8) * 120), () => {
+    if (autoIndex + 1 >= sequence.length) pause(); else setAutoIndex(index => index + 1);
+  });
+  const startPlayback = (index: number) => {
+    setAutoIndex(index); setPlaybackRound(round => round + 1); setPlaying(true);
+    const next = new URLSearchParams(params); next.delete('milestone'); setParams(next, { replace: true });
+  };
+  const togglePlayback = () => { if (playing) pause(); else startPlayback(sequenceIndex < 0 || sequenceIndex === sequence.length - 1 ? 0 : sequenceIndex); };
+  const move = (direction: number) => {
+    const list = data?.snapshots || [], target = list[Math.max(0, Math.min(list.length - 1, snapshotIndex + direction))];
+    if (target) select(target.milestone);
+  };
+
 
   useEffect(() => {
     if (!fact) return;
@@ -97,11 +112,19 @@ function ProjectEvolutionContent() {
       <div className="evolution-stats"><div><strong>{data.milestones.length}</strong><span>关键里程碑</span></div><div><strong>{new Set(data.milestones.flatMap(m => m.featureAreas)).size}</strong><span>能力领域</span></div><div><strong>{data.snapshots.length}</strong><span>架构快照</span></div><p>代码记录证明能力的演进。<br />生产部署与设备验收，需要各自的证据。</p></div>
       <nav className="evolution-stages" aria-label="成长阶段">{data.stages.map((stage, i) => <button key={stage} aria-pressed={milestone.stage === i} onClick={() => { const target = data.milestones.find(m => m.stage === i); if (target) select(target.id); }}><span>0{i + 1}</span>{stage}<ArrowUpRight size={14} /></button>)}</nav>
       <section id="evolution-architecture" data-playback-active={playing&&motionVisible} ref={mapSection} className="evolution-playback-section">
-      <header className="evolution-playback-header"><div><h2><Layers size={21}/>架构演化</h2><p>{playing?'沿着历史，看系统逐步连接。':'已定格，选择节点查看职责与连接。'}</p></div><div className="evolution-playback-actions"><span>{snapshotIndex+1} / {data.snapshots.length}</span>{playing?<Tooltip content="暂停架构播放"><IconButton label="暂停架构播放" variant="quiet" onClick={togglePlayback}><Pause size={17}/></IconButton></Tooltip>:<Button variant="quiet" leadingIcon={<Play size={16}/>} onClick={togglePlayback}>{reduced?'播放历史':'继续播放'}</Button>}</div></header>
-      <div className="evolution-playback-progress" aria-hidden="true"><span style={{transform:`scaleX(${(snapshotIndex+1)/data.snapshots.length})`}}/></div>
+      <header className="evolution-playback-header"><div><h2><Layers size={21} />架构演化</h2><p>{playing ? '沿着历史，看系统逐步连接。' : '已定格，选择节点查看职责与连接。'}</p></div><div className="evolution-playback-actions">
+        <span>{snapshotIndex + 1} / {data.snapshots.length}</span>
+        <Tooltip content="上一快照"><IconButton label="上一快照" variant="quiet" disabled={snapshotIndex <= 0} onClick={() => move(-1)}><ChevronLeft size={17} /></IconButton></Tooltip>
+        {playing ? <Tooltip content="暂停架构播放"><IconButton label="暂停架构播放" variant="quiet" onClick={togglePlayback}><Pause size={17} /></IconButton></Tooltip> : <Button variant="quiet" leadingIcon={<Play size={16} />} onClick={togglePlayback}>{reduced ? '播放历史' : '继续播放'}</Button>}
+        <Tooltip content="下一快照"><IconButton label="下一快照" variant="quiet" disabled={snapshotIndex >= data.snapshots.length - 1} onClick={() => move(1)}><ChevronRight size={17} /></IconButton></Tooltip>
+        <Tooltip content="重新播放"><IconButton label="重新播放" variant="quiet" onClick={() => startPlayback(0)}><RotateCcw size={16} /></IconButton></Tooltip>
+      </div></header>
+      <div className="evolution-playback-progress" aria-hidden="true"><span style={{ transform: `scaleX(${(snapshotIndex + 1) / data.snapshots.length})` }} /></div>
+      <div className="evolution-playback-mode" role="group" aria-label="演示范围"><Button variant="quiet" aria-pressed={playbackMode === 'story'} onClick={() => { pause(); setPlaybackMode('story'); }}>精选演示 · {storySnapshots(data).length} 站</Button><Button variant="quiet" aria-pressed={playbackMode === 'history'} onClick={() => { pause(); setPlaybackMode('history'); }}>完整历史 · {data.snapshots.length} 个快照</Button><span>能力阶段可以交叉，播放顺序按历史排列</span></div>
       {invalid && <p role="status" className="evolution-notice">链接中的选择无效，已显示最新收录记录。<Button variant="quiet" onClick={() => select(milestone.id)}>重置链接</Button></p>}
       <div className="evolution-selection" onPointerDownCapture={pause} onFocusCapture={pause}><label htmlFor="evolution-milestone">当前里程碑</label><select id="evolution-milestone" value={milestone.id} onChange={e => select(e.target.value)}>{data.milestones.map(m => <option value={m.id} key={m.id}>{day(data.facts.find(f => f.id === m.id)!.date)} · {m.title}</option>)}</select></div>
-      <Architecture data={data} current={snapshot} previous={prior} playing={playing&&!reduced} motionActive={motionVisible} onPause={pause}/>
+      <Architecture data={data} current={snapshot} previous={prior} playing={playing&&!reduced} motionActive={motionVisible} onPause={pause} milestone={milestone}/>
+      <nav className="evolution-story-stops" aria-label="精选演示停靠点">{storySnapshots(data).map((stop, index) => { const entry = data.milestones.find(m => m.id === stop.milestone)!; return <Button key={stop.id} variant="quiet" aria-pressed={snapshot.id === stop.id} onClick={() => { setPlaybackMode('story'); select(stop.milestone); }}><span>{index + 1}</span>{data.stages[entry.stage]}{index === storySnapshots(data).length - 1 ? ' · 今天' : ''}</Button>; })}</nav>
       </section>
       <section id="evolution-growth" className="evolution-growth-section"><h2>成长历程</h2>
         <div className="evolution-workbench">
@@ -158,23 +181,49 @@ function Metrics({ data, selectedId }: { data: EvolutionData; selectedId: string
   </section>;
 }
 
-function Architecture({ data, current, previous, playing, motionActive, onPause }: { data: EvolutionData; current: EvolutionSnapshot; previous?: EvolutionSnapshot; playing:boolean;motionActive:boolean;onPause:()=>void }) {
-  const diff = architectureChanges(previous, current);
-  const [selectedNode, setSelectedNode] = useState(diff.nodes[0]?.id);
-  const [zoom, setZoom] = useState(1);
-  const [showMap, setShowMap] = useState(true);
-  useEffect(()=>{if(!diff.nodes.some(n=>n.id===selectedNode))setSelectedNode(diff.nodes[0]?.id);},[current.id]);
-  const newNodes=diff.nodes.filter(n=>n.change==='added');
+function Architecture({ data, current, previous, playing, motionActive, onPause, milestone }: { data: EvolutionData; current: EvolutionSnapshot; previous?: EvolutionSnapshot; playing: boolean; motionActive: boolean; onPause: () => void; milestone: EvolutionMilestone }) {
+  const diff = useMemo(() => architectureChanges(previous, current), [previous, current]);
+  const [selectedNode, setSelectedNode] = useState<string>();
+  const [full, setFull] = useState(false), [zoom, setZoom] = useState(1);
+  const viewport = useRef<HTMLDivElement>(null), overview = useRef<HTMLDivElement>(null);
+  const [geometry, setGeometry] = useState<{ width: number; height: number; positions: Record<string, { x: number; y: number }> }>({ width: 1, height: 1, positions: {} });
   const node = diff.nodes.find(n => n.id === selectedNode);
+  const focus = useMemo(() => architectureFocus(diff, selectedNode), [diff, selectedNode]);
+  const projection = useMemo(() => architectureGroups(diff, selectedNode), [diff, selectedNode]);
+  const newNodes = diff.nodes.filter(n => n.change === 'added');
   const origin = data.milestones.find(m => m.id === current.milestone)!;
   const first = node && data.snapshots.find(s => s.nodes.some(n => n.id === node.id));
   const firstMilestone = data.milestones.find(m => m.id === first?.milestone);
   const height = Math.max(240, ...diff.nodes.map(n => n.y + 100));
-  return <section className={`evolution-architecture${playing?' is-playing':''}`} style={{animationPlayState:motionActive?'running':'paused'}} onFocusCapture={event=>{if((event.target as HTMLElement).closest('.evolution-node,.evolution-node-list'))onPause();}}><div className="evolution-detail-heading"><div><h2>这一刻，系统怎样连接</h2><p>快照来源：{origin.title}<br />{previous ? `对比：${data.milestones.find(m => m.id === previous.milestone)?.title}` : '第一个可追溯快照；新增表示此时已可证实存在。'}</p></div><div className="evolution-legend">{Object.entries(changes).map(([key, label]) => <span className={`change-${key}`} key={key}>{label} {diff.nodes.filter(n => n.change === key).length}</span>)}</div></div>
-    <button className="evolution-map-toggle" onClick={() => setShowMap(v => !v)} aria-expanded={showMap}>{showMap ? '收起完整图' : '展开完整图'}</button>
-    <div className={`evolution-map-area ${showMap ? 'is-open' : ''}`}><div className="evolution-map-controls"><button onClick={() => setZoom(z => Math.max(0.5, z - 0.25))} disabled={zoom <= 0.5} aria-label="缩小架构图">−</button><span>{Math.round(zoom * 100)}%</span><button onClick={() => setZoom(z => Math.min(1.5, z + 0.25))} disabled={zoom >= 1.5} aria-label="放大架构图">＋</button><button onClick={() => setZoom(1)}>复位</button></div>
-      <div className="evolution-map-scroll" tabIndex={0} aria-label="架构图，可在容器内滚动"><div style={{ width: 1110 * zoom, height: height * zoom }}><div className="evolution-map" style={{ width: 1110, height, transform: `scale(${zoom})` }}>{Object.entries(groups).map(([key, label], i) => <span className="evolution-map-group" style={{ left: [25, 300, 580, 860][i] }} key={key}>{label}</span>)}<svg width="1110" height={height} aria-hidden="true">{diff.edges.map(e => { const a = diff.nodes.find(n => n.id === e.source)!, b = diff.nodes.find(n => n.id === e.target)!; return <g key={e.id}><path key={`${current.id}:${e.id}`} pathLength="1" style={{animationDelay:`${Math.max(0,newNodes.findIndex(n=>n.id===e.source),newNodes.findIndex(n=>n.id===e.target))*180+200}ms`,animationPlayState:motionActive?'running':'paused'}} className={`architecture-edge change-${e.change}`} d={edgePath(a, b)} /><title>{a.label} → {b.label}：{changes[e.change]}</title></g>; })}</svg>{diff.nodes.map(n => <Button variant="quiet" key={n.id} style={{ left:n.x,top:n.y,animationDelay:`${Math.max(0,newNodes.findIndex(node=>node.id===n.id))*180}ms`,animationPlayState:motionActive?'running':'paused'}} className={`evolution-node change-${n.change}`} aria-pressed={n.id === selectedNode} onClick={() => {onPause();setSelectedNode(n.id);}}><strong>{n.label}</strong><span>{changes[n.change]}</span></Button>)}</div></div></div>
-    </div>
-    <div className="evolution-architecture-bottom"><nav className="evolution-node-list" aria-label="架构模块">{Object.entries(groups).map(([group, label]) => <div key={group}><h3>{label}</h3>{diff.nodes.filter(n => n.group === group).map(n => <Button variant="quiet" key={n.id} onClick={() => {onPause();setSelectedNode(n.id);}} aria-pressed={selectedNode === n.id}>{n.label}<span className={`change-${n.change}`}>{changes[n.change]}</span></Button>)}</div>)}</nav>{node && <article className="evolution-node-detail" aria-live={playing?'off':'polite'}><span className="evolution-eyebrow">{groups[node.group]} · {changes[node.change]}</span><h3>{node.label}</h3><p>{node.description}</p><p><strong>最早可证实：</strong>{firstMilestone?.title ?? '未记录'}</p><p><strong>连接模块：</strong>{diff.edges.filter(e => e.source === node.id || e.target === node.id).map(e => diff.nodes.find(n => n.id === (e.source === node.id ? e.target : e.source))?.label).join('、') || '无'}</p><p className="evolution-muted">结构图表示职责与集成关系，不代表所有外部服务已部署或设备已验收。</p></article>}</div>
+  useEffect(() => { if (!diff.nodes.some(n => n.id === selectedNode)) setSelectedNode(undefined); }, [diff, selectedNode]);
+  const choose = (id: string) => { onPause(); setSelectedNode(id); };
+  useLayoutEffect(() => {
+    const element = overview.current; if (!element || full) return;
+    const measure = () => {
+      const rect = element.getBoundingClientRect(); if (!rect.width || !rect.height) return;
+      const positions: Record<string, { x: number; y: number }> = {};
+      element.querySelectorAll<HTMLElement>('[data-group]').forEach(item => { const bounds = item.getBoundingClientRect(); positions[item.dataset.group!] = { x: bounds.left - rect.left + bounds.width / 2, y: bounds.top - rect.top + bounds.height / 2 }; });
+      setGeometry({ width: rect.width, height: rect.height, positions });
+    };
+    measure(); const observer = new ResizeObserver(measure); observer.observe(element); return () => observer.disconnect();
+  }, [full, current.id]);
+  useLayoutEffect(() => {
+    const element = viewport.current; if (!element || !full) return;
+    const fit = () => { if (element.clientWidth && element.clientHeight) setZoom(Math.max(.95, Math.min(1, element.clientWidth / 1110, element.clientHeight / height))); };
+    fit(); const observer = new ResizeObserver(fit); observer.observe(element); return () => observer.disconnect();
+  }, [full, height]);
+  return <section className={`evolution-architecture${playing ? ' is-playing' : ''}`} onFocusCapture={event => { if ((event.target as HTMLElement).closest('.evolution-node,.evolution-node-list,.evolution-overview-group')) onPause(); }}>
+    <div className="evolution-story-layout"><div className="evolution-diagram-column"><div className="evolution-diagram-toolbar"><h3>{full ? '完整架构' : node ? `聚焦：${node.label}` : '这一刻，系统怎样连接'}</h3><Button variant="quiet" onClick={() => { onPause(); setFull(value => !value); }}>{full ? '返回概览' : '查看完整架构'}</Button></div>
+      {full ? <div className="evolution-full-map"><div className="evolution-map-controls"><Button aria-label="缩小架构图" disabled={zoom <= .5} onClick={() => setZoom(z => Math.max(.5, z - .1))}>−</Button><span>{Math.round(zoom * 100)}%</span><Button aria-label="放大架构图" disabled={zoom >= 1.5} onClick={() => setZoom(z => Math.min(1.5, z + .1))}>＋</Button><Button onClick={() => { const element = viewport.current; if (element) { setZoom(Math.max(.95, Math.min(1, element.clientWidth / 1110, element.clientHeight / height))); element.scrollTo(0, 0); } }}>复位</Button></div>
+        <div ref={viewport} className="evolution-map-scroll" tabIndex={0} aria-label="完整架构图，可在容器内滚动"><div style={{ width: 1110 * zoom, height: height * zoom }}><div className="evolution-map" style={{ width: 1110, height, transform: `scale(${zoom})` }}>{Object.entries(groups).map(([key, label], i) => <span className="evolution-map-group" style={{ left: [25, 300, 580, 860][i] }} key={key}>{label}</span>)}<svg width="1110" height={height} aria-hidden="true">{diff.edges.map(e => { const a = diff.nodes.find(n => n.id === e.source)!, b = diff.nodes.find(n => n.id === e.target)!; return <path key={`${current.id}:${e.id}`} data-edge={e.id} pathLength="1" style={{ animationDelay: `${Math.min(7, Math.max(0, newNodes.findIndex(n => n.id === e.source), newNodes.findIndex(n => n.id === e.target))) * 120 + 200}ms`, animationPlayState: motionActive ? 'running' : 'paused' }} className={`architecture-edge change-${e.change}${node ? focus.edges.some(item => item.id === e.id) ? ' is-related' : ' is-muted' : ''}`} d={edgePath(a, b)}><title>{a.label} → {b.label}：{changes[e.change]}</title></path>; })}</svg>{diff.nodes.map(n => <Button variant="quiet" key={n.id} data-node={n.id} style={{ left: n.x, top: n.y, animationDelay: `${Math.min(7, Math.max(0, newNodes.findIndex(item => item.id === n.id))) * 120}ms`, animationPlayState: motionActive ? 'running' : 'paused' }} className={`evolution-node change-${n.change}${node && !focus.nodes.has(n.id) ? ' is-muted' : ''}`} aria-pressed={n.id === selectedNode} onClick={() => choose(n.id)}><strong>{n.label}</strong><span>{changes[n.change]}</span></Button>)}</div></div></div><p className="evolution-muted">保留可读字号，可在完整图内滚动。缩放不改变历史坐标。</p></div>
+      : <div ref={overview} className="evolution-overview" aria-label={node ? `${node.label}及直接连接概览` : '系统分组概览'}><svg className="evolution-overview-edges" viewBox={`0 0 ${geometry.width} ${geometry.height}`} aria-hidden="true">{projection.relations.filter((e, i, all) => e.source !== e.target && !all.slice(0, i).some(prior => prior.source === e.target && prior.target === e.source)).map(e => { const a = geometry.positions[e.source], b = geometry.positions[e.target]; if (!a || !b) return null; const reverse = projection.relations.find(item => item.source === e.target && item.target === e.source); const count = e.count + (reverse?.count || 0); const horizontal = Math.abs(a.y - b.y) < 5, mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; return <g key={e.id} className={node && !e.focused ? 'is-muted' : ''}><path className={`evolution-group-edge${e.focused ? ' is-related' : ''}`} d={horizontal ? `M${a.x},${a.y} H${b.x}` : `M${a.x},${a.y} V${mid.y} H${b.x} V${b.y}`} /><text x={mid.x} y={mid.y - 7 + (e.source === 'client' && e.target === 'external' ? -18 : e.source === 'server' && e.target === 'data' ? 12 : 0)} textAnchor="middle">{count}<title>{groups[e.source]}→{groups[e.target]}：{e.count} 条{reverse ? `；${groups[e.target]}→${groups[e.source]}：${reverse.count} 条` : ''}</title></text></g>; })}</svg>
+        {projection.groups.map(group => { const related = group.nodes.filter(n => !node || focus.nodes.has(n.id)), changed = related.filter(n => n.change !== 'unchanged'), featured = (changed.length ? changed : related).slice(0, 2); return <div data-group={group.id} key={group.id} className={`evolution-overview-group${group.related ? '' : ' is-muted'}${playing && changed.some(n => n.change === 'added') ? ' has-additions' : ''}`} style={{ animationPlayState: motionActive ? 'running' : 'paused' }}><h4>{groups[group.id]}<span>{node ? `${related.length} 个相关` : `${group.nodes.length} 个模块`}</span></h4>{featured.length ? featured.map(n => <Button key={n.id} variant="quiet" aria-pressed={n.id === selectedNode} onClick={() => choose(n.id)}><span>{n.label}</span><small className={`change-${n.change}`}>{changes[n.change]}</small></Button>) : <p>此时尚无{node ? '直接关联' : '记录'}</p>}<small>{projection.relations.filter(e => e.source === group.id && e.target === group.id).reduce((sum, e) => sum + e.count, 0)} 条组内连接{related.length > featured.length ? ` · 其余 ${related.length - featured.length}` : ''}</small></div>; })}
+      </div>}</div>
+      <div className="evolution-story-copy"><div className="evolution-stage-title">{data.stages[milestone.stage]}</div><h2>{milestone.title}</h2><p className="evolution-story-summary">{milestone.summary}</p>
+        <div className="evolution-legend">{Object.entries(changes).map(([key, label]) => <span className={`change-${key}`} key={key}>{label} {diff.nodes.filter(n => n.change === key).length}</span>)}</div><p className="evolution-comparison">快照：{origin.title}<br />{previous ? `对比：${data.milestones.find(m => m.id === previous.milestone)?.title}` : '第一个可追溯快照；新增表示此时已有证据。'}</p>
+        {node && <article className="evolution-node-detail" aria-live={playing ? 'off' : 'polite'}><div className="evolution-diagram-toolbar"><h3>{node.label}</h3><Button variant="quiet" onClick={() => { onPause(); setSelectedNode(undefined); }}>清除聚焦</Button></div><p className={`change-${node.change}`}>{groups[node.group]} · {changes[node.change]}</p><p>{node.description}</p><p><strong>最早可证实：</strong>{firstMilestone?.title ?? '未记录'}</p><div className="evolution-related-list"><strong>直接连接：</strong>{focus.edges.length ? focus.edges.map(e => { const other = diff.nodes.find(n => n.id === (e.source === node.id ? e.target : e.source))!; return <Button variant="quiet" key={e.id} onClick={() => choose(other.id)}>{e.source === node.id ? '→' : '←'} {other.label}{e.label ? ` · ${e.label}` : ''}</Button>; }) : <span>无</span>}</div></article>}
+        <nav className="evolution-node-list" aria-label="架构模块">{Object.entries(groups).map(([group, label]) => <div key={group}><h3>{label}</h3>{diff.nodes.filter(n => n.group === group).map(n => <Button variant="quiet" key={n.id} onClick={() => choose(n.id)} aria-pressed={selectedNode === n.id}>{n.label}<span className={`change-${n.change}`}>{changes[n.change]}</span></Button>)}</div>)}</nav>
+        <p className="evolution-muted">结构与历史证据不代表外部服务已部署或设备已验收。</p>
+      </div></div>
   </section>;
 }
