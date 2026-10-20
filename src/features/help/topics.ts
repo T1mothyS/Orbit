@@ -1,12 +1,12 @@
 /** Controlled product questions only. The help page never starts an AI request. */
 export const helpTopics = [
-  { id: 'schedule', title: '日程与待办', description: '在日程页创建和编辑事项；AI 生成的草稿需要你确认后才会写入。无固定日期的待办可放在挂起区。', to: '/schedule', action: '打开日程', question: 'Orbit 中如何创建日程、无日期待办，并确认 AI 生成的事项？' },
-  { id: 'recurring', title: '周期事务', description: '为重复事务设置周期，逐次登记完成。完成历史和下一周期由现有规则管理。', to: '/reminders', action: '打开周期提醒', question: 'Orbit 周期事务如何设置、登记完成，以及查看历史？' },
-  { id: 'ai', title: 'AI 对话与记事', description: '在对话中描述任务；核对生成结果后再确认。记事可直接保存，发送到对话不会自动完成来源记事。', to: '/assistant', action: '打开对话', question: 'Orbit 的 AI 对话、记事和事项确认分别怎样使用？' },
-  { id: 'library', title: '知识库', description: '阅读和管理知识条目，或从“记录经历”开始复盘。仅在明确提及知识库时检索，确认前不写入。', to: '/library', action: '打开知识库', question: 'Orbit 如何查询知识库、管理条目和记录经历？' },
-  { id: 'notifications', title: '提醒与通知', description: '通知页统一管理收件邮箱、渠道和免打扰。Android 提醒需要客户端权限和设备绑定，服务端接受不等于手机已收到。', to: '/settings/notifications', action: '设置提醒', question: 'Orbit 的邮件、站内、浏览器和 Android 提醒分别在哪里配置与检查？' },
-  { id: 'reports', title: '日报与周报', description: '日报阅读、Cloud 个性化和来源接收各有独立设置。Orbit Weekly 默认关闭；保存偏好不会立即生成或补发。', to: '/settings/reports', action: '打开日报设置', question: 'Orbit 的日报阅读、个性化、邮件开关和 Orbit Weekly 如何配置？' },
-  { id: 'security', title: '账户与安全', description: '修改登录密码需要当前密码，成功后所有 Orbit 登录失效。独立日报、知识库令牌和外部授权继续保留。', to: '/settings/account', action: '打开账户与安全', question: 'Orbit 如何修改密码，哪些登录会失效，哪些独立授权继续保留？' },
+  { id: 'schedule', title: '日程与待办', description: '有明确时间的安排放进日程，暂未确定日期的任务放进挂起待办。', steps: ['打开日程，点击“添加日程”，填写标题并核对日期、时间后保存。', '没有执行期限时，选择待办和“无固定期限待办”；之后可在今日的挂起待办中查看。', '也可在 AI 对话描述安排；检查计划中的对象、日期和类型，再确认执行。'], to: '/schedule', action: '打开日程', question: 'Orbit 中如何创建日程、无日期待办，并确认 AI 生成的事项？' },
+  { id: 'recurring', title: '周期事务', description: '用周期提醒管理订阅、账单和定期事务，每次完成都留下记录。', steps: ['进入周期提醒，新建事务并选择类型，填写名称、周期和提醒设置后保存。', '完成本次事务时，点击“登记完成”，核对实际日期，按需补充金额、备注或证明附件。', '展开该事务的历史记录查看完成情况；下一周期按当前规则推进。'], to: '/reminders', action: '打开周期提醒', question: 'Orbit 周期事务如何设置、登记完成，以及查看历史？' },
+  { id: 'ai', title: 'AI 对话与记事', description: '用对话讨论和安排事情，用记事先收集想法，再决定何时处理。', steps: ['选择“指令”，输入问题或安排并发送；涉及日程的计划需核对后确认。', '选择“记事”，输入文字或附上图片，再点击保存；记事直接进入记事板。', '点击纸张图标打开记事板，编辑或发送记事到对话；发送后仍由你决定何时完成来源记事。'], to: '/assistant', action: '打开对话', question: 'Orbit 的 AI 对话、记事和事项确认分别怎样使用？' },
+  { id: 'library', title: '知识库', description: '查阅已有知识，或通过经历复盘整理值得留下的经验。', steps: ['打开知识库，用筛选与排序找到条目，点击卡片阅读正文。', '需要整理个人经历时，从头像菜单选择“记录经历”，完成复盘并核对预览后确认保存。', '在 AI 对话中明确提出查询知识库；开启自动检索时也可按上下文检索，回答后核对引用来源。'], to: '/library', action: '打开知识库', question: 'Orbit 如何查询知识库、管理条目和记录经历？' },
+  { id: 'notifications', title: '提醒与通知', description: '选择接收提醒的渠道，并设置适合自己的提醒时间和免打扰时段。', steps: ['打开通知与提醒，核对收件邮箱，以及邮件、站内和浏览器提醒开关。', '调整提醒时间和免打扰时段，保存对应设置；保存不会立即发送或补发。', 'Android 还需客户端通知权限及设备绑定；排查时分别检查网页记录、邮件收件箱或手机实际显示。'], to: '/settings/notifications', action: '设置提醒', question: 'Orbit 的邮件、站内、浏览器和 Android 提醒分别在哪里配置与检查？' },
+  { id: 'reports', title: '日报与周报', description: '阅读已保存的日报，并分别管理个性化偏好、来源接收和邮件开关。', steps: ['从主导航打开日报，按日期阅读；同一天有多个来源时可切换查看。', '进入“设置 → 日报 → 个性化”调整阅读偏好，再到“接收与邮件”管理来源和日报邮件。', 'Orbit Weekly 在“通知与提醒”中单独开启，默认关闭；保存偏好不会立即生成或补发报告。'], to: '/settings/reports', action: '打开日报设置', question: 'Orbit 的日报阅读、个性化、邮件开关和 Orbit Weekly 如何配置？' },
+  { id: 'security', title: '账户与安全', description: '在账户设置管理头像和登录密码，在个人资料页维护背景与表达偏好。', steps: ['打开账户与安全，在“账号管理”查看账户并修改头像。', '修改密码时填写当前密码和新密码，成功后需要重新登录所有 Orbit 客户端；独立接入令牌和外部授权继续保留。', '切换到“个人资料”编辑背景与表达偏好，再点击保存；离开未保存内容时可取消返回继续编辑。'], to: '/settings/account', action: '打开账户与安全', question: 'Orbit 如何修改密码，哪些登录会失效，哪些独立授权继续保留？' },
 ] as const;
 export function helpQuestion(id: unknown): string | null { return helpTopics.find(topic => topic.id === id)?.question || null; }
 export function appendHelpQuestion(text: string, question: string): string { return text.endsWith(question) ? text : text ? `${text}\n\n${question}` : question; }

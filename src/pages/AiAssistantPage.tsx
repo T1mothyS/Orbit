@@ -1,9 +1,9 @@
-import { Check, Eraser, Loader2, StickyNote } from 'lucide-react';
+import { Eraser, StickyNote } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AiNoteBoardHost, useAiNoteBoard } from '../components/AiNoteBoardHost';
 import { AiSchedulePanel, type AiSchedulePanelHandle } from '../components/AiSchedulePanel';
-import { Button, useActionConfirmation } from '../ui';
+import { IconButton, Tooltip, useActionConfirmation } from '../ui';
 
 import { OrbitScheduleEditor } from '../components/OrbitScheduleEditor';
 
@@ -35,31 +35,31 @@ export function AiAssistantPage() {
           </div>
 
           <div className="ai-assistant-topbar-actions">
-            <Button
+            <Tooltip content={resetTitle}><IconButton
               type="button"
+              variant="quiet"
               className="ai-workspace-action"
               data-confirm-action={clearKey}
               onClick={() => { void confirmation.run({key:clearKey,title:'清空当前对话？',description:'当前对话的历史记录将被清空，此操作无法撤销。',confirmLabel:'清空对话'}, async () => { setChatError(''); await chatPanelRef.current?.clearCurrentConversation(); }); }}
               disabled={resetDisabled}
-              title={resetTitle}
-              aria-label={resetTitle}
+              label={resetTitle}
+              loading={clearing}
             >
-              {clearing ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Eraser size={16} aria-hidden="true" />}
-              <span>{resetTitle}</span>
-            </Button>
-            <button
+              <Eraser size={20} aria-hidden="true" />
+            </IconButton></Tooltip>
+            <Tooltip content="打开 AI 记事板"><IconButton
               type="button"
+              variant="quiet"
               className="ai-workspace-action ai-workspace-note-action"
               onClick={noteBoard.toggleDrawer}
               aria-expanded={noteBoard.drawerOpen}
               aria-controls="ai-note-board"
-              title="打开 AI 记事板"
-              aria-label="打开 AI 记事板"
+              aria-pressed={noteBoard.drawerOpen}
+              label="打开 AI 记事板"
             >
-              <StickyNote size={16} aria-hidden="true" />
-              <span>记事板</span>
+              <StickyNote size={20} aria-hidden="true" />
               {noteBoard.pendingCount > 0 && <em aria-label={`${noteBoard.pendingCount} 条未完成记事`}>{noteBoard.pendingCount}</em>}
-            </button>
+            </IconButton></Tooltip>
           </div>
         </header>
         <section

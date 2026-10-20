@@ -1,6 +1,8 @@
 /* Shared secondary surfaces: filtering, image viewing and clipboard fallback. */
 .mobile-filter-trigger { display:none !important; }
 .filter-count { display:inline-grid; place-items:center; min-width:18px; height:18px; padding:0 4px; border-radius:50px; background:var(--td-brand-color-light); color:var(--td-brand-color); font-size:11px; }
+.daily-report-toolbar-actions .mobile-filter-trigger { position: relative; }
+.daily-report-toolbar-actions .filter-count { position: absolute; top: 0; right: 0; pointer-events: none; }
 .compact-filter-hint,.note-copy-sheet p { font-size:12px; color:var(--td-text-color-secondary); line-height:1.6; margin:0; }
 .library-filters label { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--td-text-color-secondary); }
 .report-view-status { display:inline-block; margin-top:4px; color:var(--td-text-color-secondary); font-size:12px; }

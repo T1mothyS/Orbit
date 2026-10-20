@@ -199,10 +199,8 @@
 .ai-assistant-tab:hover { color: var(--td-text-color-primary); background: var(--td-bg-color-component-hover); }
 .ai-assistant-tab.active { border-color: color-mix(in srgb, var(--td-brand-color) 35%, var(--td-component-stroke)); color: var(--td-brand-color); background: var(--td-brand-color-light); }
 .ai-assistant-topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
-.ai-workspace-action { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; position: relative; padding: 0 10px; border: 1px solid transparent; border-radius: 10px; color: var(--td-text-color-secondary); background: transparent; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; }
-.ai-workspace-action:hover:not(:disabled), .ai-workspace-action[aria-expanded="true"] { border-color: rgba(124, 58, 237, .22); color: #7c3aed; background: rgba(124, 58, 237, .08); }
-.ai-workspace-action:disabled { color: var(--td-text-color-disabled); cursor: not-allowed; opacity: .7; }
-.ai-workspace-action em { min-width: 17px; height: 17px; display: inline-grid; place-items: center; padding-inline: 4px; border: 2px solid var(--td-bg-color-container); border-radius: 999px; color: #fff; background: #7c3aed; font-size: 10px; font-style: normal; line-height: 1; }
+.ai-workspace-action { position: relative; }
+.ai-workspace-action em { position: absolute; top: 0; right: 0; min-width: 17px; height: 17px; display: inline-grid; place-items: center; padding-inline: 4px; border-radius: var(--orbit-radius-full); color: var(--orbit-on-brand); background: var(--orbit-brand); font-size: 10px; font-style: normal; line-height: 1; pointer-events: none; }
 .ai-assistant-tool-content { min-width: 0; min-height: 0; display: flex; flex: 1 1 auto; overflow: hidden; }
 .ai-assistant-tool-content > .ai-import-page { width: 100%; min-width: 0; min-height: 0; height: 100%; flex: 1 1 auto; box-sizing: border-box; }
 .ai-import-tutorial, .ai-import-page > .ai-import-card { max-width: 1180px; margin-inline: auto; }

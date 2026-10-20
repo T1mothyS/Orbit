@@ -8,7 +8,7 @@ import './settings-frame.css';
 
 export const SettingsHeadingHelp = createContext<(help: ReactNode) => void>(() => {});
 
-export function SettingsFrame({ category, title, description, navigation, children, search, accountMenu }: { category?: string; title: string; description?: string; navigation: SettingsCategory[]; children: ReactNode; search?: ReactNode; accountMenu?: ReactNode; fallbackReturnTo?: string }) {
+export function SettingsFrame({ category, title, description, navigation, children, search, searchExpanded, accountMenu }: { category?: string; title: string; description?: string; navigation: SettingsCategory[]; children: ReactNode; search?: ReactNode; searchExpanded?: boolean; accountMenu?: ReactNode; fallbackReturnTo?: string }) {
   const location = useLocation(), heading = useRef<HTMLHeadingElement>(null);
   const [sectionHelp, setSectionHelp] = useState<ReactNode>();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -30,7 +30,7 @@ export function SettingsFrame({ category, title, description, navigation, childr
     return () => { clearTimeout(timer); observer.disconnect(); };
   }, [location.pathname, location.search]);
   return <div className="oui-root settings-workspace">
-    <header className="settings-workspace-topbar"><div className="settings-workspace-start"><Link to="/assistant" className="settings-workspace-brand" aria-label="Orbit 首页"><img src="/orbit-logo.png" alt="" /><strong>Orbit</strong></Link>
+    <header className="settings-workspace-topbar" data-search-expanded={searchExpanded || undefined}><div className="settings-workspace-start"><Link to="/assistant" className="settings-workspace-brand" aria-label="Orbit 首页"><img src="/orbit-logo.png" alt="" /><strong>Orbit</strong></Link>
       </div>
       {search}
       <div className="settings-workspace-actions">{accountMenu}</div>
@@ -42,7 +42,7 @@ export function SettingsFrame({ category, title, description, navigation, childr
       </div>)}</nav>
     </aside><main className="settings-workspace-main"><div className="settings-content-navigation"><ReturnToToday/>
       {category && <div className="settings-workspace-mobile-back"><TextLink to="/settings" state={navigationState}>设置</TextLink></div>}</div>
-      <header className="settings-workspace-heading"><div className="settings-heading-with-help"><h1 tabIndex={-1} ref={heading}>{title}</h1>{(description || sectionHelp) && <HelpPopover label={title}>{description && <p>{description}</p>}{sectionHelp}</HelpPopover>}</div></header>
+      <header className="settings-workspace-heading"><div className="settings-heading-with-help"><h1 tabIndex={-1} ref={heading}>{title}</h1>{category && (description || sectionHelp) && <HelpPopover label={title}>{description && <p>{description}</p>}{sectionHelp}</HelpPopover>}</div>{!category && description && <p>{description}</p>}</header>
       <SettingsHeadingHelp.Provider value={setSectionHelp}>{children}</SettingsHeadingHelp.Provider>
     </main></div>
   </div>;

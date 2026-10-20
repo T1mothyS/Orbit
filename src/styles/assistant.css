@@ -300,4 +300,16 @@
   .calendar-toolbar button { min-height: 40px; }
 }
 
-.orbit-request-quip { color:var(--orbit-text-secondary); font-size:var(--orbit-type-secondary); min-height:3.2em; line-height:1.6; margin-block:6px; overflow-wrap:anywhere; }
+.orbit-request-quip { display:flex; align-items:start; gap:var(--orbit-space-2); color:var(--orbit-text-secondary); font-size:var(--orbit-type-secondary); line-height:1.6; margin-block:var(--orbit-space-2); overflow-wrap:anywhere; }
+.orbit-quip-loading { flex:none; margin-top:var(--orbit-space-1); animation:orbit-quip-spin 2.4s linear infinite; }
+.orbit-request-quip[data-paused] .orbit-quip-loading { animation-play-state:paused; }
+.orbit-quip-copy { display:grid; min-width:0; }
+.orbit-quip-copy > span { grid-area:1 / 1; }
+.orbit-quip-size { visibility:hidden; pointer-events:none; }
+.orbit-quip-text { opacity:1; transition:opacity 180ms ease-in-out; }
+.orbit-quip-text[data-fading] { opacity:0; }
+@keyframes orbit-quip-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) {
+  .orbit-quip-loading { animation:none; }
+  .orbit-quip-text, .orbit-quip-text[data-fading] { opacity:1; transition:none; }
+}
