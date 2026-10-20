@@ -38,6 +38,11 @@ async function discardEditor(page, accept) {
   await confirmation.waitFor({ state: 'detached' });
 }
 async function newSchedule(page) { await page.getByRole('button', { name: '添加日程', exact: true }).click(); await page.getByLabel('日程标题', { exact: true }).waitFor(); }
+// Navigation tests start from a rendered avatar; they do not race its disposable blob loader.
+async function avatarReady(page) {
+  await page.waitForLoadState('networkidle');
+  await page.waitForFunction(() => { const image = document.querySelector('[data-account-menu-trigger] img'); return image?.complete && image.naturalWidth > 0; });
+}
 // Chromium can leave reload waiting for a load event after beforeunload is dismissed.
 // Used only with an explicit dismiss expectation; the caller also checks the retained draft.
 async function abortedReload(page) { try { await page.reload({ timeout: 3000 }); } catch (error) { if (error.name !== 'TimeoutError' && !String(error).includes('ERR_ABORTED')) throw error; } }
@@ -87,7 +92,7 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
     const auto = await createAuditContext(browser, { baseURL: automatedBase, synthetic: true }); telemetry.push({ mode: 'automated-native-events', records: auto.records }); await login(auto, automatedBase);
     const automated = await auto.context.newPage(); diagnosticPage = automated; automated.setDefaultTimeout(6000);
     for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]) {
-      await automated.setViewportSize({ width, height }); await automated.goto(automatedBase + '/schedule');
+      await automated.setViewportSize({ width, height }); await automated.goto(automatedBase + '/schedule'); await avatarReady(automated);
       await automated.locator('#orbit-browser-audit-controls').waitFor();
       // Development source transforms may be cold; action deadlines remain 6s after page readiness.
       await automated.getByRole('button', { name: '添加日程', exact: true }).waitFor({ timeout: 30000 });
@@ -119,18 +124,25 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
       // Legacy setting URLs now enter the standalone page and return to Today.
       await automated.goto(automatedBase + '/schedule?settings=setting-ai-1l45kwl');await automated.getByRole('link',{name:'返回今日行动中心',exact:true}).click();
       await automated.waitForFunction(() => document.activeElement?.matches('[data-account-menu-trigger]'));
-      await automated.goto(automatedBase + '/settings/profile'); await automated.getByLabel('职业背景', { exact: true }).waitFor();
+      await automated.goto(automatedBase + '/settings/profile'); await automated.getByLabel('职业背景', { exact: true }).waitFor(); await avatarReady(automated);
       await arm(automated, '测试：下次资料离开取消放弃'); await automated.getByLabel('职业背景', { exact: true }).fill(`合成资料修改 ${width}`); await automated.getByRole('link', { name: '返回今日行动中心', exact:true }).click(); assert.ok(automated.url().endsWith('/settings/account/profile'));
       await arm(automated, '测试：下次资料离开确认放弃'); await automated.getByRole('link', { name: '返回今日行动中心', exact:true }).click(); await automated.waitForURL(url => url.pathname === '/today');
-      await automated.locator('[data-account-menu-trigger]').click(); await automated.getByRole('menuitem', { name: '个人资料', exact: true }).or(automated.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '个人资料', exact: true })).click();
-      await automated.getByLabel('职业背景', { exact: true }).waitFor();
+      await automated.locator('[data-account-menu-trigger]').click();
+      assert.equal(await automated.getByRole('menuitem', { name: '个人资料', exact: true }).or(automated.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '个人资料', exact: true })).count(), 0);
+      await automated.getByRole('menuitem', { name: '设置', exact: true }).or(automated.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '设置', exact: true })).click();
+      if (width < 768) await automated.getByRole('link', { name: '账户与安全', exact: true }).click();
+      await automated.getByRole('tab', { name: '账号管理', exact: true }).waitFor();
+      await avatarReady(automated);
+      const profileReturn = automated.url();
+      await automated.getByRole('tab', { name: '个人资料', exact: true }).click();
+      await automated.getByLabel('职业背景', { exact: true }).waitFor(); await avatarReady(automated);
       await arm(automated, '测试：下次资料离开取消放弃'); await automated.getByLabel('职业背景', { exact: true }).fill(`合成浏览器返回 ${width}`);
       await automated.goBack(); await automated.waitForURL('**/settings/account/profile');
       assert.equal(await automated.getByLabel('职业背景', { exact: true }).inputValue(), `合成浏览器返回 ${width}`);
-      await arm(automated, '测试：下次资料离开确认放弃'); await automated.goBack(); await automated.waitForURL(url => url.pathname === '/today');
+      await arm(automated, '测试：下次资料离开确认放弃'); await automated.goBack(); await automated.waitForURL(profileReturn);
       assert.deepEqual(await automated.evaluate(() => window.__orbitBrowserAudit.failures), []);
       telemetry.push({ mode: 'prelude-profile', width, records: await automated.evaluate(() => window.__orbitBrowserAudit.records) });
-      await automated.goto(automatedBase + '/settings/profile'); await automated.getByLabel('职业背景', { exact: true }).waitFor(); await automated.getByLabel('职业背景', { exact: true }).fill('合成刷新丢弃'); await automated.reload(); await automated.getByLabel('职业背景', { exact: true }).waitFor();
+      await automated.goto(automatedBase + '/settings/profile'); await automated.getByLabel('职业背景', { exact: true }).waitFor(); await avatarReady(automated); await automated.getByLabel('职业背景', { exact: true }).fill('合成刷新丢弃'); await automated.reload(); await automated.getByLabel('职业背景', { exact: true }).waitFor(); await avatarReady(automated);
       assert.equal(await automated.getByLabel('职业背景', { exact: true }).inputValue(), savedProfile);
       assert.equal(await automated.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
       await automated.screenshot({ path: path.join(output, `automated-${width}.png`) });
