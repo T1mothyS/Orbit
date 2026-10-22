@@ -46,6 +46,15 @@
         ],
         "createdAt": "2026-10-20T11:16:47.380Z",
         "reason": "Agent: Arial predates this change in commit 630e604 and is intentionally retained only in the existing HTML email templates for stable client font fallback; this task changes emphasis tolerance, not typography."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/styles/assistant.css"
+        ],
+        "createdAt": "2026-10-22T16:26:21.241Z",
+        "reason": "Agent reviewed: the sole occurrence is .agenda-schedule-card; AgendaView derives --schedule-color from getScheduleCategory(schedule.category).color to identify the event category. It predates this task in d83990e8 and is unchanged from the deployed c159ea3 UI baseline; retain the semantic category marker."
       }
     ]
   }
