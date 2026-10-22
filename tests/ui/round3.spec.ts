@@ -61,7 +61,7 @@ test('round3 message branches render GFM safely and request retry stays anchored
   await page.route('**/api/ai-schedule/history?*',route=>{const before=new URL(route.request().url()).searchParams.has('before');if(before)older=true;return route.fulfill({json:{messages:before?[{id:'earlier',role:'assistant',type:'text',text:'更早记录',timestamp:at(0)}]:messages,requests:before?[]:[{...request,state}],start:'synthetic-start',nextBefore:older?null:'synthetic-before'}});});
   await page.route('**/api/orbit/requests/old-failure/retry',route=>{state='interrupted';return route.fulfill({json:{request:{...request,state}}});});
   await page.setViewportSize({width:390,height:844});await page.goto(base+'/assistant');
-  const failure=page.locator('.orbit-request').filter({hasText:'原始失败请求'});await expect(failure).toContainText('处理失败');
+  const failure=page.locator('[data-request-id="old-failure"]');await expect(failure).toContainText('处理失败');await expect(failure).not.toContainText('原始失败请求');
   const column=page.locator('.schedule-ai-reading-column'),scroll=column.locator('..');await scroll.evaluate(el=>el.scrollTop=0);
   await expect(page.locator('#orbit-message-old-user table')).toHaveCount(1);await expect(page.locator('#orbit-message-body table')).toHaveCount(1);await expect(page.locator('#orbit-message-error-body table')).toHaveCount(1);
   await expect(column.locator('img,script')).toHaveCount(0);await expect(column.locator('.orbit-plan')).toContainText('结构化日程保留');await expect(column.locator('.orbit-message-body .orbit-plan')).toHaveCount(0);expect(trackers).toBe(0);expect(await page.evaluate(()=>(window as any).unsafe)).toBeUndefined();

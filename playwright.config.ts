@@ -7,7 +7,7 @@ const scope = process.env.ORBIT_UI_SCOPE || 'all';
 if (!['all', 'gallery', 'app'].includes(scope) || (process.env.CI && scope !== 'all')) throw new Error('CI requires the complete UI scope');
 export default defineConfig({
   testDir: './tests/ui',
-  testMatch: scope === 'gallery' ? '**/gallery.spec.ts' : scope === 'app' ? ['**/account.spec.ts', '**/settings.spec.ts', '**/stage2.spec.ts', '**/round3.spec.ts', '**/round4.spec.ts'] : '**/*.spec.ts',
+  testMatch: scope === 'gallery' ? '**/gallery.spec.ts' : scope === 'app' ? ['**/account.spec.ts', '**/settings.spec.ts', '**/stage2.spec.ts', '**/round3.spec.ts', '**/round4.spec.ts', '**/ai-chat.spec.ts'] : '**/*.spec.ts',
   timeout: 30_000,
   fullyParallel: true,
   // Real login fixtures share the server's IP budget; keep the expanded matrix within it.

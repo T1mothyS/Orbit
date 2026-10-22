@@ -910,8 +910,8 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
         {/* 消息列表 */}
         {orbit.nextBefore && <Button disabled={orbit.loadingOlder} onClick={() => { const container = messagesContainerRef.current; const oldHeight = container?.scrollHeight || 0, oldTop = container?.scrollTop || 0; followBottom.current = false; void orbit.loadOlder().then(() => requestAnimationFrame(() => requestAnimationFrame(() => { if (container) container.scrollTop = oldTop + container.scrollHeight - oldHeight; }))).catch(e => orbit.setError(e.message)); }}>{orbit.loadingOlder ? '加载中…' : '加载更早记录'}</Button>}
         {[
-          ...messages.map(msg => ({ id: 'message:'+msg.id, at: requestTimes.get(msg.id) || msg.timestamp || '', msg, request: undefined })),
-          ...orbit.requests.map(request => ({ id: 'request:'+request.id, at: request.createdAt || '', msg: undefined, request })),
+          ...messages.filter(msg=>!(msg.type==='error'&&(msg.orbitMeta as any)?.requestId&&orbit.requests.some(r=>r.id===(msg.orbitMeta as any).requestId))).map(msg => ({ id: 'message:'+msg.id, at: requestTimes.get(msg.id) || msg.timestamp || '', msg, request: undefined })),
+          ...orbit.requests.filter(request=>request.state!=='completed'||!(request.responseMessageId&&messages.some(m=>m.id===request.responseMessageId))).map(request => ({ id: 'request:'+request.id, at: request.createdAt || '', msg: undefined, request })),
         ].sort((a,b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).map(entry => entry.msg ? (
 
           <MessageBubble
@@ -927,7 +927,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
             confirmingPlanId={confirmingPlanId}
             savingPlanOperationKey={savingPlanOperationKey}
           />
-        ) : entry.request ? <OrbitRequestStatus key={entry.id} request={entry.request} onAction={verb => { void orbit.action(entry.request!.id,verb).catch(e => orbit.setError(e.message)); }}/> : null)}
+        ) : entry.request ? <OrbitRequestStatus key={entry.id} request={entry.request} onAction={verb => orbit.action(entry.request!.id,verb)}/> : null)}
 
         {/* 加载中 */}
         {hasNewReply&&<button type="button" className="orbit-new-reply" onClick={()=>{followBottom.current=true;setHasNewReply(false);const el=messagesContainerRef.current;el?.scrollTo({top:el.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});}}>有新回复 · 滚动到底部</button>}

@@ -31,6 +31,8 @@
   --orbit-brand-hover: #1d4ed8;
   --orbit-brand-active: #1e40af;
   --orbit-brand-soft: #eff4ff;
+  --orbit-chat-selection: #b9d0ff;
+  --orbit-chat-selection-text: #0b1c3e;
   --orbit-on-brand: rgb(var(--orbit-on-brand-rgb));
   --orbit-destructive: #b42318;
   --orbit-destructive-hover: #912018;
@@ -99,6 +101,8 @@
   --orbit-brand-hover: #b5ceff;
   --orbit-brand-active: #76a3fb;
   --orbit-brand-soft: #202d46;
+  --orbit-chat-selection: #7da7ff;
+  --orbit-chat-selection-text: #0c1730;
   --orbit-destructive: #ffaaa3;
   --orbit-destructive-hover: #ffc3bd;
   --orbit-destructive-soft: #3c2423;

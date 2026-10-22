@@ -8,6 +8,8 @@ import { normaliseCodeBuddyBaseUrl } from '../codebuddy-env.js';
 import { addLog } from '../log-service.js';
 import * as db from '../db.js';
 import { defaultModel, modelService, getAvailableModels, resolveCodeBuddyCredentialInfo, resolveCodeBuddyCredential, getMissingCodeBuddyCredentialMessage } from '../ai-credentials.js';
+import { workBuddyProvider } from '../ai-provider-workbuddy.js';
+import { aiErrorInfo } from '../ai-execution.js';
 
 export function createSettingsRouter({ authenticate, JWT_SECRET }: Pick<ReturnType<typeof createAuth>, 'authenticate'> & { JWT_SECRET: string }) {
   const app = Router();
@@ -127,59 +129,19 @@ export function createSettingsRouter({ authenticate, JWT_SECRET }: Pick<ReturnTy
         });
       }
 
-      // 验证必须绕过缓存，确保当前凭据仍然有效。
+      if (/[^\x21-\x7e]/.test(userCredential.api_key)) return res.status(400).json({valid:false,authenticationVerified:false,code:'INVALID_KEY_FORMAT',error:'当前保存的 API Key 含中文、空白或控制字符，无法构造认证请求头。请重新复制原始 Key。'});
       const currentUser = (req as any).user as JwtPayload;
-      const models = await getAvailableModels(currentUser.userId, userCredential, true);
-
-      res.json({
-        valid: true,
-        modelCount: models.length,
-        models: models.slice(0, 5).map((m: any) => m.modelId) // 返回前5个模型ID
-      });
+      const model=db.getUserPreferredModel(currentUser.userId,defaultModel);
+      const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
+      const closed=()=>controller.abort();res.once('close',closed);
+      try{
+        const answer=await workBuddyProvider.generate({userId:currentUser.userId,model,instructions:'你正在执行连接测试。仅回复 OK，不调用工具，不执行操作。',input:[{type:'text',text:'请只回复 OK。'}],tools:[],responseMode:'text',controller});
+        controller.signal.throwIfAborted();if(!answer.trim())throw new Error('模型响应为空');
+        res.json({valid:true,verification:'generation',authenticationVerified:true,model});
+      }finally{clearTimeout(timer);res.removeListener('close',closed);}
     } catch (error: any) {
-      console.error("[Verify API Key] Error:", error);
-
-      // 区分不同错误类型
-      const errorMsg = error?.message || String(error);
-      const errorCode = error?.code || '';
-
-      // 429 额度用完
-      if (errorMsg.includes('429') || errorMsg.includes('Credits exhausted') || errorCode === 'QUOTA_EXCEEDED') {
-        return res.status(402).json({
-          valid: true,  // Key 本身有效，只是额度用完
-          keyValid: true,
-          quotaExhausted: true,
-          error: 'API Key 有效，但额度已用完。请前往 CodeBuddy 控制台购买额度。',
-          code: 'QUOTA_EXHAUSTED',
-          purchaseUrl: 'https://www.codebuddy.cn/profile/usage'
-        });
-      }
-
-      // 无效 Key
-      if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') || errorMsg.includes('Invalid API key') || errorMsg.includes('无效')) {
-        return res.status(401).json({
-          valid: false,
-          keyValid: false,
-          error: 'API Key 无效，请检查是否正确填写',
-          code: 'INVALID_KEY'
-        });
-      }
-
-      // 网络错误
-      if (errorMsg.includes('fetch') || errorMsg.includes('network') || errorMsg.includes('ECONNREFUSED')) {
-        return res.status(503).json({
-          valid: false,
-          error: '网络连接失败，请检查网络后重试',
-          code: 'NETWORK_ERROR'
-        });
-      }
-
-      // 其他错误
-      return res.status(500).json({
-        valid: false,
-        error: errorMsg,
-        code: 'UNKNOWN_ERROR'
-      });
+      const info=aiErrorInfo(error);addLog('warn','ai','WorkBuddy 连接测试未通过',{userId:((req as any).user as JwtPayload).userId,code:info.code,stage:info.stage});
+      return res.status(info.code==='AUTH'?401:info.code==='NETWORK'?503:502).json({valid:false,authenticationVerified:false,error:info.message,code:info.code});
     }
   });
 
@@ -222,6 +184,7 @@ export function createSettingsRouter({ authenticate, JWT_SECRET }: Pick<ReturnTy
         return res.status(400).json({ error: 'API Key 不能为空' });
       }
       const normalizedApiKey = String(apiKey).trim();
+      if (/[^\x21-\x7e]/.test(normalizedApiKey)) return res.status(400).json({error:'API Key 不能包含中文、空白或控制字符，请复制原始 Key'});
       if (normalizedApiKey.length > 4_096) return res.status(400).json({ error: 'API Key 过长' });
       const normalizedBaseUrl = normaliseCodeBuddyBaseUrl(baseUrl);
 

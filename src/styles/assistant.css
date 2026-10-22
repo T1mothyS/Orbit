@@ -303,4 +303,4 @@
   .calendar-toolbar button { min-height: 40px; }
 }
 
-.orbit-request-quip { color:var(--orbit-text-secondary); font-size:var(--orbit-type-secondary); min-height:3.2em; line-height:1.6; margin-block:6px; overflow-wrap:anywhere; }
+.orbit-request-quip { color:var(--orbit-text-secondary); font-size:var(--orbit-type-secondary); line-height:1.6; margin-block:4px 0; overflow-wrap:anywhere; }

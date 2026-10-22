@@ -29,3 +29,22 @@ export function allowsPlainChatReply(text: string, context: { activePlan?: boole
   return !needsScheduleContext(normalized)
     && !/(提醒我|安排|日程|待办|会议|行程|标记.*完成|取消|删除|删掉|修改|改成|改到|调到|换到|挪到|移到|推迟|提前|新建|创建|添加|schedule|calendar|remind|appointment|meeting)/i.test(normalized);
 }
+
+export function requestsScheduleDraft(text: string): boolean {
+  if (/^(如何|怎么|怎样|为什么|请问.*如何)/.test(text.trim())) return false;
+  return /(?:帮我|请)?(?:添加|新建|创建|生成.*草稿|整理.*(?:日程|草稿)|安排|提醒我|修改|改成|改到|调到|推迟|提前|取消|删除|删掉|标记.*完成)/.test(text);
+}
+export function isActivityDescription(text: string): boolean {
+  return needsScheduleContext(text) && !isReadOnlyScheduleQuery(text) && !requestsScheduleDraft(text)
+    && !/[?？]|如何|怎么|为什么|有没有|是否|冲突/.test(text);
+}
+export function chatToolNames(text: string, options: { product: boolean; schedule: boolean; knowledge: boolean; history: boolean }) {
+  const names = new Set<string>();
+  if (options.product) for (const name of ['settings','product_help','system_status','deployment_status','task_status','daily_report_status','reminder_status','recent_errors']) names.add(name);
+  if (options.schedule) names.add('calendar');
+  if (/日报|reports/i.test(text)) names.add('reports');
+  if (options.knowledge) names.add('knowledge');
+  if (options.history) names.add('history');
+  if (/搜索|联网|查证|查一下|最新|新闻|官网|https?:\/\/|如何|怎么|教程|接入|配置/i.test(text)) for (const name of ['search','read_url']) names.add(name);
+  return names;
+}

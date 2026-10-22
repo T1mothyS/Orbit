@@ -33,7 +33,7 @@ const rules: RateRule[] = [
   { name: 'authentication', limit: 20, windowMs: 15 * 60_000, matches: req => req.method === 'POST' && ['/api/auth/login', '/api/auth/register'].includes(req.path) },
   { name: 'invite-code-rotation', limit: 10, windowMs: 60 * 60_000, matches: req => req.method === 'POST' && /^\/api\/admin\/invite-codes\/(admin|user)\/rotate$/.test(req.path) },
   { name: 'outbound-email', limit: 5, windowMs: 60 * 60_000, matches: req => req.method === 'POST' && ['/api/action-center/send-email', '/api/cycle-reminders/test-email'].includes(req.path) },
-  { name: 'ai', limit: 30, windowMs: 60_000, matches: req => req.method === 'POST' && (req.path === '/api/ai-chat' || req.path === '/api/ai/imports/parse') },
+  { name: 'ai', limit: 30, windowMs: 60_000, matches: req => req.method === 'POST' && ['/api/ai-chat','/api/ai/imports/parse','/api/verify-api-key'].includes(req.path) },
   { name: 'backup', limit: 20, windowMs: 60 * 60_000, matches: req => req.path.startsWith('/api/backups/') || req.path === '/api/backups/export' },
   { name: 'export', limit: 30, windowMs: 60 * 60_000, matches: req => req.method === 'GET' && req.path.startsWith('/api/exports/') },
   { name: 'weather', limit: 60, windowMs: 60_000, matches: req => req.method === 'GET' && req.path.startsWith('/api/weather/') },

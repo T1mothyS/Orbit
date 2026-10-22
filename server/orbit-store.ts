@@ -14,6 +14,9 @@ export interface OrbitContext {
     conversationId: string;
     requestId?: string;
     controller?: AbortController;
+    timezone?: string;
+    rootRequestId?: string;
+    continuationOf?: string;
 }
 export const orbitContext = new AsyncLocalStorage<OrbitContext>();
 export interface Conversation {
@@ -36,6 +39,15 @@ export interface ChatRequest {
     result: string | null;
     error: string | null;
     created_at: string;
+    execution_meta?: string | null;
+}
+export interface RequestExecution {
+    attempt?: number; startedAt?: string; timezone?: string; rootRequestId?: string; continuationOf?: string;
+    evidence?: import('./ai-execution.js').AiEvidence[]; errorInfo?: ReturnType<typeof import('./ai-execution.js').aiErrorInfo>;
+    responseMessageId?: string;
+}
+export function requestExecution(row: {execution_meta?:string|null}): RequestExecution {
+    try {const value=JSON.parse(row.execution_meta || '{}');return value&&typeof value==='object'&&!Array.isArray(value)?value:{};} catch {return {};}
 }
 export function conversation(userId: string, id: string): Conversation {
     const item = queryOne<Conversation>('SELECT * FROM orbit_conversations WHERE id=? AND user_id=?', [id, userId]);

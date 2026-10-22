@@ -241,11 +241,11 @@ Tools 的正式来源是 `protected-tools/manifest.json` 及各 slug 的完整�
 
 Orbit 使用现有 chat.db 和同步持久化事务，未增加数据库服务或框架。`orbit_conversations` 保存账号归属和会话标题；`ai_schedule_messages.conversation_id` 关联历史；旧记录首次访问时迁入默认会话。会话历史长期保留，模型仅使用最近 20 条、最多 12000 字符的历史，以及有界对象引用、附件节选和当前账号事实。活跃草稿优先于普通历史；历史和知识资料不是系统指令，不能把历史计划视为已执行。模型查询关闭内置工具、继承配置、外部 MCP 和 SDK 会话持久化，仅注册 Orbit 进程内受控工具；只有本站认证服务可以在确认后写入事务。
 
-`orbit_requests` 保存请求 ID、归属、输入、状态和结果。每账号一次执行一个 AI 请求；不同账号及短同步写操作可以并行。请求号在账号内唯一，重复提交返回原请求，号相同而内容不同拒绝。状态为 queued/running/completed/failed/cancelled/interrupted；页面关闭不取消后台任务，显式取消会中止 SDK 并禁止迟到历史/计划落库。启动时 running 转 interrupted，queued 继续执行；失败或中断需要手动重试。该队列不保证外部模型的计费撤销，也不重放备份中的外部请求。
+`orbit_requests` 保存请求 ID、归属、输入、状态和结果。每账号一次执行一个 AI 请求；不同账号及短同步写操作可以并行。请求号在账号内唯一，重复提交返回原请求，号相同而内容不同拒绝。状态为 queued/running/completed/failed/cancelled/interrupted/partial；页面关闭不取消后台任务，显式取消会中止 SDK 并禁止迟到历史/计划落库。启动时 running 转 interrupted，queued 继续执行；失败或中断需要手动重试。该队列不保证外部模型的计费撤销，也不重放备份中的外部请求。
 
 前端 useOrbitChat 用同步创建标记阻止新对话创建期间发送/重复创建，select 先更新当前目标引用，旧会话回调不能提交。页面对应显示创建进度；没有被接受的提交不会清空输入。正常模型请求运行不等于创建/切换，仍沿持久队列接收后续消息。
 
-清空当前对话与行内删除共用一次待确认状态，5 秒超时/外部点击/Escape/切换/关闭菜单复位，第二次点击才请求接口。清理期间同步锁阻止重复提交与新发送，并使清理前的刷新响应失效；成功后更新本地空历史，后续刷新失败明确报告已清理、状态正在重连。取消请求在服务端仍保留持久状态，但从页面状态列表移除；失败和中断继续显示重试。
+清空当前对话与行内删除共用一次待确认状态，5 秒超时/外部点击/Escape/切换/关闭菜单复位，第二次点击才请求接口。清理期间同步锁阻止重复提交与新发送，并使清理前的刷新响应失效；成功后更新本地空历史，后续刷新失败明确报告已清理、状态正在重连。取消请求保留持久状态并显示轻量“已停止”；失败和中断显示一次安全说明及重试，成功请求由关联的正式回复接替状态卡。
 
 清空和删除在同一同步持久化事务内清理账号/会话所属的聊天附件元数据、消息、请求及处理步骤、活跃计划指针，queued/running 时拒绝。提交成功后只清除该会话的计划/请求缓存，失败不动缓存。清空保留会话、正式事务、记事及浏览器文字/记事图片草稿；聊天附件列表同步重置，未确认发送的重试编号失效。文件在事务成功后按共享引用清理，写入失败保留原记录和字节；若提交后文件删除失败，兼容响应增加 `attachmentCleanupPending: true` 并显示存储清理提示，不能把已接受的历史清空误报为整体失败。计划确认继续从所属账号的持久消息解析，清空后的缓存不能恢复已删除计划。
 
@@ -273,6 +273,20 @@ AI 生成的 update/delete 绑定真实对象 ID 和事实指纹，确认时拒�
 账号加密备份保存会话、消息、检索偏好及周期安排日期；新队列执行状态不随账号备份重放。旧备份缺少 Orbit 字段时保留现有会话；跨账号恢复重映射会话/消息 ID，并清除原账号的计划、日程和知识引用。完整系统备份仍通过既有数据库文件合同覆盖这些表。清空/删除账号清理新表。
 
 品牌改为 Orbit，应用内部数据库、备份魔数/格式、加密盐、认证存储键、appId 和既有桌面数据目录保留兼容身份。
+
+### AI 对话可靠性与恢复
+
+主聊天通过 ProviderRequest 的可选 responseMode 区分 text/draft；原 generate(): Promise<string> 和未声明模式的其他消费者保持兼容。普通回答直接接收文本/GFM，不依赖 JSON 包装。只有明确的事务操作或已确认的草稿修订进入 draft；单贴活动先展示归一后的日期/时间并询问用途。时间范围不作为月日解析；星期注释、非法日期、跨年缺失年份存在歧义时先澄清。入队冻结日期和账号时区，重试与继续沿用。
+
+草稿共享 Schema 与现有操作校验，适配层支持 WorkBuddy outputFormat/structured_output 和 ChatGPT text.format。当前锁定 WorkBuddy SDK 0.3.119 的 query 实现未向 CLI 传递 outputFormat；真实 glm-5.1 探针也没有 structured_output，因此该版本明确走同模型、无工具严格 JSON 路径，不将类型声明当作支持证据。升级 SDK 后须重新核对传输与真实模型，才启用原生格式。其他原生格式明确不受支持时同样回退；格式无效最多一次无工具校对，不补造实体或执行部分草稿。SDK 成功终态与完整内容均必需；WorkBuddy 的 ExecutionError subtype 和结果错误、ChatGPT 的中断/failed/incomplete 均不能采用中间文本冒充成功。模型目录的 get_available_models 是配置目录控制请求，目录可读及“已配置 Key”均不证明生成认证通过。连接测试接口使用当前账号、选定 WorkBuddy 模型执行一次无工具最小生成，成功才返回 valid=true、verification=generation、authenticationVerified=true；界面明确标注调用模型，受60秒后端期限及现有AI限流约束。模型目录由独立刷新入口读取，不能作为认证成功证明。Key 输入即时标明非法字符，保存和生成边界再次拒绝中文、空白和控制字符；日志不保存 Key 或 Authorization 值。
+
+按用途注册受控工具；普通常识不开放工具，外部方法咨询按需开放搜索/公开网页，产品、状态、日历、知识和历史按现有权限开放。单次工具阶段最多4轮、6次调用、2次搜索，相同工具/参数的成功和失败在本次执行内复用；超限至多一次无工具汇总，仍受请求5分钟期限约束。网络瞬时恢复和格式恢复均有界，取消信号覆盖后续恢复和汇总。所有正式写入继续走原确认、revision、事实指纹和 operation_results。
+
+orbit_requests.execution_meta 是增量可空 JSON，记录 attempt、startedAt、冻结时区、结果消息、结构化错误、最多6份/总12000字符的已验证工具资料，以及 continuationOf/rootRequestId。新增字段前通过现有 migration-backups 留数据库快照；不新增数据库服务。重试保留 requestId/createdAt、增加 attempt 并清理前次可见步骤，日志保留原执行诊断。最终助手消息、计划和 completed/result 在同一同步持久化事务提交，失败不吞异常。失败只由请求呈现，不另存助手技术错误；旧错误原文不改写，只在读取时映射安全说明，不按时间猜测关联。
+
+GET 请求与状态事件增加 startedAt、attempt、responseMessageId、errorInfo、canContinue、continuationOf 和 partial 的有界资料；原 error 保留安全摘要。errorInfo 包含 code/message/stage/retryable/requestId，区分 NETWORK、MODEL_OUTPUT、PARAMETER、TOOL、BUDGET、CANCELLED、INTERNAL、AUTH。上游状态/错误码/请求号和脱敏原因仅进入诊断日志。
+
+POST /api/orbit/requests/:id/continue 接收新的 requestId，仅当前账号拥有、存在有效资料的 partial 请求可继续。每个父请求只产生一个子请求，重复点击/不同重试编号返回已有子请求；编号已被其他内容使用则拒绝。子请求继承原问题、日期、Provider/模型，使用新预算只读查询，不重放确认/写入，不重复插入用户消息。私人资料在继续时按当前权限重查，公开网页资料明确作为既有来源；不完整草稿不激活。清空、删除账号与会话清理关联元数据；账号备份不导出或重放执行请求，完整系统快照按原文件合同保护。SSE、轮询恢复和历史联合分页继续覆盖新终态。
 
 ### 聊天模型偏好
 
@@ -364,7 +378,7 @@ Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓�
 
 `/import` 是 AppShell/PageFrame 下的独立邮箱导入页，不装载对话工具栏或记事板；头像菜单直接进入。`/assistant?tool=email-import` 使用 replace 兼容跳转并移除 tool 参数，保留其余查询参数；站内安全来源用于“返回”，直接访问回退到 /assistant。邮箱识别、草稿确认与账号级 API 不变。
 
-`GET /api/ai-schedule/history` 保留无 limit 时的旧响应；新 UI 传 limit（默认 60，最大 100）使用消息与请求联合游标分页，包含尚未产生日志消息的失败/中断请求。响应附 requests、start、nextBefore；before 加载更早页，after 重新读取已加载的当前窗口（含边界时刻全部记录，防止排队后迟到的用户消息丢失）并合并新记录，不能与 before 同用。游标包含排序时间、记录类型和已有 ID，账号/会话所有权仍先验证。时间以首次提交为准；复用确定性的 orbit-user:<userId>:<requestId> 用户消息 ID，不新增持久关联字段。重试保持 request ID/createdAt，步骤与状态更新不重新追加卡片。
+`GET /api/ai-schedule/history` 保留无 limit 时的旧响应；新 UI 传 limit（默认 60，最大 100）使用消息与请求联合游标分页，包含尚未产生日志消息的失败/中断请求。响应附 requests、start、nextBefore；before 加载更早页，after 重新读取已加载的当前窗口（含边界时刻全部记录，防止排队后迟到的用户消息丢失）并合并新记录，不能与 before 同用。游标包含排序时间、记录类型和已有 ID，账号/会话所有权仍先验证。时间以首次提交为准；复用确定性的 orbit-user:<userId>:<rootRequestId 或 requestId> 用户消息 ID；继续查询沿用原用户消息，执行关联见上述恢复合同。重试保持 request ID/createdAt，步骤与状态更新不重新追加卡片。
 
 客户端保留已加载消息/请求并按原提交位置排序；最新 40 条请求端点仍用于队列恢复，不是完整历史的唯一来源。更早记录由按钮按需加载并补偿滚动高度；消息深链接按页读取直到目标可见，保持按需读取；清空、切换和删除不能被未完成旧读取回填。只有新增消息序列在读者跟随底部时触发滚动，状态刷新不滚动。历史窗口的扩大由用户加载或当前新消息驱动，不在首次进入加载全会话。
 

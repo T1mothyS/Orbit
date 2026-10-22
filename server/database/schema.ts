@@ -76,6 +76,7 @@ export function applyChatSchema(db: Database, { queryAll, queryOne }: SchemaQuer
   db.run(`CREATE TABLE IF NOT EXISTS orbit_conversations (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,title TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`);
   db.run(`CREATE TABLE IF NOT EXISTS orbit_preferences (user_id TEXT PRIMARY KEY,auto_knowledge INTEGER NOT NULL DEFAULT 0)`);
   db.run(`CREATE TABLE IF NOT EXISTS orbit_requests (id TEXT NOT NULL,user_id TEXT NOT NULL,conversation_id TEXT NOT NULL,state TEXT NOT NULL,body TEXT NOT NULL,result TEXT,error TEXT,created_at TEXT NOT NULL,PRIMARY KEY(user_id,id))`);
+  if(!queryAll<{name:string}>('PRAGMA table_info(orbit_requests)').some(c=>c.name==='execution_meta')) db.run('ALTER TABLE orbit_requests ADD COLUMN execution_meta TEXT');
   const conversationColumns=queryAll<{name:string}>('PRAGMA table_info(orbit_conversations)');
   for(const [name,type] of [['is_main','INTEGER NOT NULL DEFAULT 0'],['scope_schedule_id','TEXT'],['last_read_at','TEXT'],['active_plan_message_id','TEXT']]) {
     if(!conversationColumns.some(c=>c.name===name)) db.run(`ALTER TABLE orbit_conversations ADD COLUMN ${name} ${type}`);

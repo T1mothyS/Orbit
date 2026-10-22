@@ -2,6 +2,7 @@ import * as dbModule from './db.js';
 import * as db from './db.js';
 import {messageAttachments} from './orbit-attachments.js';
 import {scheduleItemsForPlan} from '../src/utils/plan-schedule-items.js';
+import { aiErrorInfo } from './ai-execution.js';
 
 export const AI_SCHEDULE_HISTORY_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -23,7 +24,7 @@ export function toAiScheduleHistoryMessage(message: dbModule.DbAiScheduleMessage
     conversationId: message.conversation_id,
     role: message.role,
     type: message.type,
-    text: message.content,
+    text: message.type==='error'?aiErrorInfo(new Error(message.content)).message:message.content,
     intent: message.intent || undefined,
     scheduleItems: message.type === 'plan' ? scheduleItemsForPlan(Array.isArray(items) ? items : [], Array.isArray(plan?.operations) ? plan.operations : []) : items,
     plan,

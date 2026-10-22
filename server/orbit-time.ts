@@ -16,8 +16,8 @@ export function resolveQueryDates(text: string, anchor: string): string[] {
   const now = new Date(`${anchor}T12:00:00Z`);
   const weekday = now.getUTCDay() || 7;
   let rest = text.toLowerCase();
-  rest = rest.replace(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/g, (_, y, m, d) => { add(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`); return ' '; });
-  rest = rest.replace(/(?:(\d{4})年)?(\d{1,2})[月/-](\d{1,2})[日号]?/g, (_, y, m, d) => { add(`${y || anchor.slice(0, 4)}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`); return ' '; });
+  rest = rest.replace(/(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/g, (_, y, m, d) => { add(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`); return ' '; });
+  rest = rest.replace(/(?<![\d:：])(?:(\d{4})[年/])?(\d{1,2})[月/-](\d{1,2})(?:[日号]|(?![\d:：]))/g, (_, y, m, d) => { add(`${y || anchor.slice(0, 4)}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`); return ' '; });
   rest = rest.replace(/(上|下|本|这)?(?:周|星期)([一二三四五六日天])/g, (_, which, day) => {
     const index = '一二三四五六日'.indexOf(day === '天' ? '日' : day) + 1;
     add(addDateDays(anchor, index - weekday + (which === '下' ? 7 : which === '上' ? -7 : 0)));
@@ -44,6 +44,26 @@ export function resolveQueryDates(text: string, anchor: string): string[] {
     for (let i = 1; i <= end; i++) add(`${first.toISOString().slice(0, 8)}${String(i).padStart(2, '0')}`);
   }
   return dates.size ? [...dates].sort() : [anchor];
+}
+
+/** An annotation must agree with its absolute date, rather than add a second event. */
+export function dateClarification(text: string, anchor: string): string | null {
+  const absolute = /(?<![\d:：])(?:(\d{4})[年/-])?(\d{1,2})(?:月|[/-])(\d{1,2})(?:[日号]|(?![\d:：]))/.exec(text);
+  try { resolveQueryDates(text, anchor); } catch { return '这段日期无法确定，请核对具体年月日。'; }
+  if (!absolute) return null;
+  const year = absolute[1] || anchor.slice(0,4), month = absolute[2], day = absolute[3];
+  const date = `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`;
+  const annotation = /[（(]\s*((?:上|下|本|这)?(?:周|星期)[一二三四五六日天])\s*[）)]/.exec(text)?.[1];
+  if (annotation) {
+    const expected = '一二三四五六日'.indexOf(annotation.at(-1)!.replace('天','日')) + 1;
+    const actual = new Date(`${date}T12:00:00Z`).getUTCDay() || 7;
+    if (expected !== actual || (/^[上下本这]/.test(annotation) && !resolveQueryDates(annotation,anchor).includes(date))) return `“${date}”与“${annotation}”不一致，请确认以哪个日期为准。`;
+  }
+  const crossYear=(Number(anchor.slice(5,7))>=11&&Number(month)<=2)||(Number(anchor.slice(5,7))<=2&&Number(month)>=11);
+  if (!absolute[1] && (crossYear||date < anchor && /下|明年|将|即将|准备|计划/.test(text))) return `这里的${month}月${day}日是指哪一年？请确认完整日期。`;
+  const relative=text.match(/大后天|后天|明天|明日|tomorrow|大前天|前天|昨天|昨日|yesterday|今天|今日|today|(?:上|下|本|这)(?:周|星期)[一二三四五六日天]/g)||[];
+  if(relative.some(word=>!resolveQueryDates(word,anchor).includes(date)))return `“${date}”与相对日期描述不一致，请确认具体日期。`;
+  return null;
 }
 
 export function statisticsPeriod(period: string, anchor: string): { start: string; end: string } {

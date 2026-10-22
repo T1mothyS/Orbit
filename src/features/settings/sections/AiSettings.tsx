@@ -32,6 +32,7 @@ export function AiSettings({ authHeaders, isAdmin = false }: {
     useSettingsDirty('ai-key',showEnvConfig && (!!envConfig.apiKey || envConfig.baseUrl!==savedBaseUrl));
     const [savingEnv, setSavingEnv] = useState(false);
     const [loadingConfig, setLoadingConfig] = useState(false);
+    const invalidKey=/[^\x21-\x7e]/.test(envConfig.apiKey.trim());
     const [loginStatus, setLoginStatus] = useState<LoginStatus>({
         isLoggedIn: false,
         checking: true,
@@ -94,16 +95,19 @@ export function AiSettings({ authHeaders, isAdmin = false }: {
             const res = await settingsFetch('/api/verify-api-key', {
                 method: 'POST',
                 headers: authHeaders(),
-                signal: AbortSignal.timeout(15000)
+                signal: AbortSignal.timeout(90000)
             });
             const data = await res.json();
-            if (data.valid) {
+            if (data.verification==='generation'&&data.authenticationVerified===true&&data.valid) {
+                feedback.success('WorkBuddy 对话连接验证通过，模型：'+data.model);
+            }
+            else if (data.valid) {
                 if (data.quotaExhausted) {
                     // Key 有效但额度用完
                     feedback.warning('API Key 有效，但额度已用完。请前往 CodeBuddy 控制台购买额度。');
                 }
                 else {
-                    feedback.success('API Key 验证成功！可用模型：' + data.modelCount + ' 个');
+                    feedback.warning('已读取模型目录，尚未验证对话连接；请刷新页面后重试。');
                 }
             }
             else {
@@ -127,6 +131,7 @@ export function AiSettings({ authHeaders, isAdmin = false }: {
             feedback.warning('请输入 API Key');
             return;
         }
+        if(invalidKey){feedback.error('粘贴内容包含中文、空白或控制字符，请核对原始 Key。');return;}
         setSavingEnv(true);
         try {
             const response = await settingsFetch('/api/user-api-key', {
@@ -162,7 +167,7 @@ export function AiSettings({ authHeaders, isAdmin = false }: {
           <strong>{loginStatus.checking ? '检查中…' : loginStatus.isLoggedIn ? '已配置' : '未连接'}</strong>
           {!loginStatus.checking && <span>{loginStatus.usingSharedApi ? '使用管理员共享 API，密钥仅在服务器端使用。' : loginStatus.hasApiKey ? `个人 API Key ${loginStatus.apiKey || ''}` : loginStatus.error || '请配置个人 API Key。'}</span>}
           <div className="settings-actions">
-            <Button variant="secondary" loading={verifying} disabled={loginStatus.checking || savingEnv} onClick={verifyApiKey}>验证 Key</Button>
+            <Button variant="secondary" loading={verifying} disabled={loginStatus.checking || savingEnv} onClick={verifyApiKey}>测试连接（调用模型）</Button>
             <Button variant="quiet" disabled={loginStatus.checking} onClick={checkLoginStatus}>刷新状态</Button>
           </div>
         </div>
@@ -174,11 +179,12 @@ export function AiSettings({ authHeaders, isAdmin = false }: {
           <ExternalLink href="https://www.workbuddy.cn/profile/keys" target="_blank" rel="noopener noreferrer">打开 WorkBuddy API 管理</ExternalLink>
         </div> : (<div className="settings-credential-form">
             <label className="settings-field-label" htmlFor="settings-api-key">API Key（必填）</label>
-            <PasswordInput id="settings-api-key" className="settings-monospace" value={envConfig.apiKey} onChange={(event) => setEnvConfig(prev => ({ ...prev, apiKey: String(event.target.value) }))} placeholder={loginStatus.hasApiKey ? '输入新的 API Key 以覆盖当前配置' : '输入 API Key'} autoComplete="new-password" disabled={savingEnv}/>
+            <PasswordInput id="settings-api-key" className="settings-monospace" value={envConfig.apiKey} onChange={(event) => setEnvConfig(prev => ({ ...prev, apiKey: String(event.target.value) }))} placeholder={loginStatus.hasApiKey ? '输入新的 API Key 以覆盖当前配置' : '输入 API Key'} autoComplete="new-password" disabled={savingEnv} aria-invalid={invalidKey||undefined} aria-describedby={invalidKey?'settings-api-key-error':undefined}/>
+            {invalidKey&&<p id="settings-api-key-error" role="alert">粘贴内容包含中文、空白或控制字符，请核对原始 Key。</p>}
             <label className="settings-field-label" htmlFor="settings-base-url">Base URL（可选）</label>
             <Input id="settings-base-url" value={envConfig.baseUrl} onChange={(event) => setEnvConfig(prev => ({ ...prev, baseUrl: String(event.target.value) }))} placeholder="https://api.codebuddy.cn" disabled={savingEnv}/>
             <div className="settings-actions">
-              <Button onClick={saveEnvConfig} loading={savingEnv} variant="primary">保存 API Key</Button>
+              <Button onClick={saveEnvConfig} loading={savingEnv} disabled={invalidKey} variant="primary">保存 API Key</Button>
               <Button variant="quiet" disabled={savingEnv} onClick={() => { setShowEnvConfig(false); setEnvConfig({ apiKey: '', baseUrl: '' }); }}>取消</Button>
             </div>
           </div>)}

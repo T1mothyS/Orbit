@@ -172,7 +172,8 @@ export function saveAiScheduleHistoryMessage(input: {
     const user=db.getUserById(input.userId);if(!user || user.disabled) throw new Error('账号不可用');
     if(context.requestId && !getRequest(input.userId,context.requestId)) throw new Error('请求已移除');
   }
-  const id = context?.requestId && input.role === 'user' ? `orbit-user:${input.userId}:${context.requestId}` : uuidv4();
+  return withPersistenceTransaction(()=>{
+  const id = context?.requestId && input.role === 'user' ? `orbit-user:${input.userId}:${context.rootRequestId||context.requestId}` : uuidv4();
   const existing = context?.requestId && input.role==='user' ? dbQueryOne<dbModule.DbAiScheduleMessage>('SELECT * FROM ai_schedule_messages WHERE id=? AND user_id=?',[id,input.userId]) : null;
   if(existing) return existing;
   if(context?.conversationId) dbQueryRun('UPDATE orbit_conversations SET updated_at=? WHERE id=? AND user_id=?',[new Date().toISOString(),context.conversationId,input.userId]);
@@ -189,8 +190,10 @@ export function saveAiScheduleHistoryMessage(input: {
     knowledge_sources: input.knowledgeSources === undefined ? null : JSON.stringify(input.knowledgeSources),
     created_at: new Date().toISOString(),
   });
+  if(context?.requestId&&input.role==='assistant') dbQueryRun('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({requestId:context.requestId}),message.id,input.userId]);
   if(input.role==='assistant')recordKnowledgeCitations(input.userId,message.id,input.knowledgeSources);
   return message;
+  });
 }
 
 export function saveAiScheduleResponseHistory(userId: string, response: any): dbModule.DbAiScheduleMessage {

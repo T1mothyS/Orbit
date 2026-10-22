@@ -14,6 +14,14 @@ export interface OrbitRequest {
     state: string;
     error?: string;
     createdAt?:string;
+    startedAt?:string;
+    attempt?:number;
+    responseMessageId?:string;
+    continuationOf?:string;
+    canContinue?:boolean;
+    partialReply?:string;
+    evidence?:Array<{tool:string;args:Record<string,string>;data:string}>;
+    errorInfo?:{code:string;message:string;stage:string;retryable:boolean;requestId?:string};
     steps?:Array<{id:string;label:string;state:string;query?:string;at:string}>;
 }
 export function useOrbitChat(authHeaders: () => Record<string, string>, authenticated: boolean) {
@@ -167,7 +175,13 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
             setSubmitting(false);
         }
     }, [api, cid, refresh]);
-    const action = useCallback(async (id: string, verb: 'cancel' | 'retry') => { await api(`/api/orbit/requests/${encodeURIComponent(id)}/${verb}`, 'POST', {}); await refresh(); }, [api, refresh]);
+    const continuationIds=useRef(new Map<string,string>());
+    const action = useCallback(async (id: string, verb: 'cancel' | 'retry' | 'continue') => {
+        let requestId=continuationIds.current.get(id);
+        if(verb==='continue'&&!requestId){requestId=crypto.randomUUID();continuationIds.current.set(id,requestId);}
+        await api(`/api/orbit/requests/${encodeURIComponent(id)}/${verb}`, 'POST', verb==='continue'?{requestId}:{});
+        try{await refresh();}catch{setRefreshError('操作已接受，状态正在重新连接…');}
+    }, [api, refresh]);
     const rename = useCallback(async (title: string, id=cid) => { await api(`/api/orbit/conversations/${encodeURIComponent(id)}`, 'PATCH', { title }); await refreshConversations(); }, [api, cid, refreshConversations]);
     const remove = useCallback(async (id=cid) => {
         if (mutatingRef.current || creatingRef.current || submittingRef.current) throw new Error('请等待当前操作结束');

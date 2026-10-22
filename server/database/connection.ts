@@ -74,6 +74,11 @@ export async function initDb(): Promise<void> {
     fs.mkdirSync(snapshot, { recursive: true });
     for (const name of fs.readdirSync(dataDir).filter(name => name.endsWith('.db'))) fs.copyFileSync(path.join(dataDir, name), path.join(snapshot, name), fs.constants.COPYFILE_EXCL);
   }
+  if (fs.existsSync(dbPath) && queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='orbit_requests'") && !queryAll<{name:string}>('PRAGMA table_info(orbit_requests)').some(column=>column.name==='execution_meta')) {
+    const snapshot=path.join(dataDir,'migration-backups',`chat-reliability-${new Date().toISOString().replace(/[:.]/g,'-')}`);
+    fs.mkdirSync(snapshot,{recursive:true});
+    for(const name of ['chat.db','schedule.db','reminder.db','activity.db']) if(fs.existsSync(path.join(dataDir,name))) fs.copyFileSync(path.join(dataDir,name),path.join(snapshot,name),fs.constants.COPYFILE_EXCL);
+  }
   applyChatSchema(db, { queryAll, queryOne });
   setActivityEventSink(event => run('INSERT OR IGNORE INTO orbit_activity_events (id,user_id,kind,source_id,occurred_at,metadata) VALUES (?,?,?,?,?,?)',[event.id,event.userId,event.kind,event.sourceId,event.occurredAt,JSON.stringify(event.metadata)]));
 

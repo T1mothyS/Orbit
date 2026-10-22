@@ -46,6 +46,20 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .orbit-request-content details { font-size:12px; margin-top:8px; }
 .orbit-request-content details p { margin-top:6px; overflow-wrap:anywhere; }
 .orbit-request strong small { display:inline; font-weight:400; }
+.orbit-request-header { display:flex; gap:8px; align-items:center; min-height:44px; }
+.orbit-request-header strong { font-size:13px; font-weight:600; overflow-wrap:anywhere; }
+.orbit-request-elapsed { color:var(--orbit-text-secondary); font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.orbit-request-actions { display:flex; margin-inline-start:auto; flex-shrink:0; }
+.orbit-request .orbit-stop-button { width:44px; height:44px; min-width:44px; border-radius:var(--orbit-radius-full); }
+.orbit-request-content > .orbit-request-quip { display:flex; align-items:flex-start; gap:8px; max-height:none; overflow:visible; margin:0; }
+.orbit-request-quip > svg { flex:none; margin-top:3px; }
+.orbit-request-content > .orbit-request-error,.orbit-request-content > .orbit-request-notice { max-height:none; overflow:visible; }
+.orbit-request-error { color:var(--orbit-destructive); }
+.orbit-request-details summary { cursor:pointer; padding-block:4px; }
+.orbit-request-details pre { max-height:240px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
+.orbit-request[data-state=cancelled] { border-color:transparent; color:var(--orbit-text-secondary); padding-block:0; }
+.oui-root .orbit-message-body { user-select:text; }
+.oui-root .orbit-message-body::selection,.oui-root .orbit-message-body *::selection { background:var(--orbit-chat-selection); color:var(--orbit-chat-selection-text); }
 .orbit-status-dot { display:inline-block; width:6px; height:6px; margin-right:6px; border-radius:50%; background:var(--td-text-color-placeholder); }
 .orbit-status-dot.is-working { background:var(--td-brand-color); animation:orbit-working 1.8s ease-in-out infinite; }
 @keyframes orbit-working {50%{opacity:.4;}}
