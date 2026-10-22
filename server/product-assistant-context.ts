@@ -2,12 +2,12 @@ import { searchProductHelp } from './product-help.js';
 import { querySystem } from './system-query.js';
 import { getUserById, getReminder } from './db.js';
 import { todayInTimezone } from './reminder-store.js';
-import { isOrbitDiagnosticQuestion, isOrbitProductQuestion } from './product-assistant-intent.js';
+import { isOrbitDiagnosticQuestion, isOrbitProductQuestion, isOrbitIntegrationQuestion } from './product-assistant-intent.js';
 // Mandatory evidence for product questions, even if a provider does not request tools.
 export function productAssistantContext(userId: string, text: string) {
   const admin = getUserById(userId)?.role === 'admin';
   const evidence: unknown[] = [];
-  if (isOrbitProductQuestion(text)) evidence.push(searchProductHelp(text.slice(0,300), admin));
+  if (isOrbitProductQuestion(text)) evidence.push(searchProductHelp((isOrbitIntegrationQuestion(text)?'Orbit AI 设置 Provider 个人 API Key 模型选择 '+text:text).slice(0,300), admin));
   if (isOrbitDiagnosticQuestion(text)) {
     let date = text.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
     if (!date && /昨天|昨日|前天/.test(text)) {

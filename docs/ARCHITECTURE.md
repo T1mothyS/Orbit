@@ -280,7 +280,7 @@ AI 生成的 update/delete 绑定真实对象 ID 和事实指纹，确认时拒�
 
 草稿共享 Schema 与现有操作校验，适配层支持 WorkBuddy outputFormat/structured_output 和 ChatGPT text.format。当前锁定 WorkBuddy SDK 0.3.119 的 query 实现未向 CLI 传递 outputFormat；真实 glm-5.1 探针也没有 structured_output，因此该版本明确走同模型、无工具严格 JSON 路径，不将类型声明当作支持证据。升级 SDK 后须重新核对传输与真实模型，才启用原生格式。其他原生格式明确不受支持时同样回退；格式无效最多一次无工具校对，不补造实体或执行部分草稿。SDK 成功终态与完整内容均必需；WorkBuddy 的 ExecutionError subtype 和结果错误、ChatGPT 的中断/failed/incomplete 均不能采用中间文本冒充成功。模型目录的 get_available_models 是配置目录控制请求，目录可读及“已配置 Key”均不证明生成认证通过。连接测试接口使用当前账号、选定 WorkBuddy 模型执行一次无工具最小生成，成功才返回 valid=true、verification=generation、authenticationVerified=true；界面明确标注调用模型，受60秒后端期限及现有AI限流约束。模型目录由独立刷新入口读取，不能作为认证成功证明。Key 输入即时标明非法字符，保存和生成边界再次拒绝中文、空白和控制字符；日志不保存 Key 或 Authorization 值。
 
-按用途注册受控工具；普通常识不开放工具，外部方法咨询按需开放搜索/公开网页，产品、状态、日历、知识和历史按现有权限开放。单次工具阶段最多4轮、6次调用、2次搜索，相同工具/参数的成功和失败在本次执行内复用；超限至多一次无工具汇总，仍受请求5分钟期限约束。网络瞬时恢复和格式恢复均有界，取消信号覆盖后续恢复和汇总。所有正式写入继续走原确认、revision、事实指纹和 operation_results。
+按用途注册受控工具；普通常识不开放工具，外部方法咨询按需开放搜索/公开网页，产品帮助只开放说明与设置入口，明确诊断时才开放运行查询；日历、知识和历史按现有权限开放。在 Orbit 内询问 WorkBuddy/ChatGPT 接入方法且未指定目标时，默认解释为接入 Orbit，用户明确的其他目标优先。服务端补充已有 Provider 的产品说明，先解释现有配置与源码接入点，再区分需要联网核实的外部细节，不因网络不可用改答通用清单；方法咨询不授权执行。单次工具阶段最多4轮、6次调用、2次搜索，相同工具/参数的成功和失败在本次执行内复用；超限至多一次无工具汇总，仍受请求5分钟期限约束。网络瞬时恢复和格式恢复均有界，取消信号覆盖后续恢复和汇总。所有正式写入继续走原确认、revision、事实指纹和 operation_results。
 
 orbit_requests.execution_meta 是增量可空 JSON，记录 attempt、startedAt、冻结时区、结果消息、结构化错误、最多6份/总12000字符的已验证工具资料，以及 continuationOf/rootRequestId。新增字段前通过现有 migration-backups 留数据库快照；不新增数据库服务。重试保留 requestId/createdAt、增加 attempt 并清理前次可见步骤，日志保留原执行诊断。最终助手消息、计划和 completed/result 在同一同步持久化事务提交，失败不吞异常。失败只由请求呈现，不另存助手技术错误；旧错误原文不改写，只在读取时映射安全说明，不按时间猜测关联。
 
@@ -392,4 +392,4 @@ Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓�
 
 `exportOrbit/restoreOrbit` 携带 `statisticsFilters`；旧备份 merge 保留目标值，replace 恢复 all/all，非法值在写入前拒绝。此偏好没有资源 ID，允许按既有账号恢复流程导入，不触发发信或 AI。
 
-请求状态中的俏皮话是前端展示：queued/running 每三秒轮换，终态和页面隐藏时停止计时，不进入消息、备份、日志或模型上下文。真实步骤、耗时、错误、取消与重试仍由既有请求状态决定。
+请求状态中的俏皮话是前端展示：queued/running每条独立随机停留2–5秒后从现有随机袋轮换，使用引号、独立的小型Loading和弱一级文字区分趣味文案；不是工具调用或真实进度。淡出/淡入与本地文案尺寸占位只影响展示，尊重reduced-motion；终态、卸载及页面隐藏清理/暂停俏皮话计时，后台暂停旋转。不进入消息、备份、日志或模型上下文。真实步骤、耗时、错误、取消与重试仍由既有请求状态决定。

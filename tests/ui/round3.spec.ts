@@ -1,3 +1,4 @@
+import { answerConfirmation } from './confirmation';
 import { test, expect } from '@playwright/test';
 import { fixtureToken } from './auth-fixture';
 import { checkVisual } from './visual-check';
@@ -27,7 +28,7 @@ for (const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (c
     await form.getByRole('button',{name:'创建提醒',exact:true}).click(); expect(writes).toBe(0); await expect(form).toBeVisible();
     await time.fill('09:37'); await form.getByRole('button',{name:'选择提醒时间',exact:true}).click();
     await checkVisual(page,`round3-time-${width}-${theme}.png`,false,false); await page.keyboard.press('Escape');
-    page.once('dialog',dialog=>dialog.accept()); await form.getByRole('button',{name:'取消',exact:true}).click();
+    await answerConfirmation(page, true, () => form.getByRole('button', {name:'取消',exact:true}).click());
     await page.goto(base+'/settings/notifications'); await page.getByRole('button',{name:'了解提醒收件邮箱',exact:true}).click();
     await expect(page.getByText('每日摘要、周期提醒和日报邮件共用此邮箱。',{exact:true})).toBeVisible(); await page.keyboard.press('Escape');
     await checkVisual(page,`round3-settings-${width}-${theme}.png`,false,false);

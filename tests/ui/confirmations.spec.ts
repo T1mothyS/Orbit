@@ -1,0 +1,60 @@
+import { test, expect } from '@playwright/test';
+import { fixtureToken } from './auth-fixture';
+import { checkVisual } from './visual-check';
+const base = 'http://127.0.0.1:4187';
+test('plan validation keeps the first error focused and failed changes editable', async ({page,context}) => {
+  const token=await fixtureToken(context,'preview-guards@example.invalid');await context.addInitScript(token=>localStorage.setItem('aicalendar_token',token),token);
+  const native:string[]=[];page.on('dialog',async d=>{native.push(d.type());await d.dismiss();});
+  await page.route('**/api/ai-schedule/history?*',async route=>{
+    const response=await route.fetch(),data=await response.json();
+    data.messages=[{id:'synthetic-validation',role:'assistant',type:'plan',text:'合成计划验证',timestamp:new Date().toISOString(),plan:{id:'synthetic-validation',expiresAt:new Date(Date.now()+60000).toISOString(),revision:1,state:'pending',warnings:[],operations:[{key:'0',type:'create',title:'合成验证待办',isUnscheduled:true}]}}];
+    await route.fulfill({response,json:data});
+  });
+  let saves=0;await page.route('**/api/ai-chat/plans/synthetic-validation/operations/0',route=>{saves++;return route.fulfill({status:503,json:{error:'合成保存失败，请重试'}});});
+  await page.goto(base+'/assistant');await page.getByRole('button',{name:'编辑计划项 合成验证待办',exact:true}).click();const editor=page.locator('.ai-plan-operation-editor'),title=editor.locator('[data-plan-field="title"] input');
+  await title.fill('');await editor.getByRole('button',{name:'保存这项',exact:true}).click();await expect(editor.getByRole('alert')).toHaveText('标题不能为空');await expect(title).toBeFocused();expect(saves).toBe(0);
+  await title.fill('失败后保留的修改');await editor.getByRole('button',{name:'保存这项',exact:true}).click();await expect(editor.getByRole('alert')).toHaveText('合成保存失败，请重试');await expect(title).toHaveValue('失败后保留的修改');expect(saves).toBe(1);expect(native).toEqual([]);
+});
+test('schedule detail popover stays inside the native top layer and Escape returns focus',async({page,context})=>{
+  const token=await fixtureToken(context,'preview-guards@example.invalid'),headers={Authorization:'Bearer '+token};await context.addInitScript(token=>localStorage.setItem('aicalendar_token',token),token);
+  const today=new Date().toLocaleDateString('sv-SE'),response=await context.request.post(base+'/api/schedules',{headers,data:{title:'合成详情确认',type:'event',start_time:today+'T10:00:00',calendar_id:'personal',priority:'medium',category:'other'}});expect(response.ok()).toBe(true);const id=(await response.json()).schedule.id;
+  await page.goto(base+'/schedule');await page.getByRole('button',{name:'切换到日程视图',exact:true}).click();await page.locator(`.agenda-view [data-schedule-id="${id}"]`).click();
+  const detail=page.locator('dialog[open]').filter({has:page.getByRole('button',{name:'关闭事项详情',exact:true})}),trigger=detail.getByRole('button',{name:'删除',exact:true});await trigger.click();const popup=page.getByRole('dialog',{name:'删除日程？',exact:true});await expect(popup).toBeVisible();expect(await popup.evaluate(e=>!!e.closest('dialog[open]'))).toBe(true);
+  await page.keyboard.press('Escape');await expect(popup).toHaveCount(0);await expect(detail).toBeVisible();await expect(trigger).toBeFocused();expect((await context.request.get(base+'/api/schedules/'+id,{headers})).ok()).toBe(true);
+  await detail.getByRole('button',{name:'关闭事项详情',exact:true}).click();await context.request.delete(base+'/api/schedules/'+id,{headers});
+});
+for (const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (const theme of ['light','dark']) test(`confirmation ${width} ${theme}: nested cancel, busy, failure and one delete`, async ({page,context}) => {
+  const token = await fixtureToken(context,'preview-guards@example.invalid'), headers = {Authorization:'Bearer '+token};
+  await context.addInitScript(({token,theme})=>{localStorage.setItem('aicalendar_token',token);localStorage.setItem('theme',theme);},{token,theme});await page.setViewportSize({width,height});await page.emulateMedia({reducedMotion:'reduce'});
+  const native:string[]=[];page.on('dialog',async d=>{native.push(d.type());await d.dismiss();});
+  await page.goto(base+'/schedule');const add=page.getByRole('button',{name:'添加日程',exact:true});await add.click();const form=page.getByRole('dialog',{name:'新增日程',exact:true});
+  await form.getByLabel('日程标题',{exact:true}).fill('不会丢失的合成草稿');await form.getByRole('button',{name:'关闭日程编辑',exact:true}).click();
+  const discard=page.getByRole('dialog',{name:'放弃未保存的修改？',exact:true});await expect(discard).toBeVisible();await expect(discard.getByRole('button',{name:'取消',exact:true})).toBeFocused();
+  await checkVisual(page,`confirmation-discard-${width}-${theme}.png`,false,false);await page.keyboard.press('Escape');await expect(discard).toHaveCount(0);await expect(form.getByLabel('日程标题',{exact:true})).toHaveValue('不会丢失的合成草稿');
+  await form.getByRole('button',{name:'关闭日程编辑',exact:true}).click();await discard.getByRole('button',{name:'放弃修改',exact:true}).click();await expect(form).toHaveCount(0);await expect(add).toBeFocused();
+  const title=`确认删除合成待办 ${width} ${theme}`;
+  const created=await context.request.post(base+'/api/schedules',{headers,data:{title,type:'todo',is_unscheduled:true,start_time:'2020-01-01T09:00:00',calendar_id:'personal',priority:'medium',category:'other'}});expect(created.ok()).toBe(true);const id=(await created.json()).schedule.id;
+  await page.goto(base+'/today');await page.getByRole('button',{name:'查看全部挂起待办',exact:true}).click();const drawer=page.getByRole('dialog',{name:'无固定期限待办',exact:true});
+  const trigger=drawer.getByRole('button',{name:'更多操作：'+title,exact:true});const ask=async()=>{await trigger.click();await page.getByRole('menuitem',{name:'删除',exact:true}).click();};
+  let calls=0, release!:()=>void;const hold=new Promise<void>(resolve=>release=resolve);
+  await page.route(`**/api/schedules/${id}`,async route=>{if(route.request().method()!=='DELETE')return route.continue();calls++;if(calls===1)return route.fulfill({status:503,json:{error:'合成删除失败'}});await hold;return route.continue();});
+  await ask();const popup=page.getByRole('dialog',{name:'删除待办？',exact:true});await expect(popup).toBeVisible();await popup.getByRole('button',{name:'取消',exact:true}).click();expect(calls).toBe(0);await expect(trigger).toBeFocused();
+  await ask();await popup.getByRole('button',{name:'删除待办',exact:true}).click();await expect(popup.getByRole('alert')).toContainText('操作未完成');expect((await context.request.get(base+'/api/schedules/'+id,{headers})).ok()).toBe(true);await expect(page.locator(`[data-confirm-anchor="todo-${id}"]`)).toHaveCount(1);
+  await checkVisual(page,`confirmation-delete-error-${width}-${theme}.png`,false,false);
+  await popup.getByRole('button',{name:'删除待办',exact:true}).click();await expect(popup.getByRole('button',{name:'取消',exact:true})).toBeDisabled();await page.keyboard.press('Escape');await expect(popup).toBeVisible();expect(calls).toBe(2);
+  release();await expect(popup).toHaveCount(0);await expect(trigger).toHaveCount(0);expect(calls).toBe(2);expect((await context.request.get(base+'/api/schedules/'+id,{headers})).status()).toBe(404);expect(native).toEqual([]);
+});
+for(const width of [390,1440])test(`tools dialogs ${width}: names, cancel, import and clipboard fallback`,async({page,context})=>{
+  const token=await fixtureToken(context,'preview-guards@example.invalid');await context.addInitScript(token=>localStorage.setItem('aicalendar_token',token),token);await page.setViewportSize({width,height:width===390?844:900});
+  const native:string[]=[];page.on('dialog',async d=>{native.push(d.type());await d.dismiss();});await page.goto(base+'/tools/poker-tracker/');const add=page.getByTitle('新建档案',{exact:true});await add.click();let dialog=page.getByRole('dialog',{name:'新建档案',exact:true});await dialog.getByRole('button',{name:'取消',exact:true}).click();await expect(add).toBeFocused();
+  await add.click();await dialog.getByRole('textbox',{name:'新建档案',exact:true}).fill('合成档案');await dialog.getByRole('button',{name:'创建档案',exact:true}).click();await expect(page.getByRole('button',{name:'删除档案：合成档案',exact:true})).toBeVisible();
+  const beforeRename=await page.evaluate(()=>localStorage.getItem('poker-tracker-v2'));await page.getByTitle('重命名当前档案',{exact:true}).click();dialog=page.getByRole('dialog',{name:'重命名档案',exact:true});await dialog.getByRole('textbox').fill('   ');await dialog.getByRole('button',{name:'保存名称',exact:true}).click();await expect(dialog.getByRole('alert')).toHaveText('请输入内容');expect(await page.evaluate(()=>localStorage.getItem('poker-tracker-v2'))).toBe(beforeRename);await dialog.getByRole('button',{name:'取消',exact:true}).click();
+  await page.getByTitle('重命名当前档案',{exact:true}).click();await dialog.getByRole('textbox').fill('合成改名');await dialog.getByRole('button',{name:'保存名称',exact:true}).click();await expect(page.getByRole('button',{name:'删除档案：合成改名',exact:true})).toBeVisible();
+  const state=await page.evaluate(()=>localStorage.getItem('poker-tracker-v2'));await page.getByRole('button',{name:'删除档案：合成改名',exact:true}).click();dialog=page.getByRole('dialog',{name:'删除档案？',exact:true});await checkVisual(page,`tool-delete-${width}.png`,false,false);await page.keyboard.press('Escape');expect(await page.evaluate(()=>localStorage.getItem('poker-tracker-v2'))).toBe(state);
+  await page.locator('#importInput').setInputFiles({name:'synthetic.json',mimeType:'application/json',buffer:Buffer.from(state!)});await page.getByRole('dialog',{name:'覆盖全部档案？',exact:true}).getByRole('button',{name:'取消',exact:true}).click();expect(await page.evaluate(()=>localStorage.getItem('poker-tracker-v2'))).toBe(state);
+  await page.goto(base+'/tools/codex-usage-dashboard-v3-1/');await page.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{readText:async()=>{throw new Error('synthetic permission denied');},writeText:async()=>{throw new Error('synthetic permission denied');}}});});
+  await page.locator('#pasteBtn').click();dialog=page.getByRole('dialog',{name:'粘贴 ccusage JSON',exact:true});await expect(dialog.getByRole('textbox')).toBeFocused();await checkVisual(page,`tool-paste-${width}.png`,false,false);await page.keyboard.press('Escape');await expect(page.locator('#pasteBtn')).toBeFocused();
+  await page.locator('#updateCcusageBtn').click();dialog=page.getByRole('dialog',{name:'复制更新命令',exact:true});await expect(dialog.getByRole('textbox')).toHaveAttribute('readonly','');await expect(dialog.getByRole('textbox')).not.toBeEmpty();await dialog.getByRole('button',{name:'完成',exact:true}).click();
+  await page.locator('#copyDailyCmd').click();dialog=page.getByRole('dialog',{name:'手动复制',exact:true});await expect(dialog.getByRole('textbox')).toHaveAttribute('readonly','');expect(await dialog.getByRole('textbox').evaluate((e:HTMLTextAreaElement)=>e.selectionEnd-e.selectionStart)).toBeGreaterThan(0);await dialog.getByRole('button',{name:'完成',exact:true}).click();
+  await page.locator('#pasteBtn').click();dialog=page.getByRole('dialog',{name:'粘贴 ccusage JSON',exact:true});await dialog.getByRole('textbox').fill(JSON.stringify({daily:[{date:'2026-10-20',inputTokens:1,outputTokens:2,totalTokens:3,totalCost:0}]}));await dialog.getByRole('button',{name:'导入 JSON',exact:true}).click();await expect(page.locator('#sumEntries')).toHaveText('1');await expect(page.locator('#statusDetail')).toContainText('已更新 daily 数据');expect(native).toEqual([]);
+});

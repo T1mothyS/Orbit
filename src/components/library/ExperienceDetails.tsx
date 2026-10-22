@@ -1,3 +1,4 @@
+import { useActionConfirmation } from '../../ui';
 import { Fragment, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { NoteImageGallery } from "../NoteImages";
@@ -94,6 +95,7 @@ export function ExperienceDetails({
   entry: LibraryEntry;
   onChanged: () => void;
 }) {
+  const confirmation = useActionConfirmation();
   const [session, setSession] = useState<ExperienceSession | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -114,35 +116,31 @@ export function ExperienceDetails({
   const meta = entry.metadata?.experience as ExperienceMetadata | undefined;
   const lifecycle = async (action: "archive" | "restore" | "purge") => {
     if (!session || busy) return;
-    if (
-      !window.confirm(
-        action === "purge"
+    await confirmation.run({ title: "更新经历状态？", description: action === "purge"
           ? "永久删除这条经历、全部复盘和照片？此操作无法撤回。"
           : action === "archive"
             ? "将这条经历移入已归档？"
-            : "恢复这条经历？",
-      )
-    )
-      return;
-    setBusy(true);
-    setError("");
-    try {
-      const current = await experienceApi("/" + session.id);
-      await experienceApi("/" + session.id + "/lifecycle", "POST", {
-        expectedRevision: current.revision,
-        action,
-        confirm: true,
-      });
-      if (action === "purge") navigate("/library");
-      else onChanged();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+            : "恢复这条经历？", confirmLabel: "确认操作", kind: action === 'purge' ? 'dialog' : 'popover' }, async () => {
+      setBusy(true);
+      setError("");
+      try {
+        const current = await experienceApi("/" + session.id);
+        await experienceApi("/" + session.id + "/lifecycle", "POST", {
+          expectedRevision: current.revision,
+          action,
+          confirm: true,
+        });
+        if (action === "purge") navigate("/library");
+        else onChanged();
+      } catch (e) {
+        setError((e as Error).message);
+       throw e; } finally {
+        setBusy(false);
+      }
+    });
   };
   return (
-    <section className="experience-memory-info">
+    <section className="experience-memory-info">{confirmation.dialog}
       <div className="experience-actions">
         {session && entry.status === "active" && (
           <Link

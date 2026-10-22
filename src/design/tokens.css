@@ -34,6 +34,10 @@
   --orbit-chat-selection: #b9d0ff;
   --orbit-chat-selection-text: #0b1c3e;
   --orbit-on-brand: rgb(var(--orbit-on-brand-rgb));
+  --orbit-note: #a94f69;
+  --orbit-note-hover: #94415a;
+  --orbit-note-active: #80334b;
+  --orbit-on-note: #ffffff;
   --orbit-destructive: #b42318;
   --orbit-destructive-hover: #912018;
   --orbit-destructive-soft: #fff0ee;
@@ -77,6 +81,10 @@
 #root { isolation: isolate; }
 
 .dark {
+  --orbit-note: #d38ba0;
+  --orbit-note-hover: #dfa0b2;
+  --orbit-note-active: #e8b1c0;
+  --orbit-on-note: #29131b;
   --orbit-action: #344f78;
   --orbit-action-text: #f1f5fc;
   --orbit-action-hover: #3d5c8b;

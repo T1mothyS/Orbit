@@ -1,3 +1,4 @@
+import { answerConfirmation } from './confirmation';
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { fixtureToken } from './auth-fixture';
 import { checkVisual } from './visual-check';
@@ -64,9 +65,9 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
     await expect(dialog.getByRole('button', { name: '创建提醒', exact: true })).toBeInViewport({ ratio: 1 });
     await dialog.getByLabel('优先级', { exact: true }).scrollIntoViewIfNeeded();
     await expect(dialog.getByRole('combobox', { name: '优先级', exact: true })).toContainText('高');
-    page.once('dialog', native => native.dismiss()); await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    await answerConfirmation(page, false, () => dialog.getByRole('button', {name:'取消',exact:true}).click());
     await expect(dialog.getByLabel('提前提醒天数', { exact: true })).toHaveValue('30,7,0');
-    page.once('dialog', native => native.accept()); await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    await answerConfirmation(page, true, () => dialog.getByRole('button', {name:'取消',exact:true}).click());
     await expect(dialog).toHaveCount(0); await expect(trigger).toBeFocused(); expect(errors).toEqual([]);
   });
 }
@@ -158,11 +159,11 @@ for (const width of [390,1440]) test(`stage2 C4 five standalone tools ${width}: 
   const state=await page.evaluate(()=>localStorage.getItem('poker-tracker-v2'));const download=page.waitForEvent('download');await page.getByRole('button',{name:'导出',exact:true}).click();const file=await download;expect(file.suggestedFilename()).toMatch(/\.json$/);const stream=await file.createReadStream();const chunks:Buffer[]=[];for await(const chunk of stream!)chunks.push(Buffer.from(chunk));expect(JSON.parse(Buffer.concat(chunks).toString())).toEqual(JSON.parse(state!));
   await page.reload();await expect(card).toHaveAttribute('aria-pressed','true');await capture('poker');
   const batch=page.getByRole('button',{name:'批量识别',exact:true});await batch.click();await expect(page.getByRole('dialog',{name:'批量识别导入',exact:true})).toBeVisible();await expect(page.getByLabel('批量牌面文字',{exact:true})).toBeFocused();await page.setViewportSize({width,height:520});await page.getByRole('button',{name:'关闭批量识别',exact:true}).scrollIntoViewIfNeeded();await checkVisual(page,`stage2-tool-poker-batch-${width}.png`,false,false);await page.keyboard.press('Escape');await expect(batch).toBeFocused();
-  page.once('dialog',dialog=>dialog.accept());await page.locator('#importInput').setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer:Buffer.from(state!)});await expect(page.locator('#progressCount')).toHaveText('1');expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('poker-tracker-v2')!))).toEqual(JSON.parse(state!));
+  await page.locator('#importInput').setInputFiles({name:'synthetic-backup.json',mimeType:'application/json',buffer:Buffer.from(state!)});await page.getByRole('dialog',{name:'覆盖全部档案？',exact:true}).getByRole('button',{name:'确认覆盖',exact:true}).click();await expect(page.locator('#progressCount')).toHaveText('1');expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('poker-tracker-v2')!))).toEqual(JSON.parse(state!));
   await page.setViewportSize({width,height:width===390?844:900});await page.goto(base+'/tools/pelican-bicycle/');const toggle=page.locator('#toggle');await toggle.click();await expect(toggle).toHaveAttribute('aria-pressed','true');await page.locator('#speed').fill('1.5');await expect(page.locator('#rate')).toHaveText('1.5×');await capture('pelican');
   await page.goto(base+'/tools/evolution-slider/');await expect(page.locator('#strength')).toBeEnabled();await page.locator('#strength').focus();await page.keyboard.press('End');await expect(page.locator('#score')).toHaveText('+15.00');await expect(page.locator('[data-stage="5"]')).toHaveAttribute('aria-pressed','true');await page.locator('.reset').click();await expect(page.locator('#score')).toHaveText('−15.00');await capture('evolution');
   await page.goto(base+'/tools/codex-usage-dashboard-v3-1/');await expect(page.locator('#statusBadge')).toHaveText('DEMO');await expect(page.locator('#sumEntries')).not.toHaveText('—');await page.locator('[data-r="7"]').click();await expect(page.locator('[data-r="7"]')).toHaveClass(/active/);await page.locator('#statMetric').selectOption('outputTokens');await capture('usage');
-  await page.goto(base+'/tools/alipay-growth-planner/');await expect(page.locator('#chart svg.main-svg').first()).toBeVisible({timeout:20_000});await expect(page.locator('#mMonthly')).not.toBeEmpty();await page.locator('#wealthAum').fill('30000');await page.getByRole('button',{name:'重新计算',exact:true}).click();await expect(page.locator('#statusBadge')).toContainText('30,000');page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'保存参数',exact:true}).click();await page.reload();await expect(page.locator('#wealthAum')).toHaveValue('30000');await capture('alipay');
+  await page.goto(base+'/tools/alipay-growth-planner/');await expect(page.locator('#chart svg.main-svg').first()).toBeVisible({timeout:20_000});await expect(page.locator('#mMonthly')).not.toBeEmpty();await page.locator('#wealthAum').fill('30000');await page.getByRole('button',{name:'重新计算',exact:true}).click();await expect(page.locator('#statusBadge')).toContainText('30,000');await page.getByRole('button',{name:'保存参数',exact:true}).click();await expect(page.locator('#settings-save-feedback')).toContainText('参数已保存在当前浏览器');await page.reload();await expect(page.locator('#wealthAum')).toHaveValue('30000');await capture('alipay');
   const table=page.getByRole('region',{name:'成长值断点明细，可横向滚动',exact:true});await expect(table).toBeVisible();if(width===390)expect(await table.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
   expect(errors).toEqual([]);
 });
@@ -227,7 +228,7 @@ test('stage2 C4 admin failures, rollback, confirmation cancellation and manual l
   await page.route('**/api/admin/users/preview-empty/clear-data',route=>{dangerWrites++;return route.continue();});
   await sharing.click();await expect(account.getByRole('alert')).toContainText('合成共享更新失败');await expect(sharing).not.toBeChecked();
   failSharing=false;await sharing.click();await expect(sharing).toBeChecked();expect(sharingWrites).toBe(2);
-  await account.locator('summary').click();for(const name of ['清空数据','删除用户']){page.once('dialog',dialog=>dialog.dismiss());await account.getByRole('button',{name,exact:true}).click();}expect(dangerWrites).toBe(0);
+  await account.locator('summary').click();for(const name of ['清空数据','删除用户']){await answerConfirmation(page,false,()=>account.getByRole('button',{name,exact:true}).click(),name==='清空数据'?'清空账号数据？':'永久删除账号？');}expect(dangerWrites).toBe(0);
   await expect(account.getByRole('button',{name:'完成',exact:true})).toBeInViewport({ratio:1});await account.getByRole('button',{name:'完成',exact:true}).click();
   let failLogs=false,clears=0;const requests:string[]=[];
   await page.route('**/api/logs?**',route=>{requests.push(route.request().url());return route.fulfill(failLogs?{status:503,json:{error:'合成日志读取失败'}}:{json:{logs:[{timestamp:'2026-10-18T06:00:00Z',level:'info',category:'admin',message:'应保留的合成日志'}],total:1,max:2000}});});
@@ -236,7 +237,7 @@ test('stage2 C4 admin failures, rollback, confirmation cancellation and manual l
   await admin.getByRole('switch',{name:'自动刷新日志',exact:true}).click();
   await admin.getByRole('combobox',{name:'日志级别筛选',exact:true}).click();await page.getByRole('option',{name:'错误',exact:true}).click();await expect.poll(()=>requests.some(url=>url.includes('level=error'))).toBe(true);
   failLogs=true;await admin.getByRole('button',{name:'刷新',exact:true}).click();await expect(admin.getByRole('alert')).toContainText('合成日志读取失败');await expect(admin.getByText('应保留的合成日志',{exact:true})).toBeVisible();
-  page.once('dialog',dialog=>dialog.accept());await admin.getByRole('button',{name:'清空',exact:true}).click();await expect(admin.getByRole('alert')).toContainText('合成清空失败');await expect(admin.getByText('应保留的合成日志',{exact:true})).toBeVisible();expect(clears).toBe(1);
+  await admin.getByRole('button',{name:'清空',exact:true}).click();const clearConfirm=page.getByRole('dialog',{name:'清空调试日志？',exact:true});await clearConfirm.getByRole('button',{name:'清空日志',exact:true}).click();await expect(clearConfirm.getByRole('alert')).toContainText('合成清空失败');await clearConfirm.getByRole('button',{name:'取消',exact:true}).click();await expect(admin.getByRole('alert')).toContainText('合成清空失败');await expect(admin.getByText('应保留的合成日志',{exact:true})).toBeVisible();expect(clears).toBe(1);
   failLogs=false;await admin.getByRole('button',{name:'重试读取',exact:true}).click();await expect(admin.getByRole('alert')).toHaveCount(0);
 });
 
@@ -272,9 +273,9 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
     await expect(page.locator('.library-card').first()).toBeVisible(); await expect(page.locator('.library-card.article')).toHaveCount(0);
     await page.goto(base + '/reports'); await expect(page.locator('.daily-report-featured')).toBeVisible(); await capture('reports');
     await page.locator('.daily-report-featured-open').click(); await expect(page.locator('.daily-report-reader-markdown')).toBeVisible(); await capture('report-reader');
-    await page.goto(base + '/project'); await expect(page.locator('.evolution-detail h2')).toBeVisible(); await capture('growth');
-    await page.locator('#evolution-milestone').selectOption('retrieval'); await expect(page).toHaveURL(/milestone=retrieval/);
-    await page.locator('#evolution-architecture').scrollIntoViewIfNeeded(); await expect(page.locator('.evolution-node-list')).toBeVisible(); await capture('architecture');
+    await page.goto(base + '/project'); await expect(page.locator('.evolution-story-copy h2')).toBeVisible(); await capture('growth');
+    await page.locator('[data-milestone="' + 'retrieval' + '"]').click(); await expect(page).toHaveURL(/milestone=retrieval/);
+    await page.locator('#evolution-architecture').scrollIntoViewIfNeeded(); await expect(page.locator('.evolution-node-list')).toBeHidden(); await page.getByText('全部模块与连接说明',{exact:true}).click(); await expect(page.locator('.evolution-node-list')).toBeVisible(); await capture('architecture');
     await page.locator('.evolution-node-list button').first().click(); await expect(page.locator('.evolution-node-detail h3')).toBeVisible();
     await page.goto(base + '/project?view=statistics'); await expect(page.getByRole('heading', { name: '执行趋势', exact: true })).toBeVisible(); await capture('statistics');
     await expect(page.locator('.activity-filter-controls,.activity-date')).toHaveCount(0);
@@ -314,7 +315,7 @@ for (const width of [390, 1440]) test(`stage2 C2 research ${width}: evidence bef
   await expect(page.getByText('合成事件证据 · 第 1 版', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '确认观点', exact: true })).toBeEnabled();
   await checkVisual(page, `stage2-research-review-${width}.png`, false, false);
-  page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: '确认观点', exact: true }).click(); expect(decisions).toBe(0);
+  await answerConfirmation(page, false, () => page.getByRole('button', { name: '确认观点', exact: true }).click(), '确认观点决定？'); expect(decisions).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -357,7 +358,7 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
     await drawer.locator('article').first().getByRole('button', {name:/更多操作：/}).click();
     await page.getByRole('menuitem', {name:'编辑',exact:true}).click();
     await expect(page.getByLabel('日程标题', {exact:true})).toBeVisible();
-    page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', {name:'关闭日程编辑',exact:true}).click();
+    await answerConfirmation(page, true, () => page.getByRole('button', {name:'关闭日程编辑',exact:true}).click());
     await expect(page.getByLabel('日程标题', {exact:true})).toHaveCount(0); await expect(drawer).toBeVisible();
     await drawer.getByRole('button', {name:'关闭',exact:true}).click(); await expect(trigger).toBeFocused();
     await page.goto(base + '/reminders'); await page.getByRole('button', {name:'+ 新建提醒',exact:true}).click();
@@ -392,8 +393,8 @@ test('stage2 C3 completion errors retain a task, retry/reopen and deletion cance
   await expect(drawer.getByRole('alert')).toContainText('合成更新失败'); await expect(complete).toBeVisible();
   failure=false; await complete.click(); const reopen=drawer.getByRole('button',{name:'设为未完成：'+title,exact:true}); await expect(reopen).toBeVisible();
   await reopen.click(); await expect(complete).toBeVisible(); expect(writes).toBe(3);
-  await drawer.getByRole('button',{name:'更多操作：'+title,exact:true}).click(); page.once('dialog',dialog=>dialog.dismiss());
-  await page.getByRole('menuitem',{name:'删除',exact:true}).click();
+  await drawer.getByRole('button',{name:'更多操作：'+title,exact:true}).click();
+  await answerConfirmation(page,false,()=>page.getByRole('menuitem',{name:'删除',exact:true}).click(),'删除待办？');
   expect((await context.request.get(base + '/api/schedules/'+id,{headers})).ok()).toBe(true);
   await drawer.getByRole('button',{name:'关闭',exact:true}).click();
   await context.request.delete(base + '/api/schedules/'+id,{headers});
@@ -405,8 +406,8 @@ test('stage2 C3 recurring long form keeps drafts and close protection at low hei
   const dialog=page.getByRole('dialog',{name:'新建周期提醒',exact:true});await dialog.getByLabel('任务名称',{exact:true}).fill('保留的长表单草稿');
   await dialog.getByRole('button',{name:'生活事务',exact:true}).click();
   const submit=dialog.getByRole('button',{name:'创建提醒',exact:true});await submit.scrollIntoViewIfNeeded();await expect(submit).toBeInViewport({ratio:1});
-  page.once('dialog',native=>native.dismiss());await dialog.getByRole('button',{name:'取消',exact:true}).click();await expect(dialog.getByLabel('任务名称',{exact:true})).toHaveValue('保留的长表单草稿');
-  page.once('dialog',native=>native.accept());await dialog.getByRole('button',{name:'取消',exact:true}).click();await expect(dialog).toHaveCount(0);
+  await answerConfirmation(page, false, () => dialog.getByRole('button', {name:'取消',exact:true}).click());await expect(dialog.getByLabel('任务名称',{exact:true})).toHaveValue('保留的长表单草稿');
+  await answerConfirmation(page, true, () => dialog.getByRole('button', {name:'取消',exact:true}).click());await expect(dialog).toHaveCount(0);
 });
 
 

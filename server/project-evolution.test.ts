@@ -8,9 +8,25 @@ import { createApp } from './app.js';
 import { createAuth } from './auth.js';
 import { createProjectEvolutionRouter, validateEvolution } from './project-evolution.js';
 import { architectureChanges, type EvolutionData } from '../src/types/project-evolution.js';
+import { architectureFocus, architectureGroups, compactArchitecture, compactNode, storySnapshots, evolutionSequence, relationChange } from '../src/utils/evolution-presentation.js';
 import { collectFact, isSource, nonemptyLines } from '../scripts/project-evolution-lib.js';
 
 const readData = () => JSON.parse(fs.readFileSync('project-evolution/generated.json', 'utf8')) as EvolutionData;
+test('compact display preserves every historical node, relation and original coordinate without overlaps', () => {
+  const data = readData(), original = JSON.stringify(data);
+  for (const snapshot of data.snapshots) for (const width of [360, 1000, 1440, 2200]) {
+    const layout = compactArchitecture(snapshot.nodes, width);
+    assert.deepEqual(new Set(layout.nodes.map(n => n.id)), new Set(snapshot.nodes.map(n => n.id)));
+    for (const node of layout.nodes) {
+      assert.ok(node.x >= 0 && node.y >= 0 && node.x + compactNode.width <= layout.width && node.y + compactNode.height <= layout.height);
+      assert.ok(snapshot.nodes.some(old => old.id === node.id && old.label === node.label && old.group === node.group && old.description === node.description));
+      for (const other of layout.nodes.filter(n => n.id !== node.id)) assert.ok(node.x + compactNode.width <= other.x || other.x + compactNode.width <= node.x || node.y + compactNode.height <= other.y || other.y + compactNode.height <= node.y);
+    }
+    assert.ok(snapshot.edges.every(edge => layout.nodes.some(n => n.id === edge.source) && layout.nodes.some(n => n.id === edge.target)));
+  }
+  assert.equal(JSON.stringify(data), original);
+  assert.ok(compactArchitecture(data.snapshots.at(-1)!.nodes, 1000).height < 800);
+});
 test('evolution curated record validates and metrics retain unknown tests', () => {
   const data = readData(); validateEvolution(data);
   assert.ok(data.milestones.length >= 15, 'The original growth history must remain available');
@@ -81,4 +97,37 @@ test('evolution API requires valid active account, shares only project facts and
     const failed = await request(auth.signUserToken(users[1])); assert.equal(failed.status, 503);
     assert.deepEqual(await failed.json(), { error: '项目成长记录暂不可用，请稍后重试' });
   } finally { listener.closeAllConnections(); await new Promise<void>(resolve => listener.close(() => resolve())); fs.rmSync(temp, { recursive: true, force: true }); }
+});
+
+test('story projection preserves chronological references and accounts for every historical relation', () => {
+  const data = readData(), before = JSON.stringify(data), sequence = storySnapshots(data);
+  assert.equal(sequence.length, 5);
+  assert.equal(sequence.at(-1)?.id, data.snapshots.at(-1)?.id);
+  assert.deepEqual(sequence.map(s => data.snapshots.indexOf(s)), [...sequence.map(s => data.snapshots.indexOf(s))].sort((a, b) => a - b));
+  data.snapshots.forEach((snapshot, index) => {
+    const diff = architectureChanges(data.snapshots[index - 1], snapshot), projection = architectureGroups(diff);
+    assert.equal(projection.groups.reduce((sum, group) => sum + group.nodes.length, 0), diff.nodes.length);
+    assert.equal(projection.relations.reduce((sum, edge) => sum + edge.count, 0), diff.edges.length);
+    for (const relation of projection.relations) assert.equal(Object.values(relation.changes).reduce((sum, count) => sum + count, 0), relation.count);
+    for (const change of ['added', 'changed', 'removed', 'unchanged'] as const) assert.equal(projection.relations.reduce((sum, relation) => sum + relation.changes[change], 0), diff.edges.filter(edge => edge.change === change).length);
+    for (const node of diff.nodes) {
+      const focus = architectureFocus(diff, node.id), grouped = architectureGroups(diff, node.id);
+      assert.ok(focus.nodes.has(node.id));
+      assert.ok(focus.edges.every(edge => edge.source === node.id || edge.target === node.id));
+      assert.equal(grouped.relations.reduce((sum, edge) => sum + edge.focused, 0), focus.edges.length);
+    }
+  });
+  assert.equal(JSON.stringify(data), before, 'Presentation cannot rewrite historical facts or positions');
+});
+
+test('milestone playback preserves every story and reused snapshot; mixed connections retain all statuses', () => {
+  const data = readData(), before = JSON.stringify(data), history = evolutionSequence(data, 'history');
+  assert.deepEqual(history, data.milestones);
+  assert.equal(history.filter(item => !data.snapshots.some(snapshot => snapshot.milestone === item.id)).length, 23);
+  assert.deepEqual(evolutionSequence(data, 'story').map(item => item.snapshot), storySnapshots(data).map(item => item.id));
+  assert.equal(relationChange({ added: 1, changed: 2, removed: 3, unchanged: 4 }), 'added');
+  assert.equal(relationChange({ added: 0, changed: 2, removed: 3, unchanged: 4 }), 'changed');
+  assert.equal(relationChange({ added: 0, changed: 0, removed: 3, unchanged: 4 }), 'removed');
+  assert.equal(relationChange({ added: 0, changed: 0, removed: 0, unchanged: 4 }), 'unchanged');
+  assert.equal(JSON.stringify(data), before);
 });

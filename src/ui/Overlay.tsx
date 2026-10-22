@@ -18,17 +18,18 @@ export interface DialogProps {
   size?: 'default' | 'wide';
   initialFocus?: RefObject<HTMLElement | null>;
   returnFocus?: RefObject<HTMLElement | null>;
+  portalContainer?: HTMLElement | null;
 }
-function Overlay({ open, onOpenChange, title, description, children, footer, busy = false, canClose, size = 'default', initialFocus, returnFocus, sheet = false }: DialogProps & { sheet?: boolean }) {
+function Overlay({ open, onOpenChange, title, description, children, footer, busy = false, canClose, size = 'default', initialFocus, returnFocus, portalContainer, sheet = false }: DialogProps & { sheet?: boolean }) {
   const close = useRef<HTMLButtonElement>(null);
   return <PrimitiveDialog.Root open={open} onOpenChange={(next, details) => {
     if (!next && (busy || canClose?.() === false)) details.cancel(); else onOpenChange(next);
   }} disablePointerDismissal={busy}>
-    <PrimitiveDialog.Portal>
+    <PrimitiveDialog.Portal container={portalContainer ?? undefined}>
       <PrimitiveDialog.Backdrop className="oui-backdrop" />
       <PrimitiveDialog.Viewport className={`oui-overlay ${sheet ? 'oui-overlay--sheet' : ''}`}>
         <PrimitiveDialog.Popup className={`oui-root oui-popup${size === 'wide' ? ' oui-popup--wide' : ''} ${sheet ? 'oui-sheet' : ''}`} aria-busy={busy || undefined}
-          initialFocus={initialFocus || close} finalFocus={returnFocus}>
+          initialFocus={initialFocus || close} finalFocus={returnFocus} onKeyDown={event => { if (event.key === 'Escape' && portalContainer) { event.preventDefault(); event.stopPropagation(); if (!busy) onOpenChange(false); } }}>
           <header className="oui-popup-header"><div><PrimitiveDialog.Title className="oui-popup-title">{title}</PrimitiveDialog.Title>
             {description && <PrimitiveDialog.Description className="oui-help">{description}</PrimitiveDialog.Description>}</div>
             <PrimitiveDialog.Close render={<IconButton ref={close} label={`关闭${title}`} variant="quiet" disabled={busy}><X size={19} /></IconButton>} />
@@ -91,10 +92,27 @@ export function Tooltip({ children, content }: { children: ReactElement; content
     <PrimitiveTooltip.Portal><PrimitiveTooltip.Positioner sideOffset={6} className="oui-positioner"><PrimitiveTooltip.Popup id={id} role="tooltip" aria-hidden={!open || undefined} className="oui-tooltip">{content}</PrimitiveTooltip.Popup></PrimitiveTooltip.Positioner></PrimitiveTooltip.Portal>
   </PrimitiveTooltip.Root>;
 }
-export function Popover({ trigger, title, children, openOnHover = false, open, onOpenChange, align = 'center', className = '' }: { trigger: ReactElement; title: string; children: ReactNode; openOnHover?: boolean; open?: boolean; onOpenChange?: (open: boolean) => void; align?: 'start' | 'center' | 'end'; className?: string }) {
+export function Popover({ trigger, title, children, openOnHover = false, open, onOpenChange, align = 'center', className = '', portalContainer }: { trigger: ReactElement; title: string; children: ReactNode; openOnHover?: boolean; open?: boolean; onOpenChange?: (open: boolean) => void; align?: 'start' | 'center' | 'end'; className?: string; portalContainer?: HTMLElement | null }) {
   return <PrimitivePopover.Root open={open} onOpenChange={onOpenChange}><PrimitivePopover.Trigger render={trigger} openOnHover={openOnHover} />
-    <PrimitivePopover.Portal><PrimitivePopover.Positioner side="bottom" align={align} sideOffset={8} className="oui-positioner">
+    <PrimitivePopover.Portal container={portalContainer ?? undefined}><PrimitivePopover.Positioner side="bottom" align={align} sideOffset={8} className="oui-positioner">
       <PrimitivePopover.Popup className={`oui-menu oui-popover ${className}`}><PrimitivePopover.Title className="oui-label">{title}</PrimitivePopover.Title>{children}</PrimitivePopover.Popup>
+    </PrimitivePopover.Positioner></PrimitivePopover.Portal>
+  </PrimitivePopover.Root>;
+}
+
+/** Lightweight confirmation anchored to a persistent control, including inside native dialogs. */
+export function ConfirmPopover({ open, onOpenChange, title, description, confirmLabel, onConfirm, anchor, portalContainer, busy, error, returnFocus }: {
+  open: boolean; onOpenChange: (open: boolean) => void; title: string; description: string; confirmLabel: string;
+  onConfirm: () => void; anchor: HTMLElement; portalContainer?: HTMLElement | null; busy?: boolean; error?: string; returnFocus: RefObject<HTMLElement | null>;
+}) {
+  const cancel = useRef<HTMLButtonElement>(null);
+  return <PrimitivePopover.Root open={open} modal onOpenChange={(next, details) => { if (!next && busy) details.cancel(); else onOpenChange(next); }}>
+    <PrimitivePopover.Portal container={portalContainer ?? undefined}><PrimitivePopover.Positioner anchor={anchor} align="end" sideOffset={8} className="oui-positioner">
+      <PrimitivePopover.Popup className="oui-root oui-menu oui-confirm-popover" initialFocus={cancel} finalFocus={returnFocus} aria-busy={busy || undefined} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (!busy) onOpenChange(false); } }}>
+        <PrimitivePopover.Title className="oui-label">{title}</PrimitivePopover.Title><PrimitivePopover.Description className="oui-help">{description}</PrimitivePopover.Description>
+        {error && <p role="alert" className="oui-confirm-error">{error}</p>}
+        <div className="oui-confirm-actions"><PrimitivePopover.Close render={<Button ref={cancel} disabled={busy}>取消</Button>} /><Button variant="danger" onClick={onConfirm} loading={busy}>{confirmLabel}</Button></div>
+      </PrimitivePopover.Popup>
     </PrimitivePopover.Positioner></PrimitivePopover.Portal>
   </PrimitivePopover.Root>;
 }

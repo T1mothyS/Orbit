@@ -51,104 +51,92 @@ const errors = [], checks = [];
       const widths = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
       assert.ok(widths[0] <= widths[1] + 1, `${label}: ${widths}`); checks.push(label);
     };
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto(base + '/tools'); await page.getByText('合成测试工具', { exact: true }).waitFor();
-    assert.ok(!assets.some(a => a.includes('ProjectEvolutionPage'))); checks.push('project assets not loaded on tools');
+    assert.ok(!assets.some(a => a.includes('ProjectEvolutionPage'))); checks.push('project assets are lazy');
+    const latest = data.milestones.at(-1).id;
     for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]) {
       await page.setViewportSize({ width, height });
       for (const theme of ['light', 'dark']) {
         await page.evaluate(theme => localStorage.setItem('theme', theme), theme);
-        await page.goto(base + '/project'); await page.getByRole('heading', { name: '继续打磨正确性与诊断', exact: true }).waitFor();
-        assert.equal(await page.title(), 'AI Calendar - 项目成长');
+        await page.goto(base + '/project?view=architecture&milestone=' + latest); await page.locator('.evolution-timeline').waitFor();
+        assert.equal(await page.title(), 'Orbit - 项目成长');
         assert.equal(await page.locator('html').evaluate(e => e.classList.contains('dark')), theme === 'dark');
-        await noOverflow(`${width} ${theme} growth`);
-        const scroller = page.locator('.evolution-page');
-        await scroller.hover(); await page.mouse.wheel(0, 600);
-        await page.waitForFunction(() => document.querySelector('.evolution-page').scrollTop > 0);
-        await scroller.evaluate(e => { e.tabIndex = 0; e.focus(); });
-        await page.keyboard.press('Control+End');
+        await noOverflow(`${width} ${theme} overview`);
+        assert.equal(await page.locator('.evolution-overview-group').count(), 4);
+        assert.ok(await page.locator('.evolution-overview').evaluate(e => e.scrollWidth <= e.clientWidth + 1));
+        await page.locator('.evolution-overview').scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(output, `${width}-${theme}-architecture.png`) });
+        await page.locator('[data-milestone="' + 'retrieval' + '"]').click();
+        await page.getByText('全部模块与连接说明', {exact:true}).click(); await page.locator('.evolution-node-list button').filter({ hasText: '知识检索' }).click();
+        assert.match(await page.locator('.evolution-node-detail').innerText(), /知识检索/);
+        assert.ok(await page.locator('.evolution-related-list button').count() > 0);
+        await page.screenshot({ path: path.join(output, `${width}-${theme}-focus.png`) });
+        await page.getByRole('button', { name: '完整架构', exact: true }).click();
+        await page.getByRole('button', { name: '缩小架构图' }).click();
+        await page.getByRole('button', { name: '适应画布', exact: true }).click();
+        await noOverflow(`${width} ${theme} full map`);
+        await page.getByRole('button', { name: '简明架构', exact: true }).click();
+        await page.getByText('趋势、测试与工程证据', {exact:true}).click(); await page.locator('.evolution-metrics').scrollIntoViewIfNeeded();
+        assert.equal(await page.locator('.evolution-test-evidence li').count(), data.milestones.filter(m => m.tests).length);
+        await page.screenshot({ path: path.join(output, `${width}-${theme}-metrics.png`) });
+        const scroller = page.locator('.evolution-page'); await scroller.hover(); await page.mouse.wheel(0, 600);
+        await scroller.evaluate(e => { e.tabIndex = 0; e.focus(); }); await page.keyboard.press('Control+End');
         await page.waitForFunction(() => { const e = document.querySelector('.evolution-page'); return e.scrollTop + e.clientHeight >= e.scrollHeight - 2; });
         checks.push(`${width} ${theme} wheel and keyboard bottom reachable`);
-        await scroller.evaluate(e => { e.scrollTop = 0; });
-
-        await page.screenshot({ path: path.join(output, `${width}-${theme}-growth.png`), fullPage: true });
-        await page.locator('.evolution-detail').scrollIntoViewIfNeeded();
-        await page.screenshot({ path: path.join(output, `${width}-${theme}-detail.png`) });
-        await page.getByRole('button', { name: '打开设置', exact: true }).click();
-        await page.locator('.settings-header-links').waitFor();
-        await page.waitForTimeout(400); // TDesign opening transition must finish before visual evidence.
-        await noOverflow(`${width} ${theme} settings`);
-        const close = await page.getByRole('button', { name: '关闭设置', exact: true }).boundingBox();
-        assert.ok(close && close.x + close.width <= width && close.y + close.height <= height);
-        await page.screenshot({ path: path.join(output, `${width}-${theme}-settings.png`) });
-        if (width === 1440) await page.locator('.settings-dialog-toolbar').screenshot({ path: path.join(output, `${theme}-settings-header.png`) });
-        await page.locator('.settings-header-links').getByRole('button', { name: 'Tools 工具中心', exact: true }).click();
-        await page.getByText('合成测试工具', { exact: true }).waitFor();
-        await page.getByRole('button', { name: '打开设置', exact: true }).click();
-        await page.locator('.settings-header-links').getByRole('button', { name: '项目成长', exact: true }).click();
-        await page.getByRole('heading', { name: '继续打磨正确性与诊断', exact: true }).waitFor();
-        await page.getByRole('button', { name: '架构演化', exact: true }).click();
-        await page.getByRole('heading', { name: '这一刻，系统怎样连接', exact: true }).waitFor();
-        await page.locator('#evolution-milestone').selectOption('retrieval');
-        await page.locator('.evolution-node-list').getByRole('button', { name: '知识检索 新增' }).click();
-        assert.match(await page.locator('.evolution-node-detail').innerText(), /新增/);
-        await noOverflow(`${width} ${theme} architecture`);
-        if (width < 640) await page.getByRole('button', { name: '展开完整图' }).click();
-        await page.getByRole('button', { name: '缩小架构图' }).click();
-        await page.getByRole('button', { name: '复位', exact: true }).click();
-        await page.locator('.evolution-map-scroll').scrollIntoViewIfNeeded();
-        await page.screenshot({ path: path.join(output, `${width}-${theme}-architecture.png`), fullPage: true });
-        await page.reload(); await page.locator('#evolution-milestone').waitFor();
-        assert.equal(await page.locator('#evolution-milestone').inputValue(), 'retrieval');
-        assert.ok(await page.getByRole('heading', { name: '这一刻，系统怎样连接', exact: true }).isVisible());
+        await page.reload(); await page.locator('.evolution-timeline').waitFor();
+        assert.equal(await page.locator('.evolution-page').getAttribute('data-current-milestone'), 'retrieval');
       }
     }
-    const touchContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-    await touchContext.addInitScript(() => localStorage.setItem('aicalendar_token', 'synthetic-only'));
-    await touchContext.route('**/*', api);
-    const touchPage = await touchContext.newPage(); await touchPage.goto(base + '/project');
-    await touchPage.locator('.evolution-page').waitFor();
-    const cdp = await touchContext.newCDPSession(touchPage);
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 190, y: 700 }] });
-    for (const y of [600, 450, 300, 180]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 190, y }] });
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    await touchPage.waitForFunction(() => document.querySelector('.evolution-page').scrollTop > 0);
-    checks.push('mobile touch scroll moves page'); await touchContext.close();
-    await page.locator('#evolution-milestone').selectOption('cloud');
-    await page.goBack(); assert.equal(await page.locator('#evolution-milestone').inputValue(), 'retrieval');
-    await page.goForward(); assert.equal(await page.locator('#evolution-milestone').inputValue(), 'cloud'); checks.push('history navigation and deep link');
-    await page.getByRole('button', { name: '成长历程', exact: true }).click();
-    await page.locator('#evolution-milestone').selectOption('baseline');
-    await page.locator('.evolution-day-toggle').first().click();
-    assert.equal(await page.locator('.evolution-day-toggle').first().getAttribute('aria-expanded'), 'false');
-    assert.equal(await page.locator('.evolution-stop.is-selected button[aria-pressed=true]').count(), 3);
-    await page.locator('.evolution-day-toggle').first().click();
-    assert.equal(await page.locator('.evolution-day-toggle').first().getAttribute('aria-expanded'), 'true'); checks.push('same-day grouping and synchronized three tracks');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.getByRole('button', { name: '完整架构', exact: true }).click();
+    for (const snapshot of data.snapshots) {
+      await page.locator('[data-milestone="' + snapshot.milestone + '"]').click();
+      const priorMilestone = data.milestones[data.milestones.findIndex(item => item.id === snapshot.milestone) - 1], prior = data.snapshots.find(item => item.id === priorMilestone?.snapshot);
+      // Select full history so the comparison always uses the adjacent historical snapshot.
+      await page.getByRole('button', { name: `完整历史 · ${data.milestones.length} 个里程碑`, exact: true }).click();
+      const expected = new Set([...snapshot.nodes, ...(prior?.nodes || [])].map(n => n.id)).size;
+      assert.equal(await page.locator('.evolution-map [data-node]').count(), expected);
+      const geometry = await page.locator('.evolution-map').evaluate(map => {
+        const rects = [...map.querySelectorAll('[data-node]')].map(e => e.getBoundingClientRect());
+        const overlap = rects.some((a, i) => rects.slice(i + 1).some(b => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1));
+        return { overlap, invalid: [...map.querySelectorAll('path')].some(p => /NaN|undefined/.test(p.getAttribute('d') || '')) };
+      });
+      assert.deepEqual(geometry, { overlap: false, invalid: false }); checks.push(`snapshot ${snapshot.id}: nodes and edges`);
+    }
+    await page.getByRole('button', { name: '简明架构', exact: true }).click();
+    await page.locator('[data-milestone="' + 'retrieval' + '"]').click(); await page.waitForURL('**milestone=retrieval'); await page.waitForFunction(() => document.querySelector('.evolution-page')?.getAttribute('data-current-milestone') === 'retrieval');
+    await page.locator('[data-milestone="' + 'cloud' + '"]').click(); await page.waitForURL('**milestone=cloud'); await page.waitForFunction(() => document.querySelector('.evolution-page')?.getAttribute('data-current-milestone') === 'cloud');
+    await page.goBack(); await page.waitForFunction(() => document.querySelector('.evolution-page')?.getAttribute('data-current-milestone') === 'retrieval'); assert.equal(await page.locator('.evolution-page').getAttribute('data-current-milestone'), 'retrieval');
+    await page.goForward(); await page.waitForFunction(() => document.querySelector('.evolution-page')?.getAttribute('data-current-milestone') === 'cloud'); assert.equal(await page.locator('.evolution-page').getAttribute('data-current-milestone'), 'cloud'); checks.push('history navigation and deep link');
+    await page.locator('[data-milestone="' + 'baseline' + '"]').click();
+    await page.getByText('趋势、测试与工程证据', { exact: true }).click();
+    assert.match(await page.locator('.evolution-detail').innerText(), /本地测试数量未记录/);
+    const dates = new Map(); for(const fact of data.facts) { const key = fact.date.slice(0,10); dates.set(key,[...(dates.get(key)||[]),fact.id]); } const sameDay = [...dates.values()].sort((a,b)=>b.length-a.length)[0]; for(const id of sameDay) { await page.locator('[data-milestone="'+id+'"]').click(); assert.equal(await page.locator('.evolution-page').getAttribute('data-current-milestone'),id); } checks.push('every same-day milestone remains individually selectable');
     await page.goto(base + '/project?view=invalid&milestone=missing'); await page.getByText('链接中的选择无效', { exact: false }).waitFor();
     await page.getByRole('button', { name: '重置链接' }).click(); checks.push('invalid query reset');
-    await page.locator('#evolution-milestone').selectOption('baseline'); await page.getByText('工程细节与证据', { exact: false }).click();
-    assert.match(await page.locator('.evolution-detail').innerText(), /本地测试数量未记录/);
-    await page.getByRole('button', { name: '打开设置' }).click(); await page.keyboard.press('Escape');
-    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '打开设置'); checks.push('Escape restores keyboard focus');
+    const touchContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    await touchContext.addInitScript(() => localStorage.setItem('aicalendar_token', 'synthetic-only')); await touchContext.route('**/*', api);
+    const touchPage = await touchContext.newPage(); await touchPage.goto(base + '/project'); await touchPage.locator('.evolution-timeline').waitFor();
+    const cdp = await touchContext.newCDPSession(touchPage); await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 190, y: 700 }] });
+    for (const y of [600, 450, 300, 180]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 190, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await touchPage.waitForFunction(() => document.querySelector('.evolution-page').scrollTop > 0); checks.push('mobile touch scrolling'); await touchContext.close();
     for (const state of ['error', 'empty', 'slow', 'long']) {
       mode = state; await page.setViewportSize({ width: 390, height: 844 }); await page.goto(base + '/project');
-      if (state === 'error') { await page.getByText('暂时没有读到成长记录', { exact: true }).waitFor(); mode = 'normal'; await page.getByRole('button', { name: '重新加载' }).click(); await page.locator('#evolution-milestone').waitFor(); }
+      if (state === 'error') { await page.getByText('暂时没有读到成长记录', { exact: true }).waitFor(); mode = 'normal'; await page.getByRole('button', { name: '重新加载' }).click(); }
       if (state === 'empty') await page.getByText('还没有可展示的里程碑。', { exact: true }).waitFor();
-      if (state === 'slow') { await page.getByText('正在读取项目历史…', { exact: true }).waitFor(); await page.locator('#evolution-milestone').waitFor(); }
-      if (state === 'long') await page.locator('#evolution-milestone').waitFor();
-      await noOverflow(state);
+      if (state === 'slow') await page.getByText('正在读取项目历史…', { exact: true }).waitFor();
+      if (state !== 'empty') await page.locator('.evolution-timeline').waitFor(); await noOverflow(state);
     }
     mode = 'normal';
-    const loginContext = await browser.newContext(); await loginContext.route('**/*', api);
-    const login = await loginContext.newPage();
-    login.on('pageerror', e => errors.push(e.message));
-    await login.goto(base + '/project?view=architecture&milestone=cloud');
-    await login.getByPlaceholder('请输入邮箱地址').fill('test@example.invalid'); await login.locator('input[type=password]').fill('synthetic-password');
-    await login.locator('form button[type=submit]').click();
-    try { await login.locator('#evolution-milestone').waitFor(); }
-    catch (error) { await login.screenshot({ path: path.join(output, 'login-failure.png') }); console.log({ loginUrl: login.url(), body: await login.locator('body').innerText(), errors }); throw error; }
-    assert.equal(await login.locator('#evolution-milestone').inputValue(), 'cloud');
-    assert.ok(login.url().includes('view=architecture')); checks.push('login retains deep link');
-    await loginContext.close();
+    const loginContext = await browser.newContext({ reducedMotion: 'reduce' }); await loginContext.route('**/*', api);
+    const login = await loginContext.newPage(); login.on('pageerror', e => errors.push(e.message));
+    await login.goto(base + '/project?view=architecture&milestone=cloud'); await login.getByPlaceholder('请输入邮箱地址').fill('test@example.invalid');
+    await login.locator('input[type=password]').fill('synthetic-password'); await login.locator('form button[type=submit]').click();
+    await login.locator('.evolution-timeline').waitFor(); assert.equal(await login.locator('.evolution-page').getAttribute('data-current-milestone'), 'cloud');
+    assert.ok(login.url().includes('view=architecture')); checks.push('login retains deep link'); await loginContext.close();
+
     assert.deepEqual(errors, []);
     fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ checks, errors, boundary: 'Built UI and synthetic APIs; real authentication covered by server tests.' }, null, 2));
     console.log(JSON.stringify({ output, checks: checks.length, errors }));

@@ -65,8 +65,8 @@ const server = http.createServer((req, res) => {
       await drawer.getByRole('button',{name:/^更多操作：/}).last().click();await page.getByRole('menuitem',{name:'编辑',exact:true}).click();
       await drawer.locator('input[type=checkbox]').first().uncheck();
       await drawer.getByText('选择日期', { exact: true }).waitFor();
-      page.once('dialog', dialog => dialog.accept());
       await drawer.getByRole('button', { name: '取消', exact: true }).click();
+      await page.getByRole('dialog',{name:'放弃未保存的修改？',exact:true}).getByRole('button',{name:'放弃修改',exact:true}).click();
       await drawer.getByRole('combobox',{name:'状态',exact:true}).click();await page.getByRole('option',{name:/^已完成/}).click();
       assert.equal(await drawer.locator('article').count(), 1);
       await drawer.getByRole('combobox',{name:'状态',exact:true}).click();await page.getByRole('option',{name:/^全部/}).click();

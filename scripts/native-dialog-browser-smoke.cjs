@@ -10,7 +10,7 @@ fs.mkdirSync(output, { recursive: true });
 const checks = [], telemetry = [];
 let diagnosticPage;
 const savedProfile = `合成已保存正常资料 ${Date.now()}`;
-const scheduleMessage = '放弃本次未保存的编辑？', profileMessage = '设置尚未保存，离开会丢弃当前修改。是否离开？';
+const profileMessage = '设置尚未保存，离开会丢弃当前修改。是否离开？';
 async function login(audit, base) {
   const response = await audit.context.request.post(base + '/api/auth/login', { data: { email: process.env.ORBIT_UI_QA_EMAIL || 'preview@example.invalid', password: process.env.ORBIT_UI_QA_PASSWORD || 'OrbitPreview123!' } });
   assert.equal(response.status(), 200); const { token } = await response.json();
@@ -29,7 +29,20 @@ async function arm(page, name) {
   await page.locator('#orbit-browser-audit-controls > summary').click();
   await page.getByRole('button', { name, exact: true }).click();
 }
+async function discardEditor(page, accept) {
+  await page.getByLabel('关闭日程编辑', { exact: true }).click();
+  const confirmation = page.getByRole('dialog', { name: '放弃未保存的修改？', exact: true });
+  await confirmation.waitFor();
+  assert.equal(await confirmation.evaluate(element => element.closest('dialog')?.getAttribute('aria-label')), '新增日程');
+  await confirmation.getByRole('button', { name: accept ? '放弃修改' : '取消', exact: true }).click();
+  await confirmation.waitFor({ state: 'detached' });
+}
 async function newSchedule(page) { await page.getByRole('button', { name: '添加日程', exact: true }).click(); await page.getByLabel('日程标题', { exact: true }).waitFor(); }
+// Navigation tests start from a rendered avatar; they do not race its disposable blob loader.
+async function avatarReady(page) {
+  await page.waitForLoadState('networkidle');
+  await page.waitForFunction(() => { const image = document.querySelector('[data-account-menu-trigger] img'); return image?.complete && image.naturalWidth > 0; });
+}
 // Chromium can leave reload waiting for a load event after beforeunload is dismissed.
 // Used only with an explicit dismiss expectation; the caller also checks the retained draft.
 async function abortedReload(page) { try { await page.reload({ timeout: 3000 }); } catch (error) { if (error.name !== 'TimeoutError' && !String(error).includes('ERR_ABORTED')) throw error; } }
@@ -51,10 +64,10 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
     assert.equal(await page.locator('#orbit-browser-audit-controls').count(), 0);
     await newSchedule(page); await page.getByLabel('关闭日程编辑', { exact: true }).click(); assert.equal(native.records.filter(r => r.type === 'dialog').length, 0);
     await newSchedule(page); await page.getByLabel('日程标题', { exact: true }).fill('合成原生确认验证');
-    await native.dialogs(page).expectDialog({ type: 'confirm', message: scheduleMessage, action: 'dismiss' }, () => page.getByLabel('关闭日程编辑', { exact: true }).click());
+    await discardEditor(page, false);
     assert.equal(await page.getByLabel('日程标题', { exact: true }).inputValue(), '合成原生确认验证');
-    await native.dialogs(page).expectDialog({ type: 'confirm', message: scheduleMessage, action: 'accept' }, () => page.getByLabel('关闭日程编辑', { exact: true }).click());
-    assert.equal(await page.getByRole('dialog', { name: '新增日程', exact: true }).count(), 0); checks.push('normal: clean close no dialog; native confirm dismiss preserves / accept discards');
+    await discardEditor(page, true);
+    assert.equal(await page.getByRole('dialog', { name: '新增日程', exact: true }).count(), 0); checks.push('normal: clean close no dialog; application confirm cancel preserves / accept discards; no native schedule dialog');
     await page.goto(normalBase + '/settings/profile'); await page.getByLabel('职业背景', { exact: true }).waitFor();
     assert.equal(await page.evaluate(() => window.__auditUnloadCount()), 0);
     const original = await page.getByLabel('职业背景', { exact: true }).inputValue();
@@ -79,7 +92,7 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
     const auto = await createAuditContext(browser, { baseURL: automatedBase, synthetic: true }); telemetry.push({ mode: 'automated-native-events', records: auto.records }); await login(auto, automatedBase);
     const automated = await auto.context.newPage(); diagnosticPage = automated; automated.setDefaultTimeout(6000);
     for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]) {
-      await automated.setViewportSize({ width, height }); await automated.goto(automatedBase + '/schedule');
+      await automated.setViewportSize({ width, height }); await automated.goto(automatedBase + '/schedule'); await avatarReady(automated);
       await automated.locator('#orbit-browser-audit-controls').waitFor();
       // Development source transforms may be cold; action deadlines remain 6s after page readiness.
       await automated.getByRole('button', { name: '添加日程', exact: true }).waitFor({ timeout: 30000 });
@@ -88,7 +101,7 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
         await automated.getByLabel('关闭日历侧栏', { exact: true }).press('Escape');
         await automated.getByLabel('打开日历侧栏', { exact: true }).waitFor({ state: 'visible' });
       }
-      await arm(automated, '测试：下次日程取消放弃'); await newSchedule(automated);
+      await newSchedule(automated);
       await automated.getByLabel('日程标题', { exact: true }).fill(`合成自动化时间 ${width}`);
       await automated.getByRole('button', { name: '选择开始', exact: true }).click();
       await automated.getByLabel('开始时间：小时', { exact: true }).press('ArrowDown');
@@ -98,11 +111,11 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
       await automated.locator('.oui-time-panel').getByRole('button', { name: '确定', exact: true }).press('Enter');
       assert.ok(await automated.getByRole('button', { name: '选择开始', exact: true }).evaluate(el => el === document.activeElement));
       assert.equal(await automated.getByLabel('开始', { exact: true }).inputValue(), '10:01');
-      await automated.getByLabel('关闭日程编辑', { exact: true }).click(); assert.equal(await automated.getByRole('dialog', { name: '新增日程', exact: true }).count(), 1);
+      await discardEditor(automated, false); assert.equal(await automated.getByRole('dialog', { name: '新增日程', exact: true }).count(), 1);
       await automated.getByRole('dialog', { name: '新增日程', exact: true }).getByRole('button', { name: '添加日程', exact: true }).click();
       await automated.getByRole('dialog', { name: '新增日程', exact: true }).waitFor({ state: 'detached' });
-      await arm(automated, '测试：下次日程确认放弃'); await newSchedule(automated); await automated.getByLabel('日程标题', { exact: true }).fill('合成放弃验证');
-      await automated.getByLabel('关闭日程编辑', { exact: true }).click(); assert.equal(await automated.getByRole('dialog', { name: '新增日程', exact: true }).count(), 0);
+      await newSchedule(automated); await automated.getByLabel('日程标题', { exact: true }).fill('合成放弃验证');
+      await discardEditor(automated, true); assert.equal(await automated.getByRole('dialog', { name: '新增日程', exact: true }).count(), 0);
       assert.deepEqual(await automated.evaluate(() => window.__orbitBrowserAudit.failures), []);
       telemetry.push({ mode: 'prelude-schedule', width, records: await automated.evaluate(() => window.__orbitBrowserAudit.records) });
       await automated.locator('[data-account-menu-trigger]').click(); await automated.getByRole('menuitem', { name: '设置', exact: true }).or(automated.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '设置', exact: true })).click();
@@ -111,18 +124,25 @@ async function abortedReload(page) { try { await page.reload({ timeout: 3000 });
       // Legacy setting URLs now enter the standalone page and return to Today.
       await automated.goto(automatedBase + '/schedule?settings=setting-ai-1l45kwl');await automated.getByRole('link',{name:'返回今日行动中心',exact:true}).click();
       await automated.waitForFunction(() => document.activeElement?.matches('[data-account-menu-trigger]'));
-      await automated.goto(automatedBase + '/settings/profile'); await automated.getByLabel('职业背景', { exact: true }).waitFor();
+      await automated.goto(automatedBase + '/settings/profile'); await automated.getByLabel('职业背景', { exact: true }).waitFor(); await avatarReady(automated);
       await arm(automated, '测试：下次资料离开取消放弃'); await automated.getByLabel('职业背景', { exact: true }).fill(`合成资料修改 ${width}`); await automated.getByRole('link', { name: '返回今日行动中心', exact:true }).click(); assert.ok(automated.url().endsWith('/settings/account/profile'));
       await arm(automated, '测试：下次资料离开确认放弃'); await automated.getByRole('link', { name: '返回今日行动中心', exact:true }).click(); await automated.waitForURL(url => url.pathname === '/today');
-      await automated.locator('[data-account-menu-trigger]').click(); await automated.getByRole('menuitem', { name: '个人资料', exact: true }).or(automated.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '个人资料', exact: true })).click();
-      await automated.getByLabel('职业背景', { exact: true }).waitFor();
+      await automated.locator('[data-account-menu-trigger]').click();
+      assert.equal(await automated.getByRole('menuitem', { name: '个人资料', exact: true }).or(automated.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '个人资料', exact: true })).count(), 0);
+      await automated.getByRole('menuitem', { name: '设置', exact: true }).or(automated.getByRole('dialog', {name:'个人菜单',exact:true}).getByRole('button', { name: '设置', exact: true })).click();
+      if (width < 768) await automated.getByRole('link', { name: '账户与安全', exact: true }).click();
+      await automated.getByRole('tab', { name: '账号管理', exact: true }).waitFor();
+      await avatarReady(automated);
+      const profileReturn = automated.url();
+      await automated.getByRole('tab', { name: '个人资料', exact: true }).click();
+      await automated.getByLabel('职业背景', { exact: true }).waitFor(); await avatarReady(automated);
       await arm(automated, '测试：下次资料离开取消放弃'); await automated.getByLabel('职业背景', { exact: true }).fill(`合成浏览器返回 ${width}`);
       await automated.goBack(); await automated.waitForURL('**/settings/account/profile');
       assert.equal(await automated.getByLabel('职业背景', { exact: true }).inputValue(), `合成浏览器返回 ${width}`);
-      await arm(automated, '测试：下次资料离开确认放弃'); await automated.goBack(); await automated.waitForURL(url => url.pathname === '/today');
+      await arm(automated, '测试：下次资料离开确认放弃'); await automated.goBack(); await automated.waitForURL(profileReturn);
       assert.deepEqual(await automated.evaluate(() => window.__orbitBrowserAudit.failures), []);
       telemetry.push({ mode: 'prelude-profile', width, records: await automated.evaluate(() => window.__orbitBrowserAudit.records) });
-      await automated.goto(automatedBase + '/settings/profile'); await automated.getByLabel('职业背景', { exact: true }).waitFor(); await automated.getByLabel('职业背景', { exact: true }).fill('合成刷新丢弃'); await automated.reload(); await automated.getByLabel('职业背景', { exact: true }).waitFor();
+      await automated.goto(automatedBase + '/settings/profile'); await automated.getByLabel('职业背景', { exact: true }).waitFor(); await avatarReady(automated); await automated.getByLabel('职业背景', { exact: true }).fill('合成刷新丢弃'); await automated.reload(); await automated.getByLabel('职业背景', { exact: true }).waitFor(); await avatarReady(automated);
       assert.equal(await automated.getByLabel('职业背景', { exact: true }).inputValue(), savedProfile);
       assert.equal(await automated.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
       await automated.screenshot({ path: path.join(output, `automated-${width}.png`) });

@@ -1,10 +1,9 @@
-import { Check, Eraser, Loader2, StickyNote } from 'lucide-react';
+import { Eraser, StickyNote } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AiNoteBoardHost, useAiNoteBoard } from '../components/AiNoteBoardHost';
 import { AiSchedulePanel, type AiSchedulePanelHandle } from '../components/AiSchedulePanel';
-import { useInlineConfirmation } from '../hooks/useInlineConfirmation';
-import { useAuth } from '../hooks/useAuth';
+import { IconButton, Tooltip, useActionConfirmation } from '../ui';
 
 import { OrbitScheduleEditor } from '../components/OrbitScheduleEditor';
 
@@ -14,8 +13,7 @@ export function AiAssistantPage() {
   const chatPanelRef = useRef<AiSchedulePanelHandle>(null);
   const [openScheduleId, setOpenScheduleId] = useState<string | null>(null);
   const [chatError,setChatError]=useState('');
-  const { user } = useAuth();
-  const confirmation = useInlineConfirmation(`${user?.id || ''}:${searchParams.get('conversation') || ''}`);
+  const confirmation = useActionConfirmation();
   const [chatState, setChatState] = useState({ hasMessages: false, busy: false, clearDisabled: true });
   const noteBoard = useAiNoteBoard({
     initialNoteId: searchParams.get('note') || undefined,
@@ -24,12 +22,11 @@ export function AiAssistantPage() {
 
   const clearKey = `clear:${searchParams.get('conversation') || ''}`;
   const clearing = confirmation.busy === clearKey;
-  const clearArmed = confirmation.pending === clearKey;
   const resetDisabled = chatState.clearDisabled || !!confirmation.busy;
-  const resetTitle = clearing ? '正在清空…' : clearArmed ? '确认清空当前对话' : '清空当前对话';
+  const resetTitle = clearing ? '正在清空…' : '清空当前对话';
 
   return (
-    <div className="ai-assistant-page">
+    <div className="ai-assistant-page">{confirmation.dialog}
       <div className="ai-assistant-page-main">
         <header className="ai-assistant-topbar">
           <div className="ai-assistant-topbar-title">
@@ -38,32 +35,31 @@ export function AiAssistantPage() {
           </div>
 
           <div className="ai-assistant-topbar-actions">
-            <button
+            <Tooltip content={resetTitle}><IconButton
               type="button"
+              variant="quiet"
               className="ai-workspace-action"
               data-confirm-action={clearKey}
-              aria-pressed={clearArmed}
-              onClick={() => { void confirmation.confirm(clearKey, async () => { setChatError(''); await chatPanelRef.current?.clearCurrentConversation(); }).catch(e=>setChatError(e instanceof Error?e.message:'清空对话失败')); }}
+              onClick={() => { void confirmation.run({key:clearKey,title:'清空当前对话？',description:'当前对话的历史记录将被清空，此操作无法撤销。',confirmLabel:'清空对话'}, async () => { setChatError(''); await chatPanelRef.current?.clearCurrentConversation(); }); }}
               disabled={resetDisabled}
-              title={resetTitle}
-              aria-label={resetTitle}
+              label={resetTitle}
+              loading={clearing}
             >
-              {clearing ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : clearArmed ? <Check size={16} aria-hidden="true" /> : <Eraser size={16} aria-hidden="true" />}
-              <span>{resetTitle}</span>
-            </button>
-            <button
+              <Eraser size={20} aria-hidden="true" />
+            </IconButton></Tooltip>
+            <Tooltip content="打开 AI 记事板"><IconButton
               type="button"
+              variant="quiet"
               className="ai-workspace-action ai-workspace-note-action"
               onClick={noteBoard.toggleDrawer}
               aria-expanded={noteBoard.drawerOpen}
               aria-controls="ai-note-board"
-              title="打开 AI 记事板"
-              aria-label="打开 AI 记事板"
+              aria-pressed={noteBoard.drawerOpen}
+              label="打开 AI 记事板"
             >
-              <StickyNote size={16} aria-hidden="true" />
-              <span>记事板</span>
+              <StickyNote size={20} aria-hidden="true" />
               {noteBoard.pendingCount > 0 && <em aria-label={`${noteBoard.pendingCount} 条未完成记事`}>{noteBoard.pendingCount}</em>}
-            </button>
+            </IconButton></Tooltip>
           </div>
         </header>
         <section

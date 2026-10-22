@@ -64,6 +64,7 @@
 .oui-button--small { padding-block: var(--orbit-space-1); }
 .oui-icon-button { width: var(--orbit-control-height); padding: var(--orbit-space-2); flex: 0 0 auto; }
 .oui-icon-button > span:empty { display: none; }
+.oui-icon-button.oui-button--quiet:disabled { border-color: transparent; background: transparent; }
 .oui-icon-link { text-decoration: none; }
 .oui-spinner { animation: orbit-ui-spin 1s linear infinite; }
 .oui-input {

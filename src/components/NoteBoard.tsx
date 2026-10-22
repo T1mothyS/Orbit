@@ -1,3 +1,4 @@
+import { useActionConfirmation } from '../ui';
 import { NoteLinks } from './NoteLinks';
 import { NoteImageGallery, NoteImageEditor } from './NoteImages';
 import { NoteCopyDialog } from './NoteCopyDialog';
@@ -331,14 +332,12 @@ export function NoteBoard({
     optimizationAbortRef.current?.abort();
   }, []);
 
+  const confirmation = useActionConfirmation();
   const currentEditing = useRef(editingId);currentEditing.current=editingId;
   const startEdit = (note: NoteItem) => {
     if (optimizationBusyId === note.id || imageBusy) return;
-    if (editingId !== note.id && hasUnsavedEdit && !window.confirm('当前记事有未保存的修改，确定切换吗？')) return;
-    setEditingId(note.id);
-    setEditValue(note.content);
-    setEditImages(note.images);
-    setColorPickerId(null);
+    const apply = () => { setEditingId(note.id); setEditValue(note.content); setEditImages(note.images); setColorPickerId(null); };
+    if (confirmation.discard(editingId !== note.id && hasUnsavedEdit, apply, '当前记事有未保存的修改，切换会丢弃修改。是否继续？')) apply();
   };
 
   const cancelEdit = () => {
@@ -486,10 +485,8 @@ export function NoteBoard({
   const mergeNote = async (note: NoteItem) => {
     if (mergeBusy) return;
     if (!mergeSourceId) {
-      if (hasUnsavedEdit && !window.confirm('当前记事有未保存的修改，确定放弃并选择合并来源吗？')) return;
-      setMergeSourceId(note.id);
-      setEditingId(null);
-      setColorPickerId(null);
+      const apply = () => { setMergeSourceId(note.id); setEditingId(null); setColorPickerId(null); };
+      if (confirmation.discard(hasUnsavedEdit, apply, '当前记事有未保存的修改，确定放弃并选择合并来源吗？')) apply();
       return;
     }
     if (mergeSourceId === note.id) {
@@ -605,7 +602,7 @@ export function NoteBoard({
       <span className="sr-only">AI 优化会在当前编辑框中锁定正文并直接保存结果；优化完成后可撤回一次，手动保存新正文会建立新的撤回基线。</span>
     </aside>
   );
-  return <>{copyPreview && <NoteCopyDialog note={copyPreview} onClose={() => setCopyPreview(null)} />}{mobile ? createPortal(<dialog ref={dialogRef} className="orbit-note-dialog" aria-label="AI 记事板" data-phase={presence.phase}
+  return <>{confirmation.dialog}{copyPreview && <NoteCopyDialog note={copyPreview} onClose={() => setCopyPreview(null)} />}{mobile ? createPortal(<dialog ref={dialogRef} className="orbit-note-dialog" aria-label="AI 记事板" data-phase={presence.phase}
     onCancel={event => { event.preventDefault(); event.stopPropagation(); if (colorPickerId) setColorPickerId(null); else onCloseDrawer(); }}
     onClick={event => { if (event.target === event.currentTarget) onCloseDrawer(); }}>{panel}</dialog>, document.body) : panel}</>;
 }

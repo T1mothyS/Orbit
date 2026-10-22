@@ -2,16 +2,17 @@
 .orbit-help-page > header { margin-bottom: var(--orbit-space-5); }
 .orbit-help-page h1 { margin: 0 0 var(--orbit-space-2); font-size: var(--orbit-type-page-title); font-weight: 600; }
 .orbit-help-page > header p { color: var(--orbit-text-secondary); line-height: 1.7; }
-.orbit-help-index { display: flex; flex-wrap: wrap; gap: var(--orbit-space-2) var(--orbit-space-5); padding-bottom: var(--orbit-space-5); }
 .orbit-help-topics { margin-top: var(--orbit-space-5); }
-.orbit-help-topics > section { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--orbit-space-5); align-items: center; padding-block: var(--orbit-space-5); border-bottom: 1px solid var(--orbit-border); scroll-margin-top: var(--orbit-space-4); }
-.orbit-help-topics h2 { margin: 0 0 var(--orbit-space-1); font-size: var(--orbit-type-section-title); line-height: 1.4; font-weight: 600; }
-.orbit-help-topics p { margin: 0; color: var(--orbit-text-secondary); font-size: var(--orbit-type-secondary); line-height: 1.6; }
-.orbit-help-actions { display: flex; gap: var(--orbit-space-3); flex-wrap: wrap; align-items: center; justify-content: end; }
+.orbit-help-topics > section { padding-block: var(--orbit-space-6); border-bottom: 1px solid var(--orbit-border); scroll-margin-top: var(--orbit-space-4); }
+.orbit-help-topic-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--orbit-space-3); margin-bottom: var(--orbit-space-3); }
+.orbit-help-topics h2 { min-width: 0; margin: 0; font-size: var(--orbit-type-section-title); line-height: 1.4; font-weight: 600; }
+.orbit-help-topics p { margin: 0; color: var(--orbit-text-secondary); font-size: var(--orbit-reader-font-size); line-height: var(--orbit-reader-line-height); }
+.orbit-help-topics ol { max-width: 72ch; margin: var(--orbit-space-4) 0 0; padding-left: var(--orbit-space-6); font-size: var(--orbit-reader-font-size); line-height: var(--orbit-reader-line-height); }
+.orbit-help-topics li + li { margin-top: var(--orbit-space-2); }
+.orbit-help-actions { display: flex; gap: var(--orbit-space-2); align-items: center; flex: none; }
 .orbit-help-page footer { display: grid; gap: var(--orbit-space-2); padding-block: var(--orbit-space-6); }
 @media (max-width: 767px) {
   .orbit-help-page { padding: var(--orbit-space-5) var(--orbit-space-4) max(var(--orbit-space-8), env(safe-area-inset-bottom)); }
   .orbit-help-page h1 { font-size: var(--orbit-type-mobile-title); }
-  .orbit-help-topics > section { grid-template-columns: minmax(0, 1fr); gap: var(--orbit-space-2); }
-  .orbit-help-actions { justify-content: start; }
+  .orbit-help-topics h2 { font-size: var(--orbit-type-section-title); }
 }

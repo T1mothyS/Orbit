@@ -1,3 +1,4 @@
+import { useActionConfirmation } from '../ui';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, Download, RefreshCw, Trash2 } from 'lucide-react';
 import { Badge, Button, Dialog, EmptyState, InlineNotice, Input, LoadingState, Select, SettingRow, Switch, Tabs, ToastProvider, useToast } from '../ui';
@@ -62,6 +63,7 @@ async function copyText(value: string): Promise<void> {
 }
 
 function UserManagementTab({ mode, onBusyChange }: { mode: 'users' | 'invites'; onBusyChange: (busy: boolean) => void }) {
+  const confirmation = useActionConfirmation();
   const { authHeaders, user: currentUser } = useAuth();
   const toast = useToast();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -239,89 +241,92 @@ function UserManagementTab({ mode, onBusyChange }: { mode: 'users' | 'invites'; 
 
   const handleRotateInviteCode = async (role: InviteRole) => {
     const roleLabel = role === 'admin' ? '管理员' : '普通用户';
-    if (!window.confirm(`确定要轮换${roleLabel}邀请码吗？\n\n旧邀请码会立即失效，已有账号和登录状态不受影响。新邀请码只在成功后显示一次，请及时复制保存。`)) return;
+    await confirmation.run({ title: "轮换邀请码？", description: `确定要轮换${roleLabel}邀请码吗？\n\n旧邀请码会立即失效，已有账号和登录状态不受影响。新邀请码只在成功后显示一次，请及时复制保存。`, confirmLabel: "轮换邀请码" }, async () => {
 
-    setInviteError(null);
-    setRotatingInviteRole(role);
-    try {
-      const res = await fetch(`/api/admin/invite-codes/${role}/rotate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeadersRef.current() },
-        cache: 'no-store',
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || '轮换邀请码失败');
-      if (typeof data.code !== 'string' || !data.code) throw new Error('服务器未返回新邀请码');
-      setRevealedInvite({ role, code: data.code, rotatedAt: String(data.rotatedAt || new Date().toISOString()) });
-      setRevealedInviteCopied(false);
-      setInviteStatuses(current => current.map(status => status.role === role ? {
-        ...status,
-        active: true,
-        createdAt: data.createdAt || status.createdAt,
-        rotatedAt: data.rotatedAt || status.rotatedAt,
-        version: typeof data.version === 'number' ? data.version : status.version,
-      } : status));
-      toast.show({tone:'success',title:`${roleLabel}邀请码已轮换`});
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '轮换邀请码失败';
-      setInviteError(message);
-    } finally {
-      setRotatingInviteRole(null);
-    }
+      setInviteError(null);
+      setRotatingInviteRole(role);
+      try {
+        const res = await fetch(`/api/admin/invite-codes/${role}/rotate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeadersRef.current() },
+          cache: 'no-store',
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || '轮换邀请码失败');
+        if (typeof data.code !== 'string' || !data.code) throw new Error('服务器未返回新邀请码');
+        setRevealedInvite({ role, code: data.code, rotatedAt: String(data.rotatedAt || new Date().toISOString()) });
+        setRevealedInviteCopied(false);
+        setInviteStatuses(current => current.map(status => status.role === role ? {
+          ...status,
+          active: true,
+          createdAt: data.createdAt || status.createdAt,
+          rotatedAt: data.rotatedAt || status.rotatedAt,
+          version: typeof data.version === 'number' ? data.version : status.version,
+        } : status));
+        toast.show({tone:'success',title:`${roleLabel}邀请码已轮换`});
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '轮换邀请码失败';
+        setInviteError(message);
+       throw error; } finally {
+        setRotatingInviteRole(null);
+      }
+    });
   };
 
   const handleClearData = async (user: User) => {
-    if (!window.confirm(`确定要清空用户 ${user.email} 的所有数据吗？\n包括：日程、待办、AI对话历史、API Key 等。\n该用户的账号和密码将保留。`)) return;
+    await confirmation.run({ title: "清空账号数据？", description: `确定要清空用户 ${user.email} 的所有数据吗？\n包括：日程、待办、AI对话历史、API Key 等。\n该用户的账号和密码将保留。`, confirmLabel: "清空数据" }, async () => {
 
-    const actionKey = `${user.id}:clear`;
-    setActionError(null);
-    setLoadingAction(actionKey);
-    try {
-      const res = await fetch(`/api/admin/users/${user.id}/clear-data`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeadersRef.current() },
-        body: JSON.stringify({ confirmEmail: user.email }),
-      });
+      const actionKey = `${user.id}:clear`;
+      setActionError(null);
+      setLoadingAction(actionKey);
+      try {
+        const res = await fetch(`/api/admin/users/${user.id}/clear-data`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeadersRef.current() },
+          body: JSON.stringify({ confirmEmail: user.email }),
+        });
       
-      if (res.ok) {
-        toast.show({tone:'success',title:`已清空 ${user.email} 的数据`});
-      } else {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || '操作失败');
+        if (res.ok) {
+          toast.show({tone:'success',title:`已清空 ${user.email} 的数据`});
+        } else {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.error || '操作失败');
+        }
+        await loadUsers();
+      } catch (error) {
+        actionFailure(error, '清空失败');
+       throw error; } finally {
+        setLoadingAction(null);
       }
-      await loadUsers();
-    } catch (error) {
-      actionFailure(error, '清空失败');
-    } finally {
-      setLoadingAction(null);
-    }
+    });
   };
 
   const handleDeleteUser = async (user: User) => {
-    if (!window.confirm(`⚠️ 危险操作！\n\n确定要删除用户 ${user.email} 吗？\n\n此操作将：\n- 删除该用户的所有日程和待办\n- 删除 AI 对话历史\n- 删除 API Key\n- 删除用户账号\n\n此操作不可恢复！`)) return;
+    await confirmation.run({ title: "永久删除账号？", description: `⚠️ 危险操作！\n\n确定要删除用户 ${user.email} 吗？\n\n此操作将：\n- 删除该用户的所有日程和待办\n- 删除 AI 对话历史\n- 删除 API Key\n- 删除用户账号\n\n此操作不可恢复！`, confirmLabel: "删除账号" }, async () => {
 
-    const actionKey = `${user.id}:delete`;
-    setActionError(null);
-    setLoadingAction(actionKey);
-    try {
-      const res = await fetch(`/api/admin/users/${user.id}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', ...authHeadersRef.current() },
-        body: JSON.stringify({ confirmEmail: user.email }),
-      });
+      const actionKey = `${user.id}:delete`;
+      setActionError(null);
+      setLoadingAction(actionKey);
+      try {
+        const res = await fetch(`/api/admin/users/${user.id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json', ...authHeadersRef.current() },
+          body: JSON.stringify({ confirmEmail: user.email }),
+        });
       
-      if (res.ok) {
-        toast.show({tone:'success',title:`已删除用户 ${user.email}`});
-      } else {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error || '删除失败');
+        if (res.ok) {
+          toast.show({tone:'success',title:`已删除用户 ${user.email}`});
+        } else {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.error || '删除失败');
+        }
+        await loadUsers();
+      } catch (error) {
+        actionFailure(error, '删除失败');
+       throw error; } finally {
+        setLoadingAction(null);
       }
-      await loadUsers();
-    } catch (error) {
-      actionFailure(error, '删除失败');
-    } finally {
-      setLoadingAction(null);
-    }
+    });
   };
 
   const formatDate = (dateStr: string | null) => {
@@ -338,7 +343,7 @@ function UserManagementTab({ mode, onBusyChange }: { mode: 'users' | 'invites'; 
   const openUser = (target: User, trigger: HTMLButtonElement) => { returnTarget.current = trigger; setSelectedId(target.id); };
   const roleBadge = (target: User) => <Badge tone={target.role === 'admin' ? 'brand' : 'neutral'}>{target.role === 'admin' ? '管理员' : '用户'}{isCurrentAccount(target) && ' · 当前账户'}</Badge>;
   const manage = (target: User) => <Button disabled={loading || !!loadingAction} onClick={event => openUser(target, event.currentTarget)} aria-label={`管理账户 ${target.email}`}>管理</Button>;
-  if (mode === 'invites') return <div className="admin-invites"><section className="admin-invite-panel">
+  if (mode === 'invites') return <div className="admin-invites">{confirmation.dialog}<section className="admin-invite-panel">
         <div className="admin-invite-panel-heading">
           <div>
             <h3 className="text-sm font-medium" style={{ color: 'var(--td-text-color-primary)' }}>邀请码管理</h3>
@@ -411,7 +416,7 @@ function UserManagementTab({ mode, onBusyChange }: { mode: 'users' | 'invites'; 
           </div>
         </details>
       </section></div>;
-  return <div className="admin-user-management">
+  return <div className="admin-user-management">{confirmation.dialog}
     <div className="admin-toolbar"><Input ref={search} aria-label="搜索用户邮箱" placeholder="搜索邮箱…" value={searchText} onChange={event => { setSearchText(event.target.value); setPage(1); }} /><Button leadingIcon={<RefreshCw size={16}/>} onClick={() => void loadUsers()} disabled={loading}>刷新</Button><span className="oui-help">共 {total} 个用户</span></div>
     {(loadError || actionError) && <InlineNotice tone="danger" title={loadError || actionError || ''} />}
     {loading && <LoadingState label="正在读取用户…" />}
@@ -430,6 +435,7 @@ function UserManagementTab({ mode, onBusyChange }: { mode: 'users' | 'invites'; 
   </div>;
 }
 function DebugLogsTab({ onBusyChange }: { onBusyChange: (busy: boolean) => void }) {
+  const confirmation = useActionConfirmation();
   const { authHeaders } = useAuth();
   const toast = useToast();
   const [logError,setLogError] = useState(''), [loading,setLoading] = useState(true), [clearing,setClearing] = useState(false);
@@ -476,14 +482,16 @@ function DebugLogsTab({ onBusyChange }: { onBusyChange: (busy: boolean) => void 
   }, [logs]);
 
   const handleClearLogs = async () => {
-    if (clearing || !window.confirm('清空全部调试日志？此操作无法撤销。')) return;
-    setClearing(true);setLogError('');
-    try {
-      const response = await fetch('/api/logs', { method: 'DELETE', headers: authHeaders() });
-      if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || '清空失败'); }
-      setLogs([]);setTotal(0);toast.show({title:'日志已清空'});
-    } catch (error) { setLogError(error instanceof Error ? error.message : '清空失败'); }
-    finally { setClearing(false); }
+    if (clearing) return;
+    await confirmation.run({ title: "清空调试日志？", description: '清空全部调试日志？此操作无法撤销。', confirmLabel: "清空日志" }, async () => {
+      setClearing(true);setLogError('');
+      try {
+        const response = await fetch('/api/logs', { method: 'DELETE', headers: authHeaders() });
+        if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || '清空失败'); }
+        setLogs([]);setTotal(0);toast.show({title:'日志已清空'});
+      } catch (error) { setLogError(error instanceof Error ? error.message : '清空失败');  throw error; }
+      finally { setClearing(false); }
+    });
   };
 
   const handleExportLogs = async () => {
@@ -515,7 +523,7 @@ function DebugLogsTab({ onBusyChange }: { onBusyChange: (busy: boolean) => void 
     }
   };
 
-  return <div className="admin-logs">
+  return <div className="admin-logs">{confirmation.dialog}
     <div className="admin-toolbar"><label className="admin-auto-refresh"><Switch label="自动刷新日志" checked={autoRefresh} onCheckedChange={setAutoRefresh}/><span>自动刷新</span></label><Button leadingIcon={<RefreshCw size={16}/>} onClick={() => void fetchLogs()} disabled={loading}>刷新</Button><Button leadingIcon={<Download size={16}/>} onClick={() => void handleExportLogs()} loading={exporting}>一键导出</Button><Button variant="quiet" leadingIcon={<Trash2 size={16}/>} onClick={() => void handleClearLogs()} loading={clearing}>清空</Button></div>
     <div className="admin-log-filters"><label>级别<Select label="日志级别筛选" value={level} onValueChange={value => setLevel(value || 'all')} options={[['all','全部'],['info','信息'],['warn','警告'],['error','错误'],['debug','调试']].map(([value,label]) => ({value,label}))}/></label><label>功能<Select label="日志功能筛选" value={category} onValueChange={value => setCategory(value || 'all')} options={[['all','全部'],['schedule','日程'],['reminder','提醒'],['weather','天气'],['ai','AI'],['mail','邮件'],['daily-report','日报'],['library','知识库'],['auth','认证'],['admin','管理'],['db','数据库'],['system','系统']].map(([value,label]) => ({value,label}))}/></label></div>
     {logError && <InlineNotice tone="danger" title={logError}><span>已保留上次读取的记录。</span><Button variant="quiet" onClick={() => void fetchLogs()}>重试读取</Button></InlineNotice>}

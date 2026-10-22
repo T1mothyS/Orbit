@@ -1,3 +1,4 @@
+import { isOrbitDiagnosticQuestion } from './product-assistant-intent.js';
 export function isReadOnlyScheduleQuery(text: string): boolean {
   const normalized = text.replace(/\s+/g, '');
   if (/(添加|新建|创建|修改|改成|推迟|提前|取消|删除|删掉|标记完成|帮我安排|给我安排|提醒我)/.test(normalized)) {
@@ -40,7 +41,8 @@ export function isActivityDescription(text: string): boolean {
 }
 export function chatToolNames(text: string, options: { product: boolean; schedule: boolean; knowledge: boolean; history: boolean }) {
   const names = new Set<string>();
-  if (options.product) for (const name of ['settings','product_help','system_status','deployment_status','task_status','daily_report_status','reminder_status','recent_errors']) names.add(name);
+  if (options.product) for (const name of ['settings','product_help']) names.add(name);
+  if (options.product&&isOrbitDiagnosticQuestion(text)) for (const name of ['system_status','deployment_status','task_status','daily_report_status','reminder_status','recent_errors']) names.add(name);
   if (options.schedule) names.add('calendar');
   if (/日报|reports/i.test(text)) names.add('reports');
   if (options.knowledge) names.add('knowledge');

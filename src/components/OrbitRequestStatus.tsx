@@ -1,6 +1,6 @@
-import { shuffledQuips } from '../utils/orbit-quips';
+import { ORBIT_QUIPS, nextQuipDelay, shuffledQuips } from '../utils/orbit-quips';
 import { Button, IconButton, Tooltip, TooltipProvider } from '../ui';
-import { Square, LoaderCircle, Check, CircleAlert, Minus } from 'lucide-react';
+import { Square, LoaderCircle } from 'lucide-react';
 import { ChatMarkdown } from './ChatMarkdown';
 import {useEffect,useRef,useState} from 'react';
 import type {OrbitRequest} from '../hooks/useOrbitChat';
@@ -8,14 +8,22 @@ export function OrbitRequestStatus({request,onAction}:{request:OrbitRequest;onAc
   const activeRequest=['queued','running'].includes(request.state);
   const bag=useRef<string[]>([]),last=useRef('');
   const [quip,setQuip]=useState('');
+  const [fading,setFading]=useState(false);
+  const [hidden,setHidden]=useState(document.hidden);
   useEffect(()=>{
-    if(!activeRequest){setQuip('');return;}
+    if(!activeRequest){setQuip('');setFading(false);return;}
     bag.current=[];
     const next=()=>{if(!bag.current.length)bag.current=shuffledQuips(last.current);last.current=bag.current.shift()!;setQuip(last.current);};
-    next();let timer:ReturnType<typeof setInterval>|undefined;
-    const visibility=()=>{clearInterval(timer);timer=undefined;if(!document.hidden)timer=setInterval(next,3000);};
+    next();let timer:ReturnType<typeof setTimeout>|undefined,fadeTimer:ReturnType<typeof setTimeout>|undefined;
+    const clear=()=>{clearTimeout(timer);clearTimeout(fadeTimer);};
+    const schedule=()=>{
+      const delay=nextQuipDelay();
+      fadeTimer=setTimeout(()=>setFading(true),delay-200);
+      timer=setTimeout(()=>{next();setFading(false);schedule();},delay);
+    };
+    const visibility=()=>{clear();setHidden(document.hidden);setFading(false);if(!document.hidden)schedule();};
     visibility();document.addEventListener('visibilitychange',visibility);
-    return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',visibility);};
+    return()=>{clear();document.removeEventListener('visibilitychange',visibility);};
   },[request.id,activeRequest]);
   const [busy,setBusy]=useState(false),busyRef=useRef(false),[actionError,setActionError]=useState('');
   const act=async(verb:'cancel'|'retry'|'continue')=>{
@@ -30,7 +38,6 @@ export function OrbitRequestStatus({request,onAction}:{request:OrbitRequest;onAc
   const elapsed=Math.max(0,Math.floor((now-started)/1000));
   const label=({queued:'已加入队列',running:'正在处理',cancelled:'已停止',completed:'已完成',failed:'处理失败',interrupted:'已中断',partial:'已取得部分资料'} as Record<string,string>)[request.state]||'状态更新中';
   const failed=['failed','interrupted'].includes(request.state);
-  const Icon=activeRequest?LoaderCircle:failed?CircleAlert:request.state==='completed'?Check:Minus;
   return <div className="orbit-request" data-request-id={request.id} data-state={request.state} aria-busy={activeRequest||undefined}>
     <div className="orbit-request-content">
       <div className="orbit-request-header">
@@ -42,7 +49,7 @@ export function OrbitRequestStatus({request,onAction}:{request:OrbitRequest;onAc
             :request.canContinue?<Button size="small" disabled={busy} onClick={()=>void act('continue')}>{busy?'正在继续…':'继续查询'}</Button>:null}
         </div>
       </div>
-      {activeRequest&&<p className="orbit-request-quip" aria-live="off"><Icon className="oui-spinner" size={14} aria-hidden="true"/><span>{quip}</span></p>}
+      {activeRequest&&<div className="orbit-request-quip" data-paused={hidden||undefined} aria-label="等待俏皮话" aria-live="off"><LoaderCircle className="orbit-quip-loading" size={14} aria-hidden="true"/><div className="orbit-quip-copy"><span className="orbit-quip-text" data-fading={fading||undefined}>“{quip}”</span>{ORBIT_QUIPS.map(text=><span className="orbit-quip-size" key={text} aria-hidden="true">“{text}”</span>)}</div></div>}
       {request.state==='partial'&&request.partialReply&&<ChatMarkdown text={request.partialReply}/>}
       {failed&&<p className="orbit-request-error" role="alert">{request.errorInfo?.message||'本次处理未完成，请重试。'}</p>}
       {request.state==='partial'&&<p className="orbit-request-notice">本次查询尚未完成；已取得的资料保留在下方。</p>}

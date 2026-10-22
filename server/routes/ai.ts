@@ -9,7 +9,7 @@ import { chatTimelinePage } from '../chat-timeline.js';
 import { getNotification } from '../activity-store.js';
 import { notificationObject, notificationContinuation } from '../notification-chat.js';
 import { ORBIT_AI_QUERY_POLICY } from '../orbit-ai-policy.js';
-import { isOrbitDiagnosticQuestion, isOrbitProductQuestion, PRODUCT_ASSISTANT_RULES } from '../product-assistant-intent.js';
+import { isOrbitDiagnosticQuestion, isOrbitProductQuestion, isOrbitIntegrationQuestion, PRODUCT_ASSISTANT_RULES } from '../product-assistant-intent.js';
 import { productAssistantContext } from '../product-assistant-context.js';
 import { settingsActions, settingAction } from '../../src/utils/navigation-actions.js';
 import { workBuddyProvider } from '../ai-provider-workbuddy.js';
@@ -731,7 +731,8 @@ ${selectedNotification}
     let assistantText = '';
     let resultText = '';
     const steps:any[]=[];
-    const settingRefs=/设置|怎么.*关|怎么.*开|开启|关闭|在哪|头像|每日总结|周报/.test(text)?findSettings(text,db.getUserById(userId)?.role==='admin').slice(0,3):[];
+    const integrationQuestion=isOrbitIntegrationQuestion(text);
+    const settingRefs=integrationQuestion||/设置|怎么.*关|怎么.*开|开启|关闭|在哪|头像|每日总结|周报/.test(text)?findSettings(integrationQuestion?'个人 API Key 模型':text,db.getUserById(userId)?.role==='admin').slice(0,3):[];
     const onStep=(step:import('../ai-provider-contract.js').AiStep)=>{const i=steps.findIndex(s=>s.id===step.id);if(i<0)steps.push(step);else steps[i]=step;if(context?.requestId)run('INSERT INTO orbit_request_steps(user_id,request_id,id,label,state,query,at,result_count) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(user_id,request_id,id) DO UPDATE SET state=excluded.state,label=excluded.label,query=excluded.query,at=excluded.at,result_count=excluded.result_count',[userId,context.requestId,step.id,step.label,step.state,step.query,step.at,step.resultCount??null]);};
     const toolContext=createOrbitTools({userId,timezone:queryTimezone,allowKnowledge:includeKnowledgeContext,allowHistory:/历史|上次.*说|之前.*聊/.test(text),onSchedules:items=>{for(const item of items)if(!contextSchedules.some(s=>s.id===item.id))contextSchedules.push(item);},onStep});
     for(const action of [...settingsActions(text,db.getUserById(userId)?.role==='admin'),...settingRefs.flatMap(r=>{const a=settingAction(r.id,db.getUserById(userId)?.role==='admin');return a?[a]:[];})]) if(!toolContext.actions.some(a=>a.settingId===action.settingId))toolContext.actions.push(action);

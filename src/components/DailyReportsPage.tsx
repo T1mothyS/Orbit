@@ -1,3 +1,4 @@
+import { IconButton, Tooltip, useActionConfirmation } from '../ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, FileText, Mail, MoreHorizontal, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { CompactFilterSheet } from './CompactFilterSheet';
@@ -96,6 +97,7 @@ async function readError(response: Response, fallback: string): Promise<Error> {
 }
 
 export function DailyReportsPage() {
+  const confirmation = useActionConfirmation();
   const { authHeaders, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -182,27 +184,29 @@ export function DailyReportsPage() {
   };
 
   const retryEmail = async (item: DailyReportSummary) => {
-    if (!item.emailNotificationId || retryingId) return;
-    if (!window.confirm('这会重新发送该日期的日报邮件，是否继续？')) return;
-    setRetryingId(item.id);
-    setError(null);
-    try {
-      const response = await fetch(`/api/notifications/${encodeURIComponent(item.emailNotificationId)}/retry`, {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirm: true }),
-      });
-      if (!response.ok) throw await readError(response, '日报邮件重试失败');
-      await load();
-    } catch (retryError) {
-      setError(retryError instanceof Error ? retryError.message : '日报邮件重试失败');
-    } finally {
-      setRetryingId(null);
-    }
+    const notificationId = item.emailNotificationId;
+    if (!notificationId || retryingId) return;
+    await confirmation.run({ title: "重新发送日报邮件？", description: '这会重新发送该日期的日报邮件，是否继续？', confirmLabel: "重新发送" }, async () => {
+      setRetryingId(item.id);
+      setError(null);
+      try {
+        const response = await fetch(`/api/notifications/${encodeURIComponent(notificationId)}/retry`, {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirm: true }),
+        });
+        if (!response.ok) throw await readError(response, '日报邮件重试失败');
+        await load();
+      } catch (retryError) {
+        setError(retryError instanceof Error ? retryError.message : '日报邮件重试失败');
+       throw retryError; } finally {
+        setRetryingId(null);
+      }
+    });
   };
 
   return (
-    <div className="daily-reports-page" ref={listRef} aria-busy={loading}>
+    <div className="daily-reports-page" ref={listRef} aria-busy={loading}>{confirmation.dialog}
       <header className="daily-reports-header">
         <div>
           <div className="daily-reports-eyebrow">PRIVATE INTELLIGENCE</div>
@@ -210,7 +214,7 @@ export function DailyReportsPage() {
           {viewMode !== 'received' && <span className="report-view-status">{viewMode === 'shadow' ? '新版预览 · 非正式' : '候选对照 · 非正式'}</span>}
         </div>
         <div className="daily-report-toolbar-actions">
-          <button type="button" className="daily-report-toolbar-button mobile-filter-trigger" onClick={() => { setPendingView(viewMode); setFiltersOpen(true); }}><SlidersHorizontal size={16} />筛选{viewMode !== 'received' && <span className="filter-count">1</span>}</button>
+          <Tooltip content="筛选日报"><IconButton label="筛选日报" variant="quiet" className="mobile-filter-trigger" onClick={() => { setPendingView(viewMode); setFiltersOpen(true); }}><SlidersHorizontal size={20} aria-hidden="true" />{viewMode !== 'received' && <span className="filter-count">1</span>}</IconButton></Tooltip>
           <div className="daily-report-view-toggle desktop-filters" role="tablist" aria-label="日报查看范围">
             <button type="button" role="tab" aria-selected={viewMode === 'received'} className={viewMode === 'received' ? 'active' : undefined} onClick={() => switchView('received')}>正式日报</button>
             <button type="button" role="tab" aria-selected={viewMode === 'candidates'} className={viewMode === 'candidates' ? 'active' : undefined} onClick={() => switchView('candidates')}>候选对照</button>
@@ -359,6 +363,7 @@ export function DailyReportsPage() {
 }
 
 export function DailyReportReaderPage() {
+  const confirmation = useActionConfirmation();
   // This route bypasses AppContent; restore the saved theme on direct opens too.
   useTheme();
   const { authHeaders, user } = useAuth();
@@ -468,29 +473,30 @@ export function DailyReportReaderPage() {
 
   const sendEmail = async () => {
     if (!date || !report || report.deliveryStatus !== 'RECEIVED' || sendingEmail) return;
-    if (!window.confirm(`将把 ${formatReportDate(date)} 的当前日报重新发送到已配置的收件邮箱，是否继续？`)) return;
-    setSendingEmail(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/daily-reports/${encodeURIComponent(date)}/send`, {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirm: true, source: report.source }),
-      });
-      if (!response.ok) throw await readError(response, '日报邮件发送失败');
-      await load();
-    } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : '日报邮件发送失败');
-    } finally {
-      setSendingEmail(false);
-    }
+    await confirmation.run({ title: "重新发送日报邮件？", description: `将把 ${formatReportDate(date)} 的当前日报重新发送到已配置的收件邮箱，是否继续？`, confirmLabel: "重新发送" }, async () => {
+      setSendingEmail(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/daily-reports/${encodeURIComponent(date)}/send`, {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirm: true, source: report.source }),
+        });
+        if (!response.ok) throw await readError(response, '日报邮件发送失败');
+        await load();
+      } catch (sendError) {
+        setError(sendError instanceof Error ? sendError.message : '日报邮件发送失败');
+       throw sendError; } finally {
+        setSendingEmail(false);
+      }
+    });
   };
 
   const availableSourceReports = dateReports.filter(item => item.deliveryStatus === (requestedView === 'candidates' ? 'CANDIDATE' : 'RECEIVED'));
   const sourceOptions = availableSourceReports.length ? availableSourceReports : report ? [report] : [];
 
   return (
-    <main className="daily-report-reader-page" ref={readerRef} aria-busy={loading}>
+    <main className="daily-report-reader-page" ref={readerRef} aria-busy={loading}>{confirmation.dialog}
       <div className="daily-report-reader-toolbar">
         <div className="daily-report-reader-toolbar-row">
           <button type="button" className="daily-report-back" onClick={returnToList} aria-label="返回日报列表">

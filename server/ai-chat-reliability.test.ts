@@ -46,6 +46,7 @@ test('answer routes do not expose private tools or create drafts for date descri
   assert.equal(requestsScheduleDraft('请生成日程草稿'),true);
   const names=chatToolNames('如何从0开始接入workbuddy',{product:false,schedule:false,knowledge:false,history:false});
   assert.deepEqual([...names],['search','read_url']);
+  assert.deepEqual([...chatToolNames('如何从0开始接入workbuddy',{product:true,schedule:false,knowledge:false,history:false})],['settings','product_help','search','read_url']);
   assert.equal(chatToolNames('科比是谁',{product:false,schedule:false,knowledge:false,history:false}).size,0);
 });
 test('SDK final failure, truncation and missing completion cannot use intermediate prose as success',async()=>{
@@ -106,7 +107,7 @@ test('same successful or failed tool arguments are executed once per run',async(
 });
 test('three screenshot inputs use text/clarification/advice routes; only explicit followup creates an unconfirmed draft',async()=>{
   const original=workBuddyProvider.generate;let calls=0;
-  workBuddyProvider.generate=async req=>{calls++;if(req.responseMode==='draft')return wire;assert.equal(req.outputSchema,undefined);if(req.input[0].text==='科比是谁'){assert.equal(req.tools?.length,0);return '科比是篮球运动员。\n\n**多段落**与 `代码`、"引号"、\\反斜杠。';}assert.ok(req.tools?.every(t=>['search','read_url'].includes(t.name)));return '先确认接口和授权方式，再按照官方文档接入。';};
+    workBuddyProvider.generate=async req=>{calls++;if(req.responseMode==='draft')return wire;assert.equal(req.outputSchema,undefined);if(req.input[0].text==='科比是谁'){assert.equal(req.tools?.length,0);return '科比是篮球运动员。\n\n**多段落**与 `代码`、"引号"、\\反斜杠。';}assert.ok(req.tools?.every(t=>['settings','product_help','search','read_url'].includes(t.name)));assert.match(req.instructions,/默认理解为接入当前 Orbit/);assert.match(req.instructions,/用户明确指定其他目标时/);assert.match(req.input[0].text!,/Orbit 资料/);return 'Orbit 已有 WorkBuddy 接入，请在个人 API Key 中配置并测试连接。';};
   try{
     const a=await send('科比是谁');assert.equal(a.row.state,'completed');assert.match(JSON.parse(a.row.result!).reply,/多段落/);
     const b=await send('10月28日（下周三）15:00-17:00举办活动');assert.equal(b.row.state,'completed');assert.match(JSON.parse(b.row.result!).reply,/2026-10-28 15:00-17:00/);assert.equal(calls,1);

@@ -86,7 +86,17 @@ button{color:inherit}
 @media(max-width:1100px){.grid6{grid-template-columns:repeat(3,1fr)}.two,.two.equal{grid-template-columns:1fr}.stats-grid{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:900px){.quick-head{flex-direction:column}.quick .cmd-actions{min-width:0;width:100%;grid-template-columns:repeat(2,1fr)}}
 @media(max-width:680px){.app{padding:11px}.topbar{flex-direction:column}.actions{justify-content:flex-start}.quick .cmd-actions{grid-template-columns:1fr}.grid6{grid-template-columns:repeat(2,1fr)}.stats-grid{grid-template-columns:repeat(2,1fr)}.insights{grid-template-columns:1fr}.model-row{grid-template-columns:1fr auto}.model-row .bar{grid-column:1/-1}.chart{height:260px}}
-@media(max-width:767px){.btn,.seg button,.legend button{min-height:44px}.legend button{padding-block:8px}.actions{row-gap:8px}}</style>
+@media(max-width:767px){.btn,.seg button,.legend button{min-height:44px}.legend button{padding-block:8px}.actions{row-gap:8px}}
+.tool-app-dialog { width:min(460px,calc(100vw - 24px)); max-height:calc(100dvh - 32px); margin:auto; overflow:auto; padding:22px; border:1px solid var(--line,#dce0e8); border-radius:12px; background:var(--panel,#fff); color:var(--text,inherit); font:inherit; }
+.tool-app-dialog::backdrop { background:rgba(0,0,0,.45); }
+.tool-app-dialog h2 { font-size:18px; margin:0 0 12px; }
+.tool-app-dialog p { font-size:13px; line-height:1.7; white-space:pre-wrap; margin:8px 0; }
+.tool-app-dialog :is(input,textarea) { display:block; width:100%; padding:10px; border:1px solid var(--line,#aeb7c5); border-radius:6px; font:inherit; color:inherit; background:var(--bg,#fff); }
+.tool-dialog-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+.tool-dialog-actions button { min-height:44px; padding:8px 14px; }
+.tool-dialog-error { color:var(--red,#b42318); }
+
+</style>
 </head>
 <body>
 <div class="app">
@@ -226,6 +236,38 @@ button{color:inherit}
 
 <script>
 (() => {
+
+// Application-owned input/confirmation; local data formats and actions stay in the owning tool.
+let toolDialogOpen = false;
+function toolDialog({ title, message = '', value = '', input = false, multiline = false, readOnly = false, confirmLabel = '确定' }) {
+  if (toolDialogOpen) return Promise.resolve(null);
+  toolDialogOpen = true;
+  const previous = document.activeElement;
+  return new Promise(resolve => {
+    const dialog = document.createElement('dialog'), form = document.createElement('form');
+    dialog.className = 'tool-app-dialog'; form.method = 'dialog';
+    const heading = document.createElement('h2'); heading.id = 'tool-dialog-title'; heading.textContent = title; dialog.setAttribute('aria-labelledby', heading.id);
+    const description = document.createElement('p'); description.textContent = message;
+    form.append(heading, description);
+    let field;
+    if (input) {
+      field = document.createElement(multiline ? 'textarea' : 'input'); field.value = value; field.readOnly = readOnly;
+      field.setAttribute('aria-label', title); field.required = !readOnly; if (multiline) field.rows = 8;
+      form.append(field);
+    }
+    const error = document.createElement('p'); error.setAttribute('role', 'alert'); error.className = 'tool-dialog-error'; form.append(error);
+    const actions = document.createElement('div'); actions.className = 'tool-dialog-actions';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn'; cancel.textContent = '取消';
+    const confirm = document.createElement('button'); confirm.type = 'submit'; confirm.className = 'btn primary'; confirm.textContent = confirmLabel;
+    actions.append(cancel, confirm); form.append(actions); dialog.append(form); document.body.append(dialog);
+    let settled = false;
+    const finish = result => { if (settled) return; settled = true; confirm.disabled = true; dialog.close(); dialog.remove(); toolDialogOpen = false; if (previous?.isConnected) previous.focus({preventScroll:true}); resolve(result); };
+    cancel.onclick = () => finish(null); dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); });
+    form.addEventListener('submit', event => { event.preventDefault(); if (field && !readOnly && !field.value.trim()) { error.textContent = '请输入内容'; field.focus(); return; } finish(field ? field.value : true); });
+    dialog.showModal(); if (field) { field.focus(); if (readOnly) field.select(); } else cancel.focus();
+  });
+}
+
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const COLORS=["#83a0ff","#66dfb5","#f7c66a","#bd8cff","#62d6ee","#ff7f8d","#9bd373","#e7a7d1"];
 // Fallback only. ccusage-provided costs always take priority.
@@ -307,7 +349,7 @@ function costSourceText(info){
  return "成本来源混合：ccusage + 本地兜底";
 }
 const toast=m=>{let t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove("show"),1700)};
-const copy=async t=>{try{await navigator.clipboard.writeText(t);toast("已复制到剪贴板")}catch{prompt("请复制：",t)}};
+const copy=async t=>{try{await navigator.clipboard.writeText(t);toast("已复制到剪贴板")}catch{await toolDialog({title:"手动复制",message:"自动复制不可用，请选择并复制下方文字。",input:true,multiline:true,readOnly:true,value:t,confirmLabel:"完成"})}};
 
 function sample(){
  const models=["gpt-5.6-luna","gpt-5.6-sol","gpt-6-astra"];
@@ -583,8 +625,8 @@ function syncRange(){
 }
 $("#copyDailyCmd").onclick=()=>copy($("#dailyCmd").textContent);
 $("#copySessionCmd").onclick=()=>copy(sessionCmd);
-$("#updateCcusageBtn").onclick=async()=>{try{await navigator.clipboard.writeText(updateCcusageCmd);toast("更新命令已复制，请在 PowerShell 运行")}catch{prompt("请复制并在 PowerShell 运行：",updateCcusageCmd)}};
-$("#pasteBtn").onclick=async()=>{try{let t=await navigator.clipboard.readText();if(!t.trim())throw Error();loadText(t,"剪贴板 JSON")}catch{let t=prompt("请粘贴 ccusage JSON：");if(t)loadText(t,"粘贴 JSON")}};
+$("#updateCcusageBtn").onclick=async()=>{try{await navigator.clipboard.writeText(updateCcusageCmd);toast("更新命令已复制，请在 PowerShell 运行")}catch{await toolDialog({title:"复制更新命令",message:"请手动复制后在 PowerShell 运行。",input:true,multiline:true,readOnly:true,value:updateCcusageCmd,confirmLabel:"完成"})}};
+$("#pasteBtn").onclick=async()=>{try{let t=await navigator.clipboard.readText();if(!t.trim())throw Error();loadText(t,"剪贴板 JSON")}catch{let t=await toolDialog({title:"粘贴 ccusage JSON",input:true,multiline:true,confirmLabel:"导入 JSON"});if(t)loadText(t,"粘贴 JSON")}};
 $("#rangeSeg").onclick=e=>{let b=e.target.closest("button");if(!b)return;$("#rangeSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b));setRangePreset(b.dataset.r==="all"?"all":num(b.dataset.r))};
 $("#rangeStartSlider").oninput=e=>{$("#rangeSeg").querySelectorAll("button").forEach(x=>x.classList.remove("active"));rangeStartIdx=Math.min(num(e.target.value),rangeEndIdx);syncRange();render()};
 $("#rangeEndSlider").oninput=e=>{$("#rangeSeg").querySelectorAll("button").forEach(x=>x.classList.remove("active"));rangeEndIdx=Math.max(num(e.target.value),rangeStartIdx);syncRange();render()};
