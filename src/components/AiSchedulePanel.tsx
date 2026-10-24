@@ -1,11 +1,11 @@
-import { Button, Input, TimePicker, isClockTime } from '../ui';
+import { Button, IconButton, Tooltip, Input, TimePicker, isClockTime } from '../ui';
 import { composerDraftKey, readComposerDraft, updateComposerDraft, snapshotComposerDraft, consumeComposerDraft, subscribeComposerDraft, type NotificationContext } from '../utils/composer-draft';
 import type { NoteImage } from '../utils/note-images';
 import { NoteImageGallery, NoteImageInput, useNoteImageUpload } from './NoteImages';
 import { OrbitNotificationCard, type NotificationMeta } from './OrbitNotificationCard';
 import { ReminderActionButtons } from './ReminderActionButtons';
 import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle } from 'react';
-import { Bot, BookOpen, Send, Loader2, Check, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus } from 'lucide-react';
+import { Bot, BookOpen, ArrowUp, Loader2, Check, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus } from 'lucide-react';
 import type { ActionConfirmation } from '../ui';
 import {safeChatHref} from '../utils/chat-markdown';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -986,21 +986,20 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
                 aria-label={noteMode ? '记事输入框' : 'AI 助手输入框'}
               />
               <span className="schedule-ai-composer-shortcut">{noteMode ? 'Enter 换行 · Ctrl+Enter 保存' : 'Enter 换行 · Ctrl+Enter 发送'}</span>
-              <Button
+              <Tooltip content={noteMode ? '保存' : '发送'}><IconButton
                 type="button"
                 onClick={noteMode ? () => { void handleSaveNotes(); } : handleSubmit}
                 disabled={cannotSend}
-                className="schedule-ai-send-button flex items-center justify-center rounded-lg text-xs font-medium transition-all"
+                className="schedule-ai-send-button"
                 aria-busy={orbit.submitting || savingNotes || undefined}
-                aria-label={noteMode ? '保存记事' : '发送'}
-                title={noteMode ? 'Ctrl+Enter 保存记事' : 'Ctrl+Enter 发送'}
+                label={noteMode ? '保存记事' : '发送'}
+                title={noteMode ? '保存' : '发送'}
               >
                 {orbit.submitting || savingNotes
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : noteMode ? <Save className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />
+                  ? <Loader2 size={20} className="animate-spin" aria-hidden="true" />
+                  : noteMode ? <Save size={20} aria-hidden="true" /> : <ArrowUp size={20} aria-hidden="true" />
                 }
-                <span>{noteMode ? '保存' : '发送'}</span>
-              </Button>
+              </IconButton></Tooltip>
             </div>
             </div>
           </div>

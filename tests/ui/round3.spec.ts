@@ -33,12 +33,12 @@ for (const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (c
     await expect(page.getByText('每日摘要、周期提醒和日报邮件共用此邮箱。',{exact:true})).toBeVisible(); await page.keyboard.press('Escape');
     await checkVisual(page,`round3-settings-${width}-${theme}.png`,false,false);
     await page.goto(base+'/tools'); await page.getByRole('button',{name:'个人菜单',exact:true}).click();
-    await page.getByRole('menuitem',{name:'邮箱导入',exact:true}).or(page.getByRole('dialog',{name:'个人菜单',exact:true}).getByRole('button',{name:'邮箱导入',exact:true})).click();
+    await expect(page.getByRole('menuitem',{name:'邮箱导入',exact:true})).toHaveCount(0); await expect(page.getByRole('menuitem',{name:'记录经历',exact:true})).toHaveCount(0); await expect(page.getByRole('menuitem',{name:'研究与观点',exact:true})).toHaveCount(0); await page.keyboard.press('Escape'); await page.goto(base+'/settings/advanced'); await page.getByRole('link',{name:'打开邮箱导入',exact:true}).click();
     await expect(page).toHaveURL(base+'/import'); await expect(page.getByRole('heading',{name:'邮箱导入',exact:true})).toBeVisible();
     await expect(page.locator('.ai-assistant-topbar,.orbit-workspace,#ai-note-board')).toHaveCount(0);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await checkVisual(page,`round3-import-${width}-${theme}.png`,false,false);
-    await page.goBack(); await expect(page).toHaveURL(base+'/tools'); await page.goForward(); await expect(page).toHaveURL(base+'/import'); await page.reload();
+    await page.goBack(); await expect(page).toHaveURL(base+'/settings/advanced'); await page.goForward(); await expect(page).toHaveURL(base+'/import'); await page.reload();
     await page.getByRole('link',{name:'返回今日行动中心',exact:true}).click(); await expect(page).toHaveURL(base+'/today');
     await page.goto(base+'/assistant?tool=email-import'); await expect(page).toHaveURL(base+'/import'); await page.reload(); await expect(page.getByRole('heading',{name:'邮箱导入',exact:true})).toBeVisible(); expect(errors).toEqual([]);
   });
@@ -122,7 +122,7 @@ for (const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (c
     await expect(popup.getByRole('combobox')).toHaveCount(4); await expect(popup.getByRole('button',{name:'应用',exact:true})).toHaveCount(0);
     await checkVisual(page,`round3-review-library-${width}-${theme}.png`,false,false); await page.keyboard.press('Escape'); await expect(trigger).toBeFocused();
     await page.getByRole('button',{name:'个人菜单',exact:true}).click();
-    await page.getByRole('menuitem',{name:'记录经历',exact:true}).or(page.getByRole('dialog',{name:'个人菜单',exact:true}).getByRole('button',{name:'记录经历',exact:true})).click();
+    await expect(page.getByRole('menuitem',{name:'记录经历',exact:true})).toHaveCount(0); await page.keyboard.press('Escape'); await page.goto(base+'/settings/advanced'); await expect(page.getByRole('link',{name:'打开研究与观点',exact:true})).toBeVisible(); await page.getByRole('link',{name:'打开记录经历',exact:true}).click();
     await expect(page).toHaveURL(base+'/library/experience'); await expect(page.getByRole('heading',{name:'记录经历',exact:true})).toBeVisible(); await page.reload();
     await expect(page.getByRole('heading',{name:'记录经历',exact:true})).toBeVisible(); await page.goBack();
     await page.goto(base+'/reports'); await expect(page.getByRole('link',{name:'日报设置',exact:true})).toHaveCount(0);
@@ -188,6 +188,7 @@ test('round3 review plan outcomes describe operations and notification controls 
   expect(await edit.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
   await checkVisual(page,'round3-review-plan-dark.png',false,false);
   const card=page.locator('#orbit-message-notice .orbit-notification-actions'); await card.scrollIntoViewIfNeeded();
+  await expect(card.getByText(/^(已读|未读)$/)).toHaveCount(0);
   for(const label of ['查看原对象','就此继续聊','完成事项','延后 15 分钟','明天 09:00 再提醒']) {
     const control=card.getByRole(label==='查看原对象'?'link':'button',{name:label,exact:true}); await expect(control).toBeVisible(); await expect(control).toHaveText('');
     await control.hover(); await expect(page.getByRole('tooltip')).toContainText(label); await page.keyboard.press('Escape');

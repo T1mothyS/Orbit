@@ -20,7 +20,7 @@ object NotificationSupport {
     const val LOCAL_ID = 1001
     const val CHANNEL = "orbit_reminders"
     private const val LOCAL_CHANNEL = "orbit_local_test"
-    fun prefs(c: Context) = c.getSharedPreferences("orbit_native", Context.MODE_PRIVATE)
+    fun prefs(c: Context) = c.getSharedPreferences(if (ServerEnvironment.current(c) == ServerPreset.PRODUCTION) "orbit_native" else "orbit_native_stage", Context.MODE_PRIVATE)
     fun createChannels(c: Context) {
         c.getSystemService(NotificationManager::class.java).createNotificationChannels(listOf(
             NotificationChannel(CHANNEL, "Orbit 手机提醒", NotificationManager.IMPORTANCE_HIGH),

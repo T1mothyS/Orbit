@@ -11,10 +11,12 @@ import java.util.Date
 @SuppressLint("MissingFirebaseInstanceTokenRefresh")
 class OrbitMessagingService : FirebaseMessagingService() {
     override fun onRegistered(installationId: String) {
+        if (!ServerEnvironment.pushEnabled(this)) return
         val p = NotificationSupport.prefs(this)
         if (p.getString("account", null) != null && !p.getBoolean("reset_pending", false)) p.edit().putString("fid", installationId).putString("fcm_state", "已注册，等待网页同步绑定").apply()
     }
     override fun onMessageReceived(message: RemoteMessage) {
+        if (!ServerEnvironment.pushEnabled(this)) return
         val p = NotificationSupport.prefs(this)
         val data = message.data
         if (p.getString("account", null) != data["accountId"] || p.getString("generation", null) != data["generation"]) return

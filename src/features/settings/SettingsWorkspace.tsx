@@ -20,6 +20,7 @@ import { IntegrationGuideSettings } from './sections/IntegrationGuideSettings';
 import { LibraryIntegrationSettings } from './sections/LibraryIntegrationSettings';
 import { NotificationSettings } from './sections/NotificationSettings';
 import { ToolsSettings } from './sections/ToolsSettings';
+import { AdvancedFeaturesSettings } from './sections/AdvancedFeaturesSettings';
 import './settings.css';
 import { SettingsConfirmProvider } from './SettingsConfirm';
 import SettingsHomePage from './SettingsHomePage';
@@ -52,7 +53,7 @@ function SettingsPages({ returnTo }: { returnTo?: string }) {
     library: <LibraryIntegrationSettings authHeaders={authHeaders} />,
     integrations: <><CaldavSettings authHeaders={authHeaders} /><IntegrationGuideSettings authHeaders={authHeaders} /></>,
     data: <DataSettings authHeaders={authHeaders} />,
-    advanced: <><ToolsSettings onOpenTools={() => navigate('/tools')} /><section className="oui-section"><h2>使用与帮助</h2><p className="oui-help">从常用任务开始，了解功能入口和操作边界。</p><TextLink to="/help">打开 Orbit 使用指南</TextLink></section>{user?.role === 'admin' && <AdminSettings onOpenAdmin={() => setAdminOpen(true)} />}</>,
+    advanced: <><AdvancedFeaturesSettings /><ToolsSettings onOpenTools={() => navigate('/tools')} /><section className="oui-section"><h2>使用与帮助</h2><p className="oui-help">从常用任务开始，了解功能入口和操作边界。</p><TextLink to="/help">打开 Orbit 使用指南</TextLink></section>{user?.role === 'admin' && <AdminSettings onOpenAdmin={() => setAdminOpen(true)} />}</>,
   };
   return <SettingsFrame fallbackReturnTo={returnTo} accountMenu={<AccountMenu theme={theme} onToggleTheme={toggleTheme} user={user} onLogout={logout} onOpenAdmin={() => setAdminOpen(true)} />} navigation={settingsCategories} category={category?.id} title={category?.title || '设置'} description={category?.description || '按需要调整你的 Orbit。'} searchExpanded={searchExpanded} search={<SettingsSearch onExpandedChange={setSearchExpanded} />}>
     {result && result.kind !== 'known' && <InlineNotice tone="warning" title={result.kind === 'forbidden' ? '无权访问此设置项' : '设置项不存在'}>请通过分类或搜索选择可用设置。</InlineNotice>}

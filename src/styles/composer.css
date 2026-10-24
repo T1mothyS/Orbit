@@ -36,7 +36,7 @@
 .orbit-segmented[aria-disabled=true] { opacity:.55; }
 .orbit-segmented-indicator { position:absolute; z-index:-1; top:7px; bottom:7px; left:2px; width:calc(50% - 2px); background:color-mix(in srgb,var(--segment-color) 12%,var(--td-bg-color-container)); border:1px solid color-mix(in srgb,var(--segment-color) 25%,var(--td-component-stroke)); border-radius:50px; transition:transform var(--orbit-motion-feedback) var(--orbit-ease),background-color var(--orbit-motion-feedback),border-color var(--orbit-motion-feedback); }
 .orbit-segmented[data-index="1"] .orbit-segmented-indicator { transform:translateX(100%); }
-.ai-schedule-page-card .schedule-ai-composer.orbit-compact-composer { --composer-accent:var(--td-brand-color); --composer-hover:var(--td-brand-color-hover); --composer-active:var(--td-brand-color-active); --composer-on-accent:var(--orbit-on-brand); grid-template-columns:44px minmax(0,1fr) 68px; align-items:end; gap:4px; padding:2px; min-height:50px; border:1px solid var(--td-component-stroke); border-radius:var(--orbit-radius-control,8px); background:var(--td-bg-color-container); box-shadow:none; }
+.ai-schedule-page-card .schedule-ai-composer.orbit-compact-composer { --composer-accent:var(--td-brand-color); --composer-hover:var(--td-brand-color-hover); --composer-active:var(--td-brand-color-active); --composer-on-accent:var(--orbit-on-brand); grid-template-columns:44px minmax(0,1fr) 44px; align-items:end; gap:4px; padding:2px; min-height:50px; border:1px solid var(--td-component-stroke); border-radius:var(--orbit-radius-control,8px); background:var(--td-bg-color-container); box-shadow:none; }
 .ai-schedule-page-card .orbit-compact-composer.is-note-mode { --composer-accent:var(--orbit-note); --composer-hover:var(--orbit-note-hover); --composer-active:var(--orbit-note-active); --composer-on-accent:var(--orbit-on-note); border-color:color-mix(in srgb,var(--composer-accent) 60%,var(--td-component-stroke)); }
 .ai-schedule-page-card .orbit-compact-composer:hover { border-color:var(--composer-accent); }
 .ai-schedule-page-card .orbit-compact-composer:focus-within { border-color:var(--composer-accent); box-shadow:0 0 0 2px color-mix(in srgb,var(--composer-accent) 14%,transparent); }
@@ -48,7 +48,7 @@
 .orbit-compact-composer .schedule-ai-send-button:disabled { background:var(--td-bg-color-component); color:var(--td-text-color-disabled); cursor:not-allowed; }
 .orbit-compact-composer .schedule-ai-send-button[aria-busy=true] { background:var(--composer-accent); color:var(--composer-on-accent); }
 .ai-schedule-page-card .orbit-compact-composer textarea { min-height:40px!important; max-height:144px; padding:9px 2px!important; font-family:inherit; font-size:16px; line-height:22px!important; }
-.ai-schedule-page-card .orbit-compact-composer .schedule-ai-send-button { width:68px; height:44px; gap:5px; padding:0 6px; border-radius:var(--orbit-radius-control,8px); margin:0; font-size:13px; }
+.ai-schedule-page-card .orbit-compact-composer .schedule-ai-send-button { width:44px; height:44px; gap:0; padding:0; border-radius:var(--orbit-radius-control,8px); margin:0; font-size:13px; }
 .orbit-composer-plus { display:grid; place-items:center; width:44px; height:44px; border-radius:8px; color:var(--td-text-color-secondary); }
 .orbit-composer-plus:hover:not(:disabled) { background:var(--td-bg-color-component-hover); color:var(--td-brand-color); }
 .orbit-composer-plus:active:not(:disabled) { background:var(--td-bg-color-component); }

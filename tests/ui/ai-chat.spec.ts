@@ -21,6 +21,10 @@ for(const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]])for(cons
   await page.route('**/api/orbit/requests/request-synthetic/continue',async route=>{continueCalls++;expect(route.request().postDataJSON().requestId).toMatch(/^[a-f0-9-]{36}$/);await new Promise<void>(r=>release=r);continued=true;history=[history[0],{id:'answer-synthetic',role:'assistant',type:'text',text:'继续查询后的完整回答。',timestamp:now.toISOString()}];await route.fulfill({status:202,json:{request:{id:'continuation-synthetic',state:'queued'}}});});
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto(base+'/assistant');
+  const send = page.getByRole('button',{name:'发送',exact:true});
+  await expect(send).toHaveText('');
+  await expect(send).toBeDisabled();
+  const sendBox = await send.boundingBox(); expect(sendBox!.width).toBeGreaterThanOrEqual(44); expect(sendBox!.height).toBeGreaterThanOrEqual(44);
   const card=page.locator('[data-request-id="request-synthetic"]');
   const stop=card.getByRole('button',{name:'停止生成',exact:true});await expect(stop).toBeVisible();
   await expect(card).not.toContainText('合成问题可以选择复制');await expect(card.locator('.orbit-request-elapsed')).toHaveText('12 秒');

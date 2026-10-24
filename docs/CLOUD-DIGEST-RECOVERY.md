@@ -23,6 +23,8 @@
 
 ## V2 Run 发布错误与部分成功核对
 
+`MEDIA_EVIDENCE_MISMATCH` 表示某条新闻的 `media_ids` 指向图片，但该图片的 `media.evidence_id` 未同时出现在本条新闻的 `evidence_ids`。全局 evidence 存在该图片条目仍不够；应把对应图片证据与原事实证据取并集、去重，保留全部事实来源、新闻与图片。新版诊断返回真实 `market/macro/stories` 路径及缺少的证据 ID；schema 与 production Prompt 也明确该关系。校验器不修改原稿或放宽引用检查。相邻日期排查仍以原 run 的 cutoff/输入和正式历史为准，不能用新输入冒充历史恢复。
+
 先固定原 runId、日期与失败调用的内容 hash，只读该次 manifest 事件和相同账号/日期的 artifact、正式 report、去重通知状态。不得把 MCP `Internal error` 或网页无记录直接判定为未到达服务端，也不得用第一次失败解释第二次调用。阶段顺序是 `MEDIA_PREPARING → MEDIA_PREPARED → REPORT_SAVED → PUBLISHED`；`FAILED.failedPhase`、媒体 code/stage/reason/attempts 与最后成功事件共同定位。
 
 若停在媒体准备且无 artifact/report/通知，则尚未发布/入队；先核对原图片的可达性与许可，再在获授权恢复时复用原内容。若已有保存记录或通知，先核对内容 hash、正式/候选状态及去重记录，不重复发布或发送。PUBLISHED、QUEUED、SMTP accepted、收件箱到达分别记录，缺失证据直接标未知。图片失败的既有有界重试不能替代故障诊断，硬闸门不得放宽；无可复现代码缺陷时不增加猜测性补丁。真实重跑、补发与收件箱检查仍需分别授权。

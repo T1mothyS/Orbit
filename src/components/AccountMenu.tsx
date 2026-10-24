@@ -1,4 +1,4 @@
-import { ChartNoAxesCombined,FlaskConical,HelpCircle,LogOut,Mail,Moon,NotebookPen,Settings,Shield,Sun,TrendingUp,Wrench } from 'lucide-react';
+import { ChartNoAxesCombined,HelpCircle,LogOut,Moon,Settings,Shield,Sun,TrendingUp,Wrench } from 'lucide-react';
 import { useLocation,useNavigate } from 'react-router-dom';
 import { APP_CONFIG } from '../config';
 import { IconButton,Menu,type MenuItem } from '../ui';
@@ -12,9 +12,7 @@ export function AccountMenu({theme,onToggleTheme,onOpenSettings,onOpenAdmin,user
     {id:'settings',label:'设置',icon:<Settings size={16}/>,onSelect:onOpenSettings || go('/settings')},
     {id:'statistics',label:'使用统计',icon:<ChartNoAxesCombined size={16}/>,onSelect:go('/project?view=statistics')},
     {id:'theme',label:'切换主题',icon:theme==='light'?<Moon size={16}/>:<Sun size={16}/>,onSelect:onToggleTheme},
-    {id:'import',label:'邮箱导入',icon:<Mail size={16}/>,separatorBefore:true,onSelect:go('/import')},
-    {id:'experience',label:'记录经历',icon:<NotebookPen size={16}/>,onSelect:go('/library/experience')},
-    {id:'research',label:'研究与观点',icon:<FlaskConical size={16}/>,onSelect:go('/research')},{id:'tools',label:'Tools 工具中心',icon:<Wrench size={16}/>,onSelect:go('/tools')},
+    {id:'tools',label:'Tools 工具中心',icon:<Wrench size={16}/>,separatorBefore:true,onSelect:go('/tools')},
     {id:'growth',label:'项目成长',icon:<TrendingUp size={16}/>,onSelect:go('/project')},{id:'help',label:'使用指南',icon:<HelpCircle size={16}/>,onSelect:go('/help')},
     ...(user?.role==='admin'?[{id:'admin',label:'管理面板',icon:<Shield size={16}/>,onSelect:()=>onOpenAdmin?.()}]:[]),
     {id:'logout',label:'退出登录',icon:<LogOut size={16}/>,danger:true,separatorBefore:true,onSelect:()=>{onLogout?.();navigate('/login',{replace:true});}},

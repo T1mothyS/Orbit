@@ -13,6 +13,9 @@ val appUrl = providers.gradleProperty("orbitAppUrl").orNull ?: orbitConfig.getPr
     ?: error("Set appUrl in android/orbit.local.properties (fixed public HTTPS URL, no credentials)")
 val parsedUrl = URI(appUrl)
 require(parsedUrl.scheme == "https" && parsedUrl.host != null && parsedUrl.userInfo == null && parsedUrl.port == -1 && parsedUrl.query == null && parsedUrl.fragment == null) { "appUrl must be a public HTTPS URL without credentials, port, query or fragment" }
+val stageUrl = providers.gradleProperty("orbitStageUrl").orNull ?: orbitConfig.getProperty("stageUrl") ?: "https://stage.flyme2moon.com/today"
+val parsedStageUrl = URI(stageUrl)
+require(parsedStageUrl.scheme == "https" && parsedStageUrl.host != null && parsedStageUrl.userInfo == null && parsedStageUrl.port == -1 && parsedStageUrl.query == null && parsedStageUrl.fragment == null && parsedStageUrl.host != parsedUrl.host) { "stageUrl must be a distinct public HTTPS origin without credentials, port, query or fragment" }
 val orbitVersion = groovy.json.JsonSlurper().parse(rootProject.file("../package.json")) as Map<*, *>
 android {
     namespace = "io.github.t1mothys.orbit"
@@ -21,9 +24,10 @@ android {
         applicationId = "io.github.t1mothys.orbit"
         minSdk = 26
         targetSdk = 36
-        versionCode = 56003
+        versionCode = 64000
         versionName = orbitVersion["version"] as String
         buildConfigField("String", "APP_URL", "\"${appUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
+        buildConfigField("String", "STAGE_URL", "\"${stageUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigured.toString())
         buildConfigField("boolean", "DEVELOPER_TOOLS", "false")
     }

@@ -60,7 +60,7 @@ const id: Schema = { ...str(100), minLength: 1, format: 'id' };
 const array = (items: Schema, maxItems = 100): Schema => ({ type: 'array', items, maxItems });
 const obj = (properties: Record<string, Schema>): Schema => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const refs = array(id, 20);
-const story = obj({ id, title: { ...str(250), minLength: 1 }, summary: { ...prose(4000), minLength: 1 }, evidence_ids: refs, media_ids: refs, verification: { ...str(), enum: ['verified', 'partial', 'unverified'] } });
+const story = obj({ id, title: { ...str(250), minLength: 1 }, summary: { ...prose(4000), minLength: 1 }, evidence_ids: { ...refs, description: '同时列出本条新闻事实的证据 ID，以及每个 media_ids 对应图片的 media.evidence_id。图片文件页是独立证据，不能替换新闻事实来源。' }, media_ids: refs, verification: { ...str(), enum: ['verified', 'partial', 'unverified'] } });
 const legacySchema = obj({
   schema_version: { ...str(), enum: [DIGEST_V2_VERSION] }, date: { ...str(), format: 'date' }, title: { ...str(200), minLength: 1 },
   executive_signals: array({ ...prose(500), minLength: 1 }, 5), calendar: array(obj({ input_id: id, text: { ...prose(), minLength: 1 } }), 300),
@@ -104,12 +104,12 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 export function digestHash(value: unknown): string { return crypto.createHash('sha256').update(canonicalJson(value)).digest('hex'); }
-export interface DigestIssue { path: string; code: string }
+export interface DigestIssue { path: string; code: string; message?: string }
 export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, generationVersion = DIGEST_V2_GENERATION) {
   const errors: DigestIssue[] = [];
   const reviewIssues: DigestIssue[] = [];
   const formattingWarnings: string[] = [];
-  const issue = (path: string, code: string) => { if (errors.length < 100) errors.push({ path, code }); };
+  const issue = (path: string, code: string, message?: string) => { if (errors.length < 100) errors.push({ path, code, ...(message ? { message } : {}) }); };
   const formattingIssue = (path: string, code: string) => {
     if (reviewIssues.length < 100) reviewIssues.push({ path, code });
     if (!formattingWarnings.includes(code)) formattingWarnings.push(code);
@@ -180,11 +180,13 @@ export function validateDigestV2(value: unknown, snapshot?: DigestSnapshot, gene
     if (!item.evidence_ids.length) issue(`$.further_reading[${i}]`, 'EVIDENCE_REQUIRED');
     if (stories.some(story => story.id === item.id)) issue(`$.further_reading[${i}]`, 'DUPLICATE_ID');
   }
-  for (const [i, s] of stories.entries()) {
-    unique(s.media_ids, `$.stories[${i}].media_ids`);
-    if (s.verification === 'verified' && !s.evidence_ids.length) issue(`$.stories[${i}]`, 'EVIDENCE_REQUIRED');
-    if (s.media_ids.some(id => !mids.has(id))) issue(`$.stories[${i}]`, 'MEDIA_NOT_FOUND');
-    if (s.media_ids.some(id => !s.evidence_ids.includes(d.media.find(m => m.id === id)?.evidence_id || ''))) issue(`$.stories[${i}]`, 'MEDIA_EVIDENCE_MISMATCH');
+  for (const section of ['market', 'macro', 'stories'] as const) for (const [i, s] of d[section].entries()) {
+    const itemPath = `$.${section}[${i}]`;
+    unique(s.media_ids, `${itemPath}.media_ids`);
+    if (s.verification === 'verified' && !s.evidence_ids.length) issue(itemPath, 'EVIDENCE_REQUIRED');
+    if (s.media_ids.some(id => !mids.has(id))) issue(itemPath, 'MEDIA_NOT_FOUND');
+    const missing = [...new Set(s.media_ids.map(id => d.media.find(m => m.id === id)?.evidence_id).filter((id): id is string => !!id && !s.evidence_ids.includes(id)))];
+    if (missing.length) issue(`${itemPath}.evidence_ids`, 'MEDIA_EVIDENCE_MISMATCH', `将图片证据 ${missing.join(', ')} 加入 ${itemPath}.evidence_ids，保留已有新闻事实证据；不要删除新闻或图片来绕过校验。`);
   }
   for (const [i, m] of d.media.entries()) {
     if (!eids.has(m.evidence_id)) issue(`$.media[${i}]`, 'EVIDENCE_NOT_FOUND');

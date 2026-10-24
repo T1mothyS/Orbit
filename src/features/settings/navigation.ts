@@ -19,5 +19,5 @@ export const settingsCategories: SettingsCategory[] = [
   { id: 'library', title: '知识库', icon: BookOpen, description: '发布与数据导出', to: '/settings/library' },
   { id: 'integrations', title: '同步与集成', icon: RefreshCw, description: '日历同步与外部连接', to: '/settings/integrations' },
   { id: 'data', title: '数据与备份', icon: Database, description: '导出、加密备份与恢复', to: '/settings/data' },
-  { id: 'advanced', title: '高级', icon: Settings2, description: '工具、管理与使用指南', to: '/settings/advanced' },
+  { id: 'advanced', title: '高级', icon: Settings2, description: '邮箱导入、经历、研究与扩展工具', to: '/settings/advanced' },
 ];

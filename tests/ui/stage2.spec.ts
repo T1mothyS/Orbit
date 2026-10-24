@@ -370,7 +370,7 @@ for (const [width, height] of [[390, 844], [430, 932], [768, 1024], [1440, 900]]
     await page.getByRole('button',{name:'打开 AI 记事板',exact:true}).click(); await expect(page.locator('#orbit-note-connected-note')).toBeVisible();
     await checkVisual(page, `stage2-notes-${width}-${theme}.png`, false, false); if(width<1100) await page.getByRole('button',{name:'关闭记事板',exact:true}).click(); else await page.getByRole('button',{name:'打开 AI 记事板',exact:true}).click();
     await page.getByRole('button',{name:'个人菜单',exact:true}).click();
-    await page.getByRole('menuitem',{name:'邮箱导入',exact:true}).or(page.getByRole('dialog',{name:'个人菜单',exact:true}).getByRole('button',{name:'邮箱导入',exact:true})).click();
+    await expect(page.getByRole('menuitem',{name:'邮箱导入',exact:true})).toHaveCount(0); await expect(page.getByRole('menuitem',{name:'记录经历',exact:true})).toHaveCount(0); await expect(page.getByRole('menuitem',{name:'研究与观点',exact:true})).toHaveCount(0); await page.keyboard.press('Escape'); await page.goto(base+'/settings/advanced'); await page.getByRole('link',{name:'打开邮箱导入',exact:true}).click();
     await expect(page.getByRole('heading',{name:'邮箱导入',exact:true})).toBeVisible(); await checkVisual(page, `stage2-email-${width}-${theme}.png`, false, false);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });

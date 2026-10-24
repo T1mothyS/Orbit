@@ -82,6 +82,8 @@ scripts/browser-automation.cjs 必须在导航前附加；每次原生确认先�
 
 ## 发布与外部层级
 
+服务器切换增量覆盖：Android JVM 检查默认正式环境、未知预设拒绝转向任意来源、两套桥接 origin 互斥与子框架拒绝；Gradle assemble/lint/unit 使用现有工具链。实体手机另验旧版覆盖安装、首次双端登录、双向切换、重启保持、离线/证书失败重试、未保存输入和旧通知，不能由 JVM 或 Web 浏览器替代。Web 四尺寸明暗保留高级入口、无头像重复入口、纯图标发送/保存及44px触控断言。图片证据回归覆盖三新闻分区的拒绝、精确路径/修复提示、纯校验不改稿、引用补齐后通过，以及跨条目不可借用证据。
+
 CI 始终运行完整服务、类型、UI 边界、构建、批准截图和产物隔离；不因 Quick 或本地复用降级。Linux artifact 必须属于冻结目标；Windows 通过不能替代 Linux 比较。当前 CI 与部署流程见 [RELEASE](RELEASE.md)，本次日期证据见归档。
 
 Release runner 仅执行隔离 Web 回归，不自动 push、tag、发布、部署、发送邮件、调用真实 AI 或触发手机。Electron/Android 原生构建运行、跨项目、生产恢复、OAuth 自然刷新、长期 CalDAV、真实 SMTP/IMAP 和手机自然通知按本次影响与授权分别验收。PUBLISHED/QUEUED、health、PM2、SMTP accepted 与收件箱/系统展示不是同一结果。

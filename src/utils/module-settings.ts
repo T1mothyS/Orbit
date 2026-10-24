@@ -1,7 +1,7 @@
 import { SETTINGS_REGISTRY } from './settings-registry.js';
 const sections: Record<string, string> = {
   account: 'account', ai: 'ai', notifications: 'notifications', 'daily-report': 'reports', 'report-email': 'reports', 'report-personalization': 'reports',
-  library: 'library', mail: 'reports', caldav: 'integrations', guides: 'integrations', data: 'data', tools: 'advanced', admin: 'advanced',
+  library: 'library', mail: 'reports', caldav: 'integrations', guides: 'integrations', data: 'data', tools: 'advanced', admin: 'advanced', 'advanced-features': 'advanced', 'android-server': 'advanced',
 };
 export function resolveSetting(id: string, admin = false): { kind: 'known'; path: string } | { kind: 'unknown' | 'forbidden' } {
   if (id === 'setting-daily-report-17lgo36') return {kind:'known',path:'/settings/reports'};

@@ -61,6 +61,28 @@ test('v2 contract: zero news, partial personal inputs, stable hash, IDs and vali
   ]) { const d = illustrated(); mutate(d); assert.equal(validateDigestV2(d).valid, false); }
 });
 
+test('photo evidence must be included in its own story references across every news section', () => {
+  for (const section of ['market', 'macro', 'stories'] as const) {
+    const d = illustrated();
+    d.evidence.push({ id: 'photo-page', url: 'https://commons.wikimedia.org/wiki/File:Example.jpg', source: 'Commons', published_at: '' });
+    d.media[0].evidence_id = 'photo-page';
+    const item = d.stories[0]; d.stories = []; d[section] = [item];
+    const original = JSON.stringify(d);
+    const result = validateDigestV2(d);
+    const mismatch = result.errors.find(issue => issue.code === 'MEDIA_EVIDENCE_MISMATCH');
+    assert.equal(result.valid, false);
+    assert.equal(mismatch?.path, `$.${section}[0].evidence_ids`);
+    assert.ok(mismatch?.message?.includes('photo-page'));
+    assert.equal(JSON.stringify(d), original, 'validator must never mutate a failed draft');
+    item.evidence_ids.push('photo-page');
+    assert.equal(validateDigestV2(d).valid, true);
+    assert.deepEqual(item.evidence_ids, ['e1', 'photo-page'], 'retain the original news source');
+    const crossStory = structuredClone(item); crossStory.id = 'second-story'; crossStory.evidence_ids = ['e1'];
+    d[section].push(crossStory);
+    assert.equal(validateDigestV2(d).valid, false, 'another story cannot borrow this story reference list');
+  }
+});
+
 test('input reader covers synthetic account calendar and watchlist, and rejects omitted IDs', async () => {
   const schedules = await import('./schedule-store.js');
   const cloudContext = await import('./daily-report-cloud-store.js');

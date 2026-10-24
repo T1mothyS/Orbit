@@ -22,7 +22,9 @@ Calendar 使用的 date-fns 现显式声明，避免依赖开发工具间接安�
 
 常规构建仅提供正式账号开关、通知权限与注册/投递状态；原生顶部、离线和网页测试入口只有 debug 且显式开启 DEVELOPER_TOOLS 才显示。release 始终关闭；本地桥接测试同样检查该标记。下面的 AlarmManager 排错能力保留，正式 FCM、Receiver、渠道和绑定/解绑行为不变。后续用户真实手机已确认精准/非精准触发及后台系统展示通过，见 [新增实机证据](archive/engineering/TEST-MATRIX-20261018.md#2026-10-08-产品助手运行诊断与保留)。
 
-`android/` 是 Kotlin + WebView 在线壳，复用 Web 登录、聊天、路由与账号数据。构建时固定一个 HTTPS 来源，原生 `WebMessageListener` 只允许该来源的主框架和协议版本 1；未知方法拒绝，外部链接打开系统应用，不忽略 TLS 错误，不允许明文/混合内容、文件 URL 和第三方 Cookie。返回、键盘/系统栏安全区、文件选择及通知点击由原生负责。没有业务离线数据库和手机常驻轮询。
+`android/` 是 Kotlin + WebView 在线壳，复用 Web 登录、聊天、路由与账号数据。构建时固定正式/测试两个 HTTPS 预设，默认正式环境；服务器设置由原生控制，网页只能请求打开选择面板，不能传入任意 URL。选择保存在独立偏好中。正式环境沿用 Default Profile，测试环境使用独立的 `orbit-stage` WebView Profile，Cookie、Web Storage、Service Worker 与缓存分别保存；不支持 MULTI_PROFILE 的 WebView 必须更新后才能进入测试环境，不降级成共享存储。每个实例的 `WebMessageListener` 只允许当前来源的主框架和协议版本 1；未知方法拒绝，外部链接打开系统应用，不忽略 TLS 错误，不允许明文/混合内容、文件 URL 和第三方 Cookie。切换先离开旧文档、终止加载，撤销旧 FCM 注册后持久选择并重建 WebView；失败/20秒超时保留原服务器并提供重试，迟到回调不能切换环境。返回、键盘/系统栏安全区、文件选择及通知点击由原生负责。没有业务离线数据库和手机常驻轮询。
+
+原生安装身份、绑定与补偿解绑队列按环境分开；解绑记录绑定原环境，切换后仍只能向该预设发送补偿请求。测试环境不注册或展示 FCM，正式环境继续使用既有链路；测试服务器后台与 Push 仍需独立禁用。切换不复制 JWT 或修改另一环境业务数据。客户端没有新增 OAuth/App Links 回调；服务端 OAuth issuer/redirect 与 APP_URL 按各环境配置，真实授权和实体手机验收独立进行。使用方法见 [Android 构建](../android/README.md)。
 
 客户端缺少 `google-services.json` 时不初始化 Firebase；本地测试仍可用。FCM 注册使用 `register/onRegistered` 的 FID，退出使用 `unregister` 与 Installations `delete`。原生不保存登录 JWT，账号与设备绑定由当前登录网页提交。Android 通知权限共用；拒绝不会阻断 Web 页面。本地 AlarmManager 一分钟试验与 FCM 独立：精确测试检查 `SCHEDULE_EXACT_ALARM`，另提供明确标注可能延迟的非精确测试，每台设备仅保留一个，取消/退出/换账号清理，重启不恢复，不创建服务器 Reminder。
 
@@ -120,7 +122,7 @@ SettingsFrame 的分类高亮由路由决定；桌面左分类/右当前页，�
 | src/pages/ToolsPage.tsx | 登录后的挂载应用菜单；不加入产品顶部导航 |
 | src/features/settings/ | SettingsWorkspace、账户级 SettingsState、领域分区与统一设置搜索；旧 components/settings 已删除 |
 
-当前登录后页面路由包括 /today、/schedule、/assistant、/reminders、/reports、/reports/:date、/research、/library、/library/:id、/tools 和 /project；/import 重定向到 /assistant?tool=email-import；未登录时使用 /login。头像菜单的设置进入独立 /settings，账户进入 /settings/account；旧账户 ID 经 moduleSettingsPath 定位新页，改密 ID 自动展开表单。其他分类均使用 /settings 下的 canonical 路由；旧模块入口仅重定向，不再保留旧容器。Tools 仍从头像菜单或设置进入，不加入产品顶部导航。
+当前登录后页面路由包括 /today、/schedule、/assistant、/reminders、/reports、/reports/:date、/research、/library、/library/:id、/tools 和 /project；/import 为独立页面，/assistant?tool=email-import 兼容跳转到 /import；未登录时使用 /login。头像菜单的设置进入独立 /settings，账户进入 /settings/account；旧账户 ID 经 moduleSettingsPath 定位新页，改密 ID 自动展开表单。其他分类均使用 /settings 下的 canonical 路由；旧模块入口仅重定向，不再保留旧容器。Tools 仍从头像菜单或设置进入，不加入产品顶部导航。
 
 设置 Frame 的返回地址仅接受同源站内路径；从业务页打开后经过设置首页/账户仍保留来源，显式返回恢复头像入口焦点；同一次设置访问中的跨分类链接继续保留来源。身份由一个 AuthProvider 管理；退出、401/403 或跨标签页身份变化清理当前账号草稿并卸载页面；过期异步身份响应受版本标识和取消信号保护，不能复活旧账号。临时网络失败保留 token。改密输入不入 local/session storage、URL、日志或共享草稿，离开/取消即卸载。
 
@@ -376,9 +378,12 @@ Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓�
 - 账号备份 orbit.connected 保存事件/报告/偏好/头像映射/通知消息映射，文件沿现有 attachments 备份。旧备份缺字段兼容；跨账号恢复保留历史证据并停用原账号链接，自动周报保持关闭；未发送通知转 suppressed。删除/清空账号清理所有新表。
 - 首次新增报告表前在运行数据目录 migration-backups 保存既有 SQLite 文件；正常跨库事务保留 undo 恢复。回滚需停服务、保留当前新增数据，再恢复对应四库快照并切回原代码；不能以恢复旧数据库保留升级后新数据。生产迁移、部署、真实 AI/SMTP 与收件箱验收分别授权。
 
+
+通知卡片的阅读状态来自 notification_deliveries.read_at（响应 readAt），当前账号卡片至少一半进入可见视口且页面可见时，前端通过认证的 POST /api/notifications/:id/read 更新；它只表示通知被查看，不表示事项完成或 AI 已处理。聊天隐藏冗余已读/未读文字，保留读写和未读计数，以及 handled/discarded/nextReminderAt 等业务状态。
+
 ## 对话历史与邮箱工具路由（2026-10-19）
 
-`/import` 是 AppShell/PageFrame 下的独立邮箱导入页，不装载对话工具栏或记事板；头像菜单直接进入。`/assistant?tool=email-import` 使用 replace 兼容跳转并移除 tool 参数，保留其余查询参数；站内安全来源用于“返回”，直接访问回退到 /assistant。邮箱识别、草稿确认与账号级 API 不变。
+`/import` 是 AppShell/PageFrame 下的独立邮箱导入页，不装载对话工具栏或记事板。邮箱导入、记录经历、研究与观点统一从“设置 → 高级”进入，不出现在产品主导航、手机底栏或头像菜单；原路由、历史数据与确认行为保留。`/assistant?tool=email-import` 使用 replace 兼容跳转并移除 tool 参数，保留其余查询参数；独立页面左上返回今日。邮箱识别、草稿确认与账号级 API 不变。
 
 `GET /api/ai-schedule/history` 保留无 limit 时的旧响应；新 UI 传 limit（默认 60，最大 100）使用消息与请求联合游标分页，包含尚未产生日志消息的失败/中断请求。响应附 requests、start、nextBefore；before 加载更早页，after 重新读取已加载的当前窗口（含边界时刻全部记录，防止排队后迟到的用户消息丢失）并合并新记录，不能与 before 同用。游标包含排序时间、记录类型和已有 ID，账号/会话所有权仍先验证。时间以首次提交为准；复用确定性的 orbit-user:<userId>:<rootRequestId 或 requestId> 用户消息 ID；继续查询沿用原用户消息，执行关联见上述恢复合同。重试保持 request ID/createdAt，步骤与状态更新不重新追加卡片。
 

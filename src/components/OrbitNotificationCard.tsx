@@ -12,7 +12,7 @@ export function OrbitNotificationCard({meta,title,onRefresh}:{meta:NotificationM
   if(meta.origin!=='notification')return null;
   const validId=typeof meta.notificationId==='string'&&meta.notificationId.length>0;
   const canContinue=validId&&meta.state!=='discarded'&&meta.canContinue!==false;
-  return <div ref={ref} className="orbit-notification-actions"><small>来源：{meta.sourceLabel||'Orbit'}</small><span className="orbit-notification-state">{meta.state==='handled'?'事项已处理':meta.state==='discarded'?'事项已变化或不可用':read?'已读':'未读'}{meta.nextReminderAt&&` · 再提醒 ${new Date(meta.nextReminderAt).toLocaleString()}`}</span><div>
+  return <div ref={ref} className="orbit-notification-actions"><small>来源：{meta.sourceLabel||'Orbit'}</small>{(meta.state==='handled'||meta.state==='discarded'||meta.nextReminderAt)&&<span className="orbit-notification-state">{meta.state==='handled'?'事项已处理':meta.state==='discarded'?'事项已变化或不可用':''}{meta.nextReminderAt&&`${meta.state==='handled'||meta.state==='discarded'?' · ':''}再提醒 ${new Date(meta.nextReminderAt).toLocaleString()}`}</span>}<div>
     {validId&&meta.state!=='discarded'&&meta.href&&<Tooltip content="查看原对象"><IconLink to={meta.href} label="查看原对象"><ArrowUpRight size={16} strokeWidth={1.8} aria-hidden="true" /></IconLink></Tooltip>}
     {canContinue&&<Tooltip content="就此继续聊"><IconButton label="就此继续聊" variant="quiet" size="small" onClick={()=>window.dispatchEvent(new CustomEvent('orbit:continue-notification',{detail:{notificationId:meta.notificationId,title}}))}><MessageCircle size={16} strokeWidth={1.8} aria-hidden="true" /></IconButton></Tooltip>}
     {meta.actionable&&meta.state==='sent'&&<ReminderActionButtons busy={busy} onAction={action => void act(action)} />}</div>{error&&<p role="alert">{error}</p>}</div>;
