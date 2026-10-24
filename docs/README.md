@@ -24,6 +24,7 @@
 | [Android 构建](../android/README.md) | 工具链、APK、固定站点、Firebase 配置与原生本地试验入口 |
 | [发布流程](RELEASE.md) | 可复用发布指令、冻结目标、效率与验收层级 |
 | [部署路径](DEPLOYMENT-PATHS.md) | 预构建/依赖变更/特殊路径和回滚判据 |
+| [PVE 迁移](migration/MIGRATION-PLAN.md) | 家庭 VM 迁移计划、[检查表](migration/MIGRATION-CHECKLIST.md)、[切换/回滚](migration/MIGRATION-RUNBOOK.md)及[执行报告](migration/MIGRATION-REPORT.md)；真实入口只在本机 runbook |
 | [项目地图](../PROJECT-MAP.md#按任务选择入口) | 按任务选择合同、源码、测试与升级范围 |
 | [测试矩阵](TEST-MATRIX.md) | Quick/Full/Release、领域覆盖、UI/平台及外部证据边界 |
 | [UI 规范](UI-GUIDELINES.md) | 布局、主题、响应式、聊天/Motion 与体验升级实施规则；逐块状态见 TASKS |
