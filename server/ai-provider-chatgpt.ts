@@ -1,5 +1,6 @@
 import { chatGPTAccessToken } from './chatgpt-connection.js';
 import {withVerifiedCapabilities,capabilityCredentialVersion} from './ai-model-capabilities.js';
+import {openAIFetch} from './openai-fetch.js';
 import {loadSecret} from './orbit-credential-vault.js';
 import type {ChatGPTCredential} from './chatgpt-oauth.js';
 import { ORBIT_TOOL_LIMITS,type AiProvider,type OrbitModel,type ProviderRequest } from './ai-provider-contract.js';
@@ -7,7 +8,7 @@ import {collectWebSources,webSearchStep} from './chatgpt-web-search.js';
 import { AiExecutionError, boundedEvidence, type AiEvidence } from './ai-execution.js';
 const API='https://api.openai.com/v1';
 export function chatGPTCapabilityVersion(userId:string){const c=loadSecret<ChatGPTCredential>('chatgpt',userId);return capabilityCredentialVersion((c?.client_id||'')+'\0'+(c?.subject||''));}
-export async function chatGPTModels(userId:string,fetcher:typeof fetch=fetch):Promise<OrbitModel[]> {
+export async function chatGPTModels(userId:string,fetcher:typeof fetch=openAIFetch):Promise<OrbitModel[]> {
   const token=await chatGPTAccessToken(userId,fetcher),res=await fetcher(API+'/models',{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(15000)});if(!res.ok)throw new Error(`无法读取 ChatGPT 模型（${res.status}）`);
   const data=await res.json();return (Array.isArray(data.models)?data.models:[]).filter((m:any)=>m.visibility==='list').map((m:any)=>withVerifiedCapabilities(userId,{id:m.slug,name:m.display_name||m.slug,provider:'chatgpt',capabilities:{images:{supported:Array.isArray(m.input_modalities)?m.input_modalities.includes('image'):null,evidence:Array.isArray(m.input_modalities)?'catalog':'unknown'},tools:{supported:null,evidence:'unknown'},files:{supported:null,evidence:'unknown'}}} as OrbitModel,chatGPTCapabilityVersion(userId)));
 }
@@ -39,7 +40,7 @@ export async function completedResponse(res:Response,onEvent?:(event:any)=>void)
   if(!Array.isArray(completed.output)||!completed.output.length)completed.output=[...items].sort(([a],[b])=>a-b).map(([,item])=>item);
   return completed;
 }
-export async function generateChatGPT(request:ProviderRequest,token:string,fetcher:typeof fetch=fetch):Promise<string>{
+export async function generateChatGPT(request:ProviderRequest,token:string,fetcher:typeof fetch=openAIFetch):Promise<string>{
   const evidence:AiEvidence[]=[];
   const observe=(item:AiEvidence)=>{evidence.push(item);request.onEvidence?.(item);};
   const originalSource=request.onWebSource;

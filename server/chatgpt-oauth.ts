@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { openAIFetch } from './openai-fetch.js';
 import { createHash,randomBytes,createPublicKey,timingSafeEqual } from 'node:crypto';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
 export const CHATGPT_ISSUER='https://auth.openai.com';
@@ -8,7 +9,7 @@ export interface ChatGPTCredential {
   client_id:string;issuer:string;subject:string;email?:string;id_token?:string;access_token?:string;refresh_token?:string;
   scopes:string[];expires_at:number;earliest_refresh_at?:number|string;ext_agent_host_id:string;nonce?:string;status?:string;
 }
-export async function verifyOpenAIToken(token:string,audience:string,nonce?:string,fetcher:typeof fetch=fetch):Promise<JwtPayload> {
+export async function verifyOpenAIToken(token:string,audience:string,nonce?:string,fetcher:typeof fetch=openAIFetch):Promise<JwtPayload> {
   const decoded=jwt.decode(token,{complete:true});if(!decoded||typeof decoded==='string'||!decoded.header.kid)throw new Error('授权身份无效');
   const res=await fetcher(CHATGPT_ISSUER+'/.well-known/jwks.json',{signal:AbortSignal.timeout(10000)});if(!res.ok)throw new Error('无法核对授权签名');
   const data=await res.json();const key=data.keys?.find((k:any)=>k.kid===decoded.header.kid&&(!k.use||k.use==='sig'));if(!key)throw new Error('授权签名不可识别');
@@ -20,7 +21,7 @@ export function tokenRecord(raw:any,registration:Pick<ChatGPTCredential,'client_
   const scopes=String(raw.scope||'').split(/\s+/).filter(Boolean);if(!['resource.invoke','chatgpt.tokens.use.direct','offline_access'].every(s=>scopes.includes(s)))throw new Error('尚未授予 ChatGPT 套餐模型调用权限，请重新授权');
   return {...registration,access_token:raw.access_token,refresh_token:raw.refresh_token,id_token:raw.id_token,scopes,expires_at:now+raw.expires_in*1000,earliest_refresh_at:raw.earliest_refresh_at,status:'connected'};
 }
-export async function beginLocalChatGPTAuth(hostId:string,old?:ChatGPTCredential,fetcher:typeof fetch=fetch) {
+export async function beginLocalChatGPTAuth(hostId:string,old?:ChatGPTCredential,fetcher:typeof fetch=openAIFetch) {
   const state=randomBytes(32).toString('base64url'),nonce=randomBytes(32).toString('base64url'),verifier=randomBytes(48).toString('base64url');
   let resolve!:(v:ChatGPTCredential)=>void,reject!:(e:Error)=>void,consumed=false;
   const result=new Promise<ChatGPTCredential>((a,b)=>{resolve=a;reject=b;});

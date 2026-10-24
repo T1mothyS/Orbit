@@ -9,6 +9,13 @@
 历史版本按归档卷查询：[CHANGELOG-2026-10](docs/archive/changelog/CHANGELOG-2026-10.md)。常态保留最近 20 条完整版本，阶段内最多 24 条。
 <!-- changelog-archives:end -->
 
+## 0.63.1-261024.1759 — OpenAI 专用代理与迁移诊断
+
+- 新增可选 `ORBIT_OPENAI_PROXY_URL`，只代理 OpenAI API 和 OAuth issuer 的精确 HTTPS origin；覆盖模型目录、生成、签名验证、刷新与撤销，保留测试 fetcher 注入。
+- 不修改全局网络环境、WorkBuddy 子进程策略、邮件或 SSRF 检查；代理错误显式失败，保留 TLS 校验和取消信号，拒绝携带同一代理跨 origin 重定向，错误不输出代理凭据。
+- 将锁定树内已有 `undici` 版本声明为直接依赖，没有改变实际锁定包版本；新增真实 CONNECT、认证隔离、取消及配置边界回归。
+- PVE staging 增加回环/LAN/公网低频性能对照与受控静态缓存验证；具体部署、性能、真实账号和视觉基线边界分别记录，不代表正式迁移完成。
+
 ## 0.63.0-261023.0004 — AI 对话可靠性与恢复
 
 - 普通回答采用文本，业务草稿独立 Schema；按实际 Provider 传输能力选择原生格式或独立 JSON 路径，严格终态检查与有界恢复保留原确认/幂等边界。

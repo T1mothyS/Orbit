@@ -326,6 +326,8 @@ WorkBuddy 主聊天经 ai-provider-workbuddy.ts 调用；旧 Key/验证/模型�
 
 `buildCodeBuddyEnv` 为所有 SDK 入口显式设置 `NODE_USE_ENV_PROXY=0`。SDK CLI 自行管理 HTTP 传输，不能继承父进程的 Node 原生代理模式；此项只作用于子进程，个人 Key/Base URL 与父进程 ChatGPT 代理保持不变。服务器代理安装、私有订阅与回退细节只记录在本机 runbook。
 
+ChatGPT 的默认 fetch 入口统一经过 `server/openai-fetch.ts`。可选服务端配置 `ORBIT_OPENAI_PROXY_URL` 使用 HTTP(S) CONNECT 代理，只匹配 `https://api.openai.com` 与 `https://auth.openai.com` 的精确 origin；API、授权导入签名检查、刷新与撤销共用该入口，显式注入的测试 fetcher 保留。未配置时沿用原 fetch；配置错误/代理失败不静默回退，代理凭据不进入错误或目标 Authorization，TLS 校验保持开启，带代理请求拒绝重定向。它不设置全局 dispatcher、HTTP(S)_PROXY 或 NODE_USE_ENV_PROXY，不改变 WorkBuddy、受控网页/媒体抓取、邮件、Tunnel 或 SSRF 检查。`undici` 固定为现有锁定树中的版本并声明为直接依赖；真实出口、认证文件权限及回退见本机部署 runbook。
+
 #### 联网工具
 Orbit 工具复用日历、词法知识库和已发布日报服务；知识沿明确请求/自动检索偏好/明确资料追问开放，跨对话历史工具只在明确请求时开放。Tavily 固定 basic，每轮两次、每次五条；月度请求保守计数，额度错误锁定本月，不自动切换。公开网页读取复用 HTTPS/DNS 地址固定防护，逐跳校验、超时和大小限制。结果记录真实 URL、发布时间（未知为空）和抓取时间。
 手动 ChatGPT 聊天在公共 Responses 请求中提供原生 `web_search`，采用 low 搜索上下文，由模型按需调用；同时移除该请求的 Tavily search 函数，其他 Orbit 读取工具保留。WorkBuddy 的 Tavily 路径保持独立。原生搜索受模型/账号策略和套餐额度约束，失败明确反馈，不静默切换搜索商或付费 API；模型能力探测及后台链路不会因此获得搜索工具。

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { openAIFetch } from './openai-fetch.js';
 import { queryOne } from './database/connection.js';
 import { getUserById } from './db.js';
 import { loadSecret,saveSecret,withSecretLock } from './orbit-credential-vault.js';
@@ -9,7 +10,7 @@ export function chatGPTOwner(userId:string):boolean {
 }
 export function chatGPTStatus(userId:string){const eligible=chatGPTOwner(userId),c=eligible?loadSecret<ChatGPTCredential>('chatgpt',userId):undefined;return {eligible,connected:!!c?.access_token,email:c?.email,status:c?.status||'disconnected',expiresAt:c?.access_token?new Date(c.expires_at).toISOString():undefined,clientId:c?.client_id,manualOnly:true};}
 export function hostId():string {let host=loadSecret<{id:string}>('host','server');if(!host){host={id:'urn:uuid:'+randomUUID()};saveSecret('host','server',host);}return host.id;}
-export async function importChatGPTCredential(userId:string,value:any,fetcher:typeof fetch=fetch) {
+export async function importChatGPTCredential(userId:string,value:any,fetcher:typeof fetch=openAIFetch) {
   if(!chatGPTOwner(userId))throw new Error('ChatGPT 试点仅对主账号开放');
   // Preserve the server's own host identity before importing the portable session.
   const serverHost=hostId();
@@ -22,7 +23,7 @@ export async function importChatGPTCredential(userId:string,value:any,fetcher:ty
   await withSecretLock('chatgpt',userId,async()=>{const old=loadSecret<ChatGPTCredential>('chatgpt',userId);if(old&&(old.client_id!==credential.client_id||old.subject!==credential.subject))throw new Error('导入账号与保存的注册身份不匹配');saveSecret('chatgpt',userId,credential);});return chatGPTStatus(userId);
 }
 const refreshing=new Map<string,Promise<string>>();
-export async function chatGPTAccessToken(userId:string,fetcher:typeof fetch=fetch):Promise<string> {
+export async function chatGPTAccessToken(userId:string,fetcher:typeof fetch=openAIFetch):Promise<string> {
   if(!chatGPTOwner(userId))throw new Error('ChatGPT Provider 不对当前账号开放');
   const c=loadSecret<ChatGPTCredential>('chatgpt',userId);if(!c?.access_token||!c.refresh_token)throw new Error('请先使用 ChatGPT 登录');
   if(c.expires_at>Date.now()+60000)return c.access_token;
@@ -40,7 +41,7 @@ export async function chatGPTAccessToken(userId:string,fetcher:typeof fetch=fetc
     saveSecret('chatgpt',userId,next);return next.access_token!;
   });refreshing.set(userId,task);try{return await task;}finally{refreshing.delete(userId);}
 }
-export async function disconnectChatGPT(userId:string,fetcher:typeof fetch=fetch){
+export async function disconnectChatGPT(userId:string,fetcher:typeof fetch=openAIFetch){
   if(!chatGPTOwner(userId))throw new Error('无权访问此连接');
   return withSecretLock('chatgpt',userId,async()=>{const c=loadSecret<ChatGPTCredential>('chatgpt',userId);let revoked=false;
     if(c?.refresh_token)try{const d=await fetcher(CHATGPT_ISSUER+'/.well-known/openid-configuration',{signal:AbortSignal.timeout(10000)});const info=await d.json();const endpoint=new URL(info.revocation_endpoint);if(endpoint.origin!==CHATGPT_ISSUER)throw new Error('撤销地址无效');const r=await fetcher(endpoint,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({token:c.refresh_token,token_type_hint:'refresh_token',client_id:c.client_id}),signal:AbortSignal.timeout(10000)});revoked=r.status===200;}catch{}
