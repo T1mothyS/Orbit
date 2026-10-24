@@ -24,7 +24,7 @@ android {
         applicationId = "io.github.t1mothys.orbit"
         minSdk = 26
         targetSdk = 36
-        versionCode = 64000
+        versionCode = 64001
         versionName = orbitVersion["version"] as String
         buildConfigField("String", "APP_URL", "\"${appUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("String", "STAGE_URL", "\"${stageUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
