@@ -26,8 +26,9 @@ fixture.run("INSERT INTO users (id,email,password_hash,role,created_at,updated_a
 fixture.run("INSERT INTO sessions (id,user_id,title,model,created_at,updated_at) VALUES ('legacy-session','owner','preserved','synthetic','2020-01-01','2020-01-01')");
 fixture.run("INSERT INTO reminders (id,user_id,created_at,updated_at) VALUES ('legacy-pref','owner','2020-01-01','2020-01-01')");
 fixture.run("INSERT INTO note_items (id,user_id,content,created_at,updated_at) VALUES ('legacy-note','owner','preserve this','2020-01-01','2020-01-01')");
+fixture.run("INSERT INTO orbit_requests (id,user_id,conversation_id,state,body,result,created_at) VALUES ('legacy-request','owner','legacy-conversation','completed','{}','preserved result','2020-01-01')");
 fixture.run('DROP INDEX idx_sessions_user_id');
-for (const [table, columns] of Object.entries({ users: ['auth_version', 'preferred_model', 'admin_shared_api_enabled'], sessions: ['user_id'], reminders: ['daily_report_delivery_sources', 'home_timezone'], note_items: ['color', 'is_optimized', 'optimization_count', 'optimization_previous_content', 'content_revision'], ai_schedule_messages: ['knowledge_sources'], library_entry_versions: ['relations_json'] })) {
+for (const [table, columns] of Object.entries({ users: ['auth_version', 'preferred_model', 'admin_shared_api_enabled'], sessions: ['user_id'], reminders: ['daily_report_delivery_sources', 'home_timezone'], note_items: ['color', 'is_optimized', 'optimization_count', 'optimization_previous_content', 'content_revision'], ai_schedule_messages: ['knowledge_sources'], library_entry_versions: ['relations_json'], orbit_requests: ['execution_meta'] })) {
   for (const column of columns) fixture.run(`ALTER TABLE ${table} DROP COLUMN ${column}`);
 }
 const databasePath = path.join(root, 'chat.db');
@@ -48,6 +49,13 @@ test('legacy migration retains rows, defaults and ownership, and is stable after
   assert.equal(legacyNote?.optimization_previous_content, null);
   assert.equal(legacyNote?.content_revision, 0);
   assert.equal(db.getReminder('owner')?.daily_report_delivery_sources, '["local"]');
+  const migrated = new SQL.Database(db.exportChatDb());
+  try {
+    const q = queries(migrated);
+    assert.equal(q.queryAll<{name:string}>('PRAGMA table_info(orbit_requests)').filter(column => column.name === 'execution_meta').length, 1);
+    assert.deepEqual(q.queryOne('SELECT id,user_id,state,body,result,execution_meta FROM orbit_requests WHERE id=?', ['legacy-request']), {id:'legacy-request',user_id:'owner',state:'completed',body:'{}',result:'preserved result',execution_meta:null});
+    assert.equal(q.queryOne('SELECT result FROM orbit_requests WHERE id=? AND user_id=?', ['legacy-request','other']), undefined);
+  } finally { migrated.close(); }
   const dump = (bytes: Buffer) => {
     const image = new SQL.Database(bytes);
     try {

@@ -292,5 +292,46 @@
       },
       "scope": "Eight fully loaded report delivery pages with fixed synthetic reminder data. Two loading-state candidates were rejected; two negligible account hash differences left unchanged."
     }
+  },
+  "unifiedReleaseReview": {
+    "approvedAt": "2026-10-24T15:02:07.925Z",
+    "authorization": "User reviewed the before/after page and explicitly approved these 52 Windows/Linux baselines, then authorized continuing the release on 2026-10-24.",
+    "scope": "Advanced settings, AI settings and help at four viewport sizes in both themes; settings search at 390/1440 dark. All other baselines, thresholds and behavioral assertions remain unchanged.",
+    "sourceVersion": "0.64.0-261024.2221",
+    "capturedCommit": "4a4c1ccc9ad384e806ec730f1ab39900d517432e",
+    "workingTreeDirty": false,
+    "sourceCheckpoint": "4a4c1ccc9ad384e806ec730f1ab39900d517432e",
+    "node": "v22.23.2",
+    "browser": "156.0.8078.4",
+    "platform": "linux",
+    "hashes": {
+      "help-1440-dark.png": "2db885a67e9ad6ebd294d79d7a91cbb2112e9575380cae248502ca08a521b39c",
+      "help-1440-light.png": "fe0ef61c6f5e7331b9d7d94b78571fba943c9e2f779a14887fdf55ce817a72c2",
+      "help-390-dark.png": "3aff072e0519bf8b2a1c7f5c85f0c70c964ad6f2405f127dbeb89a1f8d73a75a",
+      "help-390-light.png": "e907d4415ec5aed4d7e9685f9bf2f3b8be265199d0731540f9cec16510662201",
+      "help-430-dark.png": "74e7e92b80da30cacc03557d2bed2dc7ffd4b1ef5a3c2f50dafb89d7fd6f6b1d",
+      "help-430-light.png": "c4e59684cab357347516a862e8cf2c6bf6b8f692129fbe4b4788fea04cd877e3",
+      "help-768-dark.png": "36f4ca8debd9fd78fdc85d5952c74542483abd2733877463abbc8874d07fab6e",
+      "help-768-light.png": "323381099ad90bc9275f49ab95d1d7a7a7575a5d2cba01b73ce53db341b73ad2",
+      "settings-advanced-1440-dark.png": "3d9db18750d628ba18cabe417c3800ff4fe555fbcf61a75312ef0adb5267e79f",
+      "settings-advanced-1440-light.png": "34bd81e9535195d12cb18e932d811b9015e00083e7f2924912c968c1a86f2239",
+      "settings-advanced-390-dark.png": "87911a1cea845b50605eb4baf559696a0c29be59d67df18dd5ffa07e300e3044",
+      "settings-advanced-390-light.png": "1e28a69cf27b5e7326d47abf03d115609dd7695ef30f17d145ce2eff75d5bf99",
+      "settings-advanced-430-dark.png": "afc942392094c6270283a7edbce0d45fd3c6cbdf107f6b83f1c018dd3cd0aba4",
+      "settings-advanced-430-light.png": "f5c54979f4d9312e0674b592f8e881fcf4d96a044e7ae21be36ad3c8fdf9237f",
+      "settings-advanced-768-dark.png": "b7e32ae33381255a10a5b44f787eb5a7753eae038ee18d2db3f53a900886e01c",
+      "settings-advanced-768-light.png": "35d13b253373cfdc355e4dfa14ff3095c6b023e9049e7416cffdc8591470a352",
+      "settings-ai-1440-dark.png": "d7ad9aa249ff70ec4c225e9664a8400aba49fd84637f4723035b531efbd729ec",
+      "settings-ai-1440-light.png": "26bc1db6ad3c47572e5e86b98ddd5e76a55def24fe003944a68a0e57555163a1",
+      "settings-ai-390-dark.png": "25379b5b6969b9c4eec8fd65f241d99baa5f1cd550380734e5d9f3f65fbe251c",
+      "settings-ai-390-light.png": "a7c43027199fbbbee307ac659c7568d92d439a50ca74ab2b0864d02e85239f51",
+      "settings-ai-430-dark.png": "4c7f69b8871f00ad881193f47ecff0c4dbab8095a51b84dad64eabd23be627ca",
+      "settings-ai-430-light.png": "48efda8748bf3b52c95cc376dcf2018fada1589472f46d461809413d91be6e29",
+      "settings-ai-768-dark.png": "5eb1eec497fe5d8b424bc76d44a304a2042ae37f4afb48104bead98a0b3cc0c1",
+      "settings-ai-768-light.png": "7f1c8ccb744ca52525ca3eff46a4584bf10d7fa397db8840615fdde660fb5e5b",
+      "settings-header-search-1440-dark.png": "a90ca36a07d878097314a01cea5652c6e2c82ea7e2cedac12e948a3218534907",
+      "settings-header-search-390-dark.png": "b934f311b972f64ad554b4a1d75676c9027ed16d02b270ee206f57d614b30f60"
+    },
+    "workflowRun": 40103532401
   }
 }
