@@ -2,6 +2,54 @@ import { test, expect } from '@playwright/test';
 import { fixtureToken } from './auth-fixture';
 import { checkVisual } from './visual-check';
 const base='http://127.0.0.1:4187';
+for(const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]])for(const theme of ['light','dark'])test(`AI connection guidance ${width} ${theme}: provider-specific underlined settings link preserves input`,async({context,page})=>{
+  const token=await fixtureToken(context,'preview-guards@example.invalid');
+  await context.addInitScript(({token,theme})=>{localStorage.setItem('aicalendar_token',token);localStorage.setItem('theme',theme);},{token,theme});
+  await page.setViewportSize({width,height});
+  let connected=false, providerReads=0;
+  await page.route('**/api/orbit/providers',route=>{providerReads++;return route.fulfill({json:{providers:[{id:'workbuddy',connected},{id:'chatgpt',connected}]}});});
+  await page.route('**/api/models',route=>route.fulfill({json:{models:[{modelId:'synthetic-model',displayName:'合成模型'}]}}));
+  await page.route('**/api/orbit/chatgpt/models',route=>route.fulfill({json:{models:[{id:'Luna',name:'Luna'}]}}));
+  await page.route('**/api/orbit/preferences',route=>route.request().method()==='GET'?route.fulfill({json:{autoKnowledge:false,aiSelection:{provider:'workbuddy',models:{workbuddy:'synthetic-model',chatgpt:'Luna'}}}}):route.fulfill({json:{success:true}}));
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto(base+'/assistant');
+  const composer=page.getByRole('textbox',{name:'AI 助手输入框'});
+  const hint=page.locator('#orbit-ai-connection-hint');
+  await expect(hint).toContainText('尚未配置 WorkBuddy 账号');
+  const workbuddy=page.getByRole('link',{name:'去配置 WorkBuddy',exact:true});
+  await expect(workbuddy).toHaveAttribute('href','/settings/ai?settings=setting-ai-8qd2c6');
+  expect(await workbuddy.evaluate(el=>getComputedStyle(el).textDecorationLine)).toContain('underline');
+  await composer.fill('下周一的输入草稿，请保留。');
+  await expect(page.getByRole('button',{name:'发送',exact:true})).toBeDisabled();
+  await checkVisual(page,`ai-connection-missing-${width}-${theme}.png`,false,false);
+  await workbuddy.click();await expect(page).toHaveURL(/\/settings\/ai\?settings=setting-ai-8qd2c6/);
+  await expect(page.locator('#setting-ai-8qd2c6')).toBeVisible();
+  await page.goBack();await expect(composer).toHaveValue('下周一的输入草稿，请保留。');
+  await page.getByRole('button',{name:'ChatGPT',exact:true}).click();
+  await expect(hint).toContainText('尚未配置 ChatGPT 账号');
+  const chatgpt=page.getByRole('link',{name:'去配置 ChatGPT',exact:true});
+  await expect(chatgpt).toHaveAttribute('href','/settings/ai?settings=setting-ai-1xetp3u');
+  await chatgpt.click();await expect(page.locator('#setting-ai-1xetp3u')).toBeVisible();
+  await page.goBack();await expect(composer).toHaveValue('下周一的输入草稿，请保留。');
+  await page.getByRole('button',{name:'记事',exact:true}).click();
+  await expect(hint).toHaveCount(0);await expect(page.getByRole('button',{name:'保存记事',exact:true})).toBeEnabled();
+  await page.getByRole('button',{name:'指令',exact:true}).click();
+  const reads=providerReads;connected=true;
+  await page.evaluate(()=>window.dispatchEvent(new Event('orbit:provider-update')));
+  await expect.poll(()=>providerReads).toBeGreaterThan(reads);
+  await expect(hint).toHaveCount(0);await expect(page.getByRole('button',{name:'发送',exact:true})).toBeEnabled();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('provider lookup failure stays distinct from an unconfigured account',async({context,page})=>{
+  const token=await fixtureToken(context,'preview-guards@example.invalid');await context.addInitScript(token=>localStorage.setItem('aicalendar_token',token),token);
+  await page.route('**/api/orbit/providers',route=>route.fulfill({status:503,json:{error:'连接状态读取失败，请重试。'}}));
+  await page.goto(base+'/assistant');
+  await expect(page.getByRole('button',{name:/连接状态读取失败/})).toBeVisible();
+  await expect(page.locator('#orbit-ai-connection-hint')).toHaveCount(0);
+});
+
 for(const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]])for(const theme of ['light','dark'])test(`AI chat recovery ${width} ${theme}: compact states, selection, one error and idempotent continuation`,async({context,page})=>{
   test.setTimeout(60000);
   const token=await fixtureToken(context,'preview-guards@example.invalid');
@@ -36,7 +84,7 @@ for(const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]])for(cons
   await page.mouse.move(userBox!.x+1,userBox!.y+userBox!.height/2);await page.mouse.down();await page.mouse.move(userBox!.x+userBox!.width-1,userBox!.y+userBox!.height/2,{steps:12});await page.mouse.up();
   const dragged=await page.evaluate(()=>getSelection()?.toString());expect(dragged!.length).toBeGreaterThan(3);
   await page.keyboard.press('Shift+ArrowLeft');const keyboardSelected=await page.evaluate(()=>getSelection()?.toString());expect(keyboardSelected).not.toBe(dragged);expect(keyboardSelected!.length).toBeGreaterThan(2);
-  await page.keyboard.press('Control+c');const composer=page.getByLabel('AI 助手输入框',{exact:true});await composer.focus();await page.keyboard.press('Control+v');await expect(composer).toHaveValue(keyboardSelected!);await composer.fill('');
+  await page.keyboard.press('ControlOrMeta+c');const composer=page.getByLabel('AI 助手输入框',{exact:true});await composer.focus();await page.keyboard.press('ControlOrMeta+v');await expect(composer).toHaveValue(keyboardSelected!);await composer.fill('');
   const selection=await user.evaluate(element=>{
     const range=document.createRange();range.selectNodeContents(element);const selection=window.getSelection()!;selection.removeAllRanges();selection.addRange(range);
     return {text:selection.toString(),background:getComputedStyle(element,'::selection').backgroundColor,bubble:getComputedStyle(element.parentElement!).backgroundColor,color:getComputedStyle(element,'::selection').color,userSelect:getComputedStyle(element).userSelect};
@@ -65,7 +113,7 @@ test('personal key paste preserves ASCII through the password component and save
   await page.goto(base+'/settings/ai');await page.getByRole('button',{name:'配置 API Key',exact:true}).click();
   const key=page.getByLabel('API Key（必填）',{exact:true}),marker='ck_synthetic-only.not-a-real-key';
   await context.grantPermissions(['clipboard-read','clipboard-write']);await page.evaluate(text=>navigator.clipboard.writeText(text),marker);
-  await key.focus();await page.keyboard.press('Control+v');await expect(key).toHaveValue(marker);
+  await key.focus();await page.keyboard.press('ControlOrMeta+v');await expect(key).toHaveValue(marker);
   await page.getByRole('button',{name:'保存 API Key',exact:true}).click();await expect.poll(()=>saved).toBe(marker);
   await page.getByRole('button',{name:'配置 API Key',exact:true}).click();await expect(key).toHaveValue('');await expect(key).toHaveAttribute('placeholder','输入 API Key');
   await key.fill('合成中文占位文字');await expect(key).toHaveAttribute('aria-invalid','true');await expect(page.getByRole('alert')).toContainText('粘贴内容包含中文');await expect(page.getByRole('button',{name:'保存 API Key',exact:true})).toBeDisabled();expect(saved).toBe(marker);

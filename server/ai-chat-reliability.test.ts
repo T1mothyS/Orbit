@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { resolveQueryDates, dateClarification } from './orbit-time.js';
+import { resolveQueryDates, resolveDraftDates, dateClarification } from './orbit-time.js';
 import { parseDraftOutput, AI_DRAFT_SCHEMA } from './ai-chat-output.js';
 import { AiExecutionError, aiErrorInfo, generateDraft } from './ai-execution.js';
 import { chatToolNames, requestsScheduleDraft } from './ai-intent.js';
@@ -26,7 +26,7 @@ const base=`http://127.0.0.1:${(server.address() as any).port}`;
 test.after(async()=>{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));});
 const request=(url:string,body?:unknown)=>fetch(base+url,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+api.signUserToken(user),'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
 async function settle(id:string){for(let i=0;i<600;i++){const row=store.getRequest(user.id,id)!;if(!['queued','running'].includes(row.state))return row;await new Promise(r=>setTimeout(r,20));}throw new Error('queue did not settle');}
-async function send(text:string,cid=store.createConversation(user.id,'合成回归').id){const id=randomUUID();const response=await request('/api/orbit/requests',{text,requestId:id,conversationId:cid,targetDate:'2026-10-22'});assert.equal(response.status,202);return {id,cid,row:await settle(id)};}
+async function send(text:string,cid=store.createConversation(user.id,'合成回归').id,targetDate='2026-10-22'){const id=randomUUID();const response=await request('/api/orbit/requests',{text,requestId:id,conversationId:cid,targetDate});assert.equal(response.status,202);return {id,cid,row:await settle(id)};}
 const wire=JSON.stringify({intent:'create',reply:'待确认',operations:[{type:'create',data:{title:'合成活动',start_time:'2026-10-28T15:00:00',end_time:'2026-10-28T17:00:00',type:'event'}}]});
 
 test('date parser ignores time ranges and validates leap dates, annotations and year ambiguity',()=>{
@@ -48,6 +48,18 @@ test('answer routes do not expose private tools or create drafts for date descri
   assert.deepEqual([...names],['search','read_url']);
   assert.deepEqual([...chatToolNames('如何从0开始接入workbuddy',{product:true,schedule:false,knowledge:false,history:false})],['settings','product_help','search','read_url']);
   assert.equal(chatToolNames('科比是谁',{product:false,schedule:false,knowledge:false,history:false}).size,0);
+});
+test('future scheduling rolls a bare weekday forward while explicit and read-only dates keep their meaning',()=>{
+  assert.deepEqual(resolveDraftDates(['周一早上8点半报表'],'2026-11-01'),['2026-11-02']);
+  assert.deepEqual(resolveDraftDates(['周日12点取卡'],'2026-11-01'),['2026-11-01']);
+  assert.deepEqual(resolveDraftDates(['本周一报表'],'2026-11-01'),['2026-10-26']);
+  assert.deepEqual(resolveDraftDates(['上周一报表'],'2026-11-01'),['2026-10-19']);
+  assert.deepEqual(resolveQueryDates('周一有什么安排','2026-11-01'),['2026-10-26']);
+  assert.deepEqual(resolveDraftDates(['其余三项12点','这是下周一的任务啊','周一早上8点半报表'],'2026-11-01'),['2026-11-02']);
+  assert.deepEqual(resolveDraftDates(['改成11月4日','周一早上报表'],'2026-11-01'),['2026-11-04']);
+  assert.deepEqual(resolveDraftDates(['改成11/4','周一早上报表'],'2026-11-01'),['2026-11-04']);
+  assert.deepEqual(resolveDraftDates(['2026年11月9日（周一）8点报表'],'2026-11-01'),['2026-11-09']);
+  assert.deepEqual(resolveDraftDates(['周一早上报表'],'2026-12-31'),['2027-01-04']);
 });
 test('SDK final failure, truncation and missing completion cannot use intermediate prose as success',async()=>{
   const req={userId:'x',model:'x',instructions:'',input:[],responseMode:'text' as const};
@@ -115,6 +127,45 @@ test('three screenshot inputs use text/clarification/advice routes; only explici
     const c=await send('请生成日程草稿',b.cid);assert.equal(JSON.parse(c.row.result!).requiresConfirmation,true);assert.equal(schedules.getAllSchedules(user.id).length,before);
     const d=await send('如何从0开始接入workbuddy');assert.equal(d.row.state,'completed');assert.equal(calls,3);
     const views=await(await request('/api/orbit/requests?conversationId='+a.cid)).json();assert.equal(views.requests[0].responseMessageId,JSON.parse(a.row.result!).historyMessageId);assert.ok(views.requests[0].startedAt);
+  }finally{workBuddyProvider.generate=original;}
+});
+test('multi-turn date and time clarification reaches the strict draft protocol without writing schedules',async()=>{
+  const original=workBuddyProvider.generate;
+  const activity='周一早上8点半报表，周一早上做统计，周一中午取卡，周一提醒同事上线小程序';
+  let calls=0;
+  workBuddyProvider.generate=async req=>{
+    calls++;assert.equal(req.responseMode,'draft');assert.ok(req.outputSchema);assert.match(req.instructions,/2026-11-02/);
+    assert.match(req.instructions,/承接当前对话/);assert.doesNotMatch(req.instructions,/本轮只回答或查询/);
+    if(calls===1)return JSON.stringify({intent:'chat',reply:'后三项时间需要补充，请确认是否按12点。',operations:[],warnings:[]});
+    assert.match(req.instructions,/周一早上8点半报表/);
+    return JSON.stringify({intent:'create',reply:'四项草稿待确认。',operations:['报表','做统计','取卡','提醒同事'].map((title,i)=>({type:'create',data:{title,start_time:`2026-11-02T${i===0?'08:30':'12:00'}:00`,type:'todo'}}))});
+  };
+  try{
+    const before=schedules.getAllSchedules(user.id).length;
+    const first=await send(activity,undefined,'2026-11-01');assert.match(JSON.parse(first.row.result!).reply,/2026-11-02/);assert.equal(calls,0);
+    const correction=await send('这是下周一的任务啊',first.cid,'2026-11-01');assert.equal(correction.row.state,'completed');assert.equal(calls,1);
+    const final=await send('单独建一条新的，后三项时间就按12点来',first.cid,'2026-11-01');
+    const result=JSON.parse(final.row.result!);assert.equal(final.row.state,'completed');assert.equal(result.requiresConfirmation,true);assert.equal(result.plan.operations.length,4);
+    assert.deepEqual(result.plan.operations.map((op:any)=>op.startTime),['2026-11-02T08:30:00','2026-11-02T12:00:00','2026-11-02T12:00:00','2026-11-02T12:00:00']);
+    assert.equal(schedules.getAllSchedules(user.id).length,before);
+    assert.equal(calls,2);
+    workBuddyProvider.generate=async req=>{assert.equal(req.responseMode,'text');return '普通回答';};
+    const unrelated=await send('好的');assert.equal(JSON.parse(unrelated.row.result!).requiresConfirmation,undefined);
+    const other=await send('讲个笑话',store.createConversation(user.id,'新话题边界').id,'2026-11-01');
+    const next=await send('好的',other.cid,'2026-11-01');assert.equal(JSON.parse(next.row.result!).requiresConfirmation,undefined);
+  }finally{workBuddyProvider.generate=original;}
+});
+test('followup cannot borrow draft intent from attachments, notifications, failures, expired turns or finished plans',async()=>{
+  const original=workBuddyProvider.generate;
+  workBuddyProvider.generate=async req=>{assert.equal(req.responseMode,'text');return '普通答复';};
+  try{
+    for(const blocked of ['attachment','notification','failed','expired','plan']){
+      const cid=store.createConversation(user.id,'边界-'+blocked).id;
+      const body={text:'周一早上8点半报表',...(blocked==='attachment'?{attachmentIds:['synthetic-only']}:{}),...(blocked==='notification'?{notificationId:'synthetic-only'}:{})};
+      const result={intent:'chat',reply:'请补充时间。',...(blocked==='plan'?{requiresConfirmation:true}:{})};
+      run('INSERT INTO orbit_requests(id,user_id,conversation_id,state,body,result,created_at) VALUES (?,?,?,?,?,?,?)',[randomUUID(),user.id,cid,blocked==='failed'?'failed':'completed',JSON.stringify(body),JSON.stringify(result),new Date(Date.now()-(blocked==='expired'?31*60_000:1000)).toISOString()]);
+      const next=await send('好的',cid);assert.equal(next.row.state,'completed',blocked);assert.equal(JSON.parse(next.row.result!).requiresConfirmation,undefined,blocked);
+    }
   }finally{workBuddyProvider.generate=original;}
 });
 test('preprocessing and output failures have one safe request error, retry increments attempt and removes prior steps',async()=>{

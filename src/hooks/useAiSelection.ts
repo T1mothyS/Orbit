@@ -85,6 +85,7 @@ export function useAiSelection(authHeaders: () => Record<string, string>, authen
     finally { if (epoch === revision.current) setLoading(false); }
   };
   const model = selection.models[selection.provider] || '';
+  const connected = providers.find(item => item.id === selection.provider)?.connected;
   const ready = !loading && !saving && !error && providers.some(item => item.id === selection.provider && item.connected) && models.some(item => item.id === model);
-  return { provider: selection.provider, model, models, loading, saving, error, saveError, ready, chooseProvider, chooseModel, retry };
+  return { provider: selection.provider, model, models, connected, loading, saving, error, saveError, ready, chooseProvider, chooseModel, retry };
 }

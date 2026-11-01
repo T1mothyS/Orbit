@@ -1,4 +1,4 @@
-import { Button, IconButton, Tooltip, Input, TimePicker, isClockTime } from '../ui';
+import { Button, IconButton, Tooltip, Input, TimePicker, isClockTime, TextLink } from '../ui';
 import { composerDraftKey, readComposerDraft, updateComposerDraft, snapshotComposerDraft, consumeComposerDraft, subscribeComposerDraft, type NotificationContext } from '../utils/composer-draft';
 import type { NoteImage } from '../utils/note-images';
 import { NoteImageGallery, NoteImageInput, useNoteImageUpload } from './NoteImages';
@@ -617,6 +617,9 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const [renameTitle, setRenameTitle] = useState<string | null>(null);
   const [targetConversation, setTargetConversation] = useState('');
   const location=useLocation();
+  const missingAiConnection = !ai.loading && ai.connected === false;
+  const aiProviderName = ai.provider === 'chatgpt' ? 'ChatGPT' : 'WorkBuddy';
+  const aiConnectionHref = navigationHref(settingAction(ai.provider === 'chatgpt' ? 'setting-ai-1xetp3u' : 'setting-ai-8qd2c6'))!;
   const [notificationContext, setNotificationContext] = useState<NotificationContext>();
   const draftKey = composerDraftKey(user?.id || '', orbit.cid);
   const activeDraftKey = useRef(draftKey); activeDraftKey.current = draftKey;
@@ -959,7 +962,11 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
             <div hidden={noteMode}><ChatAttachmentComposer {...attachments} inputRef={attachmentInputRef} showAddButton={false} disabled={noteMode || orbit.creating || orbit.submitting || mutationBusy} /></div>
             <NoteImageInput inputRef={noteImageInputRef} disabled={orbit.creating || imageUpload.busy || savingNotes || mutationBusy} onFiles={files => { void imageUpload.add(files); }} />
             {noteMode && <><NoteImageGallery images={noteImages} editable disabled={savingNotes || imageUpload.busy || mutationBusy} onChange={changeImages} />{imageUpload.busy && <p role="status">图片上传中…</p>}{imageUpload.error && <p role="alert" className="orbit-inline-error">{imageUpload.error}</p>}</>}
-            {!noteMode && (ai.error || ai.saveError) && <button type="button" className="orbit-composer-hint is-warning" onClick={() => setComposerMenuOpen(true)}>{ai.error || ai.saveError} · 打开模型设置</button>}
+            {!noteMode && missingAiConnection && <p id="orbit-ai-connection-hint" className="orbit-composer-hint" role="status">
+              尚未配置 {aiProviderName} 账号，连接后即可开始对话。{' '}
+              <TextLink to={aiConnectionHref}>去配置 {aiProviderName}</TextLink>
+            </p>}
+            {!noteMode && !missingAiConnection && (ai.error || ai.saveError) && <button type="button" className="orbit-composer-hint is-warning" onClick={() => setComposerMenuOpen(true)}>{ai.error || ai.saveError} · 打开模型设置</button>}
             <div className={`schedule-ai-composer orbit-compact-composer${noteMode ? ' is-note-mode' : ''}`}>
               <button type="button" className="orbit-composer-plus" aria-label="更多功能" aria-haspopup="dialog" aria-expanded={composerMenuOpen}
                 disabled={orbit.creating || orbit.submitting || savingNotes || mutationBusy} onClick={() => setComposerMenuOpen(true)}><Plus size={22} aria-hidden="true" /></button>

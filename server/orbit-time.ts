@@ -9,7 +9,7 @@ export function addDateDays(date: string, days: number): string {
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
 }
-export function resolveQueryDates(text: string, anchor: string): string[] {
+export function resolveQueryDates(text: string, anchor: string, options: { upcoming?: boolean } = {}): string[] {
   if (!isValidDateKey(anchor)) throw new Error('查询基准日期无效');
   const dates = new Set<string>();
   const add = (date: string) => { if (!isValidDateKey(date))throw new Error('查询日期无效，请核对年月日'); dates.add(date); };
@@ -18,9 +18,12 @@ export function resolveQueryDates(text: string, anchor: string): string[] {
   let rest = text.toLowerCase();
   rest = rest.replace(/(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/g, (_, y, m, d) => { add(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`); return ' '; });
   rest = rest.replace(/(?<![\d:：])(?:(\d{4})[年/])?(\d{1,2})[月/-](\d{1,2})(?:[日号]|(?![\d:：]))/g, (_, y, m, d) => { add(`${y || anchor.slice(0, 4)}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`); return ' '; });
+  const hasAbsoluteDate = dates.size > 0;
+  if (options.upcoming && hasAbsoluteDate) rest = rest.replace(/[（(]\s*(?:[上下本这])?(?:周|星期)[一二三四五六日天]\s*[）)]/g, ' ');
   rest = rest.replace(/(上|下|本|这)?(?:周|星期)([一二三四五六日天])/g, (_, which, day) => {
     const index = '一二三四五六日'.indexOf(day === '天' ? '日' : day) + 1;
-    add(addDateDays(anchor, index - weekday + (which === '下' ? 7 : which === '上' ? -7 : 0)));
+    const upcoming = options.upcoming && !hasAbsoluteDate && !which && index < weekday;
+    add(addDateDays(anchor, index - weekday + (which === '下' || upcoming ? 7 : which === '上' ? -7 : 0)));
     return ' ';
   });
   rest = rest.replace(/大后天|后天|明天|明日|tomorrow|大前天|前天|昨天|昨日|yesterday|今天|今日|本日|today/g, word => {
@@ -44,6 +47,12 @@ export function resolveQueryDates(text: string, anchor: string): string[] {
     for (let i = 1; i <= end; i++) add(`${first.toISOString().slice(0, 8)}${String(i).padStart(2, '0')}`);
   }
   return dates.size ? [...dates].sort() : [anchor];
+}
+
+/** A date correction overrides earlier turns; a time-only reply keeps the preceding date. */
+export function resolveDraftDates(texts: string[], anchor: string): string[] {
+  const dated = texts.find(text => /今天|今日|明天|明日|后天|昨天|昨日|前天|(?:周|星期)[一二三四五六日天末]|[上下本这](?:周|月)|\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}月\d{1,2}|\d{1,2}[日号]|(?<![\d:：])\d{1,2}[/-]\d{1,2}(?![\d:：])/.test(text));
+  return resolveQueryDates(dated || texts[0] || '', anchor, { upcoming: true });
 }
 
 /** An annotation must agree with its absolute date, rather than add a second event. */

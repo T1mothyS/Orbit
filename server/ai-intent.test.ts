@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isReadOnlyScheduleQuery, needsScheduleContext, requestsKnowledgeContext, allowsPlainChatReply } from './ai-intent.js';
+import { isReadOnlyScheduleQuery, needsScheduleContext, requestsKnowledgeContext, allowsPlainChatReply, requestsScheduleDraft, scheduleDraftContext } from './ai-intent.js';
 
 test('普通问答和闲聊不加载用户日程上下文', () => {
   assert.equal(needsScheduleContext('讲一个简短的笑话'), false);
@@ -41,4 +41,23 @@ test('active drafts and item-specific conversations cannot fall back to prose', 
   assert.equal(allowsPlainChatReply('好的', { activePlan: true }), false);
   assert.equal(allowsPlainChatReply('只回复标识', { scoped: true }), false);
   assert.equal(allowsPlainChatReply('只回复标识'), true);
+});
+
+test('schedule clarification accepts natural confirmation and time/date corrections from recent user turns', () => {
+  const activity = '周一早上8点半报表，周一中午去取卡，周一提醒同事上线小程序';
+  assert.equal(requestsScheduleDraft(activity), false);
+  assert.equal(requestsScheduleDraft('确认生成待确认的事项'), true);
+  assert.equal(requestsScheduleDraft('这是下周一的任务啊', [activity]), true);
+  assert.equal(requestsScheduleDraft('单独建一条新的，后三项时间按12点来', ['这是下周一的任务啊', activity]), true);
+  assert.equal(requestsScheduleDraft('好的', [activity]), true);
+  assert.equal(requestsScheduleDraft('好的'), false);
+  assert.equal(requestsScheduleDraft('好的', ['讲个笑话', activity]), false);
+  assert.equal(requestsScheduleDraft('好的', ['不用创建了', activity]), false);
+  assert.deepEqual(scheduleDraftContext(['这是下周一的任务啊', activity, '上周看过的电影']), ['这是下周一的任务啊', activity]);
+  assert.deepEqual(scheduleDraftContext(['讲个笑话', activity]), []);
+  assert.deepEqual(scheduleDraftContext(['周一怎么学习编程？', activity]), []);
+  assert.deepEqual(scheduleDraftContext(['明天有什么安排', activity]), []);
+  for (const text of ['不用创建了', '先讨论一下', '为什么这么安排？', '明天有什么安排', '好的，讲个笑话']) {
+    assert.equal(requestsScheduleDraft(text, [activity]), false, text);
+  }
 });

@@ -31,12 +31,40 @@ export function allowsPlainChatReply(text: string, context: { activePlan?: boole
     && !/(提醒我|安排|日程|待办|会议|行程|标记.*完成|取消|删除|删掉|修改|改成|改到|调到|换到|挪到|移到|推迟|提前|新建|创建|添加|schedule|calendar|remind|appointment|meeting)/i.test(normalized);
 }
 
-export function requestsScheduleDraft(text: string): boolean {
-  if (/^(如何|怎么|怎样|为什么|请问.*如何)/.test(text.trim())) return false;
-  return /(?:帮我|请)?(?:添加|新建|创建|生成.*草稿|整理.*(?:日程|草稿)|安排|提醒我|修改|改成|改到|调到|推迟|提前|取消|删除|删掉|标记.*完成)/.test(text);
+function declinesScheduleDraft(text: string): boolean {
+  return /(?:不要|不用|不需要|先别|暂不|别再).{0,8}(?:创建|新建|添加|生成|安排|提醒|修改|删除|取消)/.test(text)
+    || /(?:只|先)(?:聊聊|讨论|解释)|^(?:算了|取消|不做了)[。！!\s]*$/.test(text);
+}
+
+function isScheduleFollowUp(text: string): boolean {
+  if (declinesScheduleDraft(text)) return false;
+  return /^(?:好的?|可以|确认|确定|没问题|就这样|按这个|按上面|照这个)[。！!\s]*$/.test(text)
+    || /^(?:单独建|其余|后[一二三四五六七八九十\d]+项)/.test(text)
+    || /^(?:这是|是指|是|改为|换成|时间|日期|都按|就按|按)?\s*(?:[上下本这]?(?:周|星期)[一二三四五六日天]|今天|明天|后天|\d{1,2}[月号日点时]|\d{1,2}[:：]\d{2}|上午|下午|中午|晚上)/.test(text)
+    || isActivityDescription(text);
+}
+
+export function scheduleDraftContext(previousTexts: string[]): string[] {
+  const context: string[] = [];
+  for (const text of previousTexts.slice(0, 6)) {
+    if (declinesScheduleDraft(text) || isReadOnlyScheduleQuery(text)) break;
+    context.push(text);
+    if (requestsScheduleDraft(text) || isActivityDescription(text)) return context;
+    if (/[?？]|如何|怎么|为什么/.test(text) || !isScheduleFollowUp(text)) break;
+  }
+  return [];
+}
+
+/** Recent user turns are newest first and must belong to the same unfinished dialogue. */
+export function requestsScheduleDraft(text: string, previousTexts: string[] = []): boolean {
+  const normalized = text.trim();
+  if (/^(如何|怎么|怎样|为什么|请问.*如何)/.test(normalized) || declinesScheduleDraft(normalized) || isReadOnlyScheduleQuery(normalized)) return false;
+  if (/(?:添加|新建|创建|(?:生成|整理).*?(?:草稿|待确认|日程|待办|事项|任务)|安排|提醒我|修改|改成|改到|调到|推迟|提前|取消|删除|删掉|标记.*完成)/.test(normalized)) return true;
+  return previousTexts.length > 0 && !/[?？]|如何|怎么|为什么/.test(normalized)
+    && isScheduleFollowUp(normalized) && scheduleDraftContext(previousTexts).length > 0;
 }
 export function isActivityDescription(text: string): boolean {
-  return needsScheduleContext(text) && !isReadOnlyScheduleQuery(text) && !requestsScheduleDraft(text)
+  return !declinesScheduleDraft(text) && needsScheduleContext(text) && !isReadOnlyScheduleQuery(text) && !requestsScheduleDraft(text)
     && !/[?？]|如何|怎么|为什么|有没有|是否|冲突/.test(text);
 }
 export function chatToolNames(text: string, options: { product: boolean; schedule: boolean; knowledge: boolean; history: boolean }) {
