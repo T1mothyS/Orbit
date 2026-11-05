@@ -18,6 +18,14 @@ main 用编译期 DEV 条件加载 `/dev/ui`，不渲染 App/认证 hooks。`dev
 
 Calendar 使用的 date-fns 现显式声明，避免依赖开发工具间接安装；已有日期函数边界有专项回归。无数据库/API 迁移。
 
+## 今日待办小组件
+
+`GET /api/action-center/widget` 复用行动中心的账号时区、待办和周期投影，返回今日未完成数量、今日已完成数量、最多 12 条任务的标题/时间/状态/站内定位、同步时间及次日本地零点。无日期积压、普通日程和完成证明不进入快照。响应禁止缓存。桌面端沿用网页认证，Mac 原生进程只接收经校验的展示字段。Android 用当前网页登录调用 `POST /api/action-center/widget/access`，获得最长 24 小时且不晚于网页登录到期的专用只读凭据。凭据仅能读取本接口，账号禁用或登录版本变化后失效。
+
+macOS 使用 WidgetKit 和同一 Apple Team 的 App Group。Electron 仅接受当前可信顶层页面的快照请求，通过签名的 Swift 工具写入和清理共享快照并请求刷新。App Group 只保存筛选后的展示数据，不共享 Keychain 或登录令牌。WidgetKit 控制刷新实际时间，账户时区换日后旧任务自动失效。签名和添加方法见 [发布流程](RELEASE.md#macos-今日待办小组件)。
+
+Android 使用 AppWidgetProvider 与 RemoteViews。专用凭据经 Android Keystore 加密后存于应用私有区，正式与测试环境分开，退出、换号、切换服务器和移除最后一个组件时清理凭据与快照。手动刷新、系统周期更新和应用前台同步共用有界 HTTPS 读取。网络失败保留当日有效快照并显示更新时间，服务端拒绝凭据时清除快照。使用方法见 [Android 构建](../android/README.md#桌面今日待办)。
+
 ## Android 客户端与 Push
 
 常规构建仅提供正式账号开关、通知权限与注册/投递状态；原生顶部、离线和网页测试入口只有 debug 且显式开启 DEVELOPER_TOOLS 才显示。release 始终关闭；本地桥接测试同样检查该标记。下面的 AlarmManager 排错能力保留，正式 FCM、Receiver、渠道和绑定/解绑行为不变。后续用户真实手机已确认精准/非精准触发及后台系统展示通过，见 [新增实机证据](archive/engineering/TEST-MATRIX-20261018.md#2026-10-08-产品助手运行诊断与保留)。
@@ -196,6 +204,8 @@ server/db.ts 保留兼容导出；server/database/connection.ts 拥有连接与�
 
 记事 POST/PATCH 接受 `imageIds`，一条最多3张、合计20MB，沿用账号配额。图文或仅图片为一条，纯文字保留逐行保存。图片编辑必须提供 `expectedRevision`；正文修订也覆盖图片，慢优化/编辑不得覆盖新图文。关联与正文跨库事务提交；废纸篓保留图片，合并目标在前、来源在后并去重，超限整笔拒绝。永久删除只清理没有任何记事引用的文件。清空/删除账号包含新表。
 
+记事卡片拖放以目标卡片 ID 和原正文修订为准，上传完成后用现有 PATCH 只追加图片关联。阅读态不切换到编辑，编辑态保留文字、光标与未保存图片，成功后推进编辑基线。版本冲突、目标删除或上传失败时提示，清理这批未关联文件。
+
 格式1加密用户备份增加 `noteImages` 有序关联及附件字节，跨账号重映射记事和文件ID，恢复缺图返回 `PARTIAL/missingNoteImages`；仅图片记事可恢复。合并保持已有卡片的图文编辑，旧备份缺少关联字段时禁止替换已有图文，只允许合并；恢复前保留安全副本。普通TXT/CSV不包含图片。
 
 前端 `composer-draft.ts` 同步内存及按账号/会话的 `sessionStorage`，兼容旧文字缓存。提交捕获来源和修订，成功消费对应版本；较新的文字保留，已提交图片从新草稿移除。切走后的成功响应仍消费原草稿，列表刷新不决定保存成功。退出清理账号缓存。`note-clipboard.ts` 单个ClipboardItem提供经转义的HTML（图片内嵌字节）和纯文本，独立PNG复制另用image/png；不保证目标应用保留图片，失败使用原生模态预览复制。
@@ -347,7 +357,7 @@ Orbit 工具复用日历、词法知识库和已发布日报服务；知识沿�
 
 普通聊天回复优先按结构化消息解析；无活跃草稿、非事项专属对话且输入没有日程意图时，可接收纯文本并封装为 `chat`、空 operations/knowledgeSourceIds，元数据记录 `textFallback`。显式“不操作日程”不会单独阻止文件问答，但与新增/修改请求混用时仍拒绝文本降级。空响应、破损操作 JSON、日程请求和导入/主动提醒继续严格解析；普通 chat 不渲染偶然关键词匹配的事项卡。
 
-聊天附件复用 activity.db 的 attachments、账号配额与 data/attachments 哈希文件；chat.db 增量保存 orbit_attachments（会话、解析状态/块）和 orbit_message_attachments（消息引用）。原附件/完成记录接口保持类型边界，文档扩展只在聊天与备份恢复明确启用。上传需认证、会话归属，10MB/文件、3 个/轮、20MB/轮、默认 500MB/账号；图片经 sharp 校验、2048px 压缩并去除 EXIF。
+聊天附件复用 activity.db 的 attachments、账号配额与 data/attachments 哈希文件；chat.db 增量保存 orbit_attachments（会话、解析状态/块）和 orbit_message_attachments（消息引用）。原附件/完成记录接口保持类型边界，文档扩展只在聊天与备份恢复明确启用。上传需认证、会话归属，10MB/文件、3 个/轮、20MB/轮、默认 500MB/账号；图片经 sharp 校验、2048px 压缩并去除 EXIF。上传可传 v4 UUID 格式的 `requestId`，同账号和会话用该标识重试可复用原附件。附件记录与会话关联在同一持久化事务提交。
 
 共享 file-parser 服务在最多两个 192MB heap worker 中解析，15s 超时与取消，最多 100 页 PDF/一百万字符正文/2,000 个解析块，与备份恢复上限一致。PDF.js 使用本地字体资源，不执行 PDF JavaScript、不抓取外链；PDF.js optional canvas 是服务端依赖，Node 最低 22.13，部署需保留 npm 的平台 optional dependencies。扫描/加密 PDF 明确失败。解析能力供后续知识库复用，上传不写知识库。
 
@@ -370,6 +380,7 @@ Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓�
 - Status: CONTRACT；2026-10-04 增量实现。权威来源：`notification-chat.ts`、`activity-statistics.ts`、`activity-reports.ts`、`connected-backup.ts`、`orbit-profile.ts` 与相关路由/测试。行为、表结构、过滤或投递规则变更时同步本节。
 - `reminders.in_app_enabled` 是站内及主动聊天的唯一账号开关。旧 `proactiveEnabled` GET/PATCH 仅为兼容别名，旧字段不再存第二份启用状态。逐事项提前/停用规则保持独立。
 - `orbit_notification_messages` 以账号、对象、周期实例、精确提醒时点去重。站内消息、映射、会话时间和通知 sent 在跨库同步事务落盘。系统重启复用映射，不扫描历史 sent 做消息回填；删除消息也不重放历史通知。已读使用通知 read_at，完成使用真实业务记录，投递 sent 与两者独立。
+- 主动提醒的通知标题与补充正文独立保存。历史响应在 `orbitMeta.notification` 提供 `title/body/triggerAt`，执行时间与备注取事项卡，聊天创建时间仍取原消息。只识别既有主动提醒模板和匹配的事项快照字段，老消息原文继续保留，提醒失效或事项变化时保留原提醒内容。
 - 新卡片元数据包含通知 ID、对象引用、来源标签、设置引用及事项基线指纹。GET 历史会按当前归属/完成/指纹计算状态；完成与延后接口再次检查，不接受失效卡片。旧主动卡片动作继续支持。站内扫描独立于 SMTP/IMAP；公共应用层消费浏览器前台通知，浏览器队列 sent 表示前台可消费，read 表示前台已显示/确认，不保证系统弹窗最终呈现。
 - `src/utils/orbit-links.ts` 维护旧 URL 对象定位与安全协议过滤。Settings registry 只含稳定 ID、名称、用途、关键词和定位，不含配置值；账号权限过滤管理员设置。Settings 搜索、全局搜索、AI 只读工具及聊天卡片共用索引，不建立 AI 内嵌设置表单。
 - `orbit_activity_events` 只记录成功创建来源、日期改期、确认执行和成功记事优化。复用现有同步事务与 executeOnce，不记录页面停留或复制聊天正文。采集起点在 `orbit_metrics_meta`；未知历史不回填。

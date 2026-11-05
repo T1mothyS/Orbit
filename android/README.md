@@ -29,6 +29,16 @@ $env:JAVA_HOME = 'C:\path\to\jdk-17'
 
 `versionName` 直接读取根 `package.json`；`versionCode` 在 `app/build.gradle.kts` 维护，发布新安装包时递增。调试 APK 仅适用于本轮试验；正式 release 需要独立签名、禁用 WebView 调试并单独授权发布。禁止提交签名文件和密码。
 
+## 正式 APK
+
+使用现有应用签名材料。在被忽略的 `android/signing.local.properties` 配置 `storeFile`、`storePassword`、`keyAlias`、`keyPassword`。不要更换发布证书。已有正式 FCM 的安装包必须沿用同一 Firebase 客户端配置。
+
+macOS / Linux 可运行 `sh android/gradlew -p android :app:assembleRelease --no-daemon`，Windows 用 `android\gradlew.bat`。输出位于 `android/app/build/outputs/apk/release/`。使用 Android Build Tools 的 `apksigner verify --print-certs` 与上一正式包比较证书指纹，再记录版本、大小、SHA-256、覆盖安装及启动结果。调试构建只用于本地验证。
+
+## 桌面今日待办
+
+在手机桌面长按空白处，打开系统小组件列表并添加「Orbit 今日待办」。添加后打开 Orbit，沿用当前服务器和已登录账号同步。点击标题打开今日，点击任务打开对应事项，点「刷新」主动同步。系统约每 30 分钟安排后台更新，实际频率由桌面和省电策略决定。可调整大小查看更多任务。组件通过原生桌面接口运行，无需 Google Play 服务。服务端需提供 [今日待办接口](../docs/ARCHITECTURE.md#今日待办小组件)。账户或环境变化后旧快照清理，断网时同日最后一次同步可继续展示。
+
 ## Firebase 配置
 
 客户端锁定 Firebase Messaging `25.1.3` / Installations `19.1.2`；服务端锁定 `firebase-admin` `14.5.0`（Node >=22）。按官方 FID API 使用 `register` / `onRegistered` / `unregister` 和 Admin `fid` 目标，不使用已弃用的 token 注册链路。

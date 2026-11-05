@@ -11,6 +11,7 @@ import {
   Tray,
 } from 'electron';
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -24,6 +25,68 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
 let rendererUrl = '';
+let openTodayOnStart = false;
+
+function widgetSync(): { group: string; executable: string } | undefined {
+  if (process.platform !== 'darwin' || !app.isPackaged) return;
+  try {
+    const group = fs.readFileSync(path.join(process.resourcesPath, 'orbit-widget-group.txt'), 'utf8').trim();
+    if (!/^[A-Z0-9]{10}\.[A-Za-z0-9.-]+$/.test(group)) return;
+    const executable = path.join(process.resourcesPath, '..', 'Helpers', 'OrbitWidgetSync');
+    if (fs.existsSync(executable)) return { group, executable };
+  } catch { return undefined; }
+}
+
+function widgetSender(event: Electron.IpcMainInvokeEvent): boolean {
+  if (!rendererUrl || !event.senderFrame || event.sender !== mainWindow?.webContents || event.senderFrame !== event.sender.mainFrame) return false;
+  try { return new URL(event.senderFrame.url).origin === new URL(rendererUrl).origin; }
+  catch { return false; }
+}
+
+function widgetSnapshot(value: unknown) {
+  if (!value || typeof value !== 'object') return;
+  const input = value as Record<string, unknown>;
+  const { date, generatedAt, validUntil, remaining, completed, items } = input;
+  const now = Date.now();
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+      typeof generatedAt !== 'number' || !Number.isSafeInteger(generatedAt) || Math.abs(generatedAt - now) > 300000 ||
+      typeof validUntil !== 'number' || !Number.isSafeInteger(validUntil) || validUntil <= generatedAt || validUntil - generatedAt > 26 * 3600000 ||
+      typeof remaining !== 'number' || !Number.isSafeInteger(remaining) || remaining < 0 ||
+      typeof completed !== 'number' || !Number.isSafeInteger(completed) || completed < 0 ||
+      !Array.isArray(items) || items.length > 12) return;
+  return { date, generatedAt, validUntil, remaining, completed, items: items.flatMap(item =>
+    item && typeof item.title === 'string' && typeof item.time === 'string' && typeof item.completed === 'boolean'
+      ? [{ title: item.title.slice(0, 160), time: item.time.slice(0, 8), completed: item.completed }] : [],
+  ) };
+}
+
+function runWidgetSync(command: 'write' | 'clear', input?: string): boolean {
+  const sync = widgetSync();
+  if (!sync) return false;
+  const result = spawnSync(sync.executable, [sync.group, command], { input, stdio: ['pipe', 'ignore', 'ignore'], timeout: 2500 });
+  return result.status === 0;
+}
+
+ipcMain.handle('today-widget-available', event => widgetSender(event) && !!widgetSync());
+ipcMain.handle('today-widget-clear', event => widgetSender(event) && runWidgetSync('clear'));
+ipcMain.handle('today-widget-write', (event, input: unknown) => {
+  if (!widgetSender(event)) return false;
+  const snapshot = widgetSnapshot(input);
+  return !!snapshot && runWidgetSync('write', JSON.stringify(snapshot));
+});
+
+app.on('open-url', (event, url) => {
+  if (url !== 'orbit-today://open' && url !== 'orbit-today://open/') return;
+  event.preventDefault();
+  if (!rendererUrl || !mainWindow) {
+    openTodayOnStart = true;
+    if (rendererUrl && app.isReady()) createWindow();
+    return;
+  }
+  void mainWindow.loadURL(new URL('/today', rendererUrl).href);
+  mainWindow.show();
+  mainWindow.focus();
+});
 
 function safeHttpUrl(value: string, allowLocalHttp: boolean): URL {
   let parsed: URL;
@@ -87,7 +150,8 @@ function createWindow(): void {
   });
 
   const allowedOrigin = new URL(rendererUrl).origin;
-  void mainWindow.loadURL(rendererUrl);
+  void mainWindow.loadURL(openTodayOnStart ? new URL('/today', rendererUrl).href : rendererUrl);
+  openTodayOnStart = false;
   if (isDev && process.env.ELECTRON_OPEN_DEVTOOLS === 'true') mainWindow.webContents.openDevTools();
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());

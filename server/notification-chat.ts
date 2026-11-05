@@ -51,6 +51,32 @@ export function deliverInApp(item:activity.NotificationDelivery,eventId?:string,
     return id;
   });
 }
+/** Project generated reminder fields separately while retaining the queued original. */
+export function notificationMessageContent(
+  item: activity.NotificationDelivery,
+  snapshot?: ReturnType<typeof getSchedule>,
+  showSchedule = false,
+) {
+  let body = item.sourceType === 'activity_report' && item.kind === 'weekly_report'
+    ? activityReportChatText(item.userId, item.sourceId)
+    : item.body;
+  if (snapshot && (item.kind === 'proactive' || item.kind === 'proactive_snooze')) {
+    const repeatedTitle = item.title + '\n\n';
+    const details = body.startsWith(repeatedTitle) ? body.slice(repeatedTitle.length) : body;
+    const start = /^(?:开始前提醒|本周期提醒)：\d{4}\/\d{1,2}\/\d{1,2} \d{2}:\d{2}:\d{2}/.exec(details);
+    if (start) {
+      body = details;
+      const fields = start[0] + (snapshot.location ? ` · ${snapshot.location}` : '') + '。'
+        + (snapshot.notes ? `\n${snapshot.notes}` : '');
+      const remainder = details.slice(fields.length);
+      if (showSchedule && details.startsWith(fields) && (!remainder || remainder.startsWith('\n\n'))) {
+        body = remainder.trimStart();
+      }
+    }
+  }
+  return { title: item.title, body, triggerAt: item.scheduledAt };
+}
+
 export function notificationView(userId:string,id:string) {
   const item=activity.getNotification(id,userId);if(!item)return {state:'discarded',canContinue:false,href:null,object:null,actionable:false};
   const ref=notificationObject(item);

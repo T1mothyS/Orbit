@@ -44,6 +44,7 @@ export function saveBase64Attachment(input: {
   mimeType: string;
   base64: string;
   allowDocuments?: boolean;
+  id?: string;
 }): activityStore.AttachmentRecord {
   const cleanBase64 = input.base64.replace(/^data:[^;]+;base64,/, '');
   const buffer = Buffer.from(cleanBase64, 'base64');
@@ -71,7 +72,7 @@ export function saveBase64Attachment(input: {
     sizeBytes: buffer.length,
     sha256,
     storagePath,
-  });
+  }, input.id);
 }
 
 export function readAttachment(record: activityStore.AttachmentRecord): Buffer {

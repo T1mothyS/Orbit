@@ -173,3 +173,82 @@ test('browser channel readiness is independent from mail jobs and restored pendi
 test('encrypted account backup restores avatar bytes and report snapshots with automation disabled',async()=>{
   const backups=await import('./backup-service.js');const image=await sharp({create:{width:100,height:100,channels:3,background:'#127b61'}}).png().toBuffer();await profiles.saveAvatar(owner,{mimeType:'image/png',base64:image.toString('base64')});const bytes=profiles.avatarBytes(owner);reports.setWeeklyPreferences(owner,{enabled:true,weekday:0,hour:20,minute:0});const frozen=reports.createActivityReport(owner,range);const backup=backups.createUserBackup(owner,'synthetic-backup-password');profiles.removeAvatar(owner);backups.restoreUserBackup(owner,backup,'synthetic-backup-password','replace');assert.deepEqual(profiles.avatarBytes(owner),bytes);assert.equal(reports.getActivityReport(owner,frozen.id).snapshotHash,frozen.snapshotHash);assert.equal(reports.getWeeklyPreferences(owner).enabled,false);
 });
+
+test('reminder history separates schedule facts from generated prose and retains the original', async () => {
+  const task = item('做融资平台', {
+    type: 'todo', start_time: '2026-11-09T12:00:00', end_time: '2026-11-09T12:00:00',
+    location: '会议室', notes: '独立新增的周一安排\n备注第二行',
+  });
+  const prose = '同日还有：整理项目材料。\n\n温馨提示：先确认负责人。做融资平台是本周重点。';
+  const original = `${task.title}\n\n开始前提醒：2026/11/9 12:00:00 · 会议室。\n${task.notes}\n\n${prose}`;
+  const triggerAt = '2026-11-09T03:45:00.000Z';
+  const notice = activity.enqueueNotificationDetailed({
+    userId: owner, sourceType: 'schedule', sourceId: task.id, channel: 'in_app', kind: 'proactive',
+    title: task.title, body: original, scheduledAt: triggerAt, dedupeKey: randomUUID(),
+  }).notification;
+  const id = chat.deliverInApp(notice)!;
+  const server = api.app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  try {
+    const response = await fetch(base + '/api/ai-schedule/history', { headers: { Authorization: 'Bearer ' + api.signUserToken(db.getUserById(owner)!) } });
+    assert.equal(response.status, 200);
+    const messages = (await response.json()).messages;
+    const message = messages.find((entry: { id: string }) => entry.id === id);
+    assert.deepEqual(message.orbitMeta.notification, { title: task.title, body: prose, triggerAt });
+    assert.equal(message.scheduleItems[0].start_time, '2026-11-09T12:00:00');
+    assert.equal(message.scheduleItems[0].notes, task.notes);
+    assert.equal(activity.getNotification(notice.id, owner)!.body, original);
+    assert.equal(chat.notificationMessageContent(notice, task, false).body, original.slice(task.title.length + 2));
+    assert.equal(chat.notificationMessageContent({ ...notice, kind: 'due' }, task, true).body, original);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});
+
+test('Today widget projects live owned todos and scopes its native credential', async () => {
+  const now = new Date();
+  const { todayInTimezone } = await import('./reminder-store.js');
+  const zone = 'Asia/Shanghai';
+  const date = todayInTimezone(zone, now);
+  const preference = db.getReminder(owner)!;
+  db.upsertReminder({ ...preference, timezone: zone });
+  const task = item('今日融资待办', { type: 'todo', start_time: date + 'T12:00:00', end_time: date + 'T12:00:00', notes: '不进入组件快照的正文' });
+  item('今日普通日程', { start_time: date + 'T12:00:00', end_time: date + 'T12:00:00' });
+  item('其他账号待办', { user_id: other, type: 'todo', start_time: date + 'T12:00:00', end_time: date + 'T12:00:00' });
+  const server = api.app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const endpoint = '/api/action-center/widget';
+  const bearer = 'Bearer ' + api.signUserToken(db.getUserById(owner)!);
+  try {
+    assert.equal((await fetch(base + endpoint)).status, 401);
+    const access = await fetch(base + endpoint + '/access', { method: 'POST', headers: { Authorization: bearer } });
+    assert.equal(access.status, 200);
+    const { credential, expiresAt } = await access.json();
+    assert.ok(expiresAt > now.getTime() && expiresAt <= Date.now() + 86400000);
+    const native = { Authorization: 'OrbitWidget ' + credential };
+    const snapshot = await fetch(base + endpoint, { headers: native });
+    assert.equal(snapshot.headers.get('cache-control'), 'private, no-store');
+    const data = await snapshot.json();
+    assert.equal(data.date, date);
+    assert.ok(data.validUntil > data.generatedAt);
+    assert.deepEqual(data.items.find((row: { title: string }) => row.title === task.title), {
+      title: task.title, time: '12:00', completed: false, path: `/schedule?schedule=${task.id}&date=${date}`,
+    });
+    assert.doesNotMatch(JSON.stringify(data), /其他账号待办|今日普通日程|不进入组件快照/);
+    assert.equal((await fetch(base + '/api/schedules', { headers: native })).status, 401);
+    assert.equal((await fetch(base + '/api/schedules', { headers: { Authorization: 'Bearer ' + credential } })).status, 401);
+    assert.equal((await fetch(base + endpoint + '/access', { method: 'POST', headers: native })).status, 401);
+    schedules.updateSchedule(task.id, { is_completed: true });
+    const changed = await (await fetch(base + endpoint, { headers: native })).json();
+    assert.equal(changed.remaining, data.remaining - 1);
+    assert.equal(changed.completed, data.completed + 1);
+    run('UPDATE users SET auth_version=auth_version+1 WHERE id=?', [owner]);
+    assert.equal((await fetch(base + endpoint, { headers: native })).status, 401);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});

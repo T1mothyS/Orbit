@@ -100,3 +100,73 @@
 .orbit-notification-reply button { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; }
 .orbit-notification-reply button:focus-visible { outline: 2px solid var(--td-brand-color); outline-offset: 2px; }
 @media (max-width: 640px) { .orbit-notification-reply button { min-width: 44px; min-height: 44px; } }
+
+/* The conversation and composer share one reading measure within the workspace. */
+.ai-schedule-page-card .schedule-ai-reading-column,
+.orbit-composer-content { width:min(100%,720px); }
+.schedule-ai-reading-column { padding:12px 8px 20px; }
+.orbit-message { min-width:0; margin-block:0 28px; }
+.orbit-message-heading { display:flex; align-items:center; gap:8px; color:var(--orbit-text-secondary); font-size:12px; font-weight:600; margin-bottom:9px; }
+.orbit-message-heading > svg { color:var(--orbit-action); flex:none; }
+.orbit-message-content { min-width:0; }
+.orbit-notification-title { font-size:18px; line-height:1.4; font-weight:650; margin:0 0 10px; overflow-wrap:anywhere; }
+.orbit-message-footer { display:flex; align-items:center; flex-wrap:wrap; column-gap:8px; margin-top:6px; }
+.orbit-message-footer > [role=status] { font-size:12px; color:var(--orbit-text-secondary); }
+.orbit-message-footer .orbit-copy-reply { min-height:36px; }
+@media (hover:hover) and (pointer:fine) {
+  .orbit-message:not(:hover):not(:focus-within) .orbit-copy-reply { opacity:0; }
+}
+@media (pointer:coarse), (max-width:640px) {
+  .orbit-message-footer .orbit-copy-reply { min-height:44px; opacity:1; }
+}
+.orbit-message .orbit-message-footer .ai-message-timestamp { margin:0; }
+.orbit-message .ai-message-timestamp { color:var(--orbit-text-secondary); font-size:11px; text-align:start; margin-top:10px; }
+.orbit-message-error { padding:12px 14px; border:1px solid var(--orbit-border); border-inline-start-color:var(--orbit-destructive); border-radius:var(--orbit-radius-control); background:var(--orbit-muted); }
+.orbit-message-error .orbit-message-body { color:var(--orbit-destructive); }
+.orbit-chat-task-list { display:grid; gap:6px; margin:10px 0; }
+.orbit-chat-task.ai-schedule-card { display:grid; grid-template-columns:18px minmax(0,1fr) 16px; gap:10px; align-items:start; justify-content:stretch; width:100%; padding:11px 12px; border:1px solid var(--orbit-border); border-radius:var(--orbit-radius-card); background:var(--td-bg-color-container); text-align:start; }
+.orbit-chat-task.ai-schedule-card:hover { background:var(--orbit-muted); transform:none; box-shadow:none; }
+.orbit-chat-task > span { display:contents; }
+.orbit-chat-task svg { margin-top:2px; color:var(--orbit-text-secondary); }
+.orbit-chat-task-content { display:grid; min-width:0; gap:3px; overflow-wrap:anywhere; }
+.orbit-chat-task-heading { display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 10px; }
+.orbit-chat-task-heading strong { color:var(--orbit-text); font-size:15px; font-weight:650; }
+.orbit-chat-task-heading small,.orbit-chat-task-detail { font-size:12px; color:var(--orbit-text-secondary); }
+.orbit-chat-task-time { color:var(--orbit-text); font-size:13px; font-variant-numeric:tabular-nums; }
+.orbit-chat-task-detail { display:flex; align-items:baseline; gap:4px; }
+.orbit-chat-task-detail svg { flex:none; }
+.orbit-chat-task-note { display:block; white-space:pre-wrap; }
+.orbit-message .orbit-notification-actions { gap:2px; margin-top:12px; padding-top:9px; }
+.orbit-message .orbit-notification-actions > div { gap:4px; }
+.orbit-notification-actions time { font-variant-numeric:tabular-nums; }
+.orbit-chat-code { margin-block:1em; border:1px solid var(--orbit-border); border-radius:var(--orbit-radius-control); background:var(--td-bg-color-container); }
+.orbit-chat-code-actions { display:flex; align-items:center; justify-content:space-between; gap:8px; padding-inline:10px; border-bottom:1px solid var(--orbit-border); font-size:12px; color:var(--orbit-text-secondary); }
+.orbit-chat-code-actions button { display:inline-flex; align-items:center; gap:6px; min-height:36px; padding-inline:4px; }
+.orbit-chat-code-actions button:hover { color:var(--orbit-link-color); }
+.orbit-composer-drop { position:relative; }
+.orbit-composer-drop input[type=file][hidden] { display:none; }
+.orbit-compact-composer .schedule-ai-composer-field { resize:none; background:transparent; }
+.orbit-composer-drop[data-dragging=true] { outline:2px dashed var(--orbit-action); outline-offset:3px; border-radius:var(--orbit-radius-card); }
+.orbit-composer-drop-hint { position:absolute; z-index:var(--orbit-z-sticky); inset-inline:0; bottom:100%; padding:7px 12px; border-radius:var(--orbit-radius-control); background:var(--orbit-brand-soft); color:var(--orbit-text); font-size:13px; pointer-events:none; }
+.orbit-attachments-composer { align-items:stretch; max-height:min(160px,26dvh); overflow:auto; padding:3px; }
+.orbit-attachments-composer > p { flex:1 0 100%; margin:0; }
+.orbit-draft-file { flex:1 1 210px; }
+.orbit-draft-file > :is(img,svg) { width:38px; height:38px; object-fit:cover; border-radius:var(--orbit-radius-control); flex:none; }
+.orbit-draft-file > div { display:grid; min-width:0; flex:1; }
+.orbit-draft-file strong { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+.orbit-draft-file small { overflow-wrap:anywhere; }
+.orbit-draft-file button,.orbit-file-card button { min-width:44px; min-height:44px; display:grid; place-items:center; padding-inline:4px; border-radius:var(--orbit-radius-control); }
+.orbit-draft-file button:hover,.orbit-file-card button:hover { background:var(--orbit-muted); }
+.orbit-file-card { flex-wrap:wrap; }
+.orbit-file-card > p { flex:1 0 100%; }
+.note-board-row[data-dragging=true] { outline:2px dashed var(--orbit-action); outline-offset:2px; }
+.note-board-row .note-board-edit-input { min-height:68px; padding:6px 8px; }
+@media(min-width:901px) {
+  .note-board-row-toolbar .note-board-action { width:28px; min-height:30px; padding:0; }
+}
+.note-drop-feedback { margin:6px 0 0; color:var(--orbit-text-secondary); font-size:12px; }
+@media (max-width:640px) {
+  .schedule-ai-reading-column { padding-inline:3px; }
+  .orbit-message { margin-bottom:24px; }
+  .orbit-chat-code-actions button { min-height:44px; }
+}

@@ -16,6 +16,16 @@ require(parsedUrl.scheme == "https" && parsedUrl.host != null && parsedUrl.userI
 val stageUrl = providers.gradleProperty("orbitStageUrl").orNull ?: orbitConfig.getProperty("stageUrl") ?: "https://stage.flyme2moon.com/today"
 val parsedStageUrl = URI(stageUrl)
 require(parsedStageUrl.scheme == "https" && parsedStageUrl.host != null && parsedStageUrl.userInfo == null && parsedStageUrl.port == -1 && parsedStageUrl.query == null && parsedStageUrl.fragment == null && parsedStageUrl.host != parsedUrl.host) { "stageUrl must be a distinct public HTTPS origin without credentials, port, query or fragment" }
+val releaseSigningFile = rootProject.file("signing.local.properties")
+val releaseSigning = Properties().apply {
+    if (releaseSigningFile.isFile) releaseSigningFile.inputStream().use { load(it) }
+}
+val releaseRequested = gradle.startParameter.taskNames.any {
+    it.substringAfterLast(':') in setOf("assembleRelease", "bundleRelease")
+}
+require(!releaseRequested || releaseSigningFile.isFile) {
+    "Release requires the existing production keystore in android/signing.local.properties"
+}
 val orbitVersion = groovy.json.JsonSlurper().parse(rootProject.file("../package.json")) as Map<*, *>
 android {
     namespace = "io.github.t1mothys.orbit"
@@ -24,7 +34,7 @@ android {
         applicationId = "io.github.t1mothys.orbit"
         minSdk = 26
         targetSdk = 36
-        versionCode = 64001
+        versionCode = 65000
         versionName = orbitVersion["version"] as String
         buildConfigField("String", "APP_URL", "\"${appUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("String", "STAGE_URL", "\"${stageUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
@@ -33,9 +43,22 @@ android {
     }
     buildFeatures { buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    signingConfigs {
+        if (releaseSigningFile.isFile) create("orbitRelease") {
+            fun read(key: String): String = releaseSigning.getProperty(key)?.takeIf { it.isNotBlank() }
+                ?: error("Missing signing setting: $key")
+            storeFile = rootProject.file(read("storeFile"))
+            storePassword = read("storePassword")
+            keyAlias = read("keyAlias")
+            keyPassword = read("keyPassword")
+        }
+    }
     buildTypes {
         getByName("debug") { buildConfigField("boolean", "DEVELOPER_TOOLS", (providers.gradleProperty("orbitDeveloperTools").orNull == "true").toString()) }
-        getByName("release") { isMinifyEnabled = false }
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfigs.findByName("orbitRelease")?.let { signingConfig = it }
+        }
     }
 }
 kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }

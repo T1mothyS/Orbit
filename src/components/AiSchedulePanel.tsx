@@ -1,11 +1,11 @@
-import { Button, IconButton, Tooltip, Input, TimePicker, isClockTime, TextLink } from '../ui';
+import { Button, IconButton, Tooltip, Input, Textarea, TimePicker, isClockTime, TextLink } from '../ui';
 import { composerDraftKey, readComposerDraft, updateComposerDraft, snapshotComposerDraft, consumeComposerDraft, subscribeComposerDraft, type NotificationContext } from '../utils/composer-draft';
 import type { NoteImage } from '../utils/note-images';
 import { NoteImageGallery, NoteImageInput, useNoteImageUpload } from './NoteImages';
 import { OrbitNotificationCard, type NotificationMeta } from './OrbitNotificationCard';
 import { ReminderActionButtons } from './ReminderActionButtons';
 import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle } from 'react';
-import { Bot, BookOpen, ArrowUp, Loader2, Check, CheckCircle2, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus } from 'lucide-react';
+import { Bot, BookOpen, ArrowUp, Loader2, Check, Circle, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus, Bell, ArrowUpRight, Copy } from 'lucide-react';
 import type { ActionConfirmation } from '../ui';
 import {safeChatHref} from '../utils/chat-markdown';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -18,9 +18,10 @@ import { useAiSelection } from '../hooks/useAiSelection';
 import {ChatMarkdown} from './ChatMarkdown';
 import {OrbitRequestStatus} from './OrbitRequestStatus';
 import { useOrbitChat } from '../hooks/useOrbitChat';
-import {useChatAttachments,type ChatFile} from '../hooks/useChatAttachments';
+import {useChatAttachments,isChatImage,type ChatFile} from '../hooks/useChatAttachments';
 import {ChatAttachmentCard,ChatAttachmentComposer} from './ChatAttachments';
-import { SCHEDULE_CATEGORY_COLORS, SCHEDULE_CATEGORY_LABELS } from '../utils/scheduleCategories';
+import { useFileDrop } from '../hooks/useFileDrop';
+import { copyNoteText } from '../utils/note-clipboard';
 import {scheduleItemsForPlan} from '../utils/plan-schedule-items';
 import { navigationHref, settingAction } from '../utils/navigation-actions';
 
@@ -130,13 +131,6 @@ export interface AiSchedulePanelHandle {
 }
 
 // ==================== 常量 ====================
-
-const CATEGORY_COLORS = SCHEDULE_CATEGORY_COLORS;
-const CATEGORY_LABELS = SCHEDULE_CATEGORY_LABELS;
-
-const PRIORITY_COLORS: Record<string, string> = {
-  high: '#EF4444', medium: '#F59E0B', low: '#10B981',
-};
 
 const AI_RESPONSE_TIMEOUT_MS = 330_000;
 const AI_RETRY_WINDOW_MS = 15 * 60 * 1000;
@@ -350,67 +344,39 @@ function ScheduleMiniCard({ schedule, onOpen, onOpenMenu }: {
   onOpen?: (id: string) => void;
   onOpenMenu?: (id: string, x: number, y: number) => void;
 }) {
-  const color = CATEGORY_COLORS[schedule.category] || '#6B7280';
-  const pColor = PRIORITY_COLORS[schedule.priority] || '#F59E0B';
-  const dateStr = schedule.is_unscheduled ? '无固定日期' : formatDate(schedule.start_time);
-  const startStr = schedule.is_unscheduled ? '' : schedule.all_day ? '全天' : formatTime(schedule.start_time);
-  const endStr = schedule.end_time && !schedule.all_day ? ` - ${formatTime(schedule.end_time)}` : '';
+  const date = schedule.is_unscheduled ? '无固定日期' : formatDate(schedule.start_time);
+  const start = schedule.is_unscheduled ? '' : schedule.all_day ? '全天' : formatTime(schedule.start_time);
+  const end = !schedule.is_unscheduled && !schedule.all_day && schedule.end_time ? formatTime(schedule.end_time) : '';
 
-  return (
-    <button
-      type="button"
-      className="ai-schedule-card w-full rounded-xl p-3 mb-2 text-left transition-all"
-      style={{
-        background: 'var(--td-bg-color-container)',
-        border: `1px solid ${pColor}30`,
-        borderLeft: `3px solid ${pColor}`,
-      }}
-      onClick={() => onOpen?.(schedule.id)}
-      onContextMenu={event => {
+  return <Button
+    variant="quiet"
+    className="ai-schedule-card orbit-chat-task"
+    leadingIcon={schedule.is_completed ? <Check size={18} aria-hidden="true" /> : schedule.type === 'todo' ? <Circle size={18} aria-hidden="true" /> : <Clock size={18} aria-hidden="true" />}
+    onClick={() => onOpen?.(schedule.id)}
+    onContextMenu={event => {
+      event.preventDefault();
+      onOpenMenu?.(schedule.id, event.clientX, event.clientY);
+    }}
+    onKeyDown={event => {
+      if ((event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu') {
         event.preventDefault();
-        onOpenMenu?.(schedule.id, event.clientX, event.clientY);
-      }}
-      onKeyDown={event => {
-        if ((event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu') {
-          event.preventDefault();
-          const rect = event.currentTarget.getBoundingClientRect();
-          onOpenMenu?.(schedule.id, rect.left + 24, rect.top + 24);
-        }
-      }}
-      aria-label={`打开日程详情：${schedule.title}`}
-    >
-      <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
-        <span
-          className="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0"
-          style={{ backgroundColor: `${color}18`, color }}
-        >
-          {schedule.type === 'todo' ? '待办' : CATEGORY_LABELS[schedule.category] || '其他'}
-        </span>
-        <span className="schedule-title-primary truncate">
-          {schedule.is_completed ? '已完成 · ' : ''}{schedule.title}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-3 min-w-0" style={{ color: 'var(--td-text-color-secondary)' }}>
-        <span className="flex items-center gap-1 text-xs flex-shrink-0">
-          <Clock className="w-3 h-3" />
-          {dateStr} {startStr}{endStr}
-        </span>
-        {schedule.location && (
-          <span className="flex items-center gap-1 text-xs truncate">
-            <MapPin className="w-3 h-3 flex-shrink-0" />
-            {schedule.location}
-          </span>
-        )}
-      </div>
-
-      {schedule.notes && (
-        <div className="mt-1.5 text-xs truncate" style={{ color: 'var(--td-text-color-secondary)' }}>
-          备注：{schedule.notes}
-        </div>
-      )}
-    </button>
-  );
+        const rect = event.currentTarget.getBoundingClientRect();
+        onOpenMenu?.(schedule.id, rect.left + 24, rect.top + 24);
+      }
+    }}
+    aria-label={`打开日程详情：${schedule.title}`}
+  >
+    <span className="orbit-chat-task-content">
+      <span className="orbit-chat-task-heading">
+        <strong>{schedule.title}</strong>
+        <small>{schedule.is_completed ? '已完成' : schedule.type === 'todo' ? '待办' : '日程'}</small>
+      </span>
+      <span className="orbit-chat-task-time">{date} {start}{end && end !== start ? `–${end}` : ''}</span>
+      {schedule.location && <span className="orbit-chat-task-detail"><MapPin size={14} aria-hidden="true" />{schedule.location}</span>}
+      {schedule.notes && <span className="orbit-chat-task-detail orbit-chat-task-note">{schedule.notes}</span>}
+    </span>
+    <ArrowUpRight size={16} aria-hidden="true" />
+  </Button>;
 }
 
 // ==================== 消息气泡 ====================
@@ -434,6 +400,7 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
   })].filter((action,index,rows) => navigationHref(action,user?.role === 'admin') && rows.findIndex(a=>a.settingId===action.settingId)===index);
   const [editingOperationKey, setEditingOperationKey] = useState<string | null>(null);
   const [reminderBusy,setReminderBusy]=useState(false),[reminderError,setReminderError]=useState('');
+  const [copyFeedback, setCopyFeedback] = useState('');
   const timestamp = parseMessageTimestamp(msg.timestamp);
   const scheduleItems = msg.type === 'plan' ? scheduleItemsForPlan(msg.scheduleItems || [], msg.plan?.operations || []) : msg.scheduleItems;
   const messageTime = <time className={`ai-message-timestamp${isUser ? ' is-user' : ''}${msg.type === 'error' ? ' is-error' : ''}`} dateTime={timestamp ? msg.timestamp || undefined : undefined}>{formatMessageTimestamp(msg.timestamp)}</time>;
@@ -452,47 +419,32 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
     );
   }
 
-  // AI 回复
-  const intentLabel: Record<string, string> = {
-    create: '创建', update: '修改', delete: '删除', query: '查询', chat: '对话', weather: '天气'
-  };
+  const notification = msg.orbitMeta?.origin === 'notification' ? msg.orbitMeta : undefined;
+  const notice = notification?.notification;
+  const showNoticeTitle = notice && !scheduleItems?.some(schedule => schedule.title === notice.title);
+  const prose = notice ? notice.body : msg.text;
+  const intentLabel: Record<string, string> = { create: '创建', update: '修改', delete: '删除', query: '查询', weather: '天气' };
 
   return (
-    <div id={'orbit-message-'+msg.id} className={'flex justify-start mb-3 orbit-message'+(msg.orbitMeta?.origin==='notification'?' is-notification':'')} data-new={msg.isNew||undefined}>
-      <div className="max-w-[96%] w-full">
-        {/* AI 头像行 */}
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <div
-            className="w-5 h-5 rounded-full flex items-center justify-center text-xs"
-            style={{ backgroundColor: 'var(--td-brand-color)' }}
-          >
-            <Bot className="w-3 h-3 text-white" />
-          </div>
-          <span className="text-xs font-medium" style={{ color: 'var(--td-text-color-secondary)' }}>
-            {msg.orbitMeta?.origin==='notification'?'Orbit 通知':'AI 助手'}
-            {msg.intent && msg.intent !== 'chat' && (
-              <span className="ml-1">· {intentLabel[msg.intent] || ''}</span>
-            )}
-          </span>
-        </div>
+    <article id={'orbit-message-'+msg.id} className={`orbit-message${notification ? ' is-notification' : ''}`} data-new={msg.isNew||undefined}>
+      <header className="orbit-message-heading">
+        {notification ? <Bell size={16} aria-hidden="true" /> : <Bot size={17} aria-hidden="true" />}
+        <span>{notification ? 'Orbit 通知' : 'AI 助手'}{!notification && msg.intent && intentLabel[msg.intent] ? ` · ${intentLabel[msg.intent]}` : ''}</span>
+      </header>
 
-        {msg.type === 'error' ? (
-          <div className="orbit-message-error px-3 py-2 rounded-lg" role="alert" style={{ backgroundColor: 'var(--td-error-color-light)', color: 'var(--td-error-color)', border: '1px solid var(--td-error-color)' }}>
-            <ChatMarkdown text={msg.text || ''}/>
-            {messageTime}
-          </div>
-        ) : (
-          <div
-            className="rounded-2xl rounded-tl-sm px-3 py-2.5"
-            style={{ backgroundColor: 'var(--td-bg-color-page)', border: '1px solid var(--td-component-stroke)' }}
-          >
-            {/* 文字回复 */}
-            {msg.text && (
-              <div className="flex items-start gap-1.5 mb-2">
-                {msg.plan?.state === 'completed' && <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--td-success-color)' }} />}
-                <ChatMarkdown text={msg.text}/>
-              </div>
-            )}
+      {msg.type === 'error' ? (
+        <div className="orbit-message-error" role="alert">
+          <ChatMarkdown text={msg.text || ''}/>
+          {messageTime}
+        </div>
+      ) : (
+        <div className="orbit-message-content">
+          {showNoticeTitle && <h2 className="orbit-notification-title">{notice.title}</h2>}
+          {notification && scheduleItems && scheduleItems.length > 0 && (
+            <div className="orbit-chat-task-list">{scheduleItems.map(schedule => <ScheduleMiniCard key={schedule.id} schedule={schedule} onOpen={onOpenSchedule} onOpenMenu={onOpenScheduleMenu} />)}</div>
+          )}
+          {prose && <ChatMarkdown text={prose} />}
+          {msg.attachments?.map(file => <ChatAttachmentCard key={file.id} file={file} authHeaders={authHeaders} />)}
 
             {msg.knowledgeSources && msg.knowledgeSources.length > 0 && (
               <div className="ai-knowledge-sources" aria-label="参考知识库">
@@ -549,8 +501,8 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
             )}
 
             {/* 使用结构化数据渲染可点击日程卡片 */}
-            {scheduleItems && scheduleItems.length > 0 && (
-              <div className="mt-2">
+            {!notification && scheduleItems && scheduleItems.length > 0 && (
+              <div className="orbit-chat-task-list">
                 {scheduleItems.map(schedule => (
                   <ScheduleMiniCard
                     key={schedule.id}
@@ -561,18 +513,24 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
                 ))}
               </div>
             )}
-            {msg.orbitMeta?.origin==='notification'&&<OrbitNotificationCard meta={msg.orbitMeta} title={(msg.text||'Orbit 通知').split('\n')[0]} onRefresh={onNotificationRefresh}/>}
+            {notification && <OrbitNotificationCard meta={notification} title={notice?.title || (msg.text || 'Orbit 通知').split('\n')[0]} onRefresh={onNotificationRefresh} />}
             {navigation.map(action=><Link className="orbit-setting-card" key={action.settingId} to={navigationHref(action,user?.role === 'admin')!}>{settingAction(action.settingId,user?.role === 'admin')!.label} →</Link>)}
             {msg.orbitMeta?.origin==='proactive' && <div className={`orbit-reminder-actions ${msg.orbitMeta.state==='handled'?'is-handled':''}`}><small>{msg.orbitMeta.enhanced?'Orbit 主动提醒':'Orbit 主动提醒 · 基于事项信息'}</small>{msg.orbitMeta.state==='sent' && <div><ReminderActionButtons busy={reminderBusy} onAction={action=>{setReminderBusy(true);setReminderError('');void onReminderAction?.(msg.orbitMeta!.eventId!,action).catch(e=>setReminderError(e.message)).finally(()=>setReminderBusy(false));}} /></div>}{msg.orbitMeta.state==='handled'&&<span>{msg.orbitMeta.handledAction==='complete'?'✓ 已完成':msg.orbitMeta.nextReminderAt?`已延后 · ${new Date(msg.orbitMeta.nextReminderAt).toLocaleString()}`:'已处理'}{msg.orbitMeta.handledAt&&<small> · {new Date(msg.orbitMeta.handledAt).toLocaleString()}</small>}</span>}{msg.orbitMeta.state==='discarded'&&<span>提醒已失效，请查看当前事项</span>}{reminderError&&<p role="alert">{reminderError}</p>}</div>}
             {!!(msg.orbitMeta as any)?.sources?.length&&<details className="orbit-message-sources"><summary>联网来源 · {(msg.orbitMeta as any).sources.length}</summary>{(msg.orbitMeta as any).sources.map((source:any)=><a key={source.url} href={safeChatHref(source.url)} target="_blank" rel="noopener noreferrer"><strong>{source.title}</strong><small>{source.source} · {source.publishedAt?new Date(source.publishedAt).toLocaleString():'发布时间未知'} · 获取 {new Date(source.retrievedAt).toLocaleString()}</small></a>)}</details>}
             {!!(msg.orbitMeta as any)?.steps?.length&&<details className="orbit-message-steps"><summary>处理步骤</summary>{(msg.orbitMeta as any).steps.map((s:any)=><p key={s.id}>{s.state==='completed'?'✓':s.state==='failed'?'!':'…'} {s.label} · {s.query}</p>)}</details>}
             {msg.plan?.state&&['completed','partially_completed','failed'].includes(msg.plan.state)&&<div className="orbit-outcome"><p role="status">{msg.plan.state==='completed'?`✓ ${planOutcomeLabel(msg.plan)}`:msg.plan.state==='partially_completed'?'部分操作已执行，请核对未执行项':'执行失败，正式结果请核对失败原因'}</p>{msg.plan.state!=='completed'&&<button type="button" className="secondary-button" disabled={!!savingPlanOperationKey} onClick={()=>void onUpdatePlanOperation?.(msg.plan!.id,'retry',{}).catch(e=>setReminderError(e.message))}>为失败项创建新草稿</button>}</div>}
             {msg.plan&&reminderError&&<p role="alert">{reminderError}</p>}
-            {messageTime}
+            <footer className="orbit-message-footer">
+              {messageTime}
+              {!notification && prose && <Button variant="quiet" size="small" className="orbit-copy-reply"
+                leadingIcon={<Copy size={14} aria-hidden="true" />}
+                onClick={() => void copyNoteText(prose).then(() => setCopyFeedback('已复制回复')).catch(() => setCopyFeedback('请选中正文后复制'))}
+              >复制回复</Button>}
+              <span role="status">{copyFeedback}</span>
+            </footer>
           </div>
-        )}
-      </div>
-    </div>
+      )}
+    </article>
   );
 }
 
@@ -637,6 +595,22 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     setNoteMode(false); textareaRef.current?.focus();
   }, [draftReady, draftKey, location.key, location.state, location.pathname, location.search, navigateHelp]);
   const mutationBusy = !!confirmation.busy || orbit.mutating;
+  const [dropError, setDropError] = useState('');
+  const uploadBlocked = orbit.creating || orbit.submitting || savingNotes || mutationBusy || (!noteMode && attachments.loading);
+  const addImages = (files: File[]) => {
+    const images = files.filter(isChatImage);
+    if (!images.length) return;
+    if (uploadBlocked) {
+      setDropError('当前附件区正在处理，请稍后再添加图片。');
+      return;
+    }
+    if (noteMode) void imageUpload.add(images);
+    else void attachments.upload(images);
+  };
+  const { dragging, dropProps } = useFileDrop(uploadBlocked || (noteMode && imageUpload.busy), files => {
+    setDropError(files.some(file => !isChatImage(file)) ? '拖放支持 JPEG、PNG 和 WebP 图片。其他附件请用添加菜单。' : '');
+    addImages(files);
+  });
   const destructiveBlocked = orbit.creating || orbit.submitting || savingNotes || imageUpload.busy || !!confirmingPlanId || !!savingPlanOperationKey || attachments.files.some(file => ['uploading', 'processing'].includes(file.state));
   const clearDisabled = !draftReady || destructiveBlocked || isLoading || mutationBusy;
   const cannotSend = !draftReady || orbit.creating || orbit.submitting || savingNotes || mutationBusy || (noteMode ? imageUpload.busy || (!inputText.trim() && !noteImages.length) : (!inputText.trim() && !attachments.files.length) || !attachments.ready || !ai.ready);
@@ -949,7 +923,6 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
           {/* 输入框 */}
           <div
             className="flex-shrink-0 schedule-ai-composer-wrap"
-            style={{ borderTop: '1px solid var(--td-component-stroke)' }}
           >
             <div className="orbit-composer-content">
               {!noteMode && notificationContext && <div className="orbit-notification-reply" role="status"><span>回复：{notificationContext.title}</span><button type="button" aria-label="清除关联通知" onClick={() => updateComposerDraft(draftKey, { notificationContext: undefined })}><X size={16} aria-hidden="true" /></button></div>}
@@ -959,7 +932,10 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
                 disabled={orbit.creating || orbit.submitting || savingNotes || mutationBusy} onChange={value => setNoteMode(value === 'note')} />
               {!noteMode && <AiProviderSelect provider={ai.provider} disabled={ai.loading || ai.saving || orbit.creating || orbit.submitting || savingNotes || mutationBusy} onChange={provider => void ai.chooseProvider(provider)} />}
             </div>
-            <div hidden={noteMode}><ChatAttachmentComposer {...attachments} inputRef={attachmentInputRef} showAddButton={false} disabled={noteMode || orbit.creating || orbit.submitting || mutationBusy} /></div>
+            <div className="orbit-composer-drop" data-dragging={dragging || undefined} {...dropProps}>
+            {dragging && <div className="orbit-composer-drop-hint" role="status">松开添加图片</div>}
+            {dropError && <p role="alert" className="orbit-inline-error">{dropError}</p>}
+            <div hidden={noteMode}><ChatAttachmentComposer authHeaders={authHeaders} {...attachments} inputRef={attachmentInputRef} showAddButton={false} disabled={noteMode || uploadBlocked} /></div>
             <NoteImageInput inputRef={noteImageInputRef} disabled={orbit.creating || imageUpload.busy || savingNotes || mutationBusy} onFiles={files => { void imageUpload.add(files); }} />
             {noteMode && <><NoteImageGallery images={noteImages} editable disabled={savingNotes || imageUpload.busy || mutationBusy} onChange={changeImages} />{imageUpload.busy && <p role="status">图片上传中…</p>}{imageUpload.error && <p role="alert" className="orbit-inline-error">{imageUpload.error}</p>}</>}
             {!noteMode && missingAiConnection && <p id="orbit-ai-connection-hint" className="orbit-composer-hint" role="status">
@@ -970,19 +946,32 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
             <div className={`schedule-ai-composer orbit-compact-composer${noteMode ? ' is-note-mode' : ''}`}>
               <button type="button" className="orbit-composer-plus" aria-label="更多功能" aria-haspopup="dialog" aria-expanded={composerMenuOpen}
                 disabled={orbit.creating || orbit.submitting || savingNotes || mutationBusy} onClick={() => setComposerMenuOpen(true)}><Plus size={22} aria-hidden="true" /></button>
-              <textarea
+              <Textarea
+                compact
                 ref={textareaRef}
                 value={inputText}
                 onChange={e => changeText(e.target.value)}
                 onPaste={event => {
-                  if (!noteMode) return;
-                  const files = Array.from(event.clipboardData.files);
-                  if (files.length) {
-                    event.preventDefault();
-                    const text = event.clipboardData.getData('text/plain');
-                    if (text) { const field = event.currentTarget; changeText(inputText.slice(0, field.selectionStart) + text + inputText.slice(field.selectionEnd)); }
-                    void imageUpload.add(files);
+                  const clipboard = event.clipboardData;
+                  const files = Array.from(clipboard.files);
+                  if (!files.length) {
+                    for (const item of clipboard.items) {
+                      const file = item.getAsFile();
+                      if (file) files.push(file);
+                    }
                   }
+                  const imageFiles = files.filter(file => file.type.startsWith('image/') || isChatImage(file));
+                  if (!imageFiles.length) return;
+                  event.preventDefault();
+                  const text = event.clipboardData.getData('text/plain');
+                  if (text) {
+                    const field = event.currentTarget;
+                    const start = field.selectionStart;
+                    changeText(inputText.slice(0, start) + text + inputText.slice(field.selectionEnd));
+                    requestAnimationFrame(() => field.setSelectionRange(start + text.length, start + text.length));
+                  }
+                  setDropError(imageFiles.some(file => !isChatImage(file)) ? '粘贴支持 JPEG、PNG 和 WebP 图片。' : '');
+                  addImages(imageFiles);
                 }}
                 onKeyDown={handleKeyDown}
                 disabled={!draftReady || orbit.creating || mutationBusy}
@@ -1007,6 +996,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
                   : noteMode ? <Save size={20} aria-hidden="true" /> : <ArrowUp size={20} aria-hidden="true" />
                 }
               </IconButton></Tooltip>
+            </div>
             </div>
             </div>
           </div>

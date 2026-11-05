@@ -119,3 +119,110 @@ test('personal key paste preserves ASCII through the password component and save
   await key.fill('合成中文占位文字');await expect(key).toHaveAttribute('aria-invalid','true');await expect(page.getByRole('alert')).toContainText('粘贴内容包含中文');await expect(page.getByRole('button',{name:'保存 API Key',exact:true})).toBeDisabled();expect(saved).toBe(marker);
   await page.getByRole('button',{name:'取消',exact:true}).click();await page.getByRole('button',{name:'测试连接（调用模型）',exact:true}).click();await expect.poll(()=>probes).toBe(1);await expect(page.getByText('WorkBuddy 对话连接验证通过，模型：synthetic-model',{exact:true})).toBeVisible();
 });
+
+test('structured reminder keeps one title and separates execution and trigger times', async ({ context, page }) => {
+  const token = await fixtureToken(context, 'preview-chat-experience@example.invalid');
+  await context.addInitScript(value => localStorage.setItem('aicalendar_token', value), token);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(base + '/assistant');
+  const notification = page.locator('.orbit-message.is-notification');
+  await expect(notification.getByText('做融资平台', { exact: true })).toHaveCount(1);
+  await expect(notification.getByText('独立新增的周一安排。', { exact: true })).toHaveCount(1);
+  await expect(notification.getByRole('button', { name: '打开日程详情：做融资平台' })).toContainText('12:00');
+  await expect(notification.getByText('提醒时间', { exact: false })).toBeVisible();
+  await expect(notification.locator('time[datetime="2026-11-09T03:45:00.000Z"]')).toBeVisible();
+  await expect(notification.getByText('温馨提示：请先确认资料清单和负责人。')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '融资平台推进计划' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: '这一周要交付什么' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 3, name: '验收口径' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '消息表格' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '复制代码' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
+test('paste and drop images, retry one upload, send explicitly, and drop on the correct notes', async ({ context, page }) => {
+  const token = await fixtureToken(context, 'preview-chat-experience@example.invalid');
+  const auth = { Authorization: 'Bearer ' + token };
+  await context.addInitScript(value => localStorage.setItem('aicalendar_token', value), token);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.route('**/api/orbit/providers', route => route.fulfill({ json: { providers: [{ id: 'workbuddy', connected: true }] } }));
+  await page.route('**/api/models', route => route.fulfill({ json: { models: [{ modelId: 'glm-5.1', displayName: '合成测试模型' }] } }));
+  await page.route('**/api/schedule-model', route => route.fulfill({ json: { model: 'glm-5.1' } }));
+  const createNote = async (content: string) => {
+    const response = await context.request.post(base + '/api/note-items', { headers: auth, data: { content } });
+    expect(response.status()).toBe(201);
+    return (await response.json()).items[0].id as string;
+  };
+  const readingId = await createNote('阅读态原始记事');
+  const editingId = await createNote('编辑态原始记事');
+  const image = (await (await context.request.get(base + '/orbit-logo.png')).body()).toString('base64');
+  let failOnce = true;
+  await page.route('**/api/orbit/conversations/*/attachments', async route => {
+    if (route.request().method() === 'POST' && route.request().postDataJSON().name === '重试.png' && failOnce) {
+      failOnce = false;
+      await route.fulfill({ status: 503, json: { error: '网络暂时不可用' } });
+    } else await route.continue();
+  });
+  await page.goto(base + '/assistant');
+  const composer = page.getByRole('textbox', { name: 'AI 助手输入框' });
+  const send = page.getByRole('button', { name: '发送', exact: true });
+  await expect(composer).toBeEnabled();
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate(() => navigator.clipboard.writeText('这段普通文字保留'));
+  await composer.focus();
+  await page.keyboard.press('ControlOrMeta+v');
+  await expect(composer).toHaveValue('这段普通文字保留');
+  await expect(send).toBeEnabled();
+  await composer.evaluate((element, base64) => {
+    const data = new DataTransfer();
+    data.items.add(new File([Uint8Array.from(atob(base64), char => char.charCodeAt(0))], '粘贴.png', { type: 'image/png' }));
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  }, image);
+  const drop = async (target: import('@playwright/test').Locator, names: string[], mime = 'image/png') => {
+    const payload = await page.evaluateHandle(({ image, names, mime }) => {
+      const data = new DataTransfer();
+      for (const name of names) data.items.add(new File([Uint8Array.from(atob(image), char => char.charCodeAt(0))], name, { type: mime }));
+      return data;
+    }, { image, names, mime });
+    await target.dispatchEvent('dragenter', { dataTransfer: payload });
+    await expect(target).toHaveAttribute('data-dragging', 'true');
+    await target.dispatchEvent('drop', { dataTransfer: payload });
+    await payload.dispose();
+  };
+  await expect(page.locator('.orbit-draft-file img')).toHaveCount(1);
+  await drop(page.locator('.orbit-composer-drop'), ['重试.png', '移除.png']);
+  await expect(page.getByText('网络暂时不可用')).toBeVisible();
+  await expect(send).toBeDisabled();
+  await page.getByRole('button', { name: '重试', exact: true }).click();
+  await expect(page.locator('.orbit-draft-file').getByText('待发送')).toHaveCount(3);
+  await page.getByRole('button', { name: '移除附件 移除.png' }).click();
+  await expect(page.locator('.orbit-draft-file img')).toHaveCount(2);
+  await expect(composer).toHaveValue('这段普通文字保留');
+  await expect(page.locator('.orbit-user-message').getByText('这段普通文字保留', { exact: true })).toHaveCount(0);
+  await send.click();
+  await expect(page.getByRole('button', { name: '下载附件 粘贴.png' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '下载附件 重试.png' })).toBeVisible();
+
+  const reading = page.locator('#orbit-note-' + readingId);
+  const editing = page.locator('#orbit-note-' + editingId);
+  await drop(reading, ['阅读图片.png']);
+  await expect(reading.getByRole('button', { name: /查看图片.*阅读图片/ })).toBeEnabled();
+  await expect(reading.getByRole('textbox')).toHaveCount(0);
+  await expect(editing.getByRole('button', { name: /查看图片/ })).toHaveCount(0);
+  await editing.getByRole('button', { name: /^编辑记事/ }).click();
+  const editor = editing.getByRole('textbox', { name: '编辑记事正文' });
+  await editor.fill('仍未保存的正文');
+  await editor.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(2, 2));
+  await drop(editing, ['编辑图片.png']);
+  await expect(editing.getByRole('button', { name: /查看图片.*编辑图片/ })).toBeEnabled();
+  await expect(editor).toHaveValue('仍未保存的正文');
+  expect(await editor.evaluate((el: HTMLTextAreaElement) => el.selectionStart)).toBe(2);
+  await expect(editor).toBeFocused();
+  await drop(reading, ['非法.txt'], 'text/plain');
+  await expect(reading.getByRole('alert')).toContainText('JPEG、PNG 或 WebP');
+  await page.reload();
+  await expect(reading.getByRole('button', { name: /查看图片.*阅读图片/ })).toBeEnabled();
+  await expect(editing.getByRole('button', { name: /查看图片.*编辑图片/ })).toBeEnabled();
+  await expect(editing.getByText('编辑态原始记事')).toBeVisible();
+  await expect(page.getByRole('button', { name: '下载附件 粘贴.png' })).toBeVisible();
+});

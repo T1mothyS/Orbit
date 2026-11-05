@@ -15,6 +15,10 @@ interface AuthContextValue extends AuthState {
   checkAuth: () => Promise<void>;
   authHeaders: () => Record<string, string>;
 }
+function clearDesktopWidget() {
+  const bridge = (window as Window & { orbitTodayWidget?: { clear(): Promise<boolean> } }).orbitTodayWidget;
+  void bridge?.clear().catch(() => undefined);
+}
 const TOKEN_KEY = 'aicalendar_token';
 const AuthContext = createContext<AuthContextValue | null>(null);
 export function getStoredAuthHeaders(): Record<string, string> {
@@ -32,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Prevent a late identity response from renewing a Tools cookie after logout.
     validationRequest.current?.abort(); loginRequest.current?.abort();
     androidLogout();
+    clearDesktopWidget();
     if (current.current.user?.id) clearAccountComposerDrafts(current.current.user.id);
     localStorage.removeItem(TOKEN_KEY);
     setNotice(message);
@@ -42,11 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     validationRequest.current?.abort();
     const controller = new AbortController(); validationRequest.current = controller;
     if (current.current.token !== token) {
+      clearDesktopWidget();
       loginRequest.current?.abort();
       if (current.current.user?.id) clearAccountComposerDrafts(current.current.user.id);
       commit({ user: null, token, isLoading: !!token, isAuthenticated: false });
     }
-    if (!token) { commit({ user: null, token: null, isLoading: false, isAuthenticated: false }); return; }
+    if (!token) { clearDesktopWidget(); commit({ user: null, token: null, isLoading: false, isAuthenticated: false }); return; }
     const active = () => revision.current === request && localStorage.getItem(TOKEN_KEY) === token;
     try {
       const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` }, credentials: 'same-origin', signal: controller.signal });
@@ -74,7 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '登录失败');
       if (request !== revision.current) throw new Error('登录状态已变化，请重试。');
-      if (current.current.user?.id && current.current.user.id !== data.user.id) clearAccountComposerDrafts(current.current.user.id);
+      if (current.current.user?.id !== data.user.id) {
+        clearDesktopWidget();
+        if (current.current.user?.id) clearAccountComposerDrafts(current.current.user.id);
+      }
       localStorage.setItem(TOKEN_KEY, data.token);
       setNotice(''); commit({ user: data.user, token: data.token, isLoading: false, isAuthenticated: true });
     } finally { if (loginRequest.current === controller) loginRequest.current = undefined; }

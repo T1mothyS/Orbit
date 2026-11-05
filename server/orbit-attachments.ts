@@ -35,9 +35,34 @@ export function clearConversationAttachments(userId:string,cid:string,clearHisto
 }
 export function validateChatAttachments(userId:string,cid:string,ids:unknown):string[]{if(!Array.isArray(ids)||ids.length>3||ids.some(id=>typeof id!=='string')||new Set(ids).size!==ids.length)throw new Error('每轮最多 3 个不同附件');let total=0;for(const id of ids){const row=attachment(userId,id);if(row.conversation_id!==cid||row.state!=='ready')throw new Error('附件不属于当前会话或尚未处理完成');total+=activity.getAttachment(id,userId)!.sizeBytes;}if(total>20*1024*1024)throw new Error('每轮附件总大小不能超过 20MB');return ids;}
 export function linkMessageAttachments(userId:string,messageId:string,ids:string[]){const m=queryOne<any>('SELECT conversation_id FROM ai_schedule_messages WHERE user_id=? AND id=?',[userId,messageId]);if(!m)throw new Error('消息不存在');validateChatAttachments(userId,m.conversation_id,ids);for(const id of ids)run('INSERT OR IGNORE INTO orbit_message_attachments(user_id,message_id,attachment_id) VALUES (?,?,?)',[userId,messageId,id]);}
-export async function uploadChatAttachment(userId:string,cid:string,input:{name:string;mime:string;base64:string},signal?:AbortSignal){ownedConversation(userId,cid);cleanupUnsentAttachments(userId);if(!CHAT_ATTACHMENT_TYPES.includes(input.mime))throw new Error('目前支持图片、TXT、Markdown、PDF、DOCX、XLSX 和 CSV');if(typeof input.base64!=='string'||input.base64.length>14*1024*1024||typeof input.name!=='string')throw new Error('附件格式或大小不正确');let bytes=Buffer.from(input.base64,'base64');storage.validateAttachmentBytes(input.mime,bytes,true);
-  if(input.mime.startsWith('image/')){const image=sharp(bytes,{limitInputPixels:40000000,animated:false}),meta=await image.metadata();if((meta.pages||1)>1)throw new Error('不支持动画图片');bytes=await image.rotate().resize({width:2048,height:2048,fit:'inside',withoutEnlargement:true}).toFormat(input.mime==='image/jpeg'?'jpeg':input.mime==='image/png'?'png':'webp').toBuffer();}
-  signal?.throwIfAborted();const file=storage.saveBase64Attachment({userId,importId:'orbit:'+randomUUID(),originalName:input.name,mimeType:input.mime,base64:bytes.toString('base64'),allowDocuments:true});run('INSERT INTO orbit_attachments(id,user_id,conversation_id,state,created_at) VALUES (?,?,?,?,?)',[file.id,userId,cid,'processing',new Date().toISOString()]);await processChatAttachment(userId,file.id,signal);return attachmentView(userId,file.id);
+export async function uploadChatAttachment(userId: string, cid: string, input: {name: string; mime: string; base64: string; requestId?: string}, signal?: AbortSignal) {
+  ownedConversation(userId, cid);
+  cleanupUnsentAttachments(userId);
+  if (input.requestId !== undefined && (typeof input.requestId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(input.requestId))) throw new Error('附件请求编号不正确');
+  if (!CHAT_ATTACHMENT_TYPES.includes(input.mime)) throw new Error('目前支持 JPEG、PNG、WebP、TXT、Markdown、PDF、DOCX、XLSX 和 CSV');
+  if (typeof input.base64 !== 'string' || input.base64.length > 14 * 1024 * 1024 || typeof input.name !== 'string') throw new Error('附件格式或大小不正确');
+  const id = input.requestId || randomUUID();
+  let bytes = Buffer.from(input.base64, 'base64');
+  storage.validateAttachmentBytes(input.mime, bytes, true);
+  if (input.mime.startsWith('image/')) {
+    const image = sharp(bytes, { limitInputPixels: 40000000, animated: false });
+    if (((await image.metadata()).pages || 1) > 1) throw new Error('不支持动画图片');
+    bytes = await image.rotate().resize({ width: 2048, height: 2048, fit: 'inside', withoutEnlargement: true })
+      .toFormat(input.mime === 'image/jpeg' ? 'jpeg' : input.mime === 'image/png' ? 'png' : 'webp').toBuffer();
+  }
+  signal?.throwIfAborted();
+  ownedConversation(userId, cid);
+  withPersistenceTransaction(() => {
+    const existing = queryOne<ChatAttachment>('SELECT * FROM orbit_attachments WHERE id=? AND user_id=?', [id, userId]);
+    if (existing) {
+      if (existing.conversation_id !== cid) throw new Error('附件不属于当前会话');
+      return;
+    }
+    if (activity.isAttachmentIdUsed(id)) throw new Error('附件编号不可用');
+    storage.saveBase64Attachment({ id, userId, importId: 'orbit:' + id, originalName: input.name, mimeType: input.mime, base64: bytes.toString('base64'), allowDocuments: true });
+    run('INSERT INTO orbit_attachments(id,user_id,conversation_id,state,created_at) VALUES (?,?,?,?,?)', [id, userId, cid, 'processing', new Date().toISOString()]);
+  });
+  return processChatAttachment(userId, id, signal);
 }
 export async function processChatAttachment(userId:string,id:string,signal?:AbortSignal){const row=attachment(userId,id),file=activity.getAttachment(id,userId)!;if(row.state==='ready')return attachmentView(userId,id);run("UPDATE orbit_attachments SET state='processing',error=NULL WHERE user_id=? AND id=?",[userId,id]);try{const parsed=file.mimeType.startsWith('image/')?null:await parseDocument(storage.readAttachment(file),file.mimeType,signal);attachment(userId,id);run("UPDATE orbit_attachments SET state='ready',extraction=?,error=NULL WHERE user_id=? AND id=?",[parsed?JSON.stringify(parsed):null,userId,id]);}catch(error){run("UPDATE orbit_attachments SET state='failed',error=? WHERE user_id=? AND id=?",[error instanceof Error?error.message:'解析失败',userId,id]);}return attachmentView(userId,id);}
 export function selectAttachmentIds(userId:string,cid:string,text:string,explicit:string[]):string[]{

@@ -1,0 +1,18 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
+    android:paddingHorizontal="12dp" android:paddingVertical="4dp" android:background="@color/widget_surface">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="40dp" android:gravity="center_vertical">
+        <TextView android:id="@+id/widget_open" android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="match_parent" android:gravity="center_vertical" android:text="@string/today_widget_name"
+            android:textColor="@color/widget_primary" android:textStyle="bold" android:textSize="14sp" android:maxLines="1" android:ellipsize="end" />
+        <TextView android:id="@+id/widget_refresh" android:layout_width="44dp" android:layout_height="match_parent"
+            android:gravity="center" android:text="@string/today_widget_refresh" android:textColor="@color/widget_secondary" android:textSize="12sp" />
+    </LinearLayout>
+    <TextView android:id="@+id/widget_count" style="@style/OrbitWidgetTask" android:textStyle="bold" />
+    <TextView android:id="@+id/widget_task_1" style="@style/OrbitWidgetTask" android:visibility="gone" />
+    <TextView android:id="@+id/widget_task_2" style="@style/OrbitWidgetTask" android:visibility="gone" />
+    <TextView android:id="@+id/widget_task_3" style="@style/OrbitWidgetTask" android:visibility="gone" />
+    <TextView android:id="@+id/widget_task_4" style="@style/OrbitWidgetTask" android:visibility="gone" />
+    <TextView android:id="@+id/widget_time" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textSize="11sp" android:textColor="@color/widget_secondary" android:maxLines="1" android:ellipsize="end" />
+</LinearLayout>

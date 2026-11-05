@@ -526,13 +526,13 @@ export function listCompletions(userId: string, filters: { sourceType?: string; 
   return queryAll<any>(`SELECT * FROM completion_records WHERE ${clauses.join(' AND ')} ORDER BY completed_at DESC`, params).map(rowToCompletion);
 }
 
-export function addAttachment(input: Omit<AttachmentRecord, 'id' | 'createdAt'>): AttachmentRecord {
+export function addAttachment(input: Omit<AttachmentRecord, 'id' | 'createdAt'>, id = uuidv4()): AttachmentRecord {
   const existing = queryOne<any>(
     `SELECT * FROM attachments WHERE user_id = ? AND sha256 = ? AND completion_id IS ? AND import_id IS ?`,
     [input.userId, input.sha256, input.completionId, input.importId],
   );
   if (existing) return rowToAttachment(existing);
-  const record: AttachmentRecord = { ...input, id: uuidv4(), createdAt: nowIso() };
+  const record: AttachmentRecord = { ...input, id, createdAt: nowIso() };
   run(
     `INSERT INTO attachments (id, user_id, completion_id, import_id, original_name, mime_type, size_bytes, sha256, storage_path, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -541,6 +541,10 @@ export function addAttachment(input: Omit<AttachmentRecord, 'id' | 'createdAt'>)
   );
   addAudit(record.userId, 'attachment', record.id, 'uploaded', record.originalName);
   return record;
+}
+
+export function isAttachmentIdUsed(id: string): boolean {
+  return !!queryOne('SELECT id FROM attachments WHERE id = ?', [id]);
 }
 
 export function getAttachment(id: string, userId: string): AttachmentRecord | null {

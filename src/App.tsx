@@ -5,6 +5,7 @@ import { ActionCenterPage } from './components/ActionCenterPage';
 import { AppShell } from './components/AppShell';
 import { FeatureBoundary } from './components/FeatureBoundary';
 import { useAuth } from './hooks/useAuth';
+import { useTodayWidget } from './hooks/useTodayWidget';
 import { useTheme } from './hooks/useTheme';
 import { LoginPage } from './pages/LoginPage';
 import { moduleSettingsPath } from './utils/module-settings';
@@ -26,6 +27,7 @@ const SettingsRedirect = lazy(() => import('./features/settings/SettingsRedirect
 
 function App() {
   const { isAuthenticated, isLoading } = useAuth();
+  useTodayWidget();
   const location = useLocation(), navigate = useNavigate();
   const settingsOrigin = useRef('/assistant');
   if (!location.pathname.startsWith('/settings') && !['/reports/settings','/library/settings','/library/preferences'].includes(location.pathname) && !new URLSearchParams(location.search).has('settings')) settingsOrigin.current = location.pathname + location.search;

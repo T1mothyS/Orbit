@@ -40,6 +40,43 @@ for(let i=0;i<15;i++){const created=new Date(Date.now()-(i%7)*86400000).toISOStr
 schedules.restoreUserScheduleData(uid,{schedules:fixtures},'merge');
 for(const f of fixtures.filter(f=>f.is_completed))activity.createCompletion({userId:uid,sourceType:'schedule',sourceId:f.id,completedAt:new Date(Date.parse(f.created_at)+3600000).toISOString()});
 const n=activity.enqueueNotificationDetailed({userId:uid,sourceType:'schedule',sourceId:'connected-fixture-1',channel:'in_app',kind:'due',title:'合成提醒',body:'查看事项、完成或延后。此卡片用于隔离环境交互验证。',scheduledAt:stamp,dedupeKey:'preview-notification'}).notification;notifications.deliverInApp(n);const browserNotice=activity.enqueueNotificationDetailed({userId:uid,sourceType:'schedule',sourceId:'connected-fixture-1',channel:'browser',kind:'due',title:'合成浏览器提醒',body:'AI 页面也应接收',scheduledAt:stamp,dedupeKey:'preview-browser-notification'}).notification;activity.markNotificationSent(browserNotice.id);
+if (accountUi || process.argv.includes('--chat-experience')) {
+  const userId = 'preview-chat-experience';
+  db.createUser({ id: userId, email: userId + '@example.invalid', password_hash: await bcrypt.hash('OrbitPreview123!', 10), role: 'user', disabled: 0, created_at: stamp, updated_at: stamp });
+  const conversation = orbit.ensureDefaultConversation(userId);
+  notifications.setInAppEnabled(userId, true);
+  const task = schedules.createSchedule({
+    ...fixtures[0], id: 'preview-financing', user_id: userId, title: '做融资平台', type: 'todo',
+    start_time: '2026-11-09T12:00:00', end_time: '2026-11-09T12:00:00', is_unscheduled: false,
+    is_completed: false, location: '会议室', notes: '独立新增的周一安排。',
+  });
+  const text = [
+    '# 融资平台推进计划', '',
+    '先确定第一版要解决的问题。用两周验证 **资料归集、进度追踪和风险记录**，之后再决定扩展范围。', '',
+    '## 这一周要交付什么', '',
+    '1. 整理已有融资资料和待补清单。', '   - 确定负责人和资料截止时间。', '2. 对齐审阅顺序，把阻塞事项单独记录。', '',
+    '### 验收口径', '', '> 每条事项应有负责人、执行时间和可追溯的备注。', '',
+    '| 工作项 | 当前状态 | 负责角色 | 交付时间 | 下一步 | 验收说明 |',
+    '| --- | --- | --- | --- | --- | --- |',
+    '| 融资平台 | 待办 | 项目负责人 | 12:00 | 确定范围 | 核对资料与路径 |',
+    '| 材料清单 | 处理中 | 运营同事 | 16:30 | 校对缺漏 | 保留原始来源 |', '',
+    '```typescript', 'const status = { task: "融资平台", scheduledAt: "12:00", next: "确认第一版范围与负责人" };', '```', '',
+    '[查看日程](/schedule)',
+  ].join('\n');
+  for (const [index, entry] of [
+    { id: 'chat-qa-user', role: 'user', content: '帮我整理本周的融资平台事项。' },
+    { id: 'chat-qa-short', role: 'assistant', content: '我已把重点梳理成三步。先核对范围，再补齐资料，最后明确交付时间。' },
+    { id: 'chat-qa-prose', role: 'assistant', content: text },
+  ].entries()) {
+    db.createAiScheduleMessage({ ...entry, role: entry.role as 'user' | 'assistant', type: 'text', user_id: userId, conversation_id: conversation, intent: null, plan: null, schedule_items: null, created_at: new Date(Date.now() - (3 - index) * 1000).toISOString() });
+  }
+  const notice = activity.enqueueNotificationDetailed({
+    userId, sourceType: 'schedule', sourceId: task.id, channel: 'in_app', kind: 'proactive',
+    title: task.title, body: task.title + '\n\n开始前提醒：2026/11/9 12:00:00 · 会议室。\n独立新增的周一安排。\n\n温馨提示：请先确认资料清单和负责人。',
+    scheduledAt: '2026-11-09T03:45:00.000Z', dedupeKey: 'preview-financing',
+  }).notification;
+  notifications.deliverInApp(notice);
+}
 db.createNoteItem({id:'connected-note',user_id:uid,content:'普通正文可以编辑。参考链接 https://example.invalid/ 与 [内部事项](/schedule?schedule=connected-fixture-1)。',is_optimized:0,completed:0,created_at:stamp,updated_at:stamp});
 // Mobile compact fixtures exercise occupied lists without any external content or calls.
 for (let i=0;i<18;i++) db.createLibraryEntry({id:'mobile-library-'+i,user_id:uid,kind:i%3?'article':'fragment',type:i%2?'knowledge':'reference',source_id:'synthetic-'+i,slug:'synthetic-'+i,title:i===0?'长标题用于核对知识库卡片和阅读返回行为'.repeat(5):'合成知识 '+i,content:'# 合成正文\n\n用于隔离浏览器验收的内容，不是实际知识库数据。\n\n'+Array.from({length:12},(_,section)=>`## 第 ${section+1} 节\n\n${'用于验证阅读滚动、章节定位和顶部遮挡的合成段落。'.repeat(35)}\n\n`).join(''),summary:'移动端紧凑布局、筛选条件、列表位置与搜索跳转的合成内容。',tags_json:'["合成","验收"]',status:'active',source_type:'local',source_ref:null,source_url:null,metadata_json:'{}',relations_json:'[]',content_hash:'synthetic-'+i,created_at:new Date(Date.now()-i*86400000).toISOString(),updated_at:stamp,published_at:stamp,archived_at:null});
@@ -64,11 +101,16 @@ if(process.argv.includes('--iteration')) {
   db.upsertUserApiKey({id:randomUUID(),user_id:uid,api_key:'synthetic-preview-only',base_url:null,created_at:stamp,updated_at:stamp});
   const queue=await import('../server/orbit-queue.js');
   queue.setOrbitWorker(async(req,res)=>{
-    const selected=req.body.notificationId?notifications.notificationContinuation(uid,req.body.notificationId):undefined;
-    state.saveAiScheduleHistoryMessage({userId:uid,role:'user',type:'text',content:req.body.text});
+    const userId = req.user.userId;
+    const selected=req.body.notificationId?notifications.notificationContinuation(userId,req.body.notificationId):undefined;
+    const message = state.saveAiScheduleHistoryMessage({userId,role:'user',type:'text',content:req.body.text});
+    if (req.body.attachmentIds?.length) {
+      const { linkMessageAttachments } = await import('../server/orbit-attachments.js');
+      linkMessageAttachments(userId, message.id, req.body.attachmentIds);
+    }
     await new Promise(resolve=>setTimeout(resolve,1200));
     const result={success:true,intent:'chat',reply:selected?`合成回应：已明确关联“${selected.title}”。`:'合成回应：普通对话。'};
-    const saved=state.saveAiScheduleResponseHistory(uid,result);res.json({...result,historyMessageId:saved.id});
+    const saved=state.saveAiScheduleResponseHistory(userId,result);res.json({...result,historyMessageId:saved.id});
   });
 }
 const app=express();

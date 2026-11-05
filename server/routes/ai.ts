@@ -4,7 +4,6 @@ import { AI_DRAFT_SCHEMA, parseDraftOutput } from '../ai-chat-output.js';
 import { AiExecutionError, aiErrorInfo, generateDraft } from '../ai-execution.js';
 import { requestsScheduleDraft, scheduleDraftContext, isActivityDescription, chatToolNames } from '../ai-intent.js';
 import { parseStatisticsFilters } from '../../src/utils/statistics-filters.js';
-import { activityReportChatText } from '../activity-report-chat.js';
 import { chatTimelinePage } from '../chat-timeline.js';
 import { getNotification } from '../activity-store.js';
 import { notificationObject, notificationContinuation } from '../notification-chat.js';
@@ -148,7 +147,33 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       const messages = queryAll<dbModule.DbAiScheduleMessage>(`SELECT * FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? ${messageIds ? `AND id IN (${messageIds.map(() => '?').join(',') || 'NULL'})` : ''} ORDER BY created_at,rowid`,[payload.userId,cid,...(messageIds || [])]);
       const timelineRequests = page?.entries.filter(entry => entry.kind === 'request').flatMap(entry => { const row = orbit.getRequest(payload.userId, entry.id); return row ? [requestView(row)] : []; });
       hydratePendingAiSchedulePlans(payload.userId, messages);
-      res.json({ ...(page ? {requests:timelineRequests,nextBefore:page.nextBefore,start:page.start} : {}), messages: messages.map(m => {const view=toAiScheduleHistoryMessage(m);if(view.plan?.id)view.plan=buildAiPlanSnapshot(resolveAiPlan(payload.userId,view.plan.id)!);if(view.orbitMeta?.notificationId){Object.assign(view.orbitMeta,notificationView(payload.userId,view.orbitMeta.notificationId));const notice=getNotification(view.orbitMeta.notificationId,payload.userId);if(notice?.sourceType==='activity_report'&&notice.kind==='weekly_report')view.text=notice.title+'\n\n'+activityReportChatText(payload.userId,notice.sourceId);}if(view.orbitMeta?.eventId){const event=proactiveEventView(payload.userId,view.orbitMeta.eventId);if(!view.orbitMeta.notificationId||event.state==='handled')Object.assign(view.orbitMeta,event);}if(Array.isArray(view.scheduleItems)) view.scheduleItems=view.scheduleItems.flatMap((item:any)=>{const live=scheduleStore.getSchedule(item.id);return live?.user_id===payload.userId?[live]:[];});return view;}) });
+      const history = messages.map(message => {
+        const view = toAiScheduleHistoryMessage(message);
+        if (view.plan?.id) view.plan = buildAiPlanSnapshot(resolveAiPlan(payload.userId, view.plan.id)!);
+        const snapshot = Array.isArray(view.scheduleItems) ? view.scheduleItems[0] : undefined;
+        if (Array.isArray(view.scheduleItems)) view.scheduleItems = view.scheduleItems.flatMap(item => {
+          const live = scheduleStore.getSchedule(item.id);
+          return live?.user_id === payload.userId ? [live] : [];
+        });
+        const meta = view.orbitMeta;
+        if (meta?.notificationId) {
+          const status = notificationView(payload.userId, meta.notificationId);
+          const notice = getNotification(meta.notificationId, payload.userId);
+          Object.assign(meta, status);
+          if (notice) {
+            meta.notification = notificationMessageContent(notice, snapshot, status.state !== 'discarded' && view.scheduleItems?.length === 1);
+            if (notice.sourceType === 'activity_report' && notice.kind === 'weekly_report') {
+              view.text = meta.notification.title + '\n\n' + meta.notification.body;
+            }
+          }
+        }
+        if (meta?.eventId) {
+          const event = proactiveEventView(payload.userId, meta.eventId);
+          if (!meta.notificationId || event.state === 'handled') Object.assign(meta, event);
+        }
+        return view;
+      });
+      res.json({ ...(page ? { requests: timelineRequests, nextBefore: page.nextBefore, start: page.start } : {}), messages: history });
     } catch (error: any) {
       console.error("[AI History] Error:", error);
       res.status(400).json({ error: '无法读取这个会话' });
@@ -969,5 +994,5 @@ ${selectedNotification}
   return app;
 }
 import { activityOrigin, recordActivityEvent } from '../activity-events.js';
-import { notificationView } from '../notification-chat.js';
+import { notificationView, notificationMessageContent } from '../notification-chat.js';
 import { findSettings } from '../../src/utils/settings-registry.js';

@@ -115,7 +115,7 @@ app.use(createProjectEvolutionRouter({ authenticate, file: path.resolve(__dirnam
 
 app.use(createAdminRouter({ authenticate, requireAdmin }));
 
-app.use(createActionCenterRouter({ authenticate }));
+app.use(createActionCenterRouter({ authenticate, JWT_SECRET }));
 
 app.use(createNotesRouter({ authenticate }));
 

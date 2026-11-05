@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var appUrl: String
     private lateinit var policy: WebOriginPolicy
     private lateinit var origin: String
+    private var widgetTarget: String? = null
     private var switching = false
     private var switchAttempt = 0
     private lateinit var connectionStatus: TextView
@@ -150,13 +151,24 @@ class MainActivity : ComponentActivity() {
                 try {
                     require(request.optInt("version") == 1) { "客户端桥接版本不兼容" }
                     val params = request.optJSONObject("params") ?: JSONObject()
+                    var result: JSONObject? = null
                     when (request.optString("method")) {
                         "status" -> Unit
                         "serverSettings" -> serverDialog()
                         "account" -> NativeSession.account(this, params.getString("accountId"))
                         "binding" -> NativeSession.bind(this, params)
-                        "logout" -> NativeSession.logout(this)
-                        "webAuth" -> NativeSession.observeWebAccount(this, if (params.isNull("accountId")) null else params.getString("accountId"))
+                        "logout" -> { TodayWidget.clear(this); NativeSession.logout(this) }
+                        "todayWidgetStatus" -> result = TodayWidget.status(this, params.getString("accountId"))
+                        "todayWidgetAccess" -> TodayWidget.access(this, params.getString("accountId"), params.getString("credential"), params.getLong("expiresAt"))
+                        "todayWidgetRefresh" -> {
+                            TodayWidget.observeAccount(this, params.getString("accountId"))
+                            TodayWidget.refresh(this)
+                        }
+                        "webAuth" -> {
+                            val account = if (params.isNull("accountId")) null else params.getString("accountId")
+                            TodayWidget.observeAccount(this, account)
+                            NativeSession.observeWebAccount(this, account)
+                        }
                         "abandonBinding" -> NativeSession.abandon(this, params)
                         "permission" -> askPermission()
                         "exactPermission" -> { require(BuildConfig.DEVELOPER_TOOLS) { "通知试验仅在开发者构建中开放" }; if (Build.VERSION.SDK_INT >= 31) startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName"))) }
@@ -165,7 +177,7 @@ class MainActivity : ComponentActivity() {
                         "consumeNotification" -> if (params.optString("id") == NotificationSupport.prefs(this).getString("pending_notification", null)) NotificationSupport.prefs(this).edit().remove("pending_notification").apply()
                         else -> error("未知 Android 操作")
                     }
-                    response.put("result", NativeSession.status(this))
+                    response.put("result", result ?: NativeSession.status(this))
                 } catch (e: Exception) { response.put("error", e.message ?: "Android 操作失败") }
                 reply.postMessage(response.toString())
             }
@@ -177,6 +189,7 @@ class MainActivity : ComponentActivity() {
             override fun handleOnBackPressed() { if (web.canGoBack()) web.goBack() else finish() }
         })
         handleNotification(intent)
+        handleWidget(intent)
         loadServer()
     }
     private fun loadServer() {
@@ -188,7 +201,9 @@ class MainActivity : ComponentActivity() {
                 .setPositiveButton("服务器设置") { _, _ -> serverDialog() }.setNegativeButton("关闭", null).show()
             return
         }
-        web.loadUrl(appUrl)
+        val target = widgetTarget
+        widgetTarget = null
+        web.loadUrl(if (target != null) origin + target else appUrl)
     }
     private fun serverDialog() {
         if (switching) return
@@ -229,6 +244,7 @@ class MainActivity : ComponentActivity() {
             if (attempt != switchAttempt || isFinishing || isDestroyed) return@runOnUiThread
             handler.removeCallbacks(timeout)
             if (success && ServerEnvironment.select(this, target)) {
+                TodayWidget.clear(this)
                 // Destroying this Activity's WebView cancels its outstanding page/API requests.
                 recreate()
             } else {
@@ -292,7 +308,10 @@ class MainActivity : ComponentActivity() {
             p.edit().putString("pending_notification", id).putString("fcm_result", "通知已点击 ${DateFormat.getTimeInstance().format(Date())}").apply()
         }
     }
-    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleNotification(intent); loadServer() }
+    private fun handleWidget(intent: Intent) {
+        if (intent.action == TodayWidget.openAction) widgetTarget = TodayWidget.target(this, intent)
+    }
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleNotification(intent); handleWidget(intent); loadServer() }
     private fun notifyWebStatus() {
         if (::web.isInitialized && trusted(Uri.parse(web.url ?: ""))) web.evaluateJavascript("window.dispatchEvent(new Event('orbit:android-state'))", null)
     }

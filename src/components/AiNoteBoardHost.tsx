@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { getStoredAuthHeaders, useAuth } from '../hooks/useAuth';
 import { NoteBoard, type NoteItem } from './NoteBoard';
-import type { NoteImage } from '../utils/note-images';
+import { NOTE_IMAGE_MAX_BYTES, NOTE_IMAGE_MAX_COUNT, NOTE_IMAGES_MAX_BYTES, NOTE_IMAGE_TYPES, type NoteImage } from '../utils/note-images';
+import { removeUnboundNoteImage, uploadNoteImage } from '../utils/note-image-client';
 
 async function readJsonResponse(response: Response): Promise<any> {
   const raw = await response.text();
@@ -37,6 +38,7 @@ export interface AiNoteBoardController {
   createNote: (content: string, imageIds?: string[]) => Promise<void>;
   toggleCompleted: (note: NoteItem) => Promise<void>;
   edit: (note: NoteItem, content: string, images: NoteImage[]) => Promise<void>;
+  addImages: (note: NoteItem, files: File[], draftImages: NoteImage[]) => Promise<NoteItem>;
   changeColor: (note: NoteItem, color: NoteItem['color']) => Promise<void>;
   merge: (source: NoteItem, target: NoteItem) => Promise<void>;
   optimize: (note: NoteItem, signal?: AbortSignal) => Promise<NoteItem>;
@@ -120,6 +122,40 @@ export function useAiNoteBoard({ initialNoteId }: UseAiNoteBoardOptions): AiNote
     } catch (editError) {
       setError(editError instanceof Error ? editError.message : '更新记事失败');
       throw editError;
+    }
+  }, [updateNote]);
+
+  const addImages = useCallback(async (note: NoteItem, files: File[], draftImages: NoteImage[]) => {
+    if (!files.length || files.some(file => !NOTE_IMAGE_TYPES.some(mime => mime === file.type) || !file.size || file.size > NOTE_IMAGE_MAX_BYTES)) {
+      throw new Error('请拖入 10MB 以内的 JPEG、PNG 或 WebP 图片');
+    }
+    for (const images of [note.images, draftImages]) {
+      if (images.length + files.length > NOTE_IMAGE_MAX_COUNT || [...images, ...files].reduce((sum, file) => sum + file.size, 0) > NOTE_IMAGES_MAX_BYTES) {
+        throw new Error('每条记事最多 3 张图片，合计不超过 20MB');
+      }
+    }
+    const authorization = getStoredAuthHeaders().Authorization;
+    const checkAccount = () => {
+      if (!authorization || getStoredAuthHeaders().Authorization !== authorization) throw new Error('账号已切换，请重新拖放图片');
+    };
+    const uploaded: NoteImage[] = [];
+    try {
+      for (const file of files) {
+        checkAccount();
+        uploaded.push(await uploadNoteImage(file));
+      }
+      checkAccount();
+      const item = await updateNote(note.id, {
+        imageIds: [...note.images, ...uploaded].map(image => image.id),
+        expectedRevision: note.contentRevision,
+      });
+      checkAccount();
+      return item;
+    } catch (error) {
+      if (getStoredAuthHeaders().Authorization === authorization) {
+        await Promise.allSettled(uploaded.map(removeUnboundNoteImage));
+      }
+      throw error;
     }
   }, [updateNote]);
 
@@ -225,6 +261,7 @@ export function useAiNoteBoard({ initialNoteId }: UseAiNoteBoardOptions): AiNote
     createNote,
     toggleCompleted,
     edit,
+    addImages,
     changeColor,
     merge,
     optimize,
@@ -248,6 +285,7 @@ export function AiNoteBoardHost({ controller, aiBusy = false }: {
         onCloseDrawer={controller.closeDrawer}
         onToggleCompleted={controller.toggleCompleted}
         onEdit={controller.edit}
+        onAddImages={controller.addImages}
         onColorChange={controller.changeColor}
         onMerge={controller.merge}
         onOptimize={controller.optimize}

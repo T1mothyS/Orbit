@@ -1,0 +1,5 @@
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialLayout="@layout/today_widget" android:minWidth="180dp" android:minHeight="110dp"
+    android:minResizeWidth="145dp" android:minResizeHeight="110dp" android:targetCellWidth="3"
+    android:targetCellHeight="2" android:updatePeriodMillis="1800000" android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

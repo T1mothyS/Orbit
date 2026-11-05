@@ -12,6 +12,12 @@
 
 分别报告 Git、Release、代码部署、登录/AI、Cloud、SMTP 和 IMAP；未验的明确标未验。不得因代码部署主动发信或切换正式 Work 任务。
 
+## macOS 今日待办小组件
+
+在 macOS 14 及以上使用 WidgetKit。正式打包沿用已有 `com.smartschedule.agent` 身份。设置 `ELECTRON_APP_URL`、`ORBIT_WIDGET_APP_GROUP`（Team ID 前缀的 macOS App Group）和同 Team 的 `ORBIT_WIDGET_MAC_IDENTITY`（Developer ID Application），运行 `node scripts/build-macos-widget.mjs`。可选 `ORBIT_WIDGET_HOST_PROFILE` 和 `ORBIT_WIDGET_EXTENSION_PROFILE` 分别指定已配置的描述文件。签名输入只在构建机管理。
+
+该入口在 Electron 应用内嵌扩展和原生同步工具并签名。安装并打开 Orbit 后，在桌面右键选择「编辑小组件」，搜索「Orbit 今日待办」，选择小、中或大尺寸。点击组件打开 Orbit 今日页面。正式交付前验证已签名应用和扩展的签名与公证、系统组件库注册、登录/换号、任务改期/完成、断网和跨日状态。Swift 编译检查只覆盖扩展和同步工具的源码。
+
 ## 避免重复与慢步骤
 
 | 项目 | 执行规则 |

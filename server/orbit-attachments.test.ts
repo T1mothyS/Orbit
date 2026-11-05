@@ -34,3 +34,16 @@ test('missing backup files do not restore ghost message links and account cleanu
   assert.equal(store.exportOrbit('files-other').attachments.length,0);assert.equal(vault.loadSecret('chatgpt','files-other'),undefined);
   const {queryAll}=await import('./database/connection.js');assert.equal(queryAll('SELECT * FROM orbit_model_capabilities WHERE user_id=?',['files-other']).length,0);
 });
+
+test('retrying one uploaded image after an uncertain response reuses the owned attachment', async () => {
+  const bytes = await sharp({ create: { width: 12, height: 12, channels: 3, background: 'white' } }).png().toBuffer();
+  const input = { requestId: randomUUID(), name: 'retry.png', mime: 'image/png', base64: bytes.toString('base64') };
+  const results = await Promise.all([
+    files.uploadChatAttachment('files-owner', cid, input),
+    files.uploadChatAttachment('files-owner', cid, input),
+  ]);
+  assert.deepEqual(results.map(result => result.id), [input.requestId, input.requestId]);
+  assert.equal(files.listChatAttachments('files-owner', cid).filter(file => file.id === input.requestId).length, 1);
+  const another = store.ensureDefaultConversation('files-other');
+  await assert.rejects(files.uploadChatAttachment('files-other', another, input), /编号不可用/);
+});

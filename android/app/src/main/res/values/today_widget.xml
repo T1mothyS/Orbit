@@ -1,0 +1,16 @@
+<resources>
+    <string name="today_widget_name">Orbit 今日待办</string>
+    <string name="today_widget_refresh">刷新</string>
+    <color name="widget_surface">#F8FAFF</color>
+    <color name="widget_primary">#172134</color>
+    <color name="widget_secondary">#475773</color>
+    <style name="OrbitWidgetTask">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:textColor">@color/widget_primary</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+    </style>
+</resources>

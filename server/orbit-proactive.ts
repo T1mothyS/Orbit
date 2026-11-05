@@ -94,15 +94,15 @@ export async function runOrbitProactiveTick(now=new Date()) {
         const timezone=db.getReminder(userId)?.timezone||'Asia/Shanghai';
         const startLabel=candidate.start.toLocaleString('zh-CN',{timeZone:timezone,hour12:false});
         const nearby=getAllSchedules(userId).filter(i=>i.id!==s.id&&!i.is_completed&&!i.is_unscheduled&&i.start_time.slice(0,10)===s.start_time.slice(0,10)).slice(0,3);
-        const fact=`${s.title}\n\n${candidate.taskId?'本周期提醒':'开始前提醒'}：${startLabel}${s.location?` · ${s.location}`:''}。${s.notes?`\n${s.notes}`:''}${nearby.length?`\n\n同日还有：${nearby.map(i=>i.title).join('、')}。`:''}`;
+        const details=`${candidate.taskId?'本周期提醒':'开始前提醒'}：${startLabel}${s.location?` · ${s.location}`:''}。${s.notes?`\n${s.notes}`:''}${nearby.length?`\n\n同日还有：${nearby.map(i=>i.title).join('、')}。`:''}`;
         let tip='';const generationStarted=Date.now();const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
         const busy=queryOne('SELECT id FROM orbit_requests WHERE user_id=? AND state=\'running\'',[userId]);
-        if(!busy)try {tip=await Promise.race([enhancer(userId,`${fact}\n${workingContext(userId,cid,s.title,dateInZone(now,timezone))}`,controller),new Promise<string>(resolve=>{timer=setTimeout(()=>{controller.abort();resolve('');},20000);})]);}catch{}finally{if(timer)clearTimeout(timer);controller.abort();}
+        if(!busy)try {tip=await Promise.race([enhancer(userId,`${s.title}\n\n${details}\n${workingContext(userId,cid,s.title,dateInZone(now,timezone))}`,controller),new Promise<string>(resolve=>{timer=setTimeout(()=>{controller.abort();resolve('');},20000);})]);}catch{}finally{if(timer)clearTimeout(timer);controller.abort();}
         const current=proactiveCandidates(userId).find(c=>c.schedule.id===s.id&&c.expected===candidate.expected&&c.trigger===candidate.trigger);
         const elapsed=Date.now()-generationStarted;
         if(!current||!getProactivePreference(userId)||db.getUserById(userId)?.disabled||quietNow(userId,new Date(now.getTime()+Math.max(0,elapsed)))||(!candidate.taskId&&!ruleFor(userId,s.id)?.snoozed_until&&Date.parse(candidate.trigger)<candidate.start.getTime()&&candidate.start.getTime()<now.getTime()+elapsed)||elapsed+now.getTime()-Date.parse(candidate.trigger)>300000) {run('UPDATE orbit_proactive_events SET state=? WHERE id=?',['discarded',event.id]);continue;}
         withPersistenceTransaction(()=>{
-          const notification=enqueueNotificationDetailed({userId,sourceType:candidate.taskId?'reminder':'schedule',sourceId:candidate.taskId||s.id,instanceId:candidate.instanceId,channel:'in_app',kind:ruleFor(userId,s.id)?.snoozed_until?'proactive_snooze':'proactive',title:s.title,body:fact+`\n\n温馨提示：${tip||'可以先准备好这件事所需的物品或资料，按自己的节奏完成。'}`,scheduledAt:candidate.trigger,dedupeKey:`proactive:${userId}:${s.id}:${candidate.trigger}`}).notification;
+          const notification=enqueueNotificationDetailed({userId,sourceType:candidate.taskId?'reminder':'schedule',sourceId:candidate.taskId||s.id,instanceId:candidate.instanceId,channel:'in_app',kind:ruleFor(userId,s.id)?.snoozed_until?'proactive_snooze':'proactive',title:s.title,body:details+`\n\n温馨提示：${tip||'可以先准备好这件事所需的物品或资料，按自己的节奏完成。'}`,scheduledAt:candidate.trigger,dedupeKey:`proactive:${userId}:${s.id}:${candidate.trigger}`}).notification;
           const messageId=deliverInApp(notification,event!.id,!!tip);
           if(!messageId)throw new Error('站内通知未能持久化');
           run('UPDATE orbit_proactive_events SET state=?,message_id=? WHERE id=?',['sent',messageId,event!.id]);
