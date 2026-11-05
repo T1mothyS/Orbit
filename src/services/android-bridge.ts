@@ -1,5 +1,4 @@
 export interface AndroidStatus {
-  server?:{id:'production'|'staging';label:string;url:string};
   developerTools?:boolean;
   version:string; installationId:string; installationKey:string; fid:string|null;
   notificationPermission:boolean; exactAlarmPermission:boolean; fcmConfigured:boolean;

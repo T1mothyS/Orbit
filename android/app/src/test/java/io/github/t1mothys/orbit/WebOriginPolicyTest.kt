@@ -6,6 +6,12 @@ import org.junit.Test
 
 class WebOriginPolicyTest {
     private val policy = WebOriginPolicy("https://orbit.example.invalid/today")
+    @Test fun configuredServerUsesItsOwnOrigin() {
+        val policy = WebOriginPolicy(ServerEnvironment.url)
+        assertTrue(policy.permits(ServerEnvironment.origin + "/today", true))
+        assertFalse(policy.permits(ServerEnvironment.origin, false))
+        assertFalse(policy.permits("https://retired-server.invalid", true))
+    }
     @Test fun fixedOriginMainFrameOnly() {
         assertTrue(policy.permits("https://orbit.example.invalid/assistant?conversation=123", true))
         assertTrue(policy.permits("https://orbit.example.invalid", true))

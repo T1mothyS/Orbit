@@ -18,6 +18,8 @@ const requiredFiles = {
   main: path.resolve(projectRoot, 'dist-electron/main.js'),
   preload: path.resolve(projectRoot, 'dist-electron/preload.js'),
   icon: path.resolve(projectRoot, 'public/orbit-logo.png'),
+  tray: path.resolve(projectRoot, 'electron/assets/orbitTrayTemplate.png'),
+  trayRetina: path.resolve(projectRoot, 'electron/assets/orbitTrayTemplate@2x.png'),
 };
 for (const [label, source] of Object.entries(requiredFiles)) {
   if (!fs.existsSync(source)) throw new Error(`Electron ${label} build input is missing: ${source}`);
@@ -29,6 +31,8 @@ fs.mkdirSync(targetDir, { recursive: true });
 fs.copyFileSync(requiredFiles.main, path.join(targetDir, 'main.js'));
 fs.copyFileSync(requiredFiles.preload, path.join(targetDir, 'preload.js'));
 fs.copyFileSync(requiredFiles.icon, path.join(targetDir, 'schedule.png'));
+fs.copyFileSync(requiredFiles.tray, path.join(targetDir, 'orbitTrayTemplate.png'));
+fs.copyFileSync(requiredFiles.trayRetina, path.join(targetDir, 'orbitTrayTemplate@2x.png'));
 fs.writeFileSync(path.join(targetDir, 'app-url.json'), JSON.stringify({ appUrl: parsed.toString() }, null, 2) + '\n', 'utf8');
 fs.writeFileSync(path.join(targetDir, 'package.json'), JSON.stringify({
   name: 'ai-calendar-desktop-shell',

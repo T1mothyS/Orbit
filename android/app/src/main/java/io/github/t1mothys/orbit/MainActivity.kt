@@ -33,7 +33,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import org.json.JSONObject
-import java.net.URI
 import java.text.DateFormat
 import java.util.Date
 
@@ -41,14 +40,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var web: WebView
     private lateinit var offline: LinearLayout
     private var chooser: ValueCallback<Array<Uri>>? = null
-    private lateinit var preset: ServerPreset
-    private lateinit var appUrl: String
-    private lateinit var policy: WebOriginPolicy
-    private lateinit var origin: String
+    private val appUrl = ServerEnvironment.url
+    private val policy = WebOriginPolicy(appUrl)
+    private val origin = ServerEnvironment.origin
     private var widgetTarget: String? = null
-    private var switching = false
-    private var switchAttempt = 0
-    private lateinit var connectionStatus: TextView
     private var mainFrameFailed = false
     private var localStatus: TextView? = null
     // ComponentActivity only: there are no Fragment classes or an old Fragment dependency to upgrade.
@@ -61,39 +56,26 @@ class MainActivity : ComponentActivity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        preset = ServerEnvironment.current(this)
-        appUrl = ServerEnvironment.url(preset)
-        policy = WebOriginPolicy(appUrl)
-        origin = ServerEnvironment.origin(preset)
         NativeSession.initialize(this)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val serverBar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        serverBar.addView(TextView(this).apply { text = "Orbit · ${preset.label}"; setPadding(16, 12, 8, 12) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        serverBar.addView(Button(this).apply { text = "服务器设置"; setOnClickListener { serverDialog() } })
-        root.addView(serverBar)
         if (BuildConfig.DEVELOPER_TOOLS) root.addView(Button(this).apply { text = "本地通知试验"; setOnClickListener { localDialog() } })
         offline = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; visibility = View.GONE; setPadding(24, 20, 24, 20)
-            connectionStatus = TextView(this@MainActivity).apply { text = "${preset.label}暂时无法连接。检查网络后重试，或在服务器设置中切换。" }
-            addView(connectionStatus)
-            addView(Button(this@MainActivity).apply { text = "重试 Orbit"; setOnClickListener { loadServer() } })
-            addView(Button(this@MainActivity).apply { text = "服务器设置"; setOnClickListener { serverDialog() } })
+            addView(TextView(this@MainActivity).apply { text = "orbit 暂时无法连接。检查网络后重试。" })
+            addView(Button(this@MainActivity).apply { text = "重试 orbit"; setOnClickListener { loadOrbit() } })
             if (BuildConfig.DEVELOPER_TOOLS) addView(Button(this@MainActivity).apply { text = "本地通知试验"; setOnClickListener { localDialog() } })
         }
         root.addView(offline)
         web = WebView(this)
         root.addView(web, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-        // Assign the profile before settings, clients or navigation. Production keeps the old default profile.
-        val multiProfile = WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)
-        if (preset == ServerPreset.STAGING && multiProfile) WebViewCompat.setProfile(web, "orbit-stage")
         setContentView(root)
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
             view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime.bottom)); insets
         }
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEVELOPER_TOOLS)
         web.settings.apply {
             javaScriptEnabled = true; domStorageEnabled = true
             allowFileAccess = false; allowContentAccess = false
@@ -101,11 +83,9 @@ class MainActivity : ComponentActivity() {
             setSupportMultipleWindows(false); javaScriptCanOpenWindowsAutomatically = false
             userAgentString += " OrbitAndroid/${BuildConfig.VERSION_NAME}"
         }
-        val cookies = if (multiProfile) WebViewCompat.getProfile(web).cookieManager else CookieManager.getInstance()
-        cookies.setAcceptThirdPartyCookies(web, false)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(web, false)
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                if (switching) return true
                 val url = request.url
                 if (trusted(url)) return false
                 if (request.isForMainFrame && url.scheme in listOf("https", "http", "mailto", "tel")) {
@@ -126,10 +106,19 @@ class MainActivity : ComponentActivity() {
                 if (request.isForMainFrame) { mainFrameFailed = true; offline.visibility = View.VISIBLE }
             }
             override fun onPageFinished(view: WebView, url: String) {
-                if (!switching && !mainFrameFailed && trusted(Uri.parse(url)) && view.progress == 100) {
+                if (!mainFrameFailed && trusted(Uri.parse(url)) && view.progress == 100) {
                     offline.visibility = View.GONE
                     // The error overlay is dismissed only after a successful main-frame response.
-                    view.evaluateJavascript("document.documentElement.dataset.orbitAndroid='true'", null)
+                    // Hide the retired selector when connected to an older hosted frontend.
+                    view.evaluateJavascript("""
+                        document.documentElement.dataset.orbitAndroid = 'true';
+                        if (!document.getElementById('orbit-retired-server-settings')) {
+                            const style = document.createElement('style');
+                            style.id = 'orbit-retired-server-settings';
+                            style.textContent = '#settings-android-server, #setting-result-android-server-settings { display: none !important; }';
+                            document.head.appendChild(style);
+                        }
+                    """.trimIndent(), null)
                     view.evaluateJavascript("""(()=>{let accountId=null;try{const token=localStorage.getItem('aicalendar_token');if(token){const payload=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));if(typeof payload.userId==='string')accountId=payload.userId;}}catch{}window.OrbitNative?.postMessage(JSON.stringify({version:1,id:'native-auth-observer',method:'webAuth',params:{accountId}}));})()""", null)
                 }
             }
@@ -144,7 +133,7 @@ class MainActivity : ComponentActivity() {
         }
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             WebViewCompat.addWebMessageListener(web, "OrbitNative", setOf(origin)) { _, message, source, main, reply ->
-                if (switching || !policy.permits(source.toString(), main)) return@addWebMessageListener
+                if (!policy.permits(source.toString(), main)) return@addWebMessageListener
                 val request = try { JSONObject(message.data ?: "") } catch (_: Exception) { return@addWebMessageListener }
                 val id = request.optString("id")
                 val response = JSONObject().put("id", id)
@@ -154,7 +143,6 @@ class MainActivity : ComponentActivity() {
                     var result: JSONObject? = null
                     when (request.optString("method")) {
                         "status" -> Unit
-                        "serverSettings" -> serverDialog()
                         "account" -> NativeSession.account(this, params.getString("accountId"))
                         "binding" -> NativeSession.bind(this, params)
                         "logout" -> { TodayWidget.clear(this); NativeSession.logout(this) }
@@ -190,74 +178,12 @@ class MainActivity : ComponentActivity() {
         })
         handleNotification(intent)
         handleWidget(intent)
-        loadServer()
+        loadOrbit()
     }
-    private fun loadServer() {
-        if (switching) return
-        if (preset == ServerPreset.STAGING && !WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
-            offline.visibility = View.VISIBLE
-            AlertDialog.Builder(this).setTitle("请更新 Android System WebView")
-                .setMessage("当前 WebView 不支持独立登录与缓存。更新后可使用测试环境，也可以在服务器设置中返回正式环境。")
-                .setPositiveButton("服务器设置") { _, _ -> serverDialog() }.setNegativeButton("关闭", null).show()
-            return
-        }
+    private fun loadOrbit() {
         val target = widgetTarget
         widgetTarget = null
         web.loadUrl(if (target != null) origin + target else appUrl)
-    }
-    private fun serverDialog() {
-        if (switching) return
-        var selected = preset
-        AlertDialog.Builder(this).setTitle("服务器设置")
-            .setSingleChoiceItems(ServerPreset.entries.map { "${it.label}\n${ServerEnvironment.origin(it)}" }.toTypedArray(), preset.ordinal) { _, index -> selected = ServerPreset.entries[index] }
-            .setPositiveButton("切换") { _, _ ->
-                if (selected == preset) return@setPositiveButton
-                if (selected == ServerPreset.STAGING && !WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
-                    AlertDialog.Builder(this).setMessage("请先更新 Android System WebView，以隔离两个环境的登录与缓存。")
-                        .setPositiveButton("确定", null).show()
-                    return@setPositiveButton
-                }
-                AlertDialog.Builder(this).setTitle("切换到${selected.label}？")
-                    .setMessage("未保存的页面输入会丢失。两套登录与缓存独立，首次进入需要重新登录。手机推送仅在正式环境启用。")
-                    .setPositiveButton("切换") { _, _ -> switchServer(selected) }.setNegativeButton("取消", null).show()
-            }.setNegativeButton("取消", null).show()
-    }
-    private fun switchServer(target: ServerPreset) {
-        switching = true
-        val attempt = ++switchAttempt
-        chooser?.onReceiveValue(null); chooser = null
-        web.stopLoading()
-        web.loadUrl("about:blank")
-        web.clearHistory()
-        web.visibility = View.GONE
-        connectionStatus.text = "正在切换到${target.label}，请稍候…"
-        offline.visibility = View.VISIBLE
-        val handler = android.os.Handler(android.os.Looper.getMainLooper())
-        val timeout = Runnable {
-            if (switching && attempt == switchAttempt && !isFinishing && !isDestroyed) {
-                switchAttempt++
-                switchFailed(target)
-            }
-        }
-        handler.postDelayed(timeout, 20_000L)
-        NativeSession.logout(this) { success -> runOnUiThread {
-            if (attempt != switchAttempt || isFinishing || isDestroyed) return@runOnUiThread
-            handler.removeCallbacks(timeout)
-            if (success && ServerEnvironment.select(this, target)) {
-                TodayWidget.clear(this)
-                // Destroying this Activity's WebView cancels its outstanding page/API requests.
-                recreate()
-            } else {
-                switchFailed(target)
-            }
-        } }
-    }
-    private fun switchFailed(target: ServerPreset) {
-        switching = false; web.visibility = View.VISIBLE; loadServer()
-        connectionStatus.text = "${preset.label}暂时无法连接。检查网络后重试，或在服务器设置中切换。"
-        AlertDialog.Builder(this).setTitle("服务器切换未完成")
-            .setMessage("旧环境推送注册尚未撤销或设置未能保存。请检查网络后重试，当前服务器保持不变。")
-            .setPositiveButton("重试") { _, _ -> switchServer(target) }.setNegativeButton("取消", null).show()
     }
     private fun trusted(uri: Uri): Boolean = policy.permits(uri.toString(), true)
     private fun askPermission() {
@@ -311,10 +237,10 @@ class MainActivity : ComponentActivity() {
     private fun handleWidget(intent: Intent) {
         if (intent.action == TodayWidget.openAction) widgetTarget = TodayWidget.target(this, intent)
     }
-    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleNotification(intent); handleWidget(intent); loadServer() }
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleNotification(intent); handleWidget(intent); loadOrbit() }
     private fun notifyWebStatus() {
         if (::web.isInitialized && trusted(Uri.parse(web.url ?: ""))) web.evaluateJavascript("window.dispatchEvent(new Event('orbit:android-state'))", null)
     }
-    override fun onResume() { super.onResume(); if (!switching) { NativeSession.compensate(this); NativeSession.retryReset(this); NativeSession.register(this, true); NotificationSupport.clearObsoleteTest(this); refreshLocalStatus(); notifyWebStatus() } }
+    override fun onResume() { super.onResume(); NativeSession.compensate(this); NativeSession.retryReset(this); NativeSession.register(this, true); NotificationSupport.clearObsoleteTest(this); refreshLocalStatus(); notifyWebStatus() }
     override fun onDestroy() { chooser?.onReceiveValue(null); web.destroy(); super.onDestroy() }
 }

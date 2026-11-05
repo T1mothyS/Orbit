@@ -167,6 +167,7 @@ export function createNotificationsRouter({ authenticate }: Pick<ReturnType<type
 
   app.get("/api/notifications", authenticate, (req, res) => {
     const userId = (req as any).user.userId;
+    if (req.query.popup === '1') return res.json({ popups: activityStore.listBrowserPopups(userId) });
     const notifications = activityStore.listNotifications(userId, {
       status: req.query.status ? String(req.query.status) : undefined,
       channel: req.query.channel ? String(req.query.channel) : undefined,

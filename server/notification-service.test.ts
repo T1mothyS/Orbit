@@ -174,3 +174,36 @@ test('邮件通知创建和重复入队会通过日志回调留下链路事件',
 test.after(() => {
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
+
+test('桌面弹窗仅读取当前账号近 15 分钟到期且未读的浏览器提醒，旧提醒留在收件箱', () => {
+  const now = new Date('2026-11-05T12:00:00.000Z');
+  const userId = 'browser-popup-user';
+  const enqueue = (name: string, offsetMs: number, options: { userId?: string; channel?: 'browser' | 'in_app'; pending?: boolean } = {}) => {
+    const item = activity.enqueueNotification({
+      userId: options.userId ?? userId,
+      sourceType: 'schedule',
+      sourceId: name,
+      channel: options.channel ?? 'browser',
+      kind: 'schedule_reminder',
+      title: name,
+      body: '',
+      scheduledAt: new Date(now.getTime() + offsetMs).toISOString(),
+      dedupeKey: name,
+    });
+    if (!options.pending) activity.markNotificationSent(item.id);
+    return item.id;
+  };
+
+  const fresh = enqueue('popup-fresh', 0);
+  const boundary = enqueue('popup-boundary', -15 * 60_000);
+  const old = enqueue('popup-old', -15 * 60_000 - 1);
+  enqueue('popup-future', 1);
+  enqueue('popup-other-account', 0, { userId: 'browser-popup-other-user' });
+  enqueue('popup-other-channel', 0, { channel: 'in_app' });
+  enqueue('popup-pending', 0, { pending: true });
+  const read = enqueue('popup-read', 0);
+  activity.markNotificationRead(read, userId);
+
+  assert.deepEqual(activity.listBrowserPopups(userId, now).map(item => item.id), [fresh, boundary]);
+  assert.equal(activity.listNotifications(userId, { unreadOnly: true }).some(item => item.id === old), true);
+});

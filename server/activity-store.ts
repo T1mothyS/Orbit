@@ -805,6 +805,17 @@ export function listNotifications(userId: string, filters: { status?: string; ch
   return queryAll<any>(`SELECT * FROM notification_deliveries WHERE ${clauses.join(' AND ')} ORDER BY created_at DESC LIMIT ?`, params).map(rowToNotification);
 }
 
+export function listBrowserPopups(userId: string, now = new Date()): NotificationDelivery[] {
+  const earliest = new Date(now.getTime() - 15 * 60_000).toISOString();
+  return queryAll<any>(
+    `SELECT * FROM notification_deliveries
+     WHERE user_id = ? AND channel = 'browser' AND status = 'sent' AND read_at IS NULL
+       AND scheduled_at BETWEEN ? AND ?
+     ORDER BY scheduled_at DESC LIMIT 3`,
+    [userId, earliest, now.toISOString()],
+  ).map(rowToNotification);
+}
+
 export function listDueNotifications(now = nowIso(), channel?:NotificationChannel): NotificationDelivery[] {
   return queryAll<any>(
     `SELECT * FROM notification_deliveries

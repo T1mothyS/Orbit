@@ -1,5 +1,5 @@
 <resources>
-    <string name="today_widget_name">Orbit 今日待办</string>
+    <string name="today_widget_name">orbit 今日待办</string>
     <string name="today_widget_refresh">刷新</string>
     <color name="widget_surface">#F8FAFF</color>
     <color name="widget_primary">#172134</color>

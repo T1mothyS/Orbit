@@ -177,9 +177,13 @@ function createWindow(): void {
 }
 
 function createTray(): void {
-  const icon = iconPath();
+  const icon = process.platform === 'darwin'
+    ? path.resolve(__dirname, isDev ? '../electron/assets/orbitTrayTemplate.png' : 'orbitTrayTemplate.png')
+    : iconPath();
   if (!icon) return;
-  tray = new Tray(nativeImage.createFromPath(icon).resize({ width: 24, height: 24 }));
+  const image = nativeImage.createFromPath(icon);
+  if (image.isEmpty()) return;
+  tray = new Tray(process.platform === 'darwin' ? image : image.resize({ width: 24, height: 24 }));
   tray.setToolTip('Orbit');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '显示 Orbit', click: () => { mainWindow?.show(); mainWindow?.focus(); } },

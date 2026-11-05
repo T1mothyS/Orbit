@@ -2,7 +2,45 @@ import { useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { isAndroid } from '../services/android-bridge';
 export function BrowserNotifications() {
-  const {authHeaders}=useAuth();
-  useEffect(()=>{if(isAndroid())return;let stopped=false,busy=false;const controller=new AbortController();const poll=async()=>{if(stopped||busy||!('Notification' in window)||Notification.permission!=='granted')return;busy=true;try{const response=await fetch('/api/notifications?channel=browser&unread=1&limit=30',{headers:authHeaders(),signal:controller.signal});if(!response.ok)return;const data=await response.json();for(const item of (data.notifications||[]).slice(0,3)){if(stopped)return;new Notification(item.title,{body:item.body,tag:item.id});await fetch(`/api/notifications/${encodeURIComponent(item.id)}/read`,{method:'POST',headers:authHeaders(),signal:controller.signal});}}catch{/* Next poll retries; browser delivery never blocks the page. */}finally{busy=false;}};void poll();const timer=setInterval(()=>void poll(),60000);window.addEventListener('focus',poll);return()=>{stopped=true;controller.abort();clearInterval(timer);window.removeEventListener('focus',poll);};},[authHeaders]);
+  const { authHeaders } = useAuth();
+  useEffect(() => {
+    if (isAndroid()) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    const shown = new Set<string>();
+    let busy = false;
+    const poll = async () => {
+      if (signal.aborted || busy || !('Notification' in window) || Notification.permission !== 'granted') return;
+      busy = true;
+      try {
+        const response = await fetch('/api/notifications?popup=1', { headers: authHeaders(), signal });
+        if (!response.ok) return;
+        const { popups = [] } = await response.json();
+        for (const item of popups) {
+          if (signal.aborted) return;
+          if (!shown.has(item.id)) {
+            new Notification(item.title, { body: item.body, tag: item.id });
+            shown.add(item.id);
+          }
+          const ack = await fetch(`/api/notifications/${encodeURIComponent(item.id)}/read`, {
+            method: 'POST', headers: authHeaders(), signal,
+          });
+          if (ack.ok) shown.delete(item.id);
+        }
+      } catch {
+        // Retry on the next poll without showing the same reminder twice.
+      } finally {
+        busy = false;
+      }
+    };
+    void poll();
+    const timer = window.setInterval(poll, 60_000);
+    window.addEventListener('focus', poll);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      window.removeEventListener('focus', poll);
+    };
+  }, [authHeaders]);
   return null;
 }

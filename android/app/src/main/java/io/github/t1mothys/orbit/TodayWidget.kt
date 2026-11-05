@@ -51,7 +51,9 @@ class TodayWidget : AppWidgetProvider() {
         private val syncing = AtomicBoolean()
         private fun prefs(context: Context) = context.getSharedPreferences("orbit_today_widget", Context.MODE_PRIVATE)
         private fun ids(context: Context) = AppWidgetManager.getInstance(context).getAppWidgetIds(ComponentName(context, TodayWidget::class.java))
-        private fun scope(context: Context, account: String) = ServerEnvironment.current(context).id + ":" + account
+        // Preserve the stored production scope and reject retired staging credentials.
+        private const val scopePrefix = "production:"
+        private fun scope(account: String) = scopePrefix + account
         private fun key(): SecretKey {
             val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
             (store.getKey(keyName, null) as? SecretKey)?.let { return it }
@@ -66,7 +68,7 @@ class TodayWidget : AppWidgetProvider() {
         @Synchronized
         fun observeAccount(context: Context, account: String?) {
             val stored = prefs(context).getString("scope", null)
-            if (stored != null && stored != account?.let { scope(context, it) }) clear(context)
+            if (stored != null && stored != account?.let { scope(it) }) clear(context)
         }
 
         @Synchronized
@@ -89,7 +91,7 @@ class TodayWidget : AppWidgetProvider() {
             }
             if (ids(context).isEmpty()) return
             observeAccount(context, account)
-            val scope = scope(context, account)
+            val scope = scope(account)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
                 init(Cipher.ENCRYPT_MODE, key())
                 updateAAD(scope.toByteArray())
@@ -117,9 +119,8 @@ class TodayWidget : AppWidgetProvider() {
 
         private fun fetch(context: Context) {
             val store = prefs(context)
-            val preset = ServerEnvironment.current(context)
             val scope = store.getString("scope", null) ?: return
-            if (!scope.startsWith(preset.id + ":")) return
+            if (!scope.startsWith(scopePrefix)) return
             val encrypted = store.getString("credential", null) ?: return
             if (System.currentTimeMillis() >= store.getLong("expiresAt", 0)) return
             val bytes = Base64.decode(encrypted, Base64.NO_WRAP)
@@ -135,7 +136,7 @@ class TodayWidget : AppWidgetProvider() {
                 }
                 return
             }
-            val connection = URL(ServerEnvironment.origin(preset) + "/api/action-center/widget").openConnection() as HttpsURLConnection
+            val connection = URL(ServerEnvironment.origin + "/api/action-center/widget").openConnection() as HttpsURLConnection
             try {
                 connection.instanceFollowRedirects = false
                 connection.connectTimeout = 3500
@@ -157,7 +158,7 @@ class TodayWidget : AppWidgetProvider() {
                     JSONObject(body).takeIf { it.optJSONArray("items") != null && it.optLong("validUntil") > System.currentTimeMillis() }
                 } else null
                 synchronized(this) {
-                    if (store.getString("credential", null) != encrypted || ServerEnvironment.current(context) != preset) return
+                    if (store.getString("credential", null) != encrypted || store.getString("scope", null) != scope) return
                     if (status == 401 || status == 403) clear(context)
                     else if (snapshot != null) store.edit().putString("snapshot", snapshot.toString()).apply()
                 }
@@ -166,7 +167,7 @@ class TodayWidget : AppWidgetProvider() {
 
         private fun snapshot(context: Context): JSONObject? {
             val store = prefs(context)
-            if (store.getString("scope", null)?.startsWith(ServerEnvironment.current(context).id + ":") != true) return null
+            if (store.getString("scope", null)?.startsWith(scopePrefix) != true) return null
             return try { JSONObject(store.getString("snapshot", "") ?: "") } catch (_: Exception) { null }
         }
 

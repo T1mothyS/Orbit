@@ -12,6 +12,8 @@
 
 分别报告 Git、Release、代码部署、登录/AI、Cloud、SMTP 和 IMAP；未验的明确标未验。不得因代码部署主动发信或切换正式 Work 任务。
 
+macOS 菜单栏使用独立的透明 Orbit 模板图标，打包包含标准和 Retina 两个尺寸，系统根据菜单栏亮度着色。普通 Electron 安装包可用于验证菜单栏和在线应用；今日待办组件使用下面的签名构建入口。
+
 ## macOS 今日待办小组件
 
 在 macOS 14 及以上使用 WidgetKit。正式打包沿用已有 `com.smartschedule.agent` 身份。设置 `ELECTRON_APP_URL`、`ORBIT_WIDGET_APP_GROUP`（Team ID 前缀的 macOS App Group）和同 Team 的 `ORBIT_WIDGET_MAC_IDENTITY`（Developer ID Application），运行 `node scripts/build-macos-widget.mjs`。可选 `ORBIT_WIDGET_HOST_PROFILE` 和 `ORBIT_WIDGET_EXTENSION_PROFILE` 分别指定已配置的描述文件。签名输入只在构建机管理。

@@ -2,20 +2,16 @@
 
 状态：一期试验。Kotlin / Android WebView 在线壳，包名 `io.github.t1mothys.orbit`。行为和设备验收合同见 [架构](../docs/ARCHITECTURE.md#android-客户端与-push) 与 [测试矩阵](../docs/archive/engineering/TEST-MATRIX-20261018.md#android-一期)。没有离线业务同步或厂商 Push。
 
-## 服务器设置
+## 连接正式站点
 
-默认连接正式环境。App 原生顶部和离线页的“服务器设置”，以及网页“设置 → 高级 → Android 客户端 → 服务器设置”，都打开同一预设选择器。仅允许构建时确定的正式/测试两个 HTTPS 地址，选择在重启后保留；首次进入另一环境需单独登录。
-
-使用既有 AndroidX WebKit 的 [Profile](https://developer.android.com/reference/androidx/webkit/Profile)：正式环境保留原 Default Profile，测试环境使用 `orbit-stage`，分别保存 Cookie、Web Storage、Service Worker 和缓存。不支持 MULTI_PROFILE 时提示更新 Android System WebView，不使用共享存储作为降级。切换前离开旧页面并取消加载、撤销旧 FCM 注册，成功后重建 WebView；20 秒超时或失败保留原选择并可重试，迟到回调不能改变选择。未保存的页面输入不会随切换保留。
-
-原生安装身份、绑定和待补偿解绑分别保存，补偿只能回到原预设服务器；测试环境不注册或展示手机 FCM，服务器也需保持测试 worker/Push 关闭。正式 FCM、AlarmManager、Receiver 与通知渠道继续按原合同运行。不存在客户端新增 OAuth/App Links 回调，服务端 APP_URL/issuer/redirect 按环境独立配置。此行为需通过新版 APK 的安装、登录、两向切换、重启及旧通知测试验收；构建和 JVM 测试不替代实体设备。
+Android 应用显示名称为「orbit」。安装包直接打开构建时配置的正式 HTTPS 站点。连接失败时可重试。覆盖安装继续使用既有正式环境的 WebView 登录、缓存、安装身份和小组件账户范围。旧测试环境的登录、小组件凭据和待解绑记录与正式站点隔离。
 
 ## 工具链
 
 使用 JDK 17、Android SDK Platform 36 / Build Tools 36.0.0、Gradle Wrapper 9.6.0、AGP 9.4.0（内置 Kotlin）。工具链放在项目级或用户缓存目录，不修改全局 PATH。首次运行需要访问 Google Maven、Maven Central 和 Gradle 下载站。原仓库在 Windows 非 ASCII 路径内，`android.overridePathCheck=true` 只关闭 AGP 路径预检查；实际构建和 lint 仍需通过。
 
 1. 在被忽略的 `android/local.properties` 填入 `sdk.dir=C\:/path/to/AndroidSdk`，Windows 盘符冒号需要转义。
-2. 在被忽略的 `android/orbit.local.properties` 填入 `appUrl=https://your-public-site.example/today`。只允许无端口、凭据、query、fragment 的 HTTPS URL；正式环境默认使用该地址；可选 stageUrl 指定另一测试 HTTPS 地址。安装后通过原生服务器设置在两个预设间选择，网页不能提交任意 URL。
+2. 在被忽略的 `android/orbit.local.properties` 填入 `appUrl=https://your-public-site.example/today`。只允许无端口、凭据、query、fragment 的 HTTPS URL；安装包固定使用该地址。
 3. 按需配置 Firebase。未配置也可以编译、安装、登录、聊天和测试本地通知。
 
 ```powershell
@@ -37,7 +33,7 @@ macOS / Linux 可运行 `sh android/gradlew -p android :app:assembleRelease --no
 
 ## 桌面今日待办
 
-在手机桌面长按空白处，打开系统小组件列表并添加「Orbit 今日待办」。添加后打开 Orbit，沿用当前服务器和已登录账号同步。点击标题打开今日，点击任务打开对应事项，点「刷新」主动同步。系统约每 30 分钟安排后台更新，实际频率由桌面和省电策略决定。可调整大小查看更多任务。组件通过原生桌面接口运行，无需 Google Play 服务。服务端需提供 [今日待办接口](../docs/ARCHITECTURE.md#今日待办小组件)。账户或环境变化后旧快照清理，断网时同日最后一次同步可继续展示。
+在手机桌面长按空白处，打开系统小组件列表并添加「orbit 今日待办」。添加后打开 Orbit，沿用正式站点和已登录账号同步。点击标题打开今日，点击任务打开对应事项，点「刷新」主动同步。系统约每 30 分钟安排后台更新，实际频率由桌面和省电策略决定。可调整大小查看更多任务。组件通过原生桌面接口运行，无需 Google Play 服务。服务端需提供 [今日待办接口](../docs/ARCHITECTURE.md#今日待办小组件)。切换账户后清理旧快照，断网时同日最后一次同步可继续展示。
 
 ## Firebase 配置
 

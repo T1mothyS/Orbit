@@ -24,15 +24,13 @@ Calendar 使用的 date-fns 现显式声明，避免依赖开发工具间接安�
 
 macOS 使用 WidgetKit 和同一 Apple Team 的 App Group。Electron 仅接受当前可信顶层页面的快照请求，通过签名的 Swift 工具写入和清理共享快照并请求刷新。App Group 只保存筛选后的展示数据，不共享 Keychain 或登录令牌。WidgetKit 控制刷新实际时间，账户时区换日后旧任务自动失效。签名和添加方法见 [发布流程](RELEASE.md#macos-今日待办小组件)。
 
-Android 使用 AppWidgetProvider 与 RemoteViews。专用凭据经 Android Keystore 加密后存于应用私有区，正式与测试环境分开，退出、换号、切换服务器和移除最后一个组件时清理凭据与快照。手动刷新、系统周期更新和应用前台同步共用有界 HTTPS 读取。网络失败保留当日有效快照并显示更新时间，服务端拒绝凭据时清除快照。使用方法见 [Android 构建](../android/README.md#桌面今日待办)。
+Android 使用 AppWidgetProvider 与 RemoteViews。正式站点的专用凭据经 Android Keystore 加密后存于应用私有区。退出、换号和移除最后一个组件时清理凭据与快照。手动刷新、系统周期更新和应用前台同步共用有界 HTTPS 读取。网络失败保留当日有效快照并显示更新时间，服务端拒绝凭据时清除快照。使用方法见 [Android 构建](../android/README.md#桌面今日待办)。
 
 ## Android 客户端与 Push
 
 常规构建仅提供正式账号开关、通知权限与注册/投递状态；原生顶部、离线和网页测试入口只有 debug 且显式开启 DEVELOPER_TOOLS 才显示。release 始终关闭；本地桥接测试同样检查该标记。下面的 AlarmManager 排错能力保留，正式 FCM、Receiver、渠道和绑定/解绑行为不变。后续用户真实手机已确认精准/非精准触发及后台系统展示通过，见 [新增实机证据](archive/engineering/TEST-MATRIX-20261018.md#2026-10-08-产品助手运行诊断与保留)。
 
-`android/` 是 Kotlin + WebView 在线壳，复用 Web 登录、聊天、路由与账号数据。构建时固定正式/测试两个 HTTPS 预设，默认正式环境；服务器设置由原生控制，网页只能请求打开选择面板，不能传入任意 URL。选择保存在独立偏好中。正式环境沿用 Default Profile，测试环境使用独立的 `orbit-stage` WebView Profile，Cookie、Web Storage、Service Worker 与缓存分别保存；不支持 MULTI_PROFILE 的 WebView 必须更新后才能进入测试环境，不降级成共享存储。每个实例的 `WebMessageListener` 只允许当前来源的主框架和协议版本 1；未知方法拒绝，外部链接打开系统应用，不忽略 TLS 错误，不允许明文/混合内容、文件 URL 和第三方 Cookie。切换先离开旧文档、终止加载，撤销旧 FCM 注册后持久选择并重建 WebView；失败/20秒超时保留原服务器并提供重试，迟到回调不能切换环境。返回、键盘/系统栏安全区、文件选择及通知点击由原生负责。没有业务离线数据库和手机常驻轮询。
-
-原生安装身份、绑定与补偿解绑队列按环境分开；解绑记录绑定原环境，切换后仍只能向该预设发送补偿请求。测试环境不注册或展示 FCM，正式环境继续使用既有链路；测试服务器后台与 Push 仍需独立禁用。切换不复制 JWT 或修改另一环境业务数据。客户端没有新增 OAuth/App Links 回调；服务端 OAuth issuer/redirect 与 APP_URL 按各环境配置，真实授权和实体手机验收独立进行。使用方法见 [Android 构建](../android/README.md)。
+`android/` 是 Kotlin + WebView 在线壳，复用 Web 登录、聊天、路由与账号数据。安装包固定连接构建时配置的正式 HTTPS 站点，沿用 Default Profile 和既有正式环境的原生安装身份、绑定及待补偿解绑。WebMessageListener 只允许固定来源的主框架和协议版本 1。未知方法拒绝，外部链接打开系统应用，TLS 验证保持开启，同时禁止明文、混合内容、文件 URL 和第三方 Cookie。返回、键盘/系统栏安全区、文件选择及通知点击由原生负责。旧测试环境的设置、登录和补偿凭据与正式站点隔离。使用方法见 [Android 构建](../android/README.md)。
 
 客户端缺少 `google-services.json` 时不初始化 Firebase；本地测试仍可用。FCM 注册使用 `register/onRegistered` 的 FID，退出使用 `unregister` 与 Installations `delete`。原生不保存登录 JWT，账号与设备绑定由当前登录网页提交。Android 通知权限共用；拒绝不会阻断 Web 页面。本地 AlarmManager 一分钟试验与 FCM 独立：精确测试检查 `SCHEDULE_EXACT_ALARM`，另提供明确标注可能延迟的非精确测试，每台设备仅保留一个，取消/退出/换账号清理，重启不恢复，不创建服务器 Reminder。
 
@@ -385,7 +383,7 @@ Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓�
 - `reminders.in_app_enabled` 是站内及主动聊天的唯一账号开关。旧 `proactiveEnabled` GET/PATCH 仅为兼容别名，旧字段不再存第二份启用状态。逐事项提前/停用规则保持独立。
 - `orbit_notification_messages` 以账号、对象、周期实例、精确提醒时点去重。站内消息、映射、会话时间和通知 sent 在跨库同步事务落盘。系统重启复用映射，不扫描历史 sent 做消息回填；删除消息也不重放历史通知。已读使用通知 read_at，完成使用真实业务记录，投递 sent 与两者独立。
 - 主动提醒的通知标题与补充正文独立保存。历史响应在 `orbitMeta.notification` 提供 `title/body/triggerAt`，执行时间与备注取事项卡，聊天创建时间仍取原消息。只识别既有主动提醒模板和匹配的事项快照字段，老消息原文继续保留，提醒失效或事项变化时保留原提醒内容。
-- 新卡片元数据包含通知 ID、对象引用、来源标签、设置引用及事项基线指纹。GET 历史会按当前归属/完成/指纹计算状态；完成与延后接口再次检查，不接受失效卡片。旧主动卡片动作继续支持。站内扫描独立于 SMTP/IMAP；公共应用层消费浏览器前台通知，浏览器队列 sent 表示前台可消费，read 表示前台已显示/确认，不保证系统弹窗最终呈现。
+- 新卡片元数据包含通知 ID、对象引用、来源标签、设置引用及事项基线指纹。GET 历史会按当前归属/完成/指纹计算状态；完成与延后接口再次检查，不接受失效卡片。旧主动卡片动作继续支持。站内扫描独立于 SMTP/IMAP；公共应用层消费浏览器前台通知，浏览器队列 sent 表示前台可消费，read 表示前台已显示/确认，不保证系统弹窗最终呈现。GET /api/notifications?popup=1 仅提供当前账号近 15 分钟到期的未读浏览器通知，每次最多三条。超过时限的通知仍可在记录中查看。
 - `src/utils/orbit-links.ts` 维护旧 URL 对象定位与安全协议过滤。Settings registry 只含稳定 ID、名称、用途、关键词和定位，不含配置值；账号权限过滤管理员设置。Settings 搜索、全局搜索、AI 只读工具及聊天卡片共用索引，不建立 AI 内嵌设置表单。
 - `orbit_activity_events` 只记录成功创建来源、日期改期、确认执行和成功记事优化。复用现有同步事务与 executeOnce，不记录页面停留或复制聊天正文。采集起点在 `orbit_metrics_meta`；未知历史不回填。
 - `GET /api/orbit/statistics` 保留旧字段和筛选；自定义 `period=custom&from=<带偏移时间>&to=<带偏移时间>`，最大 367 个自然日对应时长，开始包含/结束不包含。新增 activity、filters、coverage、每日趋势/热图与 metricDetails；`metric/offset/limit` 支持 1–100 条分页。安排分母按安排时间，完成按有效记录；周期与投影去重。无日期待办纳入新增、完成、积压。快照积压不反推历史；成功工具步骤要求 result_count > 0，旧未采集结果不补算。

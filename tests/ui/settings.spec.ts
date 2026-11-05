@@ -172,3 +172,34 @@ test('opening help before login resumes help after a real login', async ({ conte
   await page.locator('form').getByRole('button', { name: /^登\s*录$/ }).click();
   await expect(page).toHaveURL(base + '/help'); await expect(page.getByRole('heading', { level: 1, name: 'Orbit 使用指南', exact: true })).toBeVisible();
 });
+
+test('Android advanced settings show extensions without the retired server selector', async ({ context, page }) => {
+  await login(context);
+  await context.addInitScript(() => { window.OrbitNative = { postMessage() {} }; });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(base + '/settings/advanced');
+  await expect(page.getByRole('link', { name: '打开邮箱导入' })).toBeVisible();
+  await expect(page.getByText('服务器设置', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('选择服务器', { exact: true })).toHaveCount(0);
+});
+
+test('desktop popup retries a failed acknowledgment without replaying the notification', async ({ context, page }) => {
+  await login(context);
+  await context.addInitScript(() => {
+    class MockNotification {
+      static permission = 'granted';
+      constructor(title: string) { document.documentElement.setAttribute('data-test-popup', (document.documentElement.getAttribute('data-test-popup') || '') + title); }
+    }
+    Object.defineProperty(window, 'Notification', { value: MockNotification });
+  });
+  let acknowledged = 0;
+  await page.route('**/api/notifications?popup=1', route => route.fulfill({
+    json: { popups: acknowledged < 2 ? [{ id: 'fixture-popup', title: '新提醒', body: '示例' }] : [] },
+  }));
+  await page.route('**/api/notifications/fixture-popup/read', route => route.fulfill({ status: ++acknowledged === 1 ? 503 : 200, json: {} }));
+  await page.goto(base + '/today');
+  await expect.poll(() => acknowledged).toBe(1);
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect.poll(() => acknowledged).toBe(2);
+  await expect(page.locator('html')).toHaveAttribute('data-test-popup', '新提醒');
+});

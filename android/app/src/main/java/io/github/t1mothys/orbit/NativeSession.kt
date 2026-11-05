@@ -6,7 +6,6 @@ import com.google.firebase.messaging.FirebaseMessaging
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
-import java.net.URI
 import java.net.URL
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -28,8 +27,7 @@ object NativeSession {
         return JSONObject().put("developerTools", BuildConfig.DEVELOPER_TOOLS).put("version", BuildConfig.VERSION_NAME).put("installationId", p.getString("installation", ""))
             .put("installationKey", p.getString("key", "")).put("fid", p.getString("fid", null) ?: JSONObject.NULL)
             .put("notificationPermission", NotificationSupport.permission(c)).put("exactAlarmPermission", NotificationSupport.exactPermission(c))
-            .put("fcmConfigured", ServerEnvironment.pushEnabled(c)).put("fcmState", if (ServerEnvironment.current(c) == ServerPreset.STAGING) "测试环境不注册手机推送" else p.getString("fcm_state", if (BuildConfig.FCM_CONFIGURED) "尚未注册" else "未配置"))
-            .put("server", JSONObject().put("id", ServerEnvironment.current(c).id).put("label", ServerEnvironment.current(c).label).put("url", ServerEnvironment.url(ServerEnvironment.current(c))))
+            .put("fcmConfigured", BuildConfig.FCM_CONFIGURED).put("fcmState", p.getString("fcm_state", if (BuildConfig.FCM_CONFIGURED) "尚未注册" else "未配置"))
             .put("binding", binding).put("pendingLocal", NotificationSupport.pendingStatus(c))
             .put("localResult", p.getString("local_result", "尚未安排本地测试")).put("fcmResult", p.getString("fcm_result", "未记录"))
             .put("pendingNotification", p.getString("pending_notification", null) ?: JSONObject.NULL)
@@ -55,7 +53,7 @@ object NativeSession {
         p.edit().putString("web_account", id).apply()
     }
     fun register(c: Context, force: Boolean = false) {
-        if (!ServerEnvironment.pushEnabled(c) || registering || resetting || NotificationSupport.prefs(c).getBoolean("reset_pending", false) || NotificationSupport.prefs(c).getString("account", null) == null) return
+        if (!BuildConfig.FCM_CONFIGURED || registering || resetting || NotificationSupport.prefs(c).getBoolean("reset_pending", false) || NotificationSupport.prefs(c).getString("account", null) == null) return
         if (!force && NotificationSupport.prefs(c).getString("fid", null) != null) return
         registering = true
         val account = NotificationSupport.prefs(c).getString("account", null)
@@ -73,14 +71,13 @@ object NativeSession {
         require(fid == p.getString("fid", null)) { "FCM 身份已更新，请刷新注册" }
         p.edit().putString("device", input.getString("id")).putString("generation", input.getString("generation")).apply()
     }
-    fun logout(c: Context, afterReset: ((Boolean) -> Unit)? = null) {
-        if (afterReset != null && (resetting || registering)) { afterReset(false); return }
+    fun logout(c: Context) {
         val p = NotificationSupport.prefs(c)
         val id = p.getString("device", null)
         val hadRegistration = p.getString("account", null) != null || p.getString("fid", null) != null || p.getBoolean("reset_pending", false)
         synchronized(queueLock) {
             val queue = JSONArray(p.getString("revocations", "[]"))
-            if (id != null) queue.put(JSONObject().put("id", id).put("generation", p.getString("generation", "")).put("key", p.getString("key", "")).put("origin", ServerEnvironment.origin(ServerEnvironment.current(c))))
+            if (id != null) queue.put(JSONObject().put("id", id).put("generation", p.getString("generation", "")).put("key", p.getString("key", "")).put("origin", ServerEnvironment.origin))
             p.edit().putString("revocations", queue.toString()).remove("device").remove("generation").remove("account").remove("fid").remove("pending_notification").apply()
         }
         NotificationSupport.cancel(c, "退出或换账号，已清理本地测试")
@@ -94,15 +91,15 @@ object NativeSession {
                 resetting = false
                 p.edit().putString("fcm_state", if (it.isSuccessful) "已撤销注册" else "撤销注册未完成，下次启动重试")
                     .putBoolean("reset_pending", !it.isSuccessful).apply()
-                if (afterReset != null) afterReset(it.isSuccessful) else if (it.isSuccessful) register(c)
+                if (it.isSuccessful) register(c)
             }
-        } else afterReset?.invoke(!resetting)
+        }
     }
     fun abandon(c: Context, input: JSONObject) {
         synchronized(queueLock) {
             val p = NotificationSupport.prefs(c)
             val queue = JSONArray(p.getString("revocations", "[]"))
-            queue.put(JSONObject().put("id", input.getString("id")).put("generation", input.getString("generation")).put("key", p.getString("key", "")).put("origin", ServerEnvironment.origin(ServerEnvironment.current(c))))
+            queue.put(JSONObject().put("id", input.getString("id")).put("generation", input.getString("generation")).put("key", p.getString("key", "")).put("origin", ServerEnvironment.origin))
             p.edit().putString("revocations", queue.toString()).apply()
         }
         compensate(c)
@@ -118,15 +115,13 @@ object NativeSession {
     }
     fun compensate(c: Context) {
         executor.execute {
-            // Drain each environment's queue against its own fixed origin, including after a switch.
-            for (preset in ServerPreset.entries) {
-            val p = c.getSharedPreferences(if (preset == ServerPreset.PRODUCTION) "orbit_native" else "orbit_native_stage", Context.MODE_PRIVATE)
+            val p = NotificationSupport.prefs(c)
+            val origin = ServerEnvironment.origin
             val queue = synchronized(queueLock) { JSONArray(p.getString("revocations", "[]")) }
             val remaining = JSONArray()
             for (i in 0 until queue.length()) {
                 val value = queue.getJSONObject(i)
                 try {
-                    val origin = ServerEnvironment.origin(preset)
                     require(value.optString("origin", origin) == origin) { "解绑环境不匹配" }
                     val connection = URL("$origin/api/android-push/revoke").openConnection() as HttpURLConnection
                     connection.requestMethod = "POST"; connection.instanceFollowRedirects = false
@@ -145,7 +140,6 @@ object NativeSession {
                 val known = (0 until queue.length()).map { queue.getJSONObject(it).toString() }.toSet()
                 for (i in 0 until current.length()) if (current.getJSONObject(i).toString() !in known) remaining.put(current.getJSONObject(i))
                 p.edit().putString("revocations", remaining.toString()).apply()
-            }
             }
         }
     }

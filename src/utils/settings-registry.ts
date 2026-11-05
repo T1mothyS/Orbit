@@ -1,7 +1,6 @@
 import { settingKeywords, searchSettings, type SearchableSetting } from './settings-search.js';
 // Stable IDs are shared by the settings UI, search and read-only AI recall. No values or secrets.
 const definitions = [
-  {id:'android-server-settings',section:'android-server',label:'服务器设置',description:'Android 客户端切换正式或测试服务器，隔离登录与缓存。',admin:false},
   {id:'advanced-mail-import',section:'advanced-features',label:'邮箱导入',description:'收集邮箱事务，核对后确认导入。',admin:false},
   {id:'advanced-experience',section:'advanced-features',label:'记录经历',description:'复盘个人经历，预览后确认保存。',admin:false},
   {id:'advanced-research',section:'advanced-features',label:'研究与观点',description:'管理研究记录与已确认观点。',admin:false},
