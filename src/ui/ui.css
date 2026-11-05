@@ -186,6 +186,9 @@
 .oui-popup-header > div { min-width: 0; }
 .oui-popup-title { margin: 0 0 var(--orbit-space-1); font-size: var(--orbit-type-section-title); line-height: 1.5; font-weight: 600; }
 .oui-popup-header > .oui-icon-button { margin-top: calc(-1 * var(--orbit-space-2)); margin-right: calc(-1 * var(--orbit-space-2)); }
+.oui-popup-header--with-actions { align-items: center; gap: var(--orbit-space-2); }
+.oui-popup-header--with-actions .oui-popup-title { margin-bottom: 0; overflow-wrap: anywhere; }
+.oui-popup-header-actions { display: flex; align-items: center; flex: none; }
 .oui-popup-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 var(--orbit-space-6) var(--orbit-space-6); }
 .oui-popup-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--orbit-space-2); border-top: 1px solid var(--orbit-border); padding: var(--orbit-space-4) var(--orbit-space-6); flex: 0 0 auto; }
 .oui-overlay--sheet { place-items: stretch end; padding: 0; }

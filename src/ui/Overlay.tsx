@@ -12,6 +12,7 @@ export interface DialogProps {
   title: string;
   description?: string;
   children: ReactNode;
+  headerActions?: ReactNode;
   footer?: ReactNode;
   busy?: boolean;
   canClose?: () => boolean;
@@ -20,8 +21,9 @@ export interface DialogProps {
   returnFocus?: RefObject<HTMLElement | null>;
   portalContainer?: HTMLElement | null;
 }
-function Overlay({ open, onOpenChange, title, description, children, footer, busy = false, canClose, size = 'default', initialFocus, returnFocus, portalContainer, sheet = false }: DialogProps & { sheet?: boolean }) {
+function Overlay({ open, onOpenChange, title, description, children, headerActions, footer, busy = false, canClose, size = 'default', initialFocus, returnFocus, portalContainer, sheet = false }: DialogProps & { sheet?: boolean }) {
   const close = useRef<HTMLButtonElement>(null);
+  const closeButton = <PrimitiveDialog.Close render={<IconButton ref={close} label={`关闭${title}`} variant="quiet" disabled={busy}><X size={19} /></IconButton>} />;
   return <PrimitiveDialog.Root open={open} onOpenChange={(next, details) => {
     if (!next && (busy || canClose?.() === false)) details.cancel(); else onOpenChange(next);
   }} disablePointerDismissal={busy}>
@@ -30,9 +32,9 @@ function Overlay({ open, onOpenChange, title, description, children, footer, bus
       <PrimitiveDialog.Viewport className={`oui-overlay ${sheet ? 'oui-overlay--sheet' : ''}`}>
         <PrimitiveDialog.Popup className={`oui-root oui-popup${size === 'wide' ? ' oui-popup--wide' : ''} ${sheet ? 'oui-sheet' : ''}`} aria-busy={busy || undefined}
           initialFocus={initialFocus || close} finalFocus={returnFocus} onKeyDown={event => { if (event.key === 'Escape' && portalContainer) { event.preventDefault(); event.stopPropagation(); if (!busy) onOpenChange(false); } }}>
-          <header className="oui-popup-header"><div><PrimitiveDialog.Title className="oui-popup-title">{title}</PrimitiveDialog.Title>
+          <header className={`oui-popup-header${headerActions ? ' oui-popup-header--with-actions' : ''}`}><div><PrimitiveDialog.Title className="oui-popup-title">{title}</PrimitiveDialog.Title>
             {description && <PrimitiveDialog.Description className="oui-help">{description}</PrimitiveDialog.Description>}</div>
-            <PrimitiveDialog.Close render={<IconButton ref={close} label={`关闭${title}`} variant="quiet" disabled={busy}><X size={19} /></IconButton>} />
+            {headerActions ? <div className="oui-popup-header-actions">{headerActions}{closeButton}</div> : closeButton}
           </header>
           <div className="oui-popup-body">{children}</div>
           {footer && <footer className="oui-popup-footer">{footer}</footer>}

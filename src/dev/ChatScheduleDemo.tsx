@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Bell, Bot, CalendarDays, Check, Clock3, MapPin, Moon, Pencil, RotateCcw, Sun, Trash2, X } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
-import { Button, ConfirmDialog, Dialog, FilePicker, FormField, IconButton, Input, Select, Switch, Textarea, Tooltip, useToast } from '../ui';
+import { Button, ConfirmDialog, Dialog, FilePicker, FormField, IconButton, Input, Switch, Textarea, Tooltip, useToast } from '../ui';
 import { getScheduleCategory } from '../utils/scheduleCategories';
 import './chat-schedule-demo.css';
 
@@ -30,9 +30,9 @@ const extraSchedules: Schedule[] = [
 ];
 
 const reminderOptions = [
-  { value: '0', label: '准时' },
-  ...[5, 15, 30, 60].map(minutes => ({ value: String(minutes), label: `提前 ${minutes} 分钟` })),
-  { value: 'custom', label: '自定义' },
+  { minutes: null, label: '无需提醒' },
+  { minutes: 15, label: '提前 15 分钟' },
+  { minutes: 60, label: '提前 1 小时' },
 ];
 
 const answers = { draft: '整理成待确认日程', discuss: '先讨论这件事' };
@@ -221,7 +221,8 @@ function ScheduleDetail({ item, returnFocus, onClose, onUpdate, onDelete, saveRe
     footer={editing ? <>
       <Button onClick={() => setEditing(false)}>取消</Button>
       <Button variant="primary" type="submit" form="demo-edit-schedule" disabled={!draft.title.trim() || !draft.time.trim()}>保存修改</Button>
-    </> : <div className="demo-detail-actions">
+    </> : undefined}
+    headerActions={!editing && <div className="demo-detail-actions" role="group" aria-label="日程操作">
       <Tooltip content="删除"><IconButton ref={deleteButton} label="删除" variant="quiet" onClick={() => setConfirm(true)}><Trash2 className="demo-delete-glyph" size={19} aria-hidden="true" /></IconButton></Tooltip>
       <Tooltip content={completeLabel}><IconButton label={completeLabel} variant="quiet" onClick={() => {
         onUpdate({ ...item, completed: !item.completed });
@@ -258,18 +259,18 @@ function ScheduleDetail({ item, returnFocus, onClose, onUpdate, onDelete, saveRe
 }
 
 function ReminderEditor({ item, onSave }: { item: Schedule; onSave: (reminder: Schedule['reminder']) => boolean }) {
-  const [enabled, setEnabled] = useState(item.reminder.enabled);
-  const [minutes, setMinutes] = useState(String(item.reminder.minutes));
-  const [selection, setSelection] = useState(reminderOptions.some(option => option.value === minutes) ? minutes : 'custom');
+  const savedMinutes = item.reminder.enabled ? item.reminder.minutes : null;
+  const savedCustom = savedMinutes !== null && !reminderOptions.some(option => option.minutes === savedMinutes);
+  const [minutes, setMinutes] = useState(savedCustom ? String(savedMinutes) : '');
   const [feedback, setFeedback] = useState<'saved' | 'failed' | 'invalid'>();
-  const selectedMinutes = selection === 'custom' ? minutes.trim() : selection;
-  const valid = /^\d+$/.test(selectedMinutes) && Number(selectedMinutes) <= 10080;
-  const dirty = enabled !== item.reminder.enabled || (enabled && (!valid || Number(selectedMinutes) !== item.reminder.minutes));
 
-  function save() {
-    if (enabled && !valid) { setFeedback('invalid'); return; }
-    const saved = onSave({ enabled, minutes: enabled ? Number(selectedMinutes) : item.reminder.minutes });
-    setFeedback(saved ? 'saved' : 'failed');
+  function save(nextMinutes: number | null) {
+    if (!onSave({ enabled: nextMinutes !== null, minutes: nextMinutes ?? item.reminder.minutes })) {
+      setFeedback('failed');
+      return;
+    }
+    setMinutes(reminderOptions.some(option => option.minutes === nextMinutes) ? '' : String(nextMinutes));
+    setFeedback('saved');
   }
 
   const rule = item.reminderRule === 'all-day'
@@ -277,28 +278,35 @@ function ReminderEditor({ item, onSave }: { item: Schedule; onSave: (reminder: S
     : item.reminderRule === 'recurring' ? '沿用周期提醒时间，可以在周期提醒中调整。' : undefined;
 
   return <section className="demo-reminder" aria-label="主动聊天提醒">
-    <div className="demo-reminder-heading">
-      <h2><Bell size={17} aria-hidden="true" />主动聊天提醒</h2>
-      {!rule && <Switch label="为这个事项提醒" checked={enabled} onCheckedChange={next => { setEnabled(next); setFeedback(undefined); }} />}
+    <div className="demo-reminder-row">
+      <h2 className="demo-reminder-heading"><Bell size={17} aria-hidden="true" />主动聊天提醒</h2>
+      {!rule && <form className="demo-reminder-options" aria-label="提醒时间" onSubmit={event => {
+        event.preventDefault();
+        const value = minutes.trim();
+        if (!/^\d+$/.test(value) || Number(value) > 10080) {
+          setFeedback('invalid');
+          return;
+        }
+        save(Number(value));
+      }}>
+        {reminderOptions.map(option => <Button key={option.label} aria-pressed={savedMinutes === option.minutes} onClick={() => save(option.minutes)}>{option.label}</Button>)}
+        <label className="demo-custom-minutes">
+          <Input aria-label="自定义提醒分钟数" aria-invalid={feedback === 'invalid' || undefined}
+            aria-describedby={feedback === 'invalid' ? 'demo-reminder-feedback' : 'demo-reminder-help'}
+            inputMode="numeric" enterKeyHint="done" placeholder="自定义" value={minutes}
+            data-current={(savedCustom && minutes === String(savedMinutes)) || undefined}
+            onChange={event => { setMinutes(event.target.value); setFeedback(undefined); }} />
+          <span aria-hidden="true">分钟</span>
+        </label>
+      </form>}
     </div>
     {rule ? <p className="demo-reminder-help">{rule}</p> : <>
-      <div className="demo-reminder-controls">
-        {enabled ? <Select label="提醒时间" value={selection} options={reminderOptions}
-          onValueChange={value => { if (value) { setSelection(value); setFeedback(undefined); } }} /> : <span className="demo-secondary">不为这个事项发送提醒</span>}
-        <Tooltip content="保存提醒"><IconButton label="保存提醒" variant="quiet" disabled={!dirty} onClick={save}><span className="demo-check-glyph"><Check size={20} strokeWidth={2.4} aria-hidden="true" /></span></IconButton></Tooltip>
+      <p className="demo-reminder-help" id="demo-reminder-help">自定义按回车保存。需开启对话列表中的「主动聊天提醒」。</p>
+      <div aria-live="polite">
+        {feedback === 'saved' && <p className="demo-reminder-feedback">提醒已保存</p>}
+        {feedback === 'invalid' && <p className="demo-reminder-feedback demo-error" id="demo-reminder-feedback">请输入 0–10080 之间的整数分钟。</p>}
+        {feedback === 'failed' && <p className="demo-reminder-feedback demo-error">提醒未保存，请重试。</p>}
       </div>
-      {enabled && selection === 'custom' && <div className="demo-custom-minutes">
-        <label htmlFor="demo-minutes">提前</label>
-        <Input id="demo-minutes" aria-label="提前提醒分钟数" aria-invalid={feedback === 'invalid' || undefined}
-          aria-describedby={feedback === 'invalid' ? 'demo-reminder-feedback' : undefined} inputMode="numeric" value={minutes}
-          onChange={event => { setMinutes(event.target.value); setFeedback(undefined); }}
-          onKeyDown={event => { if (event.key === 'Enter' && dirty) save(); }} />
-        <span>分钟</span>
-      </div>}
-      {feedback === 'saved' && <p className="demo-reminder-feedback" role="status">提醒已保存</p>}
-      {feedback === 'invalid' && <p className="demo-reminder-feedback demo-error" id="demo-reminder-feedback" role="alert">请输入 0–10080 之间的整数分钟。</p>}
-      {feedback === 'failed' && <p className="demo-reminder-feedback demo-error" role="alert">提醒未保存，设置已保留。请再试一次。</p>}
-      <p className="demo-reminder-help">需开启对话列表中的「主动聊天提醒」。</p>
     </>}
   </section>;
 }

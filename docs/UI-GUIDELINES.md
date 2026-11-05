@@ -18,7 +18,7 @@ Status: 第三轮 B—F 已实施，候选图待审阅；第一轮本地收口�
 
 当前账户实现从 `features/settings/account/AccountPage` 进入；`layouts/SettingsFrame` 只组合空间与导航，feature 提供分类及业务。认证的唯一所有者是 main 中的 `AuthProvider`；普通功能使用 `useAuth`，不再为每个控件各自请求身份。Settings 的父组件不按 pathname 重挂；共享草稿只从 SettingsState 访问。新增图片选择、头像和文本导航复用 ui 的 FilePicker/Avatar/TextLink。敏感表单只留组件内存，离开即卸载；不得加入 Settings 草稿缓存。接口与失效边界见 [账号安全合同](ARCHITECTURE.md#账号密码与登录失效)。
 
-新体系使用语义色、有限按钮变体、中文系统字体与轻量状态运动；输入至少 16px，触屏至少 44px。页面可以布局，不能重写 `.oui-*` 外观。Dialog/Sheet 统一名称、滚动、焦点和 busy 关闭保护，业务只提供内容/操作/状态。
+新体系使用语义色、有限按钮变体、中文系统字体与轻量状态运动；输入至少 16px，触屏至少 44px。页面可以布局，不能重写 `.oui-*` 外观。Dialog/Sheet 统一名称、滚动、焦点和 busy 关闭保护，业务只提供内容/操作/状态。标题旁的操作可以通过 `headerActions` 放在关闭按钮前，图标按钮应提供可访问名称。
 
 **视觉判断不限于 lint。** 主动检查层级、节奏、对齐、留白、密度、控件比例、主次动作、手机组织和动效；技术合规但笨重粗糙时继续修正。A 确认 Gallery 整体视觉，B 确认账户真实页四组设备/主题，C 确认 Settings 分类一致性。常规批次不逐个审批。已迁移区域同步删除旧实现；兼容映射最后使用方退出即删。
 
