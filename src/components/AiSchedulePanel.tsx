@@ -4,8 +4,8 @@ import type { NoteImage } from '../utils/note-images';
 import { NoteImageGallery, NoteImageInput, useNoteImageUpload } from './NoteImages';
 import { OrbitNotificationCard, type NotificationMeta } from './OrbitNotificationCard';
 import { ReminderActionButtons } from './ReminderActionButtons';
-import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle } from 'react';
-import { Bot, BookOpen, ArrowUp, Loader2, Check, Circle, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus, Bell, ArrowUpRight, Copy } from 'lucide-react';
+import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle, type CSSProperties } from 'react';
+import { Bot, BookOpen, ArrowUp, Loader2, Check, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus, Bell, ArrowUpRight, Copy } from 'lucide-react';
 import type { ActionConfirmation } from '../ui';
 import {safeChatHref} from '../utils/chat-markdown';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -24,6 +24,8 @@ import { useFileDrop } from '../hooks/useFileDrop';
 import { copyNoteText } from '../utils/note-clipboard';
 import {scheduleItemsForPlan} from '../utils/plan-schedule-items';
 import { navigationHref, settingAction } from '../utils/navigation-actions';
+import { getScheduleCategory } from '../utils/scheduleCategories';
+import { orbitQuickReplies, type OrbitQuickReplyChoice } from '../utils/orbit-quick-reply';
 
 // ==================== 类型 ====================
 
@@ -100,7 +102,12 @@ type MessageType = 'text' | 'schedules' | 'update' | 'plan' | 'error';
 
 interface ChatMessage {
   attachments?:ChatFile[];
-  orbitMeta?:NotificationMeta;
+  orbitMeta?: NotificationMeta & {
+    newRoundAt?: string;
+    processingMs?: number;
+    scheduleQuickReplies?: boolean;
+    quickReplyTo?: string;
+  };
   id: string;
   role: MessageRole;
   type: MessageType;
@@ -347,11 +354,15 @@ function ScheduleMiniCard({ schedule, onOpen, onOpenMenu }: {
   const date = schedule.is_unscheduled ? '无固定日期' : formatDate(schedule.start_time);
   const start = schedule.is_unscheduled ? '' : schedule.all_day ? '全天' : formatTime(schedule.start_time);
   const end = !schedule.is_unscheduled && !schedule.all_day && schedule.end_time ? formatTime(schedule.end_time) : '';
+  const category = getScheduleCategory(schedule.category);
 
   return <Button
     variant="quiet"
-    className="ai-schedule-card orbit-chat-task"
-    leadingIcon={schedule.is_completed ? <Check size={18} aria-hidden="true" /> : schedule.type === 'todo' ? <Circle size={18} aria-hidden="true" /> : <Clock size={18} aria-hidden="true" />}
+    className="orbit-chat-task"
+    style={{ '--schedule-category': category.color } as CSSProperties}
+    data-completed={!!schedule.is_completed}
+    aria-description={schedule.is_completed ? '已完成' : schedule.type === 'todo' ? '待办' : '日程'}
+    aria-haspopup="dialog"
     onClick={() => onOpen?.(schedule.id)}
     onContextMenu={event => {
       event.preventDefault();
@@ -366,22 +377,24 @@ function ScheduleMiniCard({ schedule, onOpen, onOpenMenu }: {
     }}
     aria-label={`打开日程详情：${schedule.title}`}
   >
-    <span className="orbit-chat-task-content">
-      <span className="orbit-chat-task-heading">
+    <span className="orbit-chat-task-face">
+      <span className="orbit-chat-task-content">
+        <small>{category.name}</small>
         <strong>{schedule.title}</strong>
-        <small>{schedule.is_completed ? '已完成' : schedule.type === 'todo' ? '待办' : '日程'}</small>
+        <span>{date} {start}{end && end !== start ? `–${end}` : ''}</span>
+        {schedule.location && <span className="orbit-chat-task-detail"><MapPin size={14} aria-hidden="true" />{schedule.location}</span>}
+        {schedule.notes && <span className="orbit-chat-task-note">{schedule.notes}</span>}
       </span>
-      <span className="orbit-chat-task-time">{date} {start}{end && end !== start ? `–${end}` : ''}</span>
-      {schedule.location && <span className="orbit-chat-task-detail"><MapPin size={14} aria-hidden="true" />{schedule.location}</span>}
-      {schedule.notes && <span className="orbit-chat-task-detail orbit-chat-task-note">{schedule.notes}</span>}
+      {schedule.is_completed
+        ? <span className="orbit-chat-task-check"><Check size={16} strokeWidth={2.5} aria-hidden="true" /></span>
+        : <ArrowUpRight className="orbit-chat-task-open" size={17} aria-hidden="true" />}
     </span>
-    <ArrowUpRight size={16} aria-hidden="true" />
   </Button>;
 }
 
 // ==================== 消息气泡 ====================
 
-function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSchedule, onOpenScheduleMenu, onConfirmPlan, onDiscardPlan, onUpdatePlanOperation, confirmingPlanId, savingPlanOperationKey }: {
+function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSchedule, onOpenScheduleMenu, onConfirmPlan, onDiscardPlan, onUpdatePlanOperation, confirmingPlanId, savingPlanOperationKey, onQuickReply, quickReplyDisabled }: {
   msg: ChatMessage;
   onReminderAction?:(id:string,action:string)=>Promise<void>;
   onNotificationRefresh?:()=>void;
@@ -392,6 +405,8 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
   onUpdatePlanOperation?: (planId: string, key: string, patch: Record<string, unknown>, action?: 'remove') => Promise<void>;
   confirmingPlanId?: string | null;
   savingPlanOperationKey?: string | null;
+  onQuickReply?: (choice: OrbitQuickReplyChoice) => Promise<void>;
+  quickReplyDisabled?: boolean;
 }) {
   const isUser = msg.role === 'user';
   const {authHeaders,user}=useAuth();
@@ -401,12 +416,22 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
   const [editingOperationKey, setEditingOperationKey] = useState<string | null>(null);
   const [reminderBusy,setReminderBusy]=useState(false),[reminderError,setReminderError]=useState('');
   const [copyFeedback, setCopyFeedback] = useState('');
+  const [quickReplyError, setQuickReplyError] = useState('');
+  const roundAt = parseMessageTimestamp(msg.orbitMeta?.newRoundAt || null);
+  const processingMs = msg.orbitMeta?.processingMs;
+  const elapsed = typeof processingMs === 'number' && Number.isFinite(processingMs) && processingMs >= 0
+    ? processingMs < 1000 ? '用时不到 1 秒' : `用时 ${Math.round(processingMs / 1000)} 秒`
+    : undefined;
   const timestamp = parseMessageTimestamp(msg.timestamp);
   const scheduleItems = msg.type === 'plan' ? scheduleItemsForPlan(msg.scheduleItems || [], msg.plan?.operations || []) : msg.scheduleItems;
   const messageTime = <time className={`ai-message-timestamp${isUser ? ' is-user' : ''}${msg.type === 'error' ? ' is-error' : ''}`} dateTime={timestamp ? msg.timestamp || undefined : undefined}>{formatMessageTimestamp(msg.timestamp)}</time>;
 
   if (isUser) {
     return (
+      <>
+      {roundAt && <div className="orbit-context-divider" role="separator" aria-label="开始新一轮对话">
+        <span><time dateTime={roundAt.toISOString()}>{roundAt.toLocaleString('zh-CN', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}</time> · 开始新一轮对话</span>
+      </div>}
       <div id={"orbit-message-"+msg.id} className="flex justify-end mb-3">
         <div
           className="orbit-user-message px-3 py-2 rounded-2xl rounded-tr-sm max-w-[88%] leading-relaxed whitespace-pre-line"
@@ -416,6 +441,7 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
           {messageTime}
         </div>
       </div>
+      </>
     );
   }
 
@@ -430,6 +456,7 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
       <header className="orbit-message-heading">
         {notification ? <Bell size={16} aria-hidden="true" /> : <Bot size={17} aria-hidden="true" />}
         <span>{notification ? 'Orbit 通知' : 'AI 助手'}{!notification && msg.intent && intentLabel[msg.intent] ? ` · ${intentLabel[msg.intent]}` : ''}</span>
+        {!notification && elapsed && <span className="orbit-message-duration"><Clock size={13} aria-hidden="true" />{elapsed}</span>}
       </header>
 
       {msg.type === 'error' ? (
@@ -520,6 +547,14 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
             {!!(msg.orbitMeta as any)?.steps?.length&&<details className="orbit-message-steps"><summary>处理步骤</summary>{(msg.orbitMeta as any).steps.map((s:any)=><p key={s.id}>{s.state==='completed'?'✓':s.state==='failed'?'!':'…'} {s.label} · {s.query}</p>)}</details>}
             {msg.plan?.state&&['completed','partially_completed','failed'].includes(msg.plan.state)&&<div className="orbit-outcome"><p role="status">{msg.plan.state==='completed'?`✓ ${planOutcomeLabel(msg.plan)}`:msg.plan.state==='partially_completed'?'部分操作已执行，请核对未执行项':'执行失败，正式结果请核对失败原因'}</p>{msg.plan.state!=='completed'&&<button type="button" className="secondary-button" disabled={!!savingPlanOperationKey} onClick={()=>void onUpdatePlanOperation?.(msg.plan!.id,'retry',{}).catch(e=>setReminderError(e.message))}>为失败项创建新草稿</button>}</div>}
             {msg.plan&&reminderError&&<p role="alert">{reminderError}</p>}
+            {onQuickReply && <div className="orbit-quick-replies" role="group" aria-label="快捷回答">
+              {(Object.keys(orbitQuickReplies) as OrbitQuickReplyChoice[]).map(choice => <Button key={choice} disabled={quickReplyDisabled}
+                onClick={() => {
+                  setQuickReplyError('');
+                  void onQuickReply(choice).catch(error => setQuickReplyError(error instanceof Error ? error.message : '快捷回答发送失败，请重试。'));
+                }}>{orbitQuickReplies[choice]}<ArrowUpRight size={14} aria-hidden="true" /></Button>)}
+            </div>}
+            {quickReplyError && <p className="orbit-inline-error" role="alert">{quickReplyError}</p>}
             <footer className="orbit-message-footer">
               {messageTime}
               {!notification && prose && <Button variant="quiet" size="small" className="orbit-copy-reply"
@@ -708,6 +743,15 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
       if(accepted && options.clearComposer !== false) consumeComposerDraft(submitted, false);
     } catch(error) {orbit.setError(error instanceof Error?error.message:'发送失败，请重试');}
   }, [orbit.send,orbit.setError,ai.provider,ai.model,ai.ready,attachments,draftKey]);
+
+  const sendQuickReply = useCallback(async (messageId: string, choice: OrbitQuickReplyChoice) => {
+    await orbit.send(orbitQuickReplies[choice], { calendarId: 'personal', provider: ai.provider, model: ai.model, quickReply: { messageId, choice } });
+  }, [orbit.send, ai.provider, ai.model]);
+
+  const answeredQuickReplies = new Set([
+    ...messages.map(message => message.orbitMeta?.quickReplyTo),
+    ...orbit.requests.map(request => request.quickReplyTo),
+  ]);
 
   const handleSubmit = useCallback(() => {
     void submitMessage(inputText, { clearComposer: true });
@@ -909,6 +953,9 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
             onUpdatePlanOperation={handleUpdatePlanOperation}
             confirmingPlanId={confirmingPlanId}
             savingPlanOperationKey={savingPlanOperationKey}
+            onQuickReply={entry.msg.orbitMeta?.scheduleQuickReplies && !answeredQuickReplies.has(entry.msg.id)
+              ? choice => sendQuickReply(entry.msg!.id, choice) : undefined}
+            quickReplyDisabled={!ai.ready || orbit.submitting || orbit.creating || orbit.mutating}
           />
         ) : entry.request ? <OrbitRequestStatus key={entry.id} request={entry.request} onAction={verb => orbit.action(entry.request!.id,verb)}/> : null)}
 

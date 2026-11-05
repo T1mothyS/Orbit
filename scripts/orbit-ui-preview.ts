@@ -8,8 +8,9 @@ import {randomUUID} from 'node:crypto';
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'orbit-ui-preview-'));
 const browserAudit=process.argv.includes('--browser-audit');
 const accountUi=process.argv.includes('--account-ui');
+const chatRoundPreview=process.argv.includes('--chat-round-preview');
 Object.assign(process.env,{DATA_DIR:root,NODE_ENV:'test',APP_ENV:'development',JWT_SECRET:'isolated-preview-only-no-production',BACKGROUND_JOBS_ENABLED:'false',ORBIT_PROACTIVE_ENABLED:'false'});
-if(browserAudit||accountUi) Object.assign(process.env,{ANDROID_PUSH_ENABLED:'false',DIGEST_V2_ENABLED:'false',SMTP_USER:'',SMTP_PASS:'',IMAP_PASS:'',CODEBUDDY_API_KEY:'',BACKUP_ENCRYPTION_KEY:''});
+if(browserAudit||accountUi||chatRoundPreview) Object.assign(process.env,{ANDROID_PUSH_ENABLED:'false',DIGEST_V2_ENABLED:'false',SMTP_USER:'',SMTP_PASS:'',IMAP_PASS:'',CODEBUDDY_API_KEY:'',BACKUP_ENCRYPTION_KEY:''});
 const api=await import('../server/index.js');await api.initializeServer();
 const db=await import('../server/db.js'),orbit=await import('../server/orbit-store.js'),state=await import('../server/ai-chat-state.js');
 const {buildAiPlanSnapshot}=await import('../server/ai-plan.js');
@@ -113,7 +114,12 @@ if(process.argv.includes('--iteration')) {
     const saved=state.saveAiScheduleResponseHistory(userId,result);res.json({...result,historyMessageId:saved.id});
   });
 }
+const chatRound = chatRoundPreview ? await import('./orbit-chat-round-preview.js') : undefined;
+if (chatRound) await chatRound.seedChatRoundPreview();
 const app=express();
+if (chatRound) app.get('/api/models', (_req, res) => res.json({
+  models: [{ modelId: chatRound.roundPreviewModel, displayName: '本地合成模型' }], defaultModel: chatRound.roundPreviewModel,
+}));
 if(browserAudit||accountUi) {
   // Read-only synthetic integration displays, never SDK/model/CalDAV calls.
   app.get('/api/models',(_req,res)=>res.json({models:[],defaultModel:'glm-5.1'}));
@@ -125,7 +131,7 @@ if(process.argv.includes('--iteration')) {
   app.get('/api/check-login',(_req,res)=>res.json({isLoggedIn:true}));
 }
 app.use(api.app);app.use(express.static(path.resolve('dist')));app.get('*',(_req,res)=>res.sendFile(path.resolve('dist/index.html')));
-const port=Number(process.argv[2]||4183),server=app.listen(port,'127.0.0.1',()=>console.log(`Isolated preview: http://127.0.0.1:${port}; synthetic login preview@example.invalid / OrbitPreview123!`));
+const port=Number(process.argv[2]||4183),server=app.listen(port,'127.0.0.1',()=>console.log(`Isolated preview: http://127.0.0.1:${port}; synthetic login ${chatRound?.roundPreviewEmail || 'preview@example.invalid'} / OrbitPreview123!`));
 if(browserAudit) Object.assign(process.env,{ORBIT_UI_AUDIT_SYNTHETIC:'true',API_PROXY_TARGET:`http://127.0.0.1:${port}`});
 const auditFrontend=browserAudit ? await (await import('vite')).createServer({mode:'ui-audit',server:{host:'127.0.0.1',port:port+1,strictPort:true}}) : undefined;
 if(auditFrontend) { await auditFrontend.listen(); console.log(`Synthetic browser audit: http://127.0.0.1:${port+1}`); }

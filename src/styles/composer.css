@@ -105,7 +105,28 @@
 .ai-schedule-page-card .schedule-ai-reading-column,
 .orbit-composer-content { width:min(100%,720px); }
 .schedule-ai-reading-column { padding:12px 8px 20px; }
-.orbit-message { min-width:0; margin-block:0 28px; }
+.orbit-message {
+  min-width: 0;
+  margin-block: 0 var(--orbit-space-6);
+  padding: var(--orbit-space-4);
+  border: 1px solid var(--orbit-border);
+  border-radius: var(--orbit-radius-panel);
+  background: var(--orbit-elevated);
+}
+.orbit-context-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--orbit-space-3);
+  margin-block: var(--orbit-space-4);
+  color: var(--orbit-text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+.orbit-context-divider::before, .orbit-context-divider::after { content: ''; flex: 1; height: 1px; background: var(--orbit-border); }
+.orbit-message-duration { margin-inline-start: auto; display: flex; align-items: center; gap: var(--orbit-space-1); font-weight: 400; font-variant-numeric: tabular-nums; }
+.orbit-quick-replies { display: flex; flex-wrap: wrap; gap: var(--orbit-space-2); margin-block: var(--orbit-space-3); }
+.orbit-quick-replies .oui-button { min-height: var(--orbit-touch-target); }
+.orbit-quick-replies .oui-button > span { display: inline-flex; align-items: center; gap: var(--orbit-space-2); }
 .orbit-message-heading { display:flex; align-items:center; gap:8px; color:var(--orbit-text-secondary); font-size:12px; font-weight:600; margin-bottom:9px; }
 .orbit-message-heading > svg { color:var(--orbit-action); flex:none; }
 .orbit-message-content { min-width:0; }
@@ -124,18 +145,47 @@
 .orbit-message-error { padding:12px 14px; border:1px solid var(--orbit-border); border-inline-start-color:var(--orbit-destructive); border-radius:var(--orbit-radius-control); background:var(--orbit-muted); }
 .orbit-message-error .orbit-message-body { color:var(--orbit-destructive); }
 .orbit-chat-task-list { display:grid; gap:6px; margin:10px 0; }
-.orbit-chat-task.ai-schedule-card { display:grid; grid-template-columns:18px minmax(0,1fr) 16px; gap:10px; align-items:start; justify-content:stretch; width:100%; padding:11px 12px; border:1px solid var(--orbit-border); border-radius:var(--orbit-radius-card); background:var(--td-bg-color-container); text-align:start; }
-.orbit-chat-task.ai-schedule-card:hover { background:var(--orbit-muted); transform:none; box-shadow:none; }
-.orbit-chat-task > span { display:contents; }
-.orbit-chat-task svg { margin-top:2px; color:var(--orbit-text-secondary); }
-.orbit-chat-task-content { display:grid; min-width:0; gap:3px; overflow-wrap:anywhere; }
-.orbit-chat-task-heading { display:flex; align-items:baseline; flex-wrap:wrap; gap:2px 10px; }
-.orbit-chat-task-heading strong { color:var(--orbit-text); font-size:15px; font-weight:650; }
-.orbit-chat-task-heading small,.orbit-chat-task-detail { font-size:12px; color:var(--orbit-text-secondary); }
-.orbit-chat-task-time { color:var(--orbit-text); font-size:13px; font-variant-numeric:tabular-nums; }
-.orbit-chat-task-detail { display:flex; align-items:baseline; gap:4px; }
-.orbit-chat-task-detail svg { flex:none; }
-.orbit-chat-task-note { display:block; white-space:pre-wrap; }
+.orbit-chat-task.oui-button { width: 100%; min-width: 0; padding: 0; text-align: start; }
+.orbit-chat-task > span { display: block; width: 100%; min-width: 0; }
+.orbit-chat-task-face {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--orbit-space-3);
+  padding: var(--orbit-space-3);
+  border: 1px solid color-mix(in srgb, var(--schedule-category) 25%, var(--orbit-border));
+  border-radius: var(--orbit-radius-card);
+  background: color-mix(in srgb, var(--schedule-category) 10%, var(--orbit-elevated));
+  color: var(--orbit-text);
+}
+.dark .orbit-chat-task-face { background: color-mix(in srgb, var(--schedule-category) 13%, var(--orbit-elevated)); }
+.orbit-chat-task:is(:hover, :active) .orbit-chat-task-face { background: color-mix(in srgb, var(--schedule-category) 16%, var(--orbit-elevated)); }
+.dark .orbit-chat-task:is(:hover, :active) .orbit-chat-task-face { background: color-mix(in srgb, var(--schedule-category) 21%, var(--orbit-elevated)); }
+.orbit-chat-task-content {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  overflow-wrap: anywhere;
+  color: color-mix(in srgb, var(--orbit-text) 72%, var(--schedule-category));
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.orbit-chat-task-content strong { color: var(--orbit-text); font-size: 15px; font-weight: 650; }
+.orbit-chat-task-content small { font-size: inherit; font-weight: 600; }
+.orbit-chat-task[data-completed=true] .orbit-chat-task-content > * { text-decoration: line-through; }
+.orbit-chat-task-detail { display: flex; align-items: center; gap: 4px; }
+.orbit-chat-task-note { white-space: pre-wrap; }
+.orbit-chat-task-open { color: var(--orbit-text-secondary); margin-top: var(--orbit-space-1); }
+.orbit-chat-task-check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--orbit-radius-full);
+  color: var(--orbit-success);
+  background: var(--orbit-success-soft);
+}
 .orbit-message .orbit-notification-actions { gap:2px; margin-top:12px; padding-top:9px; }
 .orbit-message .orbit-notification-actions > div { gap:4px; }
 .orbit-notification-actions time { font-variant-numeric:tabular-nums; }
@@ -167,6 +217,6 @@
 .note-drop-feedback { margin:6px 0 0; color:var(--orbit-text-secondary); font-size:12px; }
 @media (max-width:640px) {
   .schedule-ai-reading-column { padding-inline:3px; }
-  .orbit-message { margin-bottom:24px; }
+  .orbit-message { padding: var(--orbit-space-3); }
   .orbit-chat-code-actions button { min-height:44px; }
 }

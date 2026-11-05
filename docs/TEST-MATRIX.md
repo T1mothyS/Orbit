@@ -46,6 +46,8 @@ Full/Release 的 UI 覆盖 390×844、430×932、768×1024、1440×900 明暗主
 
 单独调试时先构建，再启动 `node --import tsx scripts/orbit-ui-preview.ts 4198 --iteration --browser-audit`，创建新的合成数据库并提供普通端 4198、自动化端 4199。端口被占用时换一对空闲端口，不停止其他任务的进程。
 
+聊天分轮本地体验可在构建后运行 `node --import tsx scripts/orbit-ui-preview.ts 4188 --chat-round-preview`，用启动日志给出的合成账号登录 `/assistant`。正式页面使用临时数据库和真实请求队列，合成模型提供可重复的讨论和草稿结果。预览覆盖轮次分隔、计时、提醒保存及确认边界。
+
 给 Smoke 进程设置 ORBIT_UI_AUDIT_SYNTHETIC=true、ORBIT_PREVIEW_URL=http://127.0.0.1:4198、ORBIT_AUDIT_URL=http://127.0.0.1:4199，然后执行对应脚本。普通模式验证设置导航实际 confirm/beforeunload及日程应用内确认；ui-audit 模式只处理显式合成样本，不能作为生产绕过保护的方法。
 
 scripts/browser-automation.cjs 必须在导航前附加；每次原生确认先用 expectDialog 指定类型、消息和 accept/dismiss。未知弹窗默认拒绝并记失败；权限按合成 origin 显式授予，不改全局浏览器。IAB 引导仅在 serve + ui-audit + 显式合成 + loopback 条件生效。具体故障现场保留在日期快照，不由工具限制推定产品失败。

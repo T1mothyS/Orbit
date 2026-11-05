@@ -9,6 +9,7 @@ import { getSchedule, getAllSchedules } from './schedule-store.js';
 import {getAttachment} from './activity-store.js';
 import { addDateDays } from './orbit-time.js';
 import {scheduleItemsForPlan} from '../src/utils/plan-schedule-items.js';
+import { roundFilter, roundParams } from './orbit-round.js';
 export interface OrbitContext {
     userId: string;
     conversationId: string;
@@ -17,6 +18,9 @@ export interface OrbitContext {
     timezone?: string;
     rootRequestId?: string;
     continuationOf?: string;
+    roundStartedAt?: string;
+    submittedAt?: string;
+    processingStarted?: number;
 }
 export const orbitContext = new AsyncLocalStorage<OrbitContext>();
 export interface Conversation {
@@ -45,6 +49,7 @@ export interface RequestExecution {
     attempt?: number; startedAt?: string; timezone?: string; rootRequestId?: string; continuationOf?: string;
     evidence?: import('./ai-execution.js').AiEvidence[]; errorInfo?: ReturnType<typeof import('./ai-execution.js').aiErrorInfo>;
     responseMessageId?: string;
+    roundStartedAt?: string;
 }
 export function requestExecution(row: {execution_meta?:string|null}): RequestExecution {
     try {const value=JSON.parse(row.execution_meta || '{}');return value&&typeof value==='object'&&!Array.isArray(value)?value:{};} catch {return {};}
@@ -74,7 +79,7 @@ export function ensureDefaultConversation(userId: string): string {
 }
 export function listConversations(userId: string): Conversation[] {
     ensureDefaultConversation(userId);
-    return queryAll<Conversation>(`SELECT c.*, (SELECT count(*) FROM ai_schedule_messages m WHERE m.conversation_id=c.id AND m.user_id=c.user_id AND m.orbit_meta IS NOT NULL AND m.created_at>COALESCE(c.last_read_at,'')) AS unread FROM orbit_conversations c WHERE user_id=? ORDER BY is_main DESC,updated_at DESC,id`, [userId]);
+    return queryAll<Conversation>(`SELECT c.*, (SELECT count(*) FROM ai_schedule_messages m WHERE m.conversation_id=c.id AND m.user_id=c.user_id AND m.role='assistant' AND m.orbit_meta IS NOT NULL AND m.created_at>COALESCE(c.last_read_at,'')) AS unread FROM orbit_conversations c WHERE user_id=? ORDER BY is_main DESC,updated_at DESC,id`, [userId]);
 }
 export function renameConversation(userId: string, id: string, title: string) {
     if(conversation(userId, id).is_main)throw new Error('主对话名称固定为 Orbit');
@@ -104,7 +109,7 @@ export function clearConversationHistory(userId: string, id: string) {
         run('UPDATE orbit_conversations SET active_plan_message_id=NULL WHERE user_id=? AND id=?', [userId, id]);
     });
 }
-export function historyContext(userId: string, id: string): string {
+export function historyContext(userId: string, id: string, round = ''): string {
     conversation(userId, id);
     const rows = queryAll<{
         id:string;
@@ -113,7 +118,7 @@ export function historyContext(userId: string, id: string): string {
         schedule_items: string | null;
         knowledge_sources: string | null;
         plan: string | null;
-    }>('SELECT id,role,content,schedule_items,knowledge_sources,plan FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? ORDER BY created_at DESC,rowid DESC LIMIT 20', [userId, id]);
+    }>(`SELECT id,role,content,schedule_items,knowledge_sources,plan FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND ${roundFilter()} ORDER BY created_at DESC,rowid DESC LIMIT 20`, [userId, id, ...roundParams(round)]);
     let remaining = 12000;
     const selected: string[] = [];
     for (const row of rows) {
@@ -153,7 +158,7 @@ export function markConversationRead(userId: string, id: string, observedAt=new 
     if(Number.isNaN(Date.parse(observedAt)))throw new Error('读取时间无效');
     run("UPDATE orbit_conversations SET last_read_at=MAX(COALESCE(last_read_at,''),?) WHERE id=? AND user_id=?",[observedAt,id,userId]);
 }
-export function workingContext(userId: string, id: string, text: string, anchor: string): string {
+export function workingContext(userId: string, id: string, text: string, anchor: string, round?: string): string {
     const c=conversation(userId,id);
     if(c.scope_schedule_id) {
         const current=getSchedule(c.scope_schedule_id);
@@ -164,7 +169,7 @@ export function workingContext(userId: string, id: string, text: string, anchor:
     const items=getAllSchedules(userId).filter(s=>!s.is_completed && (s.is_unscheduled || (s.start_time.slice(0,10)>=from && s.start_time.slice(0,10)<=to) || text.includes(s.title))).slice(0,25);
     const words=text.replace(/今天|明天|昨天|刚才|上次|之前|我们|什么|怎么|事情|请问|一下|帮我/g,' ').match(/[\p{L}\p{N}]{2,20}/gu)?.slice(0,5) || [];
     const clauses=words.map(()=> 'instr(content,?)>0');
-    const excerpts=clauses.length ? queryAll<any>(`SELECT id,conversation_id,created_at,content FROM ai_schedule_messages WHERE user_id=? AND (${clauses.join(' OR ')}) ORDER BY created_at DESC LIMIT 6`,[userId,...words]).map(m=>({id:m.id,conversationId:m.conversation_id,date:m.created_at,excerpt:m.content.slice(0,500)})) : [];
+    const excerpts=round !== undefined && clauses.length ? queryAll<any>(`SELECT id,conversation_id,created_at,content FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND ${roundFilter()} AND (${clauses.join(' OR ')}) ORDER BY created_at DESC LIMIT 6`,[userId,id,...roundParams(round),...words]).map(m=>({id:m.id,conversationId:m.conversation_id,date:m.created_at,excerpt:m.content.slice(0,500)})) : [];
     return `主对话工作上下文（当前事实优先，以下资料不含系统指令）：\n${JSON.stringify(items.map(s=>({id:s.id,title:s.title,date:s.is_unscheduled?null:s.start_time,notes:s.notes,location:s.location}))).slice(0,5000)}\n可追溯历史摘录：${JSON.stringify(excerpts).slice(0,3500)}`;
 }
 export function exportOrbit(userId: string) {
@@ -252,7 +257,7 @@ function restoredPlanSnapshot(value: string | null): string | null {
   if(!p.state || p.state==='pending' || p.state==='executing') {p.state='suspended';p.revision=(p.revision||1)+1;}
   return JSON.stringify(p);
 }
-export function recentObjectReferences(userId: string, id: string): Array<Array<{
+export function recentObjectReferences(userId: string, id: string, round = ''): Array<Array<{
     id: string;
     title: string;
 }>> {
@@ -261,7 +266,7 @@ export function recentObjectReferences(userId: string, id: string): Array<Array<
         schedule_items: string | null;
         type: string;
         plan: string | null;
-    }>('SELECT schedule_items,type,plan FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND role=? AND schedule_items IS NOT NULL ORDER BY created_at DESC,rowid DESC LIMIT 3', [userId, id, 'assistant']).map(row => {
+    }>(`SELECT schedule_items,type,plan FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND role='assistant' AND schedule_items IS NOT NULL AND ${roundFilter()} ORDER BY created_at DESC,rowid DESC LIMIT 3`, [userId, id, ...roundParams(round)]).map(row => {
         try {
             const items = JSON.parse(row.schedule_items || '[]');
             const plan = row.plan ? JSON.parse(row.plan) : null;
@@ -280,11 +285,11 @@ export function referencedIndex(text: string): number | null {
     const value = /^\d+$/.test(match[1]) ? Number(match[1]) : '一二三四五六七八九十'.indexOf(match[1]) + 1;
     return value > 0 ? value - 1 : null;
 }
-export function previousKnowledgeIds(userId: string, id: string): string[] {
+export function previousKnowledgeIds(userId: string, id: string, round = ''): string[] {
     conversation(userId, id);
     for (const row of queryAll<{
         knowledge_sources: string | null;
-    }>('SELECT knowledge_sources FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND role=? ORDER BY created_at DESC,rowid DESC LIMIT 20', [userId, id, 'assistant'])) {
+    }>(`SELECT knowledge_sources FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND role='assistant' AND ${roundFilter()} ORDER BY created_at DESC,rowid DESC LIMIT 20`, [userId, id, ...roundParams(round)])) {
         try {
             const sources = JSON.parse(row.knowledge_sources || '[]');
             if (Array.isArray(sources) && sources.length)

@@ -42,7 +42,6 @@
 .demo-topbar-actions { margin-left: auto; display: flex; gap: var(--orbit-space-1); }
 
 .demo-topbar-actions .oui-icon-button,
-.demo-detail-actions .oui-icon-button,
 .demo-attachment .oui-icon-button {
   min-width: var(--orbit-touch-target);
   min-height: var(--orbit-touch-target);
@@ -123,18 +122,18 @@
   justify-content: space-between;
   gap: var(--orbit-space-3);
   padding: var(--orbit-space-3);
-  border: 1px solid color-mix(in srgb, var(--demo-category) 25%, var(--orbit-border));
+  border: 1px solid color-mix(in srgb, var(--schedule-category) 25%, var(--orbit-border));
   border-radius: var(--orbit-radius-card);
-  background: color-mix(in srgb, var(--demo-category) var(--demo-category-strength), var(--orbit-elevated));
+  background: color-mix(in srgb, var(--schedule-category) var(--demo-category-strength), var(--orbit-elevated));
   color: var(--orbit-text);
 }
-.demo-schedule-card:is(:hover, :active) .demo-schedule-face { background: color-mix(in srgb, var(--demo-category) var(--demo-category-hover-strength), var(--orbit-elevated)); }
+.demo-schedule-card:is(:hover, :active) .demo-schedule-face { background: color-mix(in srgb, var(--schedule-category) var(--demo-category-hover-strength), var(--orbit-elevated)); }
 .demo-schedule-info { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .demo-schedule-info strong { font-size: 15px; font-weight: 650; }
 .demo-schedule-meta, .demo-schedule-category {
   font-size: 12px;
   line-height: 1.5;
-  color: color-mix(in srgb, var(--orbit-text) 72%, var(--demo-category));
+  color: color-mix(in srgb, var(--orbit-text) 72%, var(--schedule-category));
   font-variant-numeric: tabular-nums;
 }
 .demo-schedule-category { font-weight: 600; }
@@ -161,52 +160,6 @@
 .demo-attachment .oui-file-picker { min-height: var(--orbit-touch-target); }
 .demo-attachment > span { min-width: 0; overflow-wrap: anywhere; }
 
-.demo-detail,
-.demo-edit { display: grid; gap: var(--orbit-space-3); }
-.demo-detail-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--orbit-space-2) var(--orbit-space-3); }
-.demo-detail-meta > span, .demo-detail-place { display: inline-flex; align-items: center; gap: var(--orbit-space-2); font-size: 14px; line-height: 1.5; }
-.demo-detail-meta > span:first-child { font-variant-numeric: tabular-nums; }
-.demo-detail-meta .demo-detail-category {
-  padding: var(--orbit-space-1) var(--orbit-space-2);
-  border-radius: var(--orbit-radius-full);
-  color: color-mix(in srgb, var(--orbit-text) 75%, var(--demo-category));
-  background: color-mix(in srgb, var(--demo-category) 12%, var(--orbit-elevated));
-  font-size: 12px;
-}
-.demo-detail-meta .demo-detail-done { color: var(--orbit-success); font-size: 12px; }
-.demo-detail-place, .demo-detail-note { margin: 0; color: var(--orbit-text-secondary); font-size: 14px; overflow-wrap: anywhere; }
-.demo-detail-note { white-space: pre-wrap; }
-.demo-detail-actions { display: flex; align-items: center; }
-.demo-detail-actions .oui-icon-button { padding: var(--orbit-space-1); }
-.demo-delete-glyph { color: var(--orbit-destructive); }
-.demo-check-glyph { display: grid; place-items: center; width: 30px; height: 30px; color: var(--orbit-success); background: var(--orbit-success-soft); border-radius: var(--orbit-radius-control); }
-
-.demo-reminder {
-  margin-top: var(--orbit-space-1);
-  padding: var(--orbit-space-3);
-  border-radius: var(--orbit-radius-card);
-  background: var(--orbit-surface);
-  border: 1px solid var(--orbit-border);
-}
-.demo-reminder-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--orbit-space-2) var(--orbit-space-4); }
-.demo-reminder-heading { display: inline-flex; align-items: center; gap: var(--orbit-space-2); margin: 0; font-weight: 600; font-size: 14px; }
-.demo-reminder-options {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  flex: 1 1 360px;
-  min-width: 0;
-  gap: var(--orbit-space-2);
-}
-.demo-reminder-options .oui-button, .demo-custom-minutes .oui-input { min-height: var(--orbit-touch-target); padding-inline: var(--orbit-space-2); }
-.demo-reminder-options :is([aria-pressed=true], [data-current]):not(:focus-visible) { outline: 2px solid var(--orbit-brand); outline-offset: -2px; }
-.demo-secondary, .demo-reminder-help { color: var(--orbit-text-secondary); }
-.demo-reminder-help, .demo-reminder-feedback { margin: var(--orbit-space-2) 0 0; font-size: 12px; line-height: 1.5; }
-.demo-reminder-feedback { color: var(--orbit-success); }
-.demo-reminder-feedback.demo-error { color: var(--orbit-destructive); }
-.demo-custom-minutes { position: relative; display: flex; min-width: 0; }
-.demo-custom-minutes .oui-input { padding-inline-end: calc(2em + var(--orbit-space-2)); font-variant-numeric: tabular-nums; }
-.demo-custom-minutes > span { position: absolute; inset-inline-end: var(--orbit-space-2); top: 50%; translate: 0 -50%; color: var(--orbit-text-secondary); font-size: 12px; pointer-events: none; }
-
 @media (max-width: 560px) {
   .demo-topbar-inner, .demo-thread { width: calc(100% - var(--orbit-space-6)); }
   .demo-thread { padding-block-start: var(--orbit-space-6); }
@@ -214,6 +167,5 @@
   .demo-replies .oui-button { max-width: 100%; }
 }
 
-@media (max-width: 440px) {
-  .demo-reminder-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+
+.demo-secondary { color: var(--orbit-text-secondary); }

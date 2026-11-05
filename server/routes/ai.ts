@@ -1,3 +1,4 @@
+import { messageMeta, ORBIT_IDLE_MS, quickReplySource } from '../orbit-round.js';
 import { withPersistenceTransaction } from '../persistence.js';
 import { dateClarification, resolveQueryDates, resolveDraftDates } from '../orbit-time.js';
 import { AI_DRAFT_SCHEMA, parseDraftOutput } from '../ai-chat-output.js';
@@ -76,7 +77,8 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     const info=meta.errorInfo || (row.error?aiErrorInfo(new Error(row.error),row.id):undefined);
     const result=row.result?JSON.parse(row.result):null;
     const child=row.state==='partial'&&queryAll<orbit.ChatRequest>('SELECT execution_meta FROM orbit_requests WHERE user_id=? AND conversation_id=?',[row.user_id,row.conversation_id]).some(item=>orbit.requestExecution(item).continuationOf===row.id);
-    return {id:row.id,conversationId:row.conversation_id,userMessageId:`orbit-user:${row.user_id}:${meta.rootRequestId||row.id}`,state:row.state,text:JSON.parse(row.body).text,error:info?.message,createdAt:row.created_at,startedAt:meta.startedAt,attempt:meta.attempt||0,responseMessageId:meta.responseMessageId||result?.historyMessageId,errorInfo:info,continuationOf:meta.continuationOf,canContinue:row.state==='partial'&&!!meta.evidence?.length&&!child,partialReply:row.state==='partial'?result?.reply:undefined,evidence:row.state==='partial'?meta.evidence:undefined,steps:queryAll('SELECT id,label,state,query,at,result_count AS resultCount FROM orbit_request_steps WHERE user_id=? AND request_id=? ORDER BY at',[row.user_id,row.id])};
+    const body = JSON.parse(row.body);
+    return {id:row.id,conversationId:row.conversation_id,userMessageId:`orbit-user:${row.user_id}:${meta.rootRequestId||row.id}`,state:row.state,text:body.text,quickReplyTo:body.quickReply?.messageId,error:info?.message,createdAt:row.created_at,startedAt:meta.startedAt,attempt:meta.attempt||0,responseMessageId:meta.responseMessageId||result?.historyMessageId,errorInfo:info,continuationOf:meta.continuationOf,canContinue:row.state==='partial'&&!!meta.evidence?.length&&!child,partialReply:row.state==='partial'?result?.reply:undefined,evidence:row.state==='partial'?meta.evidence:undefined,steps:queryAll('SELECT id,label,state,query,at,result_count AS resultCount FROM orbit_request_steps WHERE user_id=? AND request_id=? ORDER BY at',[row.user_id,row.id])};
   };
   app.get('/api/orbit/conversations', authenticate, safe((req,res) => res.json({ conversations: orbit.listConversations(user(req)) })));
   app.get('/api/orbit/providers',authenticate,safe((req,res)=>res.json({providers:[{id:'workbuddy',name:'WorkBuddy',connected:!!resolveCodeBuddyCredential(user(req))},{id:'chatgpt',name:'ChatGPT',...chatGPTStatus(user(req))}]})));
@@ -280,7 +282,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     const body = req.body || {};
     const requestedAction = body.requestedAction == null ? undefined : String(body.requestedAction).trim();
     let text = String(body.text || '').trim();
-    const targetDate = body.targetDate == null ? undefined : String(body.targetDate);
+    let targetDate = body.targetDate == null ? undefined : String(body.targetDate);
     const reqModel = body.model == null ? undefined : String(body.model).trim();
     const calendarId = body.calendarId == null ? undefined : String(body.calendarId).trim();
     const requestId = body.requestId == null ? undefined : String(body.requestId);
@@ -297,17 +299,21 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     if (!text) return res.status(400).json({ error: "请输入内容" });
     if (text.length > 20_000) return res.status(400).json({ error: '输入内容不能超过 20000 个字符' });
     const context = orbit.orbitContext.getStore();
-    const respond=(response:any)=>withPersistenceTransaction(()=>{const message=saveAiScheduleResponseHistory(userId,response);return res.json({...response,historyMessageId:message.id});});
+    const round = context?.roundStartedAt || '';
+    const quickReply = context && body.quickReply;
+    const source = quickReply ? quickReplySource(userId, context!.conversationId, quickReply, round) : undefined;
+    if (source) targetDate = source.targetDate;
+    const respond=(response:any,metadata?:Record<string,unknown>)=>withPersistenceTransaction(()=>{const message=saveAiScheduleResponseHistory(userId,response,metadata);return res.json({...response,historyMessageId:message.id});});
     let attachmentIds:string[]=[],attached={input:[] as import('../ai-provider-contract.js').AiInputPart[],notice:'',images:false};
-    try{if(context){attachmentIds=selectAttachmentIds(userId,context.conversationId,text,body.attachmentIds||[]);attached=attachmentContext(userId,attachmentIds,text);}}catch(error){return res.status(400).json({error:error instanceof Error?error.message:'附件读取失败'});}
-    const previousKnowledge = context ? orbit.previousKnowledgeIds(userId,context.conversationId) : [];
+    try{if(context){attachmentIds=selectAttachmentIds(userId,context.conversationId,text,body.attachmentIds||[],round);attached=attachmentContext(userId,attachmentIds,text);}}catch(error){return res.status(400).json({error:error instanceof Error?error.message:'附件读取失败'});}
+    const previousKnowledge = context ? orbit.previousKnowledgeIds(userId,context.conversationId,round) : [];
     const knowledgeFollowUp = previousKnowledge.length > 0 && /(第.+[篇条]|这篇|刚才.*知识|上面.*资料)/.test(text);
     const productQuestion = isOrbitProductQuestion(text) || isOrbitDiagnosticQuestion(text);
     const includeKnowledgeContext = (!productQuestion || body.knowledgeScope === true || knowledgeFollowUp) && (requestsKnowledgeContext(text) || orbit.getAiPreference(userId) || body.knowledgeScope === true || knowledgeFollowUp);
     let previousContext = '';
     let selectedNotification = '';
     const queryTimezone = context?.timezone || db.getReminder(userId)?.timezone || 'Asia/Shanghai';
-    const objectRefs = context ? orbit.recentObjectReferences(userId,context.conversationId) : [];
+    const objectRefs = context ? orbit.recentObjectReferences(userId,context.conversationId,round) : [];
     const referencedIds = new Set(objectRefs.flatMap(row => row.map((s:any)=>s.id)));
     if(body.notificationId !== undefined){
       try {
@@ -344,6 +350,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
           role: 'user',
           type: 'text',
           content: String(text),
+          metadata: quickReply ? { quickReplyTo: quickReply.messageId } : undefined,
         });
         if(attachmentIds.length)linkMessageAttachments(userId,userMessage.id,attachmentIds);
       } catch (error) { throw error; }
@@ -352,10 +359,10 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
     // Only recent completed chat turns can continue an unfinished scheduling discussion.
     // A plan, a different topic, a failed request or another conversation cannot grant this context.
     const previousDraftTexts: string[] = [];
-    if (context && !context.continuationOf && !productQuestion && !attachmentIds.length && !selectedNotification) {
+    if (context && !quickReply && !context.continuationOf && !productQuestion && !attachmentIds.length && !selectedNotification) {
       const turns = queryAll<{ body: string; result: string | null; state: string }>(
-        `SELECT body,result,state FROM orbit_requests WHERE user_id=? AND conversation_id=? AND id<>? AND state NOT IN ('queued','running') AND created_at>=? ORDER BY created_at DESC,rowid DESC LIMIT 6`,
-        [userId, context.conversationId, context.requestId || '', new Date(Date.now() - 30 * 60_000).toISOString()],
+        `SELECT body,result,state FROM orbit_requests WHERE user_id=? AND conversation_id=? AND id<>? AND state NOT IN ('queued','running') AND created_at>=? AND COALESCE(json_extract(${messageMeta('execution_meta')},'$.roundStartedAt'),?)=? ORDER BY created_at DESC,rowid DESC LIMIT 6`,
+        [userId, context.conversationId, context.requestId || '', new Date(Math.max(Date.parse(context.submittedAt || '') - ORBIT_IDLE_MS || 0, Date.parse(round) || 0)).toISOString(), round, round],
       );
       for (const turn of turns) {
         try {
@@ -365,24 +372,25 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
         } catch { break; }
       }
     }
-    const draftContextTexts = scheduleDraftContext(previousDraftTexts);
-    const draftMode = !context?.continuationOf && !productQuestion && requestsScheduleDraft(text, draftContextTexts);
+    const draftContextTexts = source ? [source.text] : scheduleDraftContext(previousDraftTexts);
+    const draftMode = !context?.continuationOf && !productQuestion &&
+      (quickReply ? quickReply.choice === 'draft' : requestsScheduleDraft(text, draftContextTexts));
 
     if (context) {
-      if(attachmentIds.length && /^(请阅读附件|总结|概述|新话题|看看)/.test(text)){const current=activeAiPlan(userId,context.conversationId);if(current)setAiPlanState(current,'suspended');}
-      const interaction=attachmentIds.length||context.continuationOf||draftMode&&!activeAiPlan(userId,context.conversationId)?{handled:false}:pendingInteraction(userId,context.conversationId,text);
+      if(attachmentIds.length && /^(请阅读附件|总结|概述|新话题|看看)/.test(text)){const current=activeAiPlan(userId,context.conversationId,round);if(current)setAiPlanState(current,'suspended');}
+      const interaction=quickReply||attachmentIds.length||context.continuationOf||draftMode&&!activeAiPlan(userId,context.conversationId,round)?{handled:false}:pendingInteraction(userId,context.conversationId,text,round);
       if(interaction.handled)return respond({success:true,intent:'chat',reply:interaction.reply,changed:false,activePlanId:interaction.plan?.id});
-      const activePlan=activeAiPlan(userId,context.conversationId);
-      previousContext=(activePlan?`当前交互状态：等待确认。优先保持同一草稿，不创建替代计划。\n当前计划：${JSON.stringify(buildAiPlanSnapshot(activePlan))}\n`:'当前交互状态：无活跃计划。\n')+orbit.historyContext(userId,context.conversationId)+(activePlan?'':'\n'+orbit.workingContext(userId,context.conversationId,text,targetDate || reminderStore.todayInTimezone(queryTimezone)));
+      const activePlan=quickReply ? undefined : activeAiPlan(userId,context.conversationId,round);
+      previousContext=(activePlan?`当前交互状态：等待确认。优先保持同一草稿，不创建替代计划。\n当前计划：${JSON.stringify(buildAiPlanSnapshot(activePlan))}\n`:'当前交互状态：无活跃计划。\n')+orbit.historyContext(userId,context.conversationId,round)+(activePlan?'':'\n'+orbit.workingContext(userId,context.conversationId,text,targetDate || reminderStore.todayInTimezone(queryTimezone),round));
     }
 
-    if(!context?.continuationOf&&!productQuestion&&!attachmentIds.length&&needsScheduleContext(text)){
+    if(!quickReply&&!context?.continuationOf&&!productQuestion&&!attachmentIds.length&&needsScheduleContext(text)){
       const clarification=dateClarification(text,targetDate||reminderStore.todayInTimezone(queryTimezone));
       if(clarification)return respond({success:true,intent:'chat',reply:clarification,changed:false,scheduleItems:[]});
       if(!draftMode&&isActivityDescription(text)){
         const dates=resolveDraftDates([text],targetDate||reminderStore.todayInTimezone(queryTimezone));
         const time=text.match(/\d{1,2}[:：]\d{2}\s*(?:-|–|—|至|到)\s*\d{1,2}[:：]\d{2}/)?.[0];
-        return respond({success:true,intent:'chat',reply:`我识别到活动时间为 ${dates.join('、')}${time?' '+time:''}（${queryTimezone}）。你希望我把它整理成待确认的日程草稿，还是先讨论活动内容？正式保存前仍会请你确认。`,changed:false,scheduleItems:[]});
+        return respond({success:true,intent:'chat',reply:`我识别到活动时间为 ${dates.join('、')}${time?' '+time:''}（${queryTimezone}）。你希望我把它整理成待确认的日程草稿，还是先讨论活动内容？正式保存前仍会请你确认。`,changed:false,scheduleItems:[]}, context?.requestId ? { scheduleQuickReplies: true } : undefined);
       }
     }
 
@@ -771,7 +779,10 @@ ${knowledgePromptSection}
 ${selectedNotification}
 当前可核对日程：${scheduleList}`;
 
-    let modelPrompt = text;
+    let modelPrompt = source
+      ? `${text}。原问题（仅用于定位这次选择）：${JSON.stringify(source.text)}`
+      : text;
+    if (quickReply?.choice === 'discuss') systemPrompt += '\n用户已选择先讨论原事项，请直接讨论，不再询问是否生成草稿。';
 
     let assistantText = '';
     let resultText = '';
@@ -779,7 +790,8 @@ ${selectedNotification}
     const integrationQuestion=isOrbitIntegrationQuestion(text);
     const settingRefs=integrationQuestion||/设置|怎么.*关|怎么.*开|开启|关闭|在哪|头像|每日总结|周报/.test(text)?findSettings(integrationQuestion?'个人 API Key 模型':text,db.getUserById(userId)?.role==='admin').slice(0,3):[];
     const onStep=(step:import('../ai-provider-contract.js').AiStep)=>{const i=steps.findIndex(s=>s.id===step.id);if(i<0)steps.push(step);else steps[i]=step;if(context?.requestId)run('INSERT INTO orbit_request_steps(user_id,request_id,id,label,state,query,at,result_count) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(user_id,request_id,id) DO UPDATE SET state=excluded.state,label=excluded.label,query=excluded.query,at=excluded.at,result_count=excluded.result_count',[userId,context.requestId,step.id,step.label,step.state,step.query,step.at,step.resultCount??null]);};
-    const toolContext=createOrbitTools({userId,timezone:queryTimezone,allowKnowledge:includeKnowledgeContext,allowHistory:/历史|上次.*说|之前.*聊/.test(text),onSchedules:items=>{for(const item of items)if(!contextSchedules.some(s=>s.id===item.id))contextSchedules.push(item);},onStep});
+    const allowHistory = /聊天历史|对话历史|上次.*说|之前.*聊/.test(text);
+    const toolContext=createOrbitTools({userId,timezone:queryTimezone,allowKnowledge:includeKnowledgeContext,allowHistory,onSchedules:items=>{for(const item of items)if(!contextSchedules.some(s=>s.id===item.id))contextSchedules.push(item);},onStep});
     for(const action of [...settingsActions(text,db.getUserById(userId)?.role==='admin'),...settingRefs.flatMap(r=>{const a=settingAction(r.id,db.getUserById(userId)?.role==='admin');return a?[a]:[];})]) if(!toolContext.actions.some(a=>a.settingId===action.settingId))toolContext.actions.push(action);
     const webCitations:WebCitation[]=[];
     try {
@@ -787,7 +799,7 @@ ${selectedNotification}
 
       // 【修复数据隔离】使用该用户的 API Key
       if(attached.images){const models=isChatGPT?await chatGPTModels(userId):await getAvailableModels(userId,userCredential!);const model=isChatGPT?models.find(m=>m.id===selectedModel):models.find(m=>m.modelId===selectedModel)?.orbit;if(model?.capabilities.images.supported!==true)throw new Error('当前模型未声明支持图片输入，请在设置中刷新模型列表并选择支持图片的模型');}
-      const allowed=chatToolNames(text,{product:productQuestion,schedule:includeScheduleContext,knowledge:includeKnowledgeContext,history:/历史|上次.*说|之前.*聊/.test(text)});
+      const allowed=chatToolNames(text,{product:productQuestion,schedule:includeScheduleContext,knowledge:includeKnowledgeContext,history:allowHistory});
       const tools=toolContext.tools.filter(tool=>allowed.has(tool.name));
       if(context?.continuationOf){
         const evidence=orbit.requestExecution(orbit.getRequest(userId,context.requestId!)!).evidence||[];
@@ -888,8 +900,12 @@ ${selectedNotification}
         changedDetails: { created: [], updated: [], deleted: [] },
       };
       {
-        const historyMessage = saveAiScheduleResponseHistory(userId, response);
-        run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({formatVersion:1,requestId:context?.requestId,provider:isChatGPT?'chatgpt':'workbuddy',model:selectedModel,textFallback:parsedResult.textFallback,steps,settingRefs:[...settingRefs,...toolContext.settingRefs].filter((r,i,rows)=>rows.findIndex(s=>s.id===r.id)===i),actions:toolContext.actions,sources:toolContext.sources}),historyMessage.id,userId]);
+        const historyMessage = saveAiScheduleResponseHistory(userId, response, {
+          formatVersion: 1, provider: isChatGPT ? 'chatgpt' : 'workbuddy', model: selectedModel,
+          textFallback: parsedResult.textFallback, steps,
+          settingRefs: [...settingRefs, ...toolContext.settingRefs].filter((r, i, rows) => rows.findIndex(s => s.id === r.id) === i),
+          actions: toolContext.actions, sources: toolContext.sources,
+        });
         response.historyMessageId = historyMessage.id;
         if (response.requiresConfirmation) {
           const pendingPlan = aiSchedulePlans.get(response.plan?.id);

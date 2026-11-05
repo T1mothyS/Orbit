@@ -1,8 +1,47 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-export function OrbitReminderSettings({id}:{id:string}) {
-  const {authHeaders}=useAuth();const [enabled,setEnabled]=useState(true),[minutes,setMinutes]=useState(15),[linked,setLinked]=useState(false),[applicable,setApplicable]=useState(true),[ready,setReady]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
-  useEffect(()=>{let alive=true;void fetch(`/api/orbit/schedules/${encodeURIComponent(id)}/reminder`,{headers:authHeaders()}).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error);if(alive){setEnabled(d.enabled);setMinutes(d.minutes);setLinked(d.linked);setApplicable(d.applicable!==false);setReady(true);}}).catch(e=>{if(alive)setError(e.message);});return()=>{alive=false;};},[id,authHeaders]);
-  const save=async()=>{setSaving(true);setSaved(false);setError('');try{const r=await fetch(`/api/orbit/schedules/${encodeURIComponent(id)}/reminder`,{method:'PATCH',headers:{...authHeaders(),'Content-Type':'application/json'},body:JSON.stringify({enabled,minutes})});const d=await r.json();if(!r.ok)throw new Error(d.error);setSaved(true);}catch(e){setError(e instanceof Error?e.message:'保存失败');}finally{setSaving(false);}};
-  return <div className="orbit-reminder-settings"><strong>主动聊天提醒</strong>{!ready?<p>{error||'读取设置…'}</p>:!applicable?<p>先设置明确的日期和时间，才能自动触发提前提醒。</p>:linked?<p>沿用周期提醒时间，在周期提醒中调整。</p>:<><label><input type="checkbox" checked={enabled} onChange={e=>{setEnabled(e.target.checked);setSaved(false);}}/>为这个事项提醒</label><label>提前 <input aria-label="提前提醒分钟数" type="number" min={0} max={10080} value={minutes} onChange={e=>{setMinutes(Number(e.target.value));setSaved(false);}}/> 分钟</label><button type="button" disabled={saving} onClick={()=>void save()}>{saving?'保存中…':saved?'已保存':'保存提醒'}</button><small>需开启对话列表中的“主动聊天提醒”。明天再提醒只调整提醒时间。</small>{error&&<p role="alert">{error}</p>}</>}</div>;
+import { Button } from '../ui';
+import { requestError } from '../utils/request-error';
+import { ScheduleReminderOptions, type ScheduleReminder } from './ScheduleReminderOptions';
+
+type ReminderDetails = ScheduleReminder & { linked: boolean; applicable: boolean };
+
+export function OrbitReminderSettings({ id }: { id: string }) {
+  const { authHeaders } = useAuth();
+  const [reminder, setReminder] = useState<ReminderDetails>();
+  const [error, setError] = useState('');
+  const [reload, setReload] = useState(0);
+  const url = `/api/orbit/schedules/${encodeURIComponent(id)}/reminder`;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setError('');
+    setReminder(undefined);
+    void fetch(url, { headers: authHeaders(), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) })
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || '无法读取提醒设置。');
+        if (!controller.signal.aborted) setReminder(data);
+      }).catch(cause => { if (!controller.signal.aborted) setError(requestError(cause, '无法读取提醒设置。', true)); });
+    return () => controller.abort();
+  }, [url, authHeaders, reload]);
+
+  if (!reminder) return error
+    ? <div><p role="alert">{error}</p><Button onClick={() => setReload(value => value + 1)}>重新读取提醒</Button></div>
+    : <p role="status">正在读取提醒设置…</p>;
+
+  return <ScheduleReminderOptions reminder={reminder}
+    explanation={reminder.linked ? '沿用周期提醒时间，在周期提醒中调整。' :
+      !reminder.applicable ? '先设置明确的日期和时间，才能自动触发提前提醒。' : undefined}
+    onSave={async next => {
+      const response = await fetch(url, {
+        method: 'PATCH', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(15000), body: JSON.stringify(next),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || '提醒未保存，请重试。');
+      }
+      setReminder(current => current && { ...current, ...next });
+    }} />;
 }

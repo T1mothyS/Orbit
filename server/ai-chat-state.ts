@@ -1,3 +1,4 @@
+import { messageMeta, roundFilter, roundParams } from './orbit-round.js';
 import { queryOne as dbQueryOne, run as dbQueryRun } from './database/connection.js';
 import { orbitContext, conversation, getRequest, referencedIndex } from './orbit-store.js';
 import { normaliseScheduleApiFields } from './schedule-input.js';
@@ -164,6 +165,7 @@ export function saveAiScheduleHistoryMessage(input: {
   scheduleItems?: unknown;
   plan?: unknown;
   knowledgeSources?: unknown;
+  metadata?: Record<string, unknown>;
 }): dbModule.DbAiScheduleMessage {
   const context=orbitContext.getStore();
   if(context?.controller?.signal.aborted) throw new Error('生成已取消');
@@ -188,15 +190,29 @@ export function saveAiScheduleHistoryMessage(input: {
     schedule_items: input.scheduleItems === undefined ? null : JSON.stringify(input.scheduleItems),
     plan: input.plan === undefined ? null : JSON.stringify(input.plan),
     knowledge_sources: input.knowledgeSources === undefined ? null : JSON.stringify(input.knowledgeSources),
-    created_at: new Date().toISOString(),
+    created_at: input.role === 'user' && context?.submittedAt ? context.submittedAt : new Date().toISOString(),
   });
-  if(context?.requestId&&input.role==='assistant') dbQueryRun('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify({requestId:context.requestId}),message.id,input.userId]);
+  const metadata = { ...input.metadata };
+  if (context?.requestId) {
+    const round = context.roundStartedAt || '';
+    metadata.requestId = context.requestId;
+    metadata.roundStartedAt = round;
+    if (input.role === 'assistant' && context.processingStarted !== undefined) {
+      metadata.processingMs = Math.max(0, Math.round(performance.now() - context.processingStarted));
+    }
+    if (input.role === 'user' && round && !dbQueryOne(
+      `SELECT id FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND role='user' AND id<>?
+       AND json_extract(${messageMeta()},'$.roundStartedAt')=? LIMIT 1`,
+      [input.userId, context.conversationId, message.id, round],
+    )) metadata.newRoundAt = round;
+  }
+  if (Object.keys(metadata).length) dbQueryRun('UPDATE ai_schedule_messages SET orbit_meta=? WHERE id=? AND user_id=?',[JSON.stringify(metadata),message.id,input.userId]);
   if(input.role==='assistant')recordKnowledgeCitations(input.userId,message.id,input.knowledgeSources);
   return message;
   });
 }
 
-export function saveAiScheduleResponseHistory(userId: string, response: any): dbModule.DbAiScheduleMessage {
+export function saveAiScheduleResponseHistory(userId: string, response: any, metadata?: Record<string, unknown>): dbModule.DbAiScheduleMessage {
   const type = response.requiresConfirmation
     ? 'plan'
     : response.intent === 'chat' || response.intent === 'query' || response.intent === 'weather'
@@ -213,6 +229,7 @@ export function saveAiScheduleResponseHistory(userId: string, response: any): db
     scheduleItems: response.scheduleItems || [],
     plan: response.plan,
     knowledgeSources: response.knowledgeSources || [],
+    metadata,
   });
 }
 
@@ -280,9 +297,9 @@ export function activateAiPlan(plan: PendingAiSchedulePlan): void {
   plan.state = 'pending'; persistAiPlan(plan);
   dbQueryRun('UPDATE orbit_conversations SET active_plan_message_id=? WHERE id=? AND user_id=?', [plan.historyMessageId, plan.conversationId, plan.userId]);
 }
-export function activeAiPlan(userId: string, cid: string): PendingAiSchedulePlan | undefined {
+export function activeAiPlan(userId: string, cid: string, round?: string): PendingAiSchedulePlan | undefined {
   const c = conversation(userId, cid);
-  const rows = queryAll<dbModule.DbAiScheduleMessage>('SELECT * FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND plan IS NOT NULL ORDER BY created_at DESC,rowid DESC', [userId, cid]);
+  const rows = queryAll<dbModule.DbAiScheduleMessage>(`SELECT * FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND plan IS NOT NULL ${round === undefined ? '' : `AND ${roundFilter()}`} ORDER BY created_at DESC,rowid DESC`, [userId, cid, ...(round === undefined ? [] : roundParams(round))]);
   const row = c.active_plan_message_id ? rows.find(m => m.id === c.active_plan_message_id) : rows.find(m => !parseHistoryJson(m.plan)?.state);
   if (!row) return undefined;
   const plan = resolveAiPlan(userId, String(parseHistoryJson(row.plan)?.id));
@@ -319,8 +336,8 @@ export function removeAiPlanOperation(plan: PendingAiSchedulePlan, index: number
   aiSchedulePlans.set(next.id, next);
   return next;
 }
-export function pendingInteraction(userId: string, cid: string, text: string): { handled: boolean; reply?: string; plan?: PendingAiSchedulePlan } {
-  const plan = activeAiPlan(userId, cid);
+export function pendingInteraction(userId: string, cid: string, text: string, round?: string): { handled: boolean; reply?: string; plan?: PendingAiSchedulePlan } {
+  const plan = activeAiPlan(userId, cid, round);
   const short = text.trim().replace(/[。！？!?.]$/g, '');
   if (!plan) {
     if (/^(确认|取消|还是算了|改成|换到|继续刚才)/.test(short) && short.length < 24) return { handled: true, reply: '当前没有活跃的待确认计划，请选择需要恢复的草稿或重新说明事项。' };

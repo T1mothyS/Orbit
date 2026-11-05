@@ -1,3 +1,4 @@
+import { roundFilter, roundParams } from './orbit-round.js';
 import sharp from 'sharp';
 import {randomUUID} from 'node:crypto';
 import {queryAll,queryOne,run} from './database/connection.js';
@@ -65,12 +66,12 @@ export async function uploadChatAttachment(userId: string, cid: string, input: {
   return processChatAttachment(userId, id, signal);
 }
 export async function processChatAttachment(userId:string,id:string,signal?:AbortSignal){const row=attachment(userId,id),file=activity.getAttachment(id,userId)!;if(row.state==='ready')return attachmentView(userId,id);run("UPDATE orbit_attachments SET state='processing',error=NULL WHERE user_id=? AND id=?",[userId,id]);try{const parsed=file.mimeType.startsWith('image/')?null:await parseDocument(storage.readAttachment(file),file.mimeType,signal);attachment(userId,id);run("UPDATE orbit_attachments SET state='ready',extraction=?,error=NULL WHERE user_id=? AND id=?",[parsed?JSON.stringify(parsed):null,userId,id]);}catch(error){run("UPDATE orbit_attachments SET state='failed',error=? WHERE user_id=? AND id=?",[error instanceof Error?error.message:'解析失败',userId,id]);}return attachmentView(userId,id);}
-export function selectAttachmentIds(userId:string,cid:string,text:string,explicit:string[]):string[]{
+export function selectAttachmentIds(userId:string,cid:string,text:string,explicit:string[],round=''):string[]{
   if(explicit.length)return explicit;
-  const rows=queryAll<{attachment_id:string}>('SELECT DISTINCT a.attachment_id FROM orbit_message_attachments a JOIN ai_schedule_messages m ON a.message_id=m.id AND a.user_id=m.user_id WHERE m.user_id=? AND m.conversation_id=? ORDER BY m.created_at DESC LIMIT 20',[userId,cid]);
+  const rows=queryAll<{attachment_id:string}>(`SELECT DISTINCT a.attachment_id FROM orbit_message_attachments a JOIN ai_schedule_messages m ON a.message_id=m.id AND a.user_id=m.user_id WHERE m.user_id=? AND m.conversation_id=? AND ${roundFilter('m')} ORDER BY m.created_at DESC LIMIT 20`,[userId,cid,...roundParams(round)]);
   const named=rows.filter(r=>text.includes(activity.getAttachment(r.attachment_id,userId)?.originalName||'\0'));if(named.length)return named.slice(0,3).map(r=>r.attachment_id);
   if(!/附件|这份文件|这个文件|刚才.*(?:图|文件)|这张图|上一张图|第\s*\d+\s*页|工作表/.test(text))return [];
-  const latest=queryAll<{attachment_id:string}>('SELECT a.attachment_id FROM orbit_message_attachments a WHERE a.user_id=? AND a.message_id=(SELECT m.id FROM ai_schedule_messages m JOIN orbit_message_attachments a ON a.message_id=m.id AND a.user_id=m.user_id WHERE m.user_id=? AND m.conversation_id=? ORDER BY m.created_at DESC,m.rowid DESC LIMIT 1)',[userId,userId,cid]);
+  const latest=queryAll<{attachment_id:string}>(`SELECT a.attachment_id FROM orbit_message_attachments a WHERE a.user_id=? AND a.message_id=(SELECT m.id FROM ai_schedule_messages m JOIN orbit_message_attachments a ON a.message_id=m.id AND a.user_id=m.user_id WHERE m.user_id=? AND m.conversation_id=? AND ${roundFilter('m')} ORDER BY m.created_at DESC,m.rowid DESC LIMIT 1)`,[userId,userId,cid,...roundParams(round)]);
   if(latest.length>1)throw new Error('上条消息包含多个附件，请用文件名说明要读取哪一个');return latest.map(r=>r.attachment_id);
 }
 function chunkScore(text:string,block:{text:string;location:string}){

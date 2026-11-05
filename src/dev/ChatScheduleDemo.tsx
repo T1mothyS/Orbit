@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, Bell, Bot, CalendarDays, Check, Clock3, MapPin, Moon, Pencil, RotateCcw, Sun, Trash2, X } from 'lucide-react';
+import { ArrowUpRight, Bot, CalendarDays, Check, Clock3, MapPin, Moon, Pencil, RotateCcw, Sun, Trash2, X } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { Button, ConfirmDialog, Dialog, FilePicker, FormField, IconButton, Input, Switch, Textarea, Tooltip, useToast } from '../ui';
+import { ScheduleReminderOptions } from '../components/ScheduleReminderOptions';
 import { getScheduleCategory } from '../utils/scheduleCategories';
 import './chat-schedule-demo.css';
 
@@ -29,16 +30,10 @@ const extraSchedules: Schedule[] = [
   { id: 'recurring', title: '每周整理桌面', date: '每周日', time: '18:00', category: 'life', reminder: { enabled: true, minutes: 15 }, reminderRule: 'recurring' },
 ];
 
-const reminderOptions = [
-  { minutes: null, label: '无需提醒' },
-  { minutes: 15, label: '提前 15 分钟' },
-  { minutes: 60, label: '提前 1 小时' },
-];
-
 const answers = { draft: '整理成待确认日程', discuss: '先讨论这件事' };
 
 function categoryStyle(category: string) {
-  return { '--demo-category': getScheduleCategory(category).color } as CSSProperties;
+  return { '--schedule-category': getScheduleCategory(category).color } as CSSProperties;
 }
 
 function ScheduleCard({ item, onOpen }: { item: Schedule; onOpen: (trigger: HTMLButtonElement) => void }) {
@@ -222,19 +217,19 @@ function ScheduleDetail({ item, returnFocus, onClose, onUpdate, onDelete, saveRe
       <Button onClick={() => setEditing(false)}>取消</Button>
       <Button variant="primary" type="submit" form="demo-edit-schedule" disabled={!draft.title.trim() || !draft.time.trim()}>保存修改</Button>
     </> : undefined}
-    headerActions={!editing && <div className="demo-detail-actions" role="group" aria-label="日程操作">
-      <Tooltip content="删除"><IconButton ref={deleteButton} label="删除" variant="quiet" onClick={() => setConfirm(true)}><Trash2 className="demo-delete-glyph" size={19} aria-hidden="true" /></IconButton></Tooltip>
+    headerActions={!editing && <div className="orbit-chat-detail-actions" role="group" aria-label="日程操作">
+      <Tooltip content="删除"><IconButton ref={deleteButton} label="删除" variant="quiet" onClick={() => setConfirm(true)}><Trash2 className="orbit-chat-detail-delete" size={19} aria-hidden="true" /></IconButton></Tooltip>
       <Tooltip content={completeLabel}><IconButton label={completeLabel} variant="quiet" onClick={() => {
         onUpdate({ ...item, completed: !item.completed });
         toast.show({ title: item.completed ? '已恢复为待办' : '已标记完成' });
         onClose();
-      }}><span className="demo-check-glyph"><Check size={21} strokeWidth={2.4} aria-hidden="true" /></span></IconButton></Tooltip>
+      }}><span className="orbit-chat-detail-check"><Check size={21} strokeWidth={2.4} aria-hidden="true" /></span></IconButton></Tooltip>
       <Tooltip content="编辑"><IconButton ref={editButton} label="编辑" variant="quiet" onClick={() => {
         setDraft(item);
         setEditing(true);
       }}><Pencil size={19} aria-hidden="true" /></IconButton></Tooltip>
     </div>}>
-    {editing ? <form id="demo-edit-schedule" className="demo-edit" onSubmit={event => {
+    {editing ? <form id="demo-edit-schedule" className="orbit-chat-detail-edit" onSubmit={event => {
       event.preventDefault();
       if (!draft.title.trim() || !draft.time.trim()) return;
       onUpdate({ ...draft, title: draft.title.trim(), time: draft.time.trim() });
@@ -244,69 +239,21 @@ function ScheduleDetail({ item, returnFocus, onClose, onUpdate, onDelete, saveRe
       <FormField id="demo-edit-title" label="标题"><Input ref={titleInput} id="demo-edit-title" value={draft.title} onChange={event => setDraft({ ...draft, title: event.target.value })} /></FormField>
       <FormField id="demo-edit-time" label="时间"><Input id="demo-edit-time" value={draft.time} onChange={event => setDraft({ ...draft, time: event.target.value })} /></FormField>
       <FormField id="demo-edit-note" label="备注"><Textarea id="demo-edit-note" rows={2} value={draft.note || ''} onChange={event => setDraft({ ...draft, note: event.target.value })} /></FormField>
-    </form> : <div className="demo-detail">
-      <div className="demo-detail-meta">
+    </form> : <div className="orbit-chat-detail">
+      <div className="orbit-chat-detail-meta">
         <span><CalendarDays size={17} aria-hidden="true" />{item.date} · {item.time}</span>
-        <span className="demo-detail-category" style={categoryStyle(item.category)}>{getScheduleCategory(item.category).name}</span>
-        {item.completed && <span className="demo-detail-done"><Check size={15} aria-hidden="true" />已完成</span>}
+        <span className="orbit-chat-detail-category" style={categoryStyle(item.category)}>{getScheduleCategory(item.category).name}</span>
+        {item.completed && <span className="orbit-chat-detail-done"><Check size={15} aria-hidden="true" />已完成</span>}
       </div>
-      {item.place && <p className="demo-detail-place"><MapPin size={17} aria-hidden="true" />{item.place}</p>}
-      {item.note && <p className="demo-detail-note">{item.note}</p>}
-      <ReminderEditor item={item} onSave={saveReminder} />
+      {item.place && <p className="orbit-chat-detail-place"><MapPin size={17} aria-hidden="true" />{item.place}</p>}
+      {item.note && <p className="orbit-chat-detail-note">{item.note}</p>}
+      <ScheduleReminderOptions
+        reminder={item.reminder}
+        explanation={item.reminderRule === 'all-day' ? '全天事项需要设置具体时间后，才能使用提前提醒。' :
+          item.reminderRule === 'recurring' ? '沿用周期提醒时间，可以在周期提醒中调整。' : undefined}
+        onSave={async reminder => { if (!saveReminder(reminder)) throw new Error('提醒未保存，请重试。'); }}
+      />
     </div>}
     <ConfirmDialog open={confirm} onOpenChange={setConfirm} title="删除这条日程？" description={`「${item.title}」将从这段示例对话中移除。`} confirmLabel="删除日程" returnFocus={deleteButton} onConfirm={onDelete}>{null}</ConfirmDialog>
   </Dialog>;
-}
-
-function ReminderEditor({ item, onSave }: { item: Schedule; onSave: (reminder: Schedule['reminder']) => boolean }) {
-  const savedMinutes = item.reminder.enabled ? item.reminder.minutes : null;
-  const savedCustom = savedMinutes !== null && !reminderOptions.some(option => option.minutes === savedMinutes);
-  const [minutes, setMinutes] = useState(savedCustom ? String(savedMinutes) : '');
-  const [feedback, setFeedback] = useState<'saved' | 'failed' | 'invalid'>();
-
-  function save(nextMinutes: number | null) {
-    if (!onSave({ enabled: nextMinutes !== null, minutes: nextMinutes ?? item.reminder.minutes })) {
-      setFeedback('failed');
-      return;
-    }
-    setMinutes(reminderOptions.some(option => option.minutes === nextMinutes) ? '' : String(nextMinutes));
-    setFeedback('saved');
-  }
-
-  const rule = item.reminderRule === 'all-day'
-    ? '全天事项需要设置具体时间后，才能使用提前提醒。'
-    : item.reminderRule === 'recurring' ? '沿用周期提醒时间，可以在周期提醒中调整。' : undefined;
-
-  return <section className="demo-reminder" aria-label="主动聊天提醒">
-    <div className="demo-reminder-row">
-      <h2 className="demo-reminder-heading"><Bell size={17} aria-hidden="true" />主动聊天提醒</h2>
-      {!rule && <form className="demo-reminder-options" aria-label="提醒时间" onSubmit={event => {
-        event.preventDefault();
-        const value = minutes.trim();
-        if (!/^\d+$/.test(value) || Number(value) > 10080) {
-          setFeedback('invalid');
-          return;
-        }
-        save(Number(value));
-      }}>
-        {reminderOptions.map(option => <Button key={option.label} aria-pressed={savedMinutes === option.minutes} onClick={() => save(option.minutes)}>{option.label}</Button>)}
-        <label className="demo-custom-minutes">
-          <Input aria-label="自定义提醒分钟数" aria-invalid={feedback === 'invalid' || undefined}
-            aria-describedby={feedback === 'invalid' ? 'demo-reminder-feedback' : 'demo-reminder-help'}
-            inputMode="numeric" enterKeyHint="done" placeholder="自定义" value={minutes}
-            data-current={(savedCustom && minutes === String(savedMinutes)) || undefined}
-            onChange={event => { setMinutes(event.target.value); setFeedback(undefined); }} />
-          <span aria-hidden="true">分钟</span>
-        </label>
-      </form>}
-    </div>
-    {rule ? <p className="demo-reminder-help">{rule}</p> : <>
-      <p className="demo-reminder-help" id="demo-reminder-help">自定义按回车保存。需开启对话列表中的「主动聊天提醒」。</p>
-      <div aria-live="polite">
-        {feedback === 'saved' && <p className="demo-reminder-feedback">提醒已保存</p>}
-        {feedback === 'invalid' && <p className="demo-reminder-feedback demo-error" id="demo-reminder-feedback">请输入 0–10080 之间的整数分钟。</p>}
-        {feedback === 'failed' && <p className="demo-reminder-feedback demo-error">提醒未保存，请重试。</p>}
-      </div>
-    </>}
-  </section>;
 }

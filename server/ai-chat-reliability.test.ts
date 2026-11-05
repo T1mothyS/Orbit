@@ -206,3 +206,104 @@ test('final persistence failure cannot acknowledge or retain a successful assist
   try{const {row,cid}=await send('科比是谁');assert.equal(row.state,'failed');assert.equal(rejected,true);assert.equal(queryAll('SELECT id FROM ai_schedule_messages WHERE user_id=? AND conversation_id=? AND role=?',[user.id,cid,'assistant']).length,0);}
   finally{fs.renameSync=rename;workBuddyProvider.generate=original;}
 });
+
+test('inactivity uses the last human or AI message, ignores notifications, and freezes the cutoff on retry', async () => {
+  const { resolveOrbitRound } = await import('./orbit-round.js');
+  const cid = store.createConversation(user.id, '合成分轮').id;
+  const now = Date.now();
+  const older = new Date(now - 31 * 60_000).toISOString();
+  const replyAt = new Date(now - 30 * 60_000).toISOString();
+  const seed = (role: 'user' | 'assistant', content: string, at: string, meta?: unknown) => {
+    const id = randomUUID();
+    db.createAiScheduleMessage({ id, user_id: user.id, conversation_id: cid, role, type: 'text', content, intent: null, plan: null,
+      schedule_items: role === 'assistant' ? JSON.stringify([{ id: 'old-item', title: '旧事项编号' }]) : null,
+      knowledge_sources: role === 'assistant' ? JSON.stringify([{ id: 'old-source' }]) : null, created_at: at });
+    if (meta) run('UPDATE ai_schedule_messages SET orbit_meta=? WHERE user_id=? AND id=?', [JSON.stringify(meta), user.id, id]);
+    return id;
+  };
+  const oldUser = seed('user', '旧话题隐私标记', older);
+  const { uploadChatAttachment, linkMessageAttachments, selectAttachmentIds } = await import('./orbit-attachments.js');
+  const attachment = await uploadChatAttachment(user.id, cid, {
+    name: '旧轮资料.txt', mime: 'text/plain', base64: Buffer.from('旧轮附件内容').toString('base64'),
+  });
+  linkMessageAttachments(user.id, oldUser, [attachment.id]);
+  seed('assistant', '旧模型回复', replyAt);
+  seed('assistant', '系统通知', new Date(now - 10_000).toISOString(), { origin: 'notification' });
+  assert.equal(resolveOrbitRound(user.id, cid, new Date(now - 60_000)), '');
+  assert.equal(resolveOrbitRound(user.id, cid, new Date(now)), new Date(now).toISOString());
+  const original = workBuddyProvider.generate;
+  try {
+    workBuddyProvider.generate = async req => {
+      assert.doesNotMatch(req.instructions, /旧话题隐私标记|旧模型回复|系统通知|旧事项编号|old-source/);
+      throw new AiExecutionError('MODEL_OUTPUT', '合成首次失败');
+    };
+    const first = await send('请回答一个新问题', cid);
+    assert.equal(first.row.state, 'failed');
+    const cutoff = store.requestExecution(first.row).roundStartedAt!;
+    assert.ok(cutoff);
+    assert.deepEqual(store.recentObjectReferences(user.id, cid, cutoff), []);
+    assert.deepEqual(store.previousKnowledgeIds(user.id, cid, cutoff), []);
+    assert.deepEqual(selectAttachmentIds(user.id, cid, '上一张图是什么？', [], cutoff), []);
+    assert.deepEqual(selectAttachmentIds(user.id, cid, '请看这个附件', [attachment.id], cutoff), [attachment.id]);
+    seed('assistant', '旧轮迟到回复', new Date().toISOString(), { roundStartedAt: '' });
+    workBuddyProvider.generate = async req => {
+      assert.doesNotMatch(req.instructions, /旧轮迟到回复|旧话题隐私标记/);
+      await new Promise(resolve => setTimeout(resolve, 35));
+      return '新轮回复';
+    };
+    assert.equal((await request('/api/orbit/requests/' + first.id + '/retry', {})).status, 200);
+    const retried = await settle(first.id);
+    assert.equal(retried.state, 'completed');
+    assert.equal(store.requestExecution(retried).roundStartedAt, cutoff);
+    const { messages } = await (await request('/api/ai-schedule/history?conversationId=' + cid)).json();
+    assert.ok(messages.some((message: any) => message.text === '旧模型回复'));
+    assert.equal(messages.filter((message: any) => message.orbitMeta?.newRoundAt === cutoff).length, 1);
+    assert.ok(messages.find((message: any) => message.text === '新轮回复').orbitMeta.processingMs >= 30);
+    assert.equal(messages.find((message: any) => message.text === '旧模型回复').orbitMeta?.processingMs, undefined);
+    const next = await send('再接着说一件事', cid);
+    assert.equal(store.requestExecution(next.row).roundStartedAt, cutoff);
+  } finally { workBuddyProvider.generate = original; }
+});
+
+test('quick replies verify the original prompt and round, then discuss or create only a pending plan', async () => {
+  const { orbitQuickReplies } = await import('../src/utils/orbit-quick-reply.js');
+  const original = workBuddyProvider.generate;
+  const activity = '10月28日（下周三）15:00-17:00举办活动';
+  try {
+    const draft = await send(activity);
+    const discuss = await send(activity);
+    const stale = await send(activity);
+    const messageId = (result: typeof draft) => JSON.parse(result.row.result!).historyMessageId;
+    const submit = (cid: string, id: string, choice: keyof typeof orbitQuickReplies, requestId = randomUUID()) =>
+      request('/api/orbit/requests', { text: orbitQuickReplies[choice], requestId, conversationId: cid, quickReply: { messageId: id, choice } });
+    const before = schedules.getAllSchedules(user.id).length;
+    assert.equal((await submit(discuss.cid, messageId(draft), 'draft')).status, 400);
+    const oldAt = new Date(Date.now() - 31 * 60_000).toISOString();
+    run('UPDATE orbit_requests SET created_at=? WHERE user_id=? AND conversation_id=?', [oldAt, user.id, stale.cid]);
+    run('UPDATE ai_schedule_messages SET created_at=? WHERE user_id=? AND conversation_id=?', [oldAt, user.id, stale.cid]);
+    const expired = await submit(stale.cid, messageId(stale), 'draft');
+    assert.equal(expired.status, 400);
+    assert.match((await expired.json()).error, /已过期.*重新描述/);
+
+    workBuddyProvider.generate = async req => {
+      assert.match(req.input[0].text!, /原问题.*举办活动/);
+      if (req.responseMode === 'draft') {
+        assert.match(req.instructions, /2026-10-28/);
+        return wire;
+      }
+      assert.match(req.instructions, /已选择先讨论/);
+      return '先讨论活动需要准备哪些材料。';
+    };
+    const draftId = randomUUID();
+    assert.equal((await submit(draft.cid, messageId(draft), 'draft', draftId)).status, 202);
+    assert.equal(JSON.parse((await settle(draftId)).result!).requiresConfirmation, true);
+    assert.equal((await submit(draft.cid, messageId(draft), 'draft', draftId)).status, 202);
+    assert.equal((await submit(draft.cid, messageId(draft), 'discuss')).status, 400);
+    const discussId = randomUUID();
+    assert.equal((await submit(discuss.cid, messageId(discuss), 'discuss', discussId)).status, 202);
+    const result = JSON.parse((await settle(discussId)).result!);
+    assert.match(result.reply, /讨论活动/);
+    assert.equal(result.requiresConfirmation, undefined);
+    assert.equal(schedules.getAllSchedules(user.id).length, before);
+  } finally { workBuddyProvider.generate = original; }
+});

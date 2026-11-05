@@ -10,6 +10,7 @@ import { addLog } from './log-service.js';
 import { aiChatRequestRecords, isAiChatRequestId } from './ai-chat-state.js';
 import { withPersistenceTransaction } from './persistence.js';
 import {validateChatAttachments} from './orbit-attachments.js';
+import { assertQuickReplyAvailable, parseOrbitQuickReply, resolveOrbitRound } from './orbit-round.js';
 type Worker = (req: any, res: any) => Promise<any>;
 let worker: Worker;
 const active = new Map<string, {
@@ -33,17 +34,19 @@ export function submitOrbitRequest(userId: string, body: any, parent?: ChatReque
     const text = String(body.text || '').trim();
     if (!text || text.length > 20000)
         throw new Error('请输入 1–20000 字的内容');
-    const allowed = new Set(['text', 'requestId', 'conversationId', 'targetDate', 'model', 'calendarId', 'knowledgeScope', 'provider','attachmentIds','notificationId']);
+    const allowed = new Set(['text', 'requestId', 'conversationId', 'targetDate', 'model', 'calendarId', 'knowledgeScope', 'provider','attachmentIds','notificationId','quickReply']);
     if(body.notificationId!==undefined&&(typeof body.notificationId!=='string'||!getNotification(body.notificationId,userId)))throw new Error('通知不存在或无权访问');
     const attachmentIds=validateChatAttachments(userId,cid,body.attachmentIds||[]);
     if(body.provider!==undefined && !['workbuddy','chatgpt'].includes(body.provider))throw new Error('Provider 当前不可用');
     if(body.provider==='chatgpt' && (!chatGPTStatus(userId).connected || !body.model))throw new Error('请连接 ChatGPT 并选择该账号可用模型');
     if (Object.keys(body).some(key => !allowed.has(key)))
         throw new Error('请求包含不支持的字段');
+    const quickReply = parseOrbitQuickReply(body.quickReply, text);
+    if (quickReply && (attachmentIds.length || body.notificationId)) throw new Error('快捷回答只关联原问题');
     const old = getRequest(userId, id);
     if (old) {
         const frozen=JSON.parse(old.body);
-        if (old.conversation_id !== cid || frozen.text !== text || (frozen.notificationId || null) !== (body.notificationId || null) || (body.provider!==undefined&&frozen.provider!==body.provider) || (body.model!==undefined&&frozen.model!==body.model) || JSON.stringify(frozen.attachmentIds||[])!==JSON.stringify(attachmentIds))
+        if (old.conversation_id !== cid || frozen.text !== text || (frozen.notificationId || null) !== (body.notificationId || null) || (body.provider!==undefined&&frozen.provider!==body.provider) || (body.model!==undefined&&frozen.model!==body.model) || JSON.stringify(frozen.attachmentIds||[])!==JSON.stringify(attachmentIds) || JSON.stringify(frozen.quickReply) !== JSON.stringify(quickReply))
             throw new Error('请求编号已用于其他内容');
         return old;
     }
@@ -52,8 +55,10 @@ export function submitOrbitRequest(userId: string, body: any, parent?: ChatReque
     const submittedAt = new Date();
     const targetDate = body.targetDate || dateInZone(submittedAt, getReminder(userId)?.timezone || 'Asia/Shanghai');
     const inherited=parent?requestExecution(parent):{};
-    const meta={attempt:0,timezone:inherited.timezone||getReminder(userId)?.timezone||'Asia/Shanghai',...(parent?{continuationOf:parent.id,rootRequestId:inherited.rootRequestId||parent.id,evidence:inherited.evidence}: {})};
-    run('INSERT INTO orbit_requests (id,user_id,conversation_id,state,body,created_at,execution_meta) VALUES (?,?,?,?,?,?,?)', [id, userId, cid, 'queued', JSON.stringify({ ...body, text, targetDate,attachmentIds, provider:body.provider||'workbuddy',model:body.model||getUserPreferredModel(userId,defaultModel) }), submittedAt.toISOString(),JSON.stringify(meta)]);
+    const roundStartedAt = parent ? inherited.roundStartedAt || '' : resolveOrbitRound(userId, cid, submittedAt);
+    if (quickReply && !parent) assertQuickReplyAvailable(userId, cid, quickReply, roundStartedAt);
+    const meta={roundStartedAt,attempt:0,timezone:inherited.timezone||getReminder(userId)?.timezone||'Asia/Shanghai',...(parent?{continuationOf:parent.id,rootRequestId:inherited.rootRequestId||parent.id,evidence:inherited.evidence}: {})};
+    run('INSERT INTO orbit_requests (id,user_id,conversation_id,state,body,created_at,execution_meta) VALUES (?,?,?,?,?,?,?)', [id, userId, cid, 'queued', JSON.stringify({ ...body, text, targetDate,attachmentIds,quickReply, provider:body.provider||'workbuddy',model:body.model||getUserPreferredModel(userId,defaultModel) }), submittedAt.toISOString(),JSON.stringify(meta)]);
     void pump(userId).catch(error=>addLog('error','ai','AI 队列持久化失败',{requestId:active.get(userId)?.id,code:aiErrorInfo(error).code}));
     return getRequest(userId, id)!;
 }
@@ -117,6 +122,7 @@ async function pump(userId: string) {
         return;
     const controller = new AbortController();
     active.set(userId, { id: row.id, controller });
+    const processingStarted = performance.now();
     const meta=requestExecution(row);Object.assign(meta,{attempt:(meta.attempt||0)+1,startedAt:new Date().toISOString()});
 
     let status = 200, result: any;
@@ -133,7 +139,7 @@ async function pump(userId: string) {
         if (!account || account.disabled)
             throw new Error('账号不可用');
         conversation(userId, row.conversation_id);
-        await orbitContext.run({ userId, conversationId: row.conversation_id, requestId: row.id, controller,timezone:meta.timezone,rootRequestId:meta.rootRequestId,continuationOf:meta.continuationOf }, () => worker({ user: { userId }, body: JSON.parse(row.body) }, res));
+        await orbitContext.run({ userId, conversationId: row.conversation_id, requestId: row.id, controller,timezone:meta.timezone,rootRequestId:meta.rootRequestId,continuationOf:meta.continuationOf, roundStartedAt:meta.roundStartedAt || '', submittedAt:row.created_at, processingStarted }, () => worker({ user: { userId }, body: JSON.parse(row.body) }, res));
         if (!getRequest(userId, row.id) || getRequest(userId, row.id)?.state === 'cancelled')
             return;
         if (controller.signal.aborted)

@@ -17,6 +17,7 @@ export interface OrbitRequest {
     startedAt?:string;
     attempt?:number;
     responseMessageId?:string;
+    quickReplyTo?: string;
     continuationOf?:string;
     canContinue?:boolean;
     partialReply?:string;

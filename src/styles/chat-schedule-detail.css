@@ -1,0 +1,49 @@
+.orbit-chat-detail,
+.orbit-chat-detail-edit { display: grid; gap: var(--orbit-space-3); }
+.orbit-chat-detail-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--orbit-space-2) var(--orbit-space-3); }
+.orbit-chat-detail-meta > span, .orbit-chat-detail-place { display: inline-flex; align-items: center; gap: var(--orbit-space-2); font-size: 14px; line-height: 1.5; }
+.orbit-chat-detail-meta > span:first-child { font-variant-numeric: tabular-nums; }
+.orbit-chat-detail-meta .orbit-chat-detail-category {
+  padding: var(--orbit-space-1) var(--orbit-space-2);
+  border-radius: var(--orbit-radius-full);
+  color: color-mix(in srgb, var(--orbit-text) 75%, var(--schedule-category));
+  background: color-mix(in srgb, var(--schedule-category) 12%, var(--orbit-elevated));
+  font-size: 12px;
+}
+.orbit-chat-detail-meta .orbit-chat-detail-done { color: var(--orbit-success); font-size: 12px; }
+.orbit-chat-detail-place, .orbit-chat-detail-note { margin: 0; color: var(--orbit-text-secondary); font-size: 14px; overflow-wrap: anywhere; }
+.orbit-chat-detail-note { white-space: pre-wrap; }
+.orbit-chat-detail-actions { display: flex; align-items: center; }
+.orbit-chat-detail-actions .oui-icon-button { padding: var(--orbit-space-1); min-width: var(--orbit-touch-target); min-height: var(--orbit-touch-target); }
+.orbit-chat-detail-delete { color: var(--orbit-destructive); }
+.orbit-chat-detail-check { display: grid; place-items: center; width: 30px; height: 30px; color: var(--orbit-success); background: var(--orbit-success-soft); border-radius: var(--orbit-radius-control); }
+
+.orbit-reminder {
+  margin-top: var(--orbit-space-1);
+  padding: var(--orbit-space-3);
+  border-radius: var(--orbit-radius-card);
+  background: var(--orbit-surface);
+  border: 1px solid var(--orbit-border);
+}
+.orbit-reminder-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--orbit-space-2) var(--orbit-space-4); }
+.orbit-reminder-heading { display: inline-flex; align-items: center; gap: var(--orbit-space-2); margin: 0; font-weight: 600; font-size: 14px; }
+.orbit-reminder-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex: 1 1 360px;
+  min-width: 0;
+  gap: var(--orbit-space-2);
+}
+.orbit-reminder-options .oui-button, .orbit-reminder-custom .oui-input { min-height: var(--orbit-touch-target); padding-inline: var(--orbit-space-2); }
+.orbit-reminder-options :is([aria-pressed=true], [data-current]):not(:focus-visible) { outline: 2px solid var(--orbit-brand); outline-offset: -2px; }
+.orbit-reminder-help { color: var(--orbit-text-secondary); }
+.orbit-reminder-help, .orbit-reminder-feedback { margin: var(--orbit-space-2) 0 0; font-size: 12px; line-height: 1.5; }
+.orbit-reminder-feedback { color: var(--orbit-success); }
+.orbit-reminder-feedback.is-error { color: var(--orbit-destructive); }
+.orbit-reminder-custom { position: relative; display: flex; min-width: 0; }
+.orbit-reminder-custom .oui-input { padding-inline-end: calc(2em + var(--orbit-space-2)); font-variant-numeric: tabular-nums; }
+.orbit-reminder-custom > span { position: absolute; inset-inline-end: var(--orbit-space-2); top: 50%; translate: 0 -50%; color: var(--orbit-text-secondary); font-size: 12px; pointer-events: none; }
+
+@media (max-width: 440px) {
+  .orbit-reminder-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

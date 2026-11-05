@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AiNoteBoardHost, useAiNoteBoard } from '../components/AiNoteBoardHost';
 import { AiSchedulePanel, type AiSchedulePanelHandle } from '../components/AiSchedulePanel';
-import { IconButton, Tooltip, useActionConfirmation } from '../ui';
+import { Button, IconButton, Tooltip, useActionConfirmation } from '../ui';
 
 import { OrbitScheduleEditor } from '../components/OrbitScheduleEditor';
 
@@ -12,7 +12,12 @@ export function AiAssistantPage() {
 
   const chatPanelRef = useRef<AiSchedulePanelHandle>(null);
   const [openScheduleId, setOpenScheduleId] = useState<string | null>(null);
-  const [chatError,setChatError]=useState('');
+  const [chatError, setChatError] = useState('');
+  const scheduleTrigger = useRef<HTMLElement | null>(null);
+  const openSchedule = useCallback((id: string) => {
+    scheduleTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setOpenScheduleId(id);
+  }, []);
   const confirmation = useActionConfirmation();
   const [chatState, setChatState] = useState({ hasMessages: false, busy: false, clearDisabled: true });
   const noteBoard = useAiNoteBoard({
@@ -72,7 +77,7 @@ export function AiAssistantPage() {
                 <AiSchedulePanel
                   ref={chatPanelRef}
                   onSaveNote={saveNote}
-                  onOpenSchedule={setOpenScheduleId}
+                  onOpenSchedule={openSchedule}
                   confirmation={confirmation}
                   onChatStateChange={setChatState}
                 />
@@ -81,8 +86,9 @@ export function AiAssistantPage() {
         </section>
       </div>
       <AiNoteBoardHost controller={noteBoard} />
-      {chatError&&<div className="orbit-error" role="alert">{chatError}<button type="button" onClick={()=>setChatError('')}>关闭</button></div>}
-      {openScheduleId && <OrbitScheduleEditor id={openScheduleId} onClose={() => setOpenScheduleId(null)} onSaved={() => {void chatPanelRef.current?.refresh();}} onChat={(id,title)=>{void chatPanelRef.current?.startConversation(id,title).then(()=>setOpenScheduleId(null)).catch(e=>setChatError(e.message));}} />}
+      {chatError && <div className="orbit-error" role="alert">{chatError}<Button variant="quiet" onClick={() => setChatError('')}>关闭</Button></div>}
+      {openScheduleId && <OrbitScheduleEditor key={openScheduleId} id={openScheduleId} returnFocus={scheduleTrigger}
+        onClose={() => setOpenScheduleId(null)} onSaved={() => { void chatPanelRef.current?.refresh(); }} />}
     </div>
   );
 }
