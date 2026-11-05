@@ -5,8 +5,12 @@ import { useTheme } from '../hooks/useTheme';
 import { ActionRow, Avatar, Badge, Button, Card, Checkbox, ConfirmDialog, Dialog, EmptyState, ErrorState, FilePicker, FormField, IconButton, InlineNotice, Input, LoadingState, Menu, PasswordInput, Popover, Section, Select, SettingRow, Sheet, Skeleton, Switch, Tabs, Textarea, TextLink, ToastProvider, Tooltip, useToast } from '../ui';
 import './ui-gallery.css';
 import { IconLink, NavigationItem, TooltipProvider } from '../ui';
+import ChatScheduleDemo from './ChatScheduleDemo';
 
-export default function UiGallery() { return <TooltipProvider><ToastProvider><Gallery /></ToastProvider></TooltipProvider>; }
+export default function UiGallery() {
+  const [search] = useSearchParams();
+  return <TooltipProvider><ToastProvider>{search.get('demo') === 'chat-schedule' ? <ChatScheduleDemo /> : <Gallery />}</ToastProvider></TooltipProvider>;
+}
 
 function Gallery() {
   const { theme, toggleTheme } = useTheme();
