@@ -125,7 +125,7 @@
 .schedule-form-fields:disabled { opacity: .72; }
 .schedule-editor-kind { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--orbit-border); border-radius: var(--orbit-radius-card); background: var(--orbit-muted); }
 .schedule-editor-kind button { flex: 1; min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 7px; border-radius: var(--orbit-radius-control); font-size: 14px; font-weight: 650; color: var(--orbit-text-secondary); }
-.schedule-editor-kind button[aria-pressed="true"] { color: var(--orbit-brand); background: var(--td-brand-color-light); }
+.schedule-editor-kind button[aria-pressed="true"] { color: var(--orbit-brand); background: var(--orbit-brand-soft); }
 .schedule-editor-field { min-width: 0; display: block; font-size: 13px; font-weight: 650; }
 .schedule-editor-field > small { color: var(--orbit-text-secondary); font-weight: 500; }
 .schedule-editor-field > input, .schedule-editor-field > textarea {
@@ -144,8 +144,6 @@
 .schedule-editor-grid.is-pair { grid-template-columns: 1.08fr 1fr; }
 .schedule-editor-choice-pair { display: grid; gap: 8px; }
 @media (min-width: 500px) { .schedule-editor-choice-pair { grid-template-columns: 2fr 1fr; } }
-.schedule-editor-reminder { position: relative; display: grid; gap: 5px; }
-.schedule-editor-custom { position: absolute; inset: 0 0 auto auto; color: var(--orbit-brand); font-size: 12px; font-weight: 650; }
 .schedule-form-modal > .orbit-inline-error { margin: 4px 16px; }
 @media (max-width: 400px) {
   .schedule-editor-header, .schedule-form-fields, .schedule-editor-footer { padding-inline: 12px; }
@@ -452,12 +450,12 @@
   min-height: 44px; border-radius: var(--orbit-radius-control); color: var(--orbit-text-secondary); font-size: 13px; font-weight: 650;
   white-space: nowrap; transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
-.schedule-form-fields .mode-option:hover, .schedule-form-fields .unscheduled-option:hover { color: var(--tone); }
-.schedule-form-fields .mode-option:has(:checked), .schedule-form-fields .unscheduled-option:has(:checked) { color: var(--tone); }
+.schedule-form-fields .mode-option:hover, .schedule-form-fields .unscheduled-option:hover { color: var(--orbit-brand); }
+.schedule-form-fields .mode-option:has(:checked), .schedule-form-fields .unscheduled-option:has(:checked) { color: var(--orbit-brand); }
 .schedule-form-fields .mode-thumb {
   position: absolute; inset: 3px auto 3px 3px; width: calc((100% - 6px) / 2);
-  border: 1px solid color-mix(in srgb, var(--tone) 34%, var(--orbit-border)); border-radius: var(--orbit-radius-control);
-  background: color-mix(in srgb, var(--tone) 12%, var(--orbit-elevated));
+  border: 1px solid color-mix(in srgb, var(--orbit-brand) 34%, var(--orbit-border)); border-radius: var(--orbit-radius-control);
+  background: var(--orbit-brand-soft);
   transition: transform 220ms cubic-bezier(.16,1,.3,1), background-color 180ms ease, border-color 180ms ease, opacity 140ms ease;
 }
 .schedule-form-fields .mode-track[data-selected="1"] .mode-thumb { transform: translateX(100%); }
@@ -466,8 +464,8 @@
   padding-inline: 10px; border: 1px solid var(--orbit-border); border-radius: var(--orbit-radius-card); background: var(--orbit-muted);
 }
 .schedule-form-fields .unscheduled-option:has(:checked) {
-  border-color: color-mix(in srgb, var(--tone) 48%, var(--orbit-border));
-  background: color-mix(in srgb, var(--tone) 12%, var(--orbit-elevated));
+  border-color: color-mix(in srgb, var(--orbit-brand) 48%, var(--orbit-border));
+  background: var(--orbit-brand-soft);
 }
 .schedule-form-fields .step-slider {
   position: relative; display: grid; grid-template-columns: repeat(var(--step-count), minmax(0, 1fr));

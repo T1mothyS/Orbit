@@ -10,7 +10,7 @@ export default defineConfig({
   testMatch: scope === 'gallery' ? '**/gallery.spec.ts' : scope === 'app' ? ['**/account.spec.ts', '**/settings.spec.ts', '**/stage2.spec.ts', '**/round3.spec.ts', '**/round4.spec.ts', '**/evolution.spec.ts', '**/confirmations.spec.ts', '**/mobile-refinement.spec.ts', '**/evolution-stage.spec.ts', '**/ai-chat.spec.ts'] : '**/*.spec.ts',
   timeout: 30_000,
   fullyParallel: true,
-  // Real login fixtures share the server's IP budget; keep the expanded matrix within it.
+  globalSetup: scope === 'gallery' ? undefined : './tests/ui/auth-fixture.ts',
   workers: 2,
   forbidOnly: !!process.env.CI,
   updateSnapshots: 'none',

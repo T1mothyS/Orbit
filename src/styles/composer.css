@@ -1,9 +1,33 @@
 /* Compact chat controls and native modal surfaces share the existing motion tokens. */
 .orbit-dialog-viewport { width:100%; height:100dvh; max-width:none; max-height:none; margin:0; border:0; box-sizing:border-box; color:var(--td-text-color-primary); }
 .orbit-dialog-viewport::backdrop { background:transparent; }
-.schedule-detail-surface { display:flex; flex-direction:column; max-height:calc(100dvh - 32px); min-width:0; }
-.schedule-detail-header { flex-shrink:0; max-height:24dvh; overflow:auto; overflow-wrap:anywhere; }
-.schedule-detail-header > button { min-width:44px; min-height:44px; flex-shrink:0; }
+/* Keep the type accent inside the calendar editor and detail surfaces. */
+:is(.schedule-form-modal, .schedule-detail-surface)[data-schedule-kind="event"] {
+  --orbit-brand: var(--orbit-event-ink);
+  --orbit-brand-soft: var(--orbit-event-selected);
+  --orbit-action: var(--orbit-event-action);
+  --orbit-action-hover: color-mix(in srgb, var(--orbit-event-action) 90%, black);
+  --orbit-action-active: color-mix(in srgb, var(--orbit-event-action) 80%, black);
+  --td-brand-color: var(--orbit-event-ink);
+}
+.schedule-detail-surface {
+  display: flex; flex-direction: column; width: min(calc(100% - 24px), 420px);
+  max-height: calc(100dvh - 32px); min-width: 0;
+}
+.schedule-detail-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--orbit-space-1); flex-shrink: 0; }
+.schedule-detail-heading { min-width: 0; max-height: 24dvh; overflow: auto; overflow-wrap: anywhere; }
+.schedule-detail-tools { display: flex; align-items: center; }
+.schedule-detail-close { min-width: var(--orbit-touch-target); min-height: var(--orbit-touch-target); }
+.schedule-detail-kind { background: var(--orbit-brand-soft); color: var(--orbit-brand); }
+.schedule-detail-tools .schedule-detail-edit { color: var(--orbit-brand); }
+@media (max-width: 360px) {
+  .schedule-detail-header { grid-template-columns: minmax(0, 1fr); }
+  .schedule-detail-tools { grid-row: 1; justify-self: end; }
+}
+.orbit-chat-detail-actions { display: flex; align-items: center; }
+.orbit-chat-detail-actions .oui-icon-button { padding: var(--orbit-space-1); min-width: var(--orbit-touch-target); min-height: var(--orbit-touch-target); }
+.orbit-chat-detail-delete { color: var(--orbit-destructive); }
+.orbit-chat-detail-check { display: grid; place-items: center; width: 30px; height: 30px; color: var(--orbit-success); background: var(--orbit-success-soft); border-radius: var(--orbit-radius-control); }
 .schedule-detail-body { min-height:0; overflow:auto; overscroll-behavior:contain; overflow-wrap:anywhere; }
 .schedule-detail-actions { flex-shrink:0; flex-wrap:wrap; }
 .schedule-detail-actions button { min-height:44px; }

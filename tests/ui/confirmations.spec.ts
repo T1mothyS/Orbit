@@ -15,13 +15,67 @@ test('plan validation keeps the first error focused and failed changes editable'
   await title.fill('');await editor.getByRole('button',{name:'保存这项',exact:true}).click();await expect(editor.getByRole('alert')).toHaveText('标题不能为空');await expect(title).toBeFocused();expect(saves).toBe(0);
   await title.fill('失败后保留的修改');await editor.getByRole('button',{name:'保存这项',exact:true}).click();await expect(editor.getByRole('alert')).toHaveText('合成保存失败，请重试');await expect(title).toHaveValue('失败后保留的修改');expect(saves).toBe(1);expect(native).toEqual([]);
 });
-test('schedule detail popover stays inside the native top layer and Escape returns focus',async({page,context})=>{
-  const token=await fixtureToken(context,'preview-guards@example.invalid'),headers={Authorization:'Bearer '+token};await context.addInitScript(token=>localStorage.setItem('aicalendar_token',token),token);
-  const today=new Date().toLocaleDateString('sv-SE'),response=await context.request.post(base+'/api/schedules',{headers,data:{title:'合成详情确认',type:'event',start_time:today+'T10:00:00',calendar_id:'personal',priority:'medium',category:'other'}});expect(response.ok()).toBe(true);const id=(await response.json()).schedule.id;
-  await page.goto(base+'/schedule');await page.getByRole('button',{name:'切换到日程视图',exact:true}).click();await page.locator(`.agenda-view [data-schedule-id="${id}"]`).click();
-  const detail=page.locator('dialog[open]').filter({has:page.getByRole('button',{name:'关闭事项详情',exact:true})}),trigger=detail.getByRole('button',{name:'删除',exact:true});await trigger.click();const popup=page.getByRole('dialog',{name:'删除日程？',exact:true});await expect(popup).toBeVisible();expect(await popup.evaluate(e=>!!e.closest('dialog[open]'))).toBe(true);
-  await page.keyboard.press('Escape');await expect(popup).toHaveCount(0);await expect(detail).toBeVisible();await expect(trigger).toBeFocused();expect((await context.request.get(base+'/api/schedules/'+id,{headers})).ok()).toBe(true);
-  await detail.getByRole('button',{name:'关闭事项详情',exact:true}).click();await context.request.delete(base+'/api/schedules/'+id,{headers});
+test('calendar detail icons keep their keyboard focus and the editor preserves an existing reminder', async ({ page, context }) => {
+  const token = await fixtureToken(context, 'preview-guards@example.invalid');
+  const headers = { Authorization: 'Bearer ' + token };
+  await context.addInitScript(value => localStorage.setItem('aicalendar_token', value), token);
+  const today = new Date().toLocaleDateString('sv-SE');
+  const response = await context.request.post(base + '/api/schedules', { headers, data: {
+    title: '合成详情确认', type: 'event', start_time: today + 'T10:00:00', calendar_id: 'personal',
+    priority: 'medium', category: 'other', reminders: ['17', '30'],
+  } });
+  expect(response.ok()).toBe(true);
+  const id = (await response.json()).schedule.id;
+  const api = base + '/api/schedules/' + id;
+  try {
+    await page.setViewportSize({ width: 664, height: 871 });
+    await page.goto(base + '/schedule');
+    await page.getByRole('button', { name: '切换到日程视图', exact: true }).click();
+    const row = page.locator(`.agenda-view [data-schedule-id="${id}"]`);
+    await row.press('Enter');
+    const detail = page.getByRole('dialog', { name: '合成详情确认', exact: true });
+    const close = detail.getByRole('button', { name: '关闭事项详情', exact: true });
+    await expect(close).toBeFocused();
+    await expect(close).toHaveCSS('outline-style', 'solid');
+    await expect(detail.locator('.schedule-detail-header')).toHaveCSS('overflow', 'visible');
+    const actions = detail.getByRole('group', { name: '事项操作', exact: true });
+    const trigger = actions.getByRole('button', { name: '删除', exact: true });
+    const edit = actions.getByRole('button', { name: '编辑', exact: true });
+    await expect(actions.getByRole('button')).toHaveCount(3);
+    await expect(edit).toHaveText('');
+    await edit.hover();
+    await expect(detail.getByRole('tooltip')).toHaveText('编辑');
+
+    await trigger.click();
+    const popup = page.getByRole('dialog', { name: '删除日程？', exact: true });
+    await expect(popup).toBeVisible();
+    expect(await popup.evaluate(element => !!element.closest('dialog[open]'))).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(popup).toHaveCount(0);
+    await expect(detail).toBeVisible();
+    await expect(trigger).toBeFocused();
+    expect((await context.request.get(api, { headers })).ok()).toBe(true);
+
+    await edit.click();
+    const editor = page.locator('.schedule-form-modal');
+    await expect(editor).toHaveAttribute('data-schedule-kind', 'event');
+    const save = editor.getByRole('button', { name: '保存修改', exact: true });
+    const eventColor = await save.evaluate(button => getComputedStyle(button).backgroundColor);
+    await editor.getByRole('button', { name: '待办', exact: true }).click();
+    await expect(editor).toHaveAttribute('data-schedule-kind', 'todo');
+    await expect(save).not.toHaveCSS('background-color', eventColor);
+    await editor.getByRole('button', { name: '日程', exact: true }).click();
+    await expect(editor.getByRole('button', { name: '自定义', exact: true })).toHaveCount(0);
+    await expect(editor.getByText('当前提醒：提前 17 分钟', { exact: true })).toBeVisible();
+    await editor.getByLabel('日程标题', { exact: true }).fill('合成详情已编辑');
+    await save.click();
+    await expect(editor).toHaveCount(0);
+    const saved = (await (await context.request.get(api, { headers })).json()).schedule;
+    expect(saved.title).toBe('合成详情已编辑');
+    expect(saved.reminders).toEqual(['17', '30']);
+  } finally {
+    await context.request.delete(api, { headers });
+  }
 });
 for (const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (const theme of ['light','dark']) test(`confirmation ${width} ${theme}: nested cancel, busy, failure and one delete`, async ({page,context}) => {
   const token = await fixtureToken(context,'preview-guards@example.invalid'), headers = {Authorization:'Bearer '+token};

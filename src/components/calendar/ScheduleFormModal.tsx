@@ -42,7 +42,6 @@ export function ScheduleFormModal({
   const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [showCustomReminder, setShowCustomReminder] = useState(false);
   const [form, setForm] = useState({
     type: (editingSchedule?.type || 'event') as 'event' | 'todo',
     title: editingSchedule?.title || '',
@@ -86,7 +85,7 @@ export function ScheduleFormModal({
   const isUnscheduled = form.type === 'todo' && form.isUnscheduled;
   const timed = !isUnscheduled && !form.all_day;
   const mode = isUnscheduled ? 'unscheduled' : form.all_day ? 'allDay' : 'timed';
-  const customReminder = !reminders.some(option => option.value === form.reminder);
+  const legacyReminder = !reminders.some(option => option.value === form.reminder);
   const title = (isEditing ? '编辑' : '新增') + (form.type === 'todo' ? '待办' : '日程');
 
   function changeMode(value: ScheduleTimeMode) {
@@ -99,10 +98,6 @@ export function ScheduleFormModal({
     if (!isUnscheduled && !form.all_day && (!isClockTime(form.startTime) || (form.type === 'event' && form.endTime && !isClockTime(form.endTime)))) { setError('请输入有效的时间（00:00–23:59）'); return; }
     if (!isUnscheduled && (!/^\d{4}-\d{2}-\d{2}$/.test(form.date) || Number.isNaN(Date.parse(form.date)))) {
       setError('请选择执行日期'); return;
-    }
-    if (timed && (showCustomReminder || customReminder) && form.reminder !== editingSchedule?.reminders?.[0]
-      && form.reminder && (!/^\d+$/.test(form.reminder) || Number(form.reminder) < 1 || Number(form.reminder) > 10080)) {
-      setError('请输入 1–10080 之间的整数分钟数'); return;
     }
     const startTime = isUnscheduled
       ? editingSchedule?.start_time || new Date().toISOString()
@@ -149,7 +144,7 @@ export function ScheduleFormModal({
       onCancel={event => { event.preventDefault(); event.stopPropagation(); dismiss(); }}
       onClick={event => { if (event.target === event.currentTarget) dismiss(); }}>
       {confirmation.dialog}
-      <div className="schedule-form-modal">
+      <div className="schedule-form-modal" data-schedule-kind={form.type}>
         <header className="schedule-editor-header">
           <h3 className="schedule-form-heading">{title}</h3>
           <IconButton variant="quiet" onClick={dismiss} disabled={saving} label="关闭日程编辑" className="schedule-editor-close">
@@ -195,15 +190,12 @@ export function ScheduleFormModal({
                     <TimePicker value={form.endTime} label="结束" required={false} onChange={value => set('endTime', value)} />
                   </div>
                 </div>}
-                {timed && <div className="schedule-editor-reminder">
-                  <ScheduleStepSlider label="提醒" value={form.reminder} options={reminders}
-                    onChange={value => { set('reminder', value); setShowCustomReminder(false); }} />
-                  <Button variant="link" size="small" className="schedule-editor-custom" aria-expanded={showCustomReminder || customReminder}
-                    onClick={() => setShowCustomReminder(true)}>自定义</Button>
-                  {(showCustomReminder || customReminder) && <label className="schedule-editor-field">自定义分钟数
-                    <Input type="number" min="1" max="10080" value={form.reminder} onChange={event => set('reminder', event.target.value)} />
-                  </label>}
-                </div>}
+                {timed && <>
+                  <ScheduleStepSlider label="提醒" value={form.reminder} options={reminders} onChange={value => set('reminder', value)} />
+                  {legacyReminder && <p className="schedule-editor-help">
+                    {/^[0-9]+$/.test(form.reminder) ? `当前提醒：提前 ${form.reminder} 分钟` : '当前提醒已保留'}
+                  </p>}
+                </>}
               </>}
             </section>
             <section className="schedule-editor-section" aria-label="补充信息">

@@ -88,10 +88,12 @@ export function Menu({ trigger, label, items, header, footer, navigation = false
 export function TooltipProvider({ children }: { children: ReactNode }) {
   return <PrimitiveTooltip.Provider delay={400}>{children}</PrimitiveTooltip.Provider>;
 }
-export function Tooltip({ children, content }: { children: ReactElement; content: string }) {
+export function Tooltip({ children, content, portalContainer }: {
+  children: ReactElement; content: string; portalContainer?: RefObject<HTMLElement | null>;
+}) {
   const id = useId(), [open, setOpen] = useState(false);
   return <PrimitiveTooltip.Root open={open} onOpenChange={setOpen}><PrimitiveTooltip.Trigger render={children} aria-describedby={open ? id : undefined} />
-    <PrimitiveTooltip.Portal><PrimitiveTooltip.Positioner sideOffset={6} className="oui-positioner"><PrimitiveTooltip.Popup id={id} role="tooltip" aria-hidden={!open || undefined} className="oui-tooltip">{content}</PrimitiveTooltip.Popup></PrimitiveTooltip.Positioner></PrimitiveTooltip.Portal>
+    <PrimitiveTooltip.Portal container={portalContainer}><PrimitiveTooltip.Positioner sideOffset={6} className="oui-positioner"><PrimitiveTooltip.Popup id={id} role="tooltip" aria-hidden={!open || undefined} className="oui-tooltip">{content}</PrimitiveTooltip.Popup></PrimitiveTooltip.Positioner></PrimitiveTooltip.Portal>
   </PrimitiveTooltip.Root>;
 }
 export function Popover({ trigger, title, children, openOnHover = false, open, onOpenChange, align = 'center', className = '', portalContainer }: { trigger: ReactElement; title: string; children: ReactNode; openOnHover?: boolean; open?: boolean; onOpenChange?: (open: boolean) => void; align?: 'start' | 'center' | 'end'; className?: string; portalContainer?: HTMLElement | null }) {

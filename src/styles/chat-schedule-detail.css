@@ -13,11 +13,6 @@
 .orbit-chat-detail-meta .orbit-chat-detail-done { color: var(--orbit-success); font-size: 12px; }
 .orbit-chat-detail-place, .orbit-chat-detail-note { margin: 0; color: var(--orbit-text-secondary); font-size: 14px; overflow-wrap: anywhere; }
 .orbit-chat-detail-note { white-space: pre-wrap; }
-.orbit-chat-detail-actions { display: flex; align-items: center; }
-.orbit-chat-detail-actions .oui-icon-button { padding: var(--orbit-space-1); min-width: var(--orbit-touch-target); min-height: var(--orbit-touch-target); }
-.orbit-chat-detail-delete { color: var(--orbit-destructive); }
-.orbit-chat-detail-check { display: grid; place-items: center; width: 30px; height: 30px; color: var(--orbit-success); background: var(--orbit-success-soft); border-radius: var(--orbit-radius-control); }
-
 .orbit-reminder {
   margin-top: var(--orbit-space-1);
   padding: var(--orbit-space-3);

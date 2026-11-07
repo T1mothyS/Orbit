@@ -5,8 +5,8 @@ import { useId, useRef, type CSSProperties, type PointerEvent } from 'react';
 type Choice = { value: string; label?: string; tone: string };
 
 const timeModes = [
-  { value: 'timed', label: '指定时间', tone: 'work', Icon: Clock },
-  { value: 'allDay', label: '全天', tone: 'travel', Icon: Sun },
+  { value: 'timed', label: '指定时间', Icon: Clock },
+  { value: 'allDay', label: '全天', Icon: Sun },
 ] as const;
 
 export function ScheduleStepSlider({ label, value, options, onChange }: {
@@ -76,13 +76,13 @@ export function ScheduleTimeModeSwitch({ value, canBeUnscheduled, onChange }: {
     <legend>时间类型</legend>
     <div className="mode-row">
       <div className="mode-track" data-selected={selected}>
-        <span className="mode-thumb" data-tone={timeModes[Math.max(0, selected)].tone} aria-hidden="true" />
-        {timeModes.map(({ value: mode, label, tone, Icon }) => <label key={mode} className="mode-option" data-tone={tone}>
+        <span className="mode-thumb" aria-hidden="true" />
+        {timeModes.map(({ value: mode, label, Icon }) => <label key={mode} className="mode-option">
           <Input className="choice-input" type="radio" name={name} checked={value === mode} onChange={() => onChange(mode)} />
           <Icon size={15} aria-hidden="true" />{label}
         </label>)}
       </div>
-      {canBeUnscheduled && <label className="unscheduled-option" data-tone="violet">
+      {canBeUnscheduled && <label className="unscheduled-option">
         <Input className="choice-input" type="radio" name={name} checked={value === 'unscheduled'} onChange={() => onChange('unscheduled')} />
         无固定期限
       </label>}
