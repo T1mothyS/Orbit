@@ -245,7 +245,12 @@ export function createSchedulesRouter({ authenticate }: Pick<ReturnType<typeof c
         return res.status(403).json({ error: "无权操作该日程" });
       }
 
-      const schedule = toggleScheduleCompletion(id, userId);
+      const desired = req.body?.completed;
+      if (desired !== undefined && typeof desired !== 'boolean') {
+        return res.status(400).json({ error: '完成状态不正确' });
+      }
+      // A replay from an inline card must not reverse an already-applied change.
+      const schedule = desired === Boolean(existing.is_completed) ? existing : toggleScheduleCompletion(id, userId);
       const action = schedule?.is_completed ? '标记完成' : '取消完成';
       addLog('info', 'schedule', action, { id: schedule?.id });
       res.json({ schedule });

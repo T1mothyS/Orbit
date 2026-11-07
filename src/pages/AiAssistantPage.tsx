@@ -11,12 +11,12 @@ export function AiAssistantPage() {
   const [searchParams] = useSearchParams();
 
   const chatPanelRef = useRef<AiSchedulePanelHandle>(null);
-  const [openScheduleId, setOpenScheduleId] = useState<string | null>(null);
+  const [scheduleEditor, setScheduleEditor] = useState<{ id: string; edit: boolean } | null>(null);
   const [chatError, setChatError] = useState('');
   const scheduleTrigger = useRef<HTMLElement | null>(null);
-  const openSchedule = useCallback((id: string) => {
+  const openSchedule = useCallback((id: string, edit = false) => {
     scheduleTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setOpenScheduleId(id);
+    setScheduleEditor({ id, edit });
   }, []);
   const confirmation = useActionConfirmation();
   const [chatState, setChatState] = useState({ hasMessages: false, busy: false, clearDisabled: true });
@@ -87,8 +87,8 @@ export function AiAssistantPage() {
       </div>
       <AiNoteBoardHost controller={noteBoard} />
       {chatError && <div className="orbit-error" role="alert">{chatError}<Button variant="quiet" onClick={() => setChatError('')}>关闭</Button></div>}
-      {openScheduleId && <OrbitScheduleEditor key={openScheduleId} id={openScheduleId} returnFocus={scheduleTrigger}
-        onClose={() => setOpenScheduleId(null)} onSaved={() => { void chatPanelRef.current?.refresh(); }} />}
+      {scheduleEditor && <OrbitScheduleEditor key={scheduleEditor.id} id={scheduleEditor.id} startEditing={scheduleEditor.edit} returnFocus={scheduleTrigger}
+        onClose={() => setScheduleEditor(null)} onSaved={() => { void chatPanelRef.current?.refresh(); window.dispatchEvent(new Event('orbit:data-change')); }} />}
     </div>
   );
 }

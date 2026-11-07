@@ -2,13 +2,16 @@ import { activityReportChatText } from './activity-report-chat.js';
 import { randomUUID } from 'node:crypto';
 import { queryAll, queryOne, run } from './database/connection.js';
 import { getReminder, getUserById, upsertReminder } from './db.js';
-import { getSchedule } from './schedule-store.js';
+import { getSchedule, getSchedulesByDate } from './schedule-store.js';
 import { readReminderProjectionSources } from './reminder-store.js';
 import { ensureDefaultConversation } from './orbit-store.js';
 import { withPersistenceTransaction } from './persistence.js';
 import { scheduleFingerprint } from './ai-plan.js';
 import { orbitObjectPath, type OrbitObject } from '../src/utils/orbit-links.js';
 import * as activity from './activity-store.js';
+import { getDailyWeather, getWeatherErrorKind, reminderWeatherLocation } from './weather-service.js';
+import { addLog } from './log-service.js';
+import type { DailyActionWeather } from '../src/utils/daily-action.js';
 import { quietAdjustedDate } from './notification-service.js';
 
 export function inAppEnabled(userId:string) {return getReminder(userId)?.in_app_enabled === 1;}
@@ -25,7 +28,34 @@ export function notificationObject(item:activity.NotificationDelivery):OrbitObje
   if(item.sourceType==='activity_report'&&queryOne('SELECT id FROM orbit_activity_reports WHERE id=? AND user_id=?',[item.sourceId,item.userId]))return {type:'activity-report',id:item.sourceId};
   return undefined;
 }
-export function deliverInApp(item:activity.NotificationDelivery,eventId?:string,enhanced=false):string|undefined {
+export function isDailyAction(item: activity.NotificationDelivery) {
+  return item.sourceType === 'digest' && item.kind === 'daily_digest';
+}
+
+export async function deliverDailyAction(item: activity.NotificationDelivery, weatherForDate = getDailyWeather) {
+  const preference = getReminder(item.userId);
+  if (preference?.enabled !== 1 || preference.in_app_enabled !== 1 || getUserById(item.userId)?.disabled) return;
+  const location = reminderWeatherLocation(preference);
+  let weather: DailyActionWeather = { state: 'unconfigured' };
+  if (location) {
+    const place = preference.home_location_name || '';
+    try {
+      const result = await weatherForDate(location, item.sourceId);
+      weather = { state: 'available', place, code: result.weatherCode, description: result.description,
+        low: result.temperatureMin, high: result.temperatureMax, rain: result.precipitationProbabilityMax,
+        cached: result.source === 'cache' || result.isStale };
+    } catch (error) {
+      weather = { state: 'unavailable', place };
+      addLog('warn', 'weather', '站内每日提醒天气获取失败', {
+        event: 'daily_action_weather_failed', userId: item.userId, date: item.sourceId, failureKind: getWeatherErrorKind(error),
+      });
+    }
+  }
+  return deliverInApp(item, undefined, false, { date: item.sourceId, weather });
+}
+
+export function deliverInApp(item:activity.NotificationDelivery,eventId?:string,enhanced=false,
+  dailyAction?: { date: string; weather: DailyActionWeather }):string|undefined {
   if(!inAppEnabled(item.userId)||getUserById(item.userId)?.disabled)return;
   const ref=notificationObject(item);
   if(['schedule','reminder','activity_report'].includes(item.sourceType)&&!ref)return;
@@ -42,9 +72,11 @@ export function deliverInApp(item:activity.NotificationDelivery,eventId?:string,
     const cid=ensureDefaultConversation(item.userId),id=randomUUID(),at=new Date().toISOString();
     const schedule=ref?.type==='schedule'?getSchedule(ref.id):undefined;
     const linkedSchedule=schedule||(ref?.type==='reminder'&&ref.instanceId?getSchedule(`reminder-cycle:${ref.instanceId}`):undefined);
-    const meta={sourceLabel:({schedule:'日程',reminder:'周期提醒',activity_report:'个人周报',digest:'每日行动提醒'} as Record<string,string>)[item.sourceType]||'用户通知',origin:'notification',notificationId:item.id,eventId,enhanced,object:ref,expectedState:linkedSchedule?scheduleFingerprint(linkedSchedule):undefined,href:item.sourceType==='digest'?'/today':ref?orbitObjectPath(ref):undefined};
+    const digestItems = dailyAction && getSchedulesByDate(dailyAction.date, item.userId)
+      .filter(schedule => !schedule.is_completed).map(schedule => ({ id: schedule.id }));
+    const meta={dailyAction,sourceLabel:({schedule:'日程',reminder:'周期提醒',activity_report:'个人周报',digest:'每日行动提醒'} as Record<string,string>)[item.sourceType]||'用户通知',origin:'notification',notificationId:item.id,eventId,enhanced,object:ref,expectedState:linkedSchedule?scheduleFingerprint(linkedSchedule):undefined,href:item.sourceType==='digest'?'/today':ref?orbitObjectPath(ref):undefined};
     const body=item.kind==='weekly_report' && item.sourceType==='activity_report' ? activityReportChatText(item.userId,item.sourceId) : item.body;
-    run('INSERT INTO ai_schedule_messages (id,user_id,role,type,content,schedule_items,created_at,conversation_id,orbit_meta) VALUES (?,?,?,?,?,?,?,?,?)',[id,item.userId,'assistant','text',`${item.title}\n\n${body}`,linkedSchedule?JSON.stringify([linkedSchedule]):null,at,cid,JSON.stringify(meta)]);
+    run('INSERT INTO ai_schedule_messages (id,user_id,role,type,content,schedule_items,created_at,conversation_id,orbit_meta) VALUES (?,?,?,?,?,?,?,?,?)',[id,item.userId,'assistant','text',`${item.title}\n\n${body}`,digestItems ? JSON.stringify(digestItems) : linkedSchedule ? JSON.stringify([linkedSchedule]) : null,at,cid,JSON.stringify(meta)]);
     run('INSERT INTO orbit_notification_messages (notification_id,user_id,message_id,delivery_key) VALUES (?,?,?,?)',[item.id,item.userId,id,deliveryKey]);
     run('UPDATE orbit_conversations SET updated_at=? WHERE id=? AND user_id=?',[at,cid,item.userId]);
     activity.markNotificationSent(item.id);
@@ -113,6 +145,8 @@ export function eventForNotification(userId:string,id:string):string {
 }
 export function processInAppNotifications(now=new Date()) {
   for(const item of activity.listDueNotifications(now.toISOString(),'in_app')){
+    // The shared reminder queue owns daily summaries and their bounded weather lookup.
+    if (isDailyAction(item)) continue;
     const next=quietAdjustedDate(item.userId,now.toISOString());if(next>now.toISOString()){activity.deferNotification(item.id,next);continue;}
     if(!activity.claimNotification(item.id))continue;
     try{if(!deliverInApp(item))activity.suppressNotification(item.id);}catch(e){activity.markNotificationFailed(item.id,e instanceof Error?e.message:'站内投递失败');}

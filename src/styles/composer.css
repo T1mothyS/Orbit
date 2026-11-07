@@ -8,11 +8,6 @@
 .schedule-detail-actions { flex-shrink:0; flex-wrap:wrap; }
 .schedule-detail-actions button { min-height:44px; }
 .schedule-detail-surface > .orbit-inline-error { flex-shrink:0; max-height:20dvh; overflow:auto; }
-.schedule-form-fields { min-width:0; border:0; padding:0; margin:0; }
-.schedule-form-modal { display:flex; flex-direction:column; }
-.schedule-form-modal > .schedule-form-scroll { flex:1; min-height:0; }
-.schedule-form-modal > .flex.gap-2.mt-6 { flex-shrink:0; margin-top:12px; padding-bottom:env(safe-area-inset-bottom); }
-.schedule-form-modal > .orbit-inline-error { flex-shrink:0; max-height:20dvh; overflow:auto; }
 .orbit-inline-error { color:var(--td-error-color,#b42318); background:var(--td-error-color-1,rgba(180,35,24,.08)); border-radius:8px; padding:10px 12px; font-size:13px; line-height:1.6; overflow-wrap:anywhere; margin:8px 0; }
 .calendar-operation-feedback { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 14px; font-size:13px; }
 .calendar-operation-feedback span { flex:1; min-width:0; }
@@ -220,3 +215,29 @@
   .orbit-message { padding: var(--orbit-space-3); }
   .orbit-chat-code-actions button { min-height:44px; }
 }
+
+.orbit-daily-action { overflow: hidden; border: 1px solid var(--orbit-border); border-radius: var(--orbit-radius-panel); }
+.orbit-daily-paper { position: relative; padding: 12px 14px; background: var(--paper); color: var(--paper-ink); }
+.orbit-daily-paper::after {
+  content: ""; position: absolute; top: 0; right: 0; width: 15px; height: 15px;
+  border-radius: 0 0 0 var(--orbit-radius-control); background: linear-gradient(45deg, var(--paper-line) 49%, var(--orbit-elevated) 52%);
+}
+.orbit-daily-paper h2 { margin: 3px 0; font-size: 21px; font-weight: 750; }
+.orbit-daily-paper p, .orbit-daily-paper time { margin: 0; color: var(--paper-muted); font-size: 12px; }
+.orbit-daily-weather {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; padding: 8px 14px;
+  background: var(--paper-band); color: var(--paper-ink); border-block: 1px solid var(--paper-line);
+  font-size: 13px; overflow-wrap: anywhere;
+}
+.orbit-daily-weather strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+.orbit-daily-weather small { color: var(--paper-muted); }
+.orbit-daily-body { display: grid; gap: 9px; padding: 10px 12px; }
+.orbit-daily-body > p { margin: 0; font-size: 13px; }
+.orbit-daily-list-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 5px; }
+.orbit-daily-list-heading h3 { margin: 0; font-size: 13px; font-weight: 700; }
+.orbit-daily-list-heading span { color: var(--orbit-text-secondary); font-size: 12px; }
+.orbit-daily-list ul { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.orbit-daily-task { display: flex; align-items: center; gap: 3px; min-width: 0; }
+.orbit-daily-task .orbit-daily-complete { flex: 0 0 44px; min-width: 44px; min-height: 44px; }
+.orbit-daily-completion-ring { display: grid; place-items: center; width: 21px; height: 21px; border: 1.5px solid var(--orbit-text-secondary); border-radius: var(--orbit-radius-full); }
+.orbit-daily-complete[aria-pressed=true] .orbit-daily-completion-ring { color: var(--orbit-success); border-color: var(--orbit-success); background: var(--orbit-success-soft); }

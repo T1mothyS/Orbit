@@ -11,7 +11,7 @@ import { getSchedulesByDate } from './schedule-store.js';
 import { getActionCenter } from './action-center.js';
 import { renderDailyReminderEmail } from './daily-email-template.js';
 import { renderDailyDigestEmailPage, renderDailyDigestPlainText } from './daily-digest-template.js';
-import { getDailyWeather, getWeatherErrorKind } from './weather-service.js';
+import { getDailyWeather, getWeatherErrorKind, reminderWeatherLocation } from './weather-service.js';
 import { addLog } from './log-service.js';
 import { escapeHtml, renderMarkdown } from './markdown-renderer.js';
 
@@ -304,13 +304,10 @@ export async function sendDailyReminderEmail(to: string, userId: string, dateOve
   const actionCenter = getActionCenter(userId, 7, new Date(), dateStr);
   let weather = null;
   let weatherError: string | null = null;
-  if (preference?.home_latitude != null && preference.home_longitude != null) {
+  const location = reminderWeatherLocation(preference);
+  if (location) {
     try {
-      weather = await getDailyWeather({
-        latitude: Number(preference.home_latitude),
-        longitude: Number(preference.home_longitude),
-        timezone: preference.home_timezone || timezone,
-      }, dateStr);
+      weather = await getDailyWeather(location, dateStr);
       if (weather.source === 'cache') {
         addLog('info', 'weather', '每日邮件使用天气缓存', {
           event: 'daily_weather_cache_fallback',

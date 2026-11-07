@@ -152,12 +152,17 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
       const history = messages.map(message => {
         const view = toAiScheduleHistoryMessage(message);
         if (view.plan?.id) view.plan = buildAiPlanSnapshot(resolveAiPlan(payload.userId, view.plan.id)!);
-        const snapshot = Array.isArray(view.scheduleItems) ? view.scheduleItems[0] : undefined;
-        if (Array.isArray(view.scheduleItems)) view.scheduleItems = view.scheduleItems.flatMap(item => {
-          const live = scheduleStore.getSchedule(item.id);
-          return live?.user_id === payload.userId ? [live] : [];
-        });
         const meta = view.orbitMeta;
+        const snapshot = Array.isArray(view.scheduleItems) ? view.scheduleItems[0] : undefined;
+        if (Array.isArray(view.scheduleItems)) {
+          const dailyItems = meta?.dailyAction
+            ? new Map(scheduleStore.getSchedulesByDate(meta.dailyAction.date, payload.userId).map(item => [item.id, item]))
+            : undefined;
+          view.scheduleItems = view.scheduleItems.flatMap(item => {
+            const live = dailyItems ? dailyItems.get(item.id) : scheduleStore.getSchedule(item.id);
+            return live?.user_id === payload.userId ? [live] : [];
+          });
+        }
         if (meta?.notificationId) {
           const status = notificationView(payload.userId, meta.notificationId);
           const notice = getNotification(meta.notificationId, payload.userId);

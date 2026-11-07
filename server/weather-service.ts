@@ -231,6 +231,18 @@ export async function searchLocations(
   }
 }
 
+/** The email and in-app reminder share the configured home location and timezone. */
+export function reminderWeatherLocation(preference?: {
+  home_latitude?: number | null; home_longitude?: number | null;
+  home_timezone?: string | null; timezone?: string | null;
+}) {
+  if (preference?.home_latitude == null || preference.home_longitude == null) return null;
+  return {
+    latitude: Number(preference.home_latitude), longitude: Number(preference.home_longitude),
+    timezone: preference.home_timezone || preference.timezone || 'Asia/Shanghai',
+  };
+}
+
 export async function getDailyWeather(
   location: Pick<WeatherLocation, 'latitude' | 'longitude' | 'timezone'>,
   date: string,
@@ -263,7 +275,7 @@ export async function getDailyWeather(
     if (!Number.isFinite(weatherCode) || payload?.daily?.time?.[0] !== date) {
       throw new WeatherServiceError('天气服务未返回指定日期的数据', 'response');
     }
-    const numberOrNull = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : null;
+    const numberOrNull = (value: unknown) => value != null && Number.isFinite(Number(value)) ? Number(value) : null;
     const result: DailyWeather = {
       date,
       timezone: cleanPart(payload.timezone) || location.timezone,

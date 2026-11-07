@@ -11,15 +11,16 @@ import type { Schedule } from './calendar/schedule-types';
 import { OrbitReminderSettings } from './OrbitReminderSettings';
 import { OrbitDialog } from './OrbitDialog';
 
-export function OrbitScheduleEditor({ id, onClose, onSaved, returnFocus }: {
+export function OrbitScheduleEditor({ id, startEditing = false, onClose, onSaved, returnFocus }: {
   id: string;
+  startEditing?: boolean;
   onClose: () => void;
   onSaved: () => void;
   returnFocus?: RefObject<HTMLElement | null>;
 }) {
   const { authHeaders } = useAuth();
   const [schedule, setSchedule] = useState<Schedule>();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const [deleting, setDeleting] = useState(false);
   const [date, setDate] = useState('');
   const dateInput = useRef<HTMLInputElement>(null);

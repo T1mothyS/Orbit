@@ -252,3 +252,53 @@ test('Today widget projects live owned todos and scopes its native credential', 
     await new Promise<void>(resolve => server.close(() => resolve()));
   }
 });
+
+test('daily action history attaches owner-scoped live items and a weather snapshot, with a safe legacy fallback', async () => {
+  const date = '2026-10-29';
+  const prefs = db.getReminder(owner)!;
+  db.upsertReminder({ ...prefs, enabled: 1, in_app_enabled: 1, home_location_name: '测试地点', home_latitude: 30, home_longitude: 120 });
+  const task = item('当日待办', { type: 'todo', start_time: date + 'T09:30:00', end_time: '' });
+  item('其他账号事项', { user_id: other, start_time: date + 'T09:30:00', end_time: date + 'T10:30:00' });
+  const enqueue = (scheduledAt: string) => activity.enqueueNotificationDetailed({
+    userId: owner, sourceType: 'digest', sourceId: date, channel: 'in_app', kind: 'daily_digest',
+    title: '今日行动提醒', body: '09:30 当日待办', scheduledAt, dedupeKey: randomUUID(),
+  }).notification;
+  const notice = enqueue(date + 'T00:00:00Z');
+  const messageId = await chat.deliverDailyAction(notice, async (location, requestedDate) => {
+    assert.equal(location.latitude, 30); assert.equal(requestedDate, date);
+    return { date, timezone: 'Asia/Shanghai', weatherCode: 61, description: '小雨', temperatureMin: 14,
+      temperatureMax: 21, precipitationProbabilityMax: 60, windSpeedMax: null, source: 'cache',
+      isStale: true, retrievedAt: stamp, cacheAgeMs: 20 };
+  });
+  const failedId = await chat.deliverDailyAction(enqueue(date + 'T01:00:00Z'), async () => { throw new Error('offline'); });
+  const oldId = chat.deliverInApp(enqueue(date + 'T02:00:00Z'));
+  const server = api.app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const call = (userId: string, path: string, method = 'GET', data?: object) => fetch(base + path, {
+    method, headers: { Authorization: 'Bearer ' + api.signUserToken(db.getUserById(userId)!), 'Content-Type': 'application/json' },
+    body: data && JSON.stringify(data),
+  });
+  const history = async (userId = owner) => (await (await call(userId, '/api/ai-schedule/history')).json()).messages;
+  try {
+    const messages = await history();
+    const digest = messages.find((entry: { id: string }) => entry.id === messageId);
+    assert.deepEqual(digest.orbitMeta.dailyAction, { date, weather: { state: 'available', place: '测试地点', code: 61,
+      description: '小雨', low: 14, high: 21, rain: 60, cached: true } });
+    assert.deepEqual(digest.scheduleItems.map((entry: { id: string }) => entry.id), [task.id]);
+    assert.equal(messages.find((entry: { id: string }) => entry.id === failedId).orbitMeta.dailyAction.weather.state, 'unavailable');
+    assert.equal(messages.find((entry: { id: string }) => entry.id === oldId).orbitMeta.dailyAction, undefined);
+    assert.ok(!(await history(other)).some((entry: { id: string }) => entry.id === messageId));
+    const toggle = '/api/schedules/' + task.id + '/toggle';
+    assert.equal((await call(other, toggle, 'POST', { completed: true })).status, 403);
+    for (let i = 0; i < 2; i++) assert.equal((await call(owner, toggle, 'POST', { completed: true })).status, 200);
+    assert.equal((await history()).find((entry: { id: string }) => entry.id === messageId).scheduleItems[0].is_completed, true);
+    assert.equal(activity.listCompletions(owner, { sourceType: 'schedule', sourceId: task.id }).length, 1);
+    schedules.updateSchedule(task.id, { start_time: '2026-10-30T09:30:00' });
+    assert.deepEqual((await history()).find((entry: { id: string }) => entry.id === messageId).scheduleItems, []);
+  } finally {
+    db.upsertReminder(prefs);
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});

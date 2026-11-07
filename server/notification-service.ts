@@ -1,6 +1,6 @@
 import * as activityStore from './activity-store.js';
 import * as db from './db.js';
-import { deliverInApp } from './notification-chat.js';
+import { deliverDailyAction, deliverInApp, isDailyAction } from './notification-chat.js';
 import {
   sendDailyReminderEmail,
   sendDailyReportEmail,
@@ -260,7 +260,8 @@ export async function processNotificationQueue(log?: NotificationLogger): Promis
           ...summarizeEmailSendResult(sendResult),
         }));
       } else if(item.channel==='in_app') {
-        if(!deliverInApp(item)){activityStore.suppressNotification(item.id);continue;}
+        const message = isDailyAction(item) ? await deliverDailyAction(item) : deliverInApp(item);
+        if(!message){activityStore.suppressNotification(item.id);continue;}
       } else {
         log?.('非邮件通知直接进入已发送状态', undefined, notificationLogData(claimedItem, {
           event: 'non_email_notification_marked_sent',
