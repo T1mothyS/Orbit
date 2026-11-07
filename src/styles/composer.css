@@ -239,5 +239,5 @@
 .orbit-daily-list ul { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
 .orbit-daily-task { display: flex; align-items: center; gap: 3px; min-width: 0; }
 .orbit-daily-task .orbit-daily-complete { flex: 0 0 44px; min-width: 44px; min-height: 44px; }
-.orbit-daily-completion-ring { display: grid; place-items: center; width: 21px; height: 21px; border: 1.5px solid var(--orbit-text-secondary); border-radius: var(--orbit-radius-full); }
+.orbit-daily-complete > .orbit-daily-completion-ring:empty, .orbit-daily-completion-ring { display: grid; place-items: center; width: 21px; height: 21px; border: 1.5px solid var(--orbit-text-secondary); border-radius: var(--orbit-radius-full); }
 .orbit-daily-complete[aria-pressed=true] .orbit-daily-completion-ring { color: var(--orbit-success); border-color: var(--orbit-success); background: var(--orbit-success-soft); }
