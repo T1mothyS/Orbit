@@ -86,6 +86,8 @@ scripts/browser-automation.cjs 必须在导航前附加；每次原生确认先�
 
 Android 固定站点增量覆盖由 JVM 检查配置的 HTTPS 来源、外部来源与子框架限制，并运行 Gradle assemble/lint/unit。实体手机另验覆盖安装、正式账号会话、离线/证书失败后的重试及通知和组件同步。桌面弹窗回归覆盖 15 分钟边界、账号隔离、旧通知留存及确认失败重试。Web 四尺寸明暗保留高级入口、无头像重复入口、纯图标发送/保存及44px触控断言。图片证据回归覆盖三新闻分区的拒绝、精确路径/修复提示、纯校验不改稿、引用补齐后通过，以及跨条目不可借用证据。
 
+Android 通知诊断扩展浏览器桥接验收，覆盖新版普通包、旧版能力检测、类别关闭、服务端不可用时的本地测试、精确/非精确、手动观察和脱敏报告。真实设备单独验证 APK 并装或覆盖、系统后台通知、锁屏、Google 网络、点击定位与切换后的旧设备解绑。
+
 CI 始终运行完整服务、类型、UI 边界、构建、批准截图和产物隔离；不因 Quick 或本地复用降级。Linux artifact 必须属于冻结目标；Windows 通过不能替代 Linux 比较。当前 CI 与部署流程见 [RELEASE](RELEASE.md)，本次日期证据见归档。
 
 Release runner 仅执行隔离 Web 回归，不自动 push、tag、发布、部署、发送邮件、调用真实 AI 或触发手机。Electron/Android 原生构建运行、跨项目、生产恢复、OAuth 自然刷新、长期 CalDAV、真实 SMTP/IMAP 和手机自然通知按本次影响与授权分别验收。PUBLISHED/QUEUED、health、PM2、SMTP accepted 与收件箱/系统展示不是同一结果。

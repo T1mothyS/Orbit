@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins { id("com.android.application") }
 val firebaseConfigured = file("google-services.json").exists()
 if (firebaseConfigured) apply(plugin = "com.google.gms.google-services")
+val personal = providers.gradleProperty("orbitPersonal").orNull == "true"
 val orbitConfig = Properties().apply {
     val configFile = rootProject.file("orbit.local.properties")
     if (configFile.exists()) configFile.inputStream().use { load(it) }
@@ -13,7 +14,7 @@ val appUrl = providers.gradleProperty("orbitAppUrl").orNull ?: orbitConfig.getPr
     ?: error("Set appUrl in android/orbit.local.properties (fixed public HTTPS URL, no credentials)")
 val parsedUrl = URI(appUrl)
 require(parsedUrl.scheme == "https" && parsedUrl.host != null && parsedUrl.userInfo == null && parsedUrl.port == -1 && parsedUrl.query == null && parsedUrl.fragment == null) { "appUrl must be a public HTTPS URL without credentials, port, query or fragment" }
-val releaseSigningFile = rootProject.file("signing.local.properties")
+val releaseSigningFile = rootProject.file(if (personal) "signing.personal.local.properties" else "signing.local.properties")
 val releaseSigning = Properties().apply {
     if (releaseSigningFile.isFile) releaseSigningFile.inputStream().use { load(it) }
 }
@@ -21,18 +22,20 @@ val releaseRequested = gradle.startParameter.taskNames.any {
     it.substringAfterLast(':') in setOf("assembleRelease", "bundleRelease")
 }
 require(!releaseRequested || releaseSigningFile.isFile) {
-    "Release requires the existing production keystore in android/signing.local.properties"
+    "Release requires the matching keystore configuration in ${releaseSigningFile.name}"
 }
+require(!releaseRequested || !personal || firebaseConfigured) { "Personal release requires its Firebase client configuration" }
 val orbitVersion = groovy.json.JsonSlurper().parse(rootProject.file("../package.json")) as Map<*, *>
 android {
     namespace = "io.github.t1mothys.orbit"
     compileSdk = 36
     defaultConfig {
-        applicationId = "io.github.t1mothys.orbit"
+        applicationId = if (personal) "io.github.t1mothys.orbit.personal" else "io.github.t1mothys.orbit"
         minSdk = 26
         targetSdk = 36
-        versionCode = 66001
+        versionCode = 68000
         versionName = orbitVersion["version"] as String
+        manifestPlaceholders["orbitAppLabel"] = if (personal) "orbit 个人版" else "orbit"
         buildConfigField("String", "APP_URL", "\"${appUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("boolean", "FCM_CONFIGURED", firebaseConfigured.toString())
         buildConfigField("boolean", "DEVELOPER_TOOLS", "false")

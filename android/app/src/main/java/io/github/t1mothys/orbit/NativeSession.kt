@@ -1,6 +1,9 @@
 package io.github.t1mothys.orbit
 
 import android.content.Context
+import android.os.Build
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailabilityLight
 import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import org.json.JSONArray
@@ -25,6 +28,11 @@ object NativeSession {
         val p = NotificationSupport.prefs(c)
         val binding = p.getString("device", null)?.let { JSONObject().put("id", it).put("accountId", p.getString("account", null)).put("generation", p.getString("generation", null)) } ?: JSONObject.NULL
         return JSONObject().put("developerTools", BuildConfig.DEVELOPER_TOOLS).put("version", BuildConfig.VERSION_NAME).put("installationId", p.getString("installation", ""))
+            .put("notificationDiagnostics", JSONObject().put("androidApi", Build.VERSION.SDK_INT)
+                .put("personal", BuildConfig.APPLICATION_ID.endsWith(".personal"))
+                .put("localChannelEnabled", NotificationSupport.channelEnabled(c, NotificationSupport.LOCAL_CHANNEL))
+                .put("fcmChannelEnabled", NotificationSupport.channelEnabled(c, NotificationSupport.CHANNEL))
+                .put("googlePlayAvailable", GoogleApiAvailabilityLight.getInstance().isGooglePlayServicesAvailable(c) == ConnectionResult.SUCCESS))
             .put("installationKey", p.getString("key", "")).put("fid", p.getString("fid", null) ?: JSONObject.NULL)
             .put("notificationPermission", NotificationSupport.permission(c)).put("exactAlarmPermission", NotificationSupport.exactPermission(c))
             .put("fcmConfigured", BuildConfig.FCM_CONFIGURED).put("fcmState", p.getString("fcm_state", if (BuildConfig.FCM_CONFIGURED) "尚未注册" else "未配置"))
@@ -78,7 +86,7 @@ object NativeSession {
         synchronized(queueLock) {
             val queue = JSONArray(p.getString("revocations", "[]"))
             if (id != null) queue.put(JSONObject().put("id", id).put("generation", p.getString("generation", "")).put("key", p.getString("key", "")).put("origin", ServerEnvironment.origin))
-            p.edit().putString("revocations", queue.toString()).remove("device").remove("generation").remove("account").remove("fid").remove("pending_notification").apply()
+            p.edit().putString("revocations", queue.toString()).remove("device").remove("generation").remove("account").remove("fid").remove("pending_notification").remove("fcm_result").apply()
         }
         NotificationSupport.cancel(c, "退出或换账号，已清理本地测试")
         c.getSystemService(android.app.NotificationManager::class.java).cancelAll()

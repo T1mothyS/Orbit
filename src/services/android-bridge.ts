@@ -1,5 +1,12 @@
 export interface AndroidStatus {
   developerTools?:boolean;
+  notificationDiagnostics?: {
+    androidApi: number;
+    personal: boolean;
+    localChannelEnabled: boolean;
+    fcmChannelEnabled: boolean;
+    googlePlayAvailable: boolean;
+  };
   version:string; installationId:string; installationKey:string; fid:string|null;
   notificationPermission:boolean; exactAlarmPermission:boolean; fcmConfigured:boolean;
   fcmState:string; binding:{accountId:string;id:string;generation:string}|null;
@@ -25,7 +32,7 @@ export function syncAndroid():Promise<AndroidStatus>{
     const {user}=await me.json();
     if(authToken!==localStorage.getItem('aicalendar_token'))throw new Error('登录状态已变化');
     const status=await androidCall('account',{accountId:user.id});
-    const response=await fetch('/api/android-push/devices',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({installationId:status.installationId,installationKey:status.installationKey,fid:status.fid,permission:status.notificationPermission,label:'Orbit Android',version:status.version})});
+    const response=await fetch('/api/android-push/devices',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({installationId:status.installationId,installationKey:status.installationKey,fid:status.fid,permission:status.notificationPermission,label:status.notificationDiagnostics?.personal?'Orbit Android 个人版':'Orbit Android',version:status.version})});
     const value=await response.json();if(!response.ok)throw new Error(value.error||'设备注册失败');
     try{
       if(authToken!==localStorage.getItem('aicalendar_token'))throw new Error('登录状态已变化');

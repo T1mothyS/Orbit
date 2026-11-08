@@ -28,7 +28,7 @@ Android 使用 AppWidgetProvider 与 RemoteViews。正式站点的专用凭据�
 
 ## Android 客户端与 Push
 
-常规构建仅提供正式账号开关、通知权限与注册/投递状态；原生顶部、离线和网页测试入口只有 debug 且显式开启 DEVELOPER_TOOLS 才显示。release 始终关闭；本地桥接测试同样检查该标记。下面的 AlarmManager 排错能力保留，正式 FCM、Receiver、渠道和绑定/解绑行为不变。后续用户真实手机已确认精准/非精准触发及后台系统展示通过，见 [新增实机证据](archive/engineering/TEST-MATRIX-20261018.md#2026-10-08-产品助手运行诊断与保留)。
+常规 Android 构建在通知设置提供本地与 FCM 测试、系统权限及两类通知状态、Google Play 服务、设备绑定和可复制的脱敏实测记录。断网从 App 连接失败页打开原生本地面板。可信主框架的版本 1 桥接通过可选 `notificationDiagnostics` 声明新能力；旧开发者包的测试入口继续工作。WebView 调试和顶部调试快捷入口仍只用于显式开发者构建。原包与个人包可并存，账号隔离和 FCM 服务端接口共用。签名、安装和设备验证方法见 [Android 构建](../android/README.md)。
 
 `android/` 是 Kotlin + WebView 在线壳，复用 Web 登录、聊天、路由与账号数据。安装包固定连接构建时配置的正式 HTTPS 站点，沿用 Default Profile 和既有正式环境的原生安装身份、绑定及待补偿解绑。WebMessageListener 只允许固定来源的主框架和协议版本 1。未知方法拒绝，外部链接打开系统应用，TLS 验证保持开启，同时禁止明文、混合内容、文件 URL 和第三方 Cookie。返回、键盘/系统栏安全区、文件选择及通知点击由原生负责。旧测试环境的设置、登录和补偿凭据与正式站点隔离。使用方法见 [Android 构建](../android/README.md)。
 

@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL; visibility = View.GONE; setPadding(24, 20, 24, 20)
             addView(TextView(this@MainActivity).apply { text = "orbit 暂时无法连接。检查网络后重试。" })
             addView(Button(this@MainActivity).apply { text = "重试 orbit"; setOnClickListener { loadOrbit() } })
-            if (BuildConfig.DEVELOPER_TOOLS) addView(Button(this@MainActivity).apply { text = "本地通知试验"; setOnClickListener { localDialog() } })
+            addView(Button(this@MainActivity).apply { text = "通知诊断"; setOnClickListener { localDialog() } })
         }
         root.addView(offline)
         web = WebView(this)
@@ -159,9 +159,15 @@ class MainActivity : ComponentActivity() {
                         }
                         "abandonBinding" -> NativeSession.abandon(this, params)
                         "permission" -> askPermission()
-                        "exactPermission" -> { require(BuildConfig.DEVELOPER_TOOLS) { "通知试验仅在开发者构建中开放" }; if (Build.VERSION.SDK_INT >= 31) startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName"))) }
-                        "scheduleLocal" -> { require(BuildConfig.DEVELOPER_TOOLS) { "通知试验仅在开发者构建中开放" }; NotificationSupport.schedule(this, params.getBoolean("exact")) }
-                        "cancelLocal" -> { require(BuildConfig.DEVELOPER_TOOLS) { "通知试验仅在开发者构建中开放" }; NotificationSupport.cancel(this) }
+                        "exactPermission" -> openExactAlarmSettings()
+                        "notificationChannel" -> openNotificationChannel(when (params.getString("kind")) {
+                            "local" -> NotificationSupport.LOCAL_CHANNEL
+                            "fcm" -> NotificationSupport.CHANNEL
+                            else -> error("未知通知类别")
+                        })
+                        "openLocalDiagnostics" -> localDialog()
+                        "scheduleLocal" -> NotificationSupport.schedule(this, params.getBoolean("exact"))
+                        "cancelLocal" -> NotificationSupport.cancel(this)
                         "consumeNotification" -> if (params.optString("id") == NotificationSupport.prefs(this).getString("pending_notification", null)) NotificationSupport.prefs(this).edit().remove("pending_notification").apply()
                         else -> error("未知 Android 操作")
                     }
@@ -170,8 +176,8 @@ class MainActivity : ComponentActivity() {
                 reply.postMessage(response.toString())
             }
         } else {
-            AlertDialog.Builder(this).setMessage("请更新 Android System WebView 以启用网页通知设置。" + if (BuildConfig.DEVELOPER_TOOLS) "本地测试仍可通过原生入口操作。" else "")
-                .setPositiveButton("继续", null).show()
+            AlertDialog.Builder(this).setMessage("请更新 Android System WebView 以启用网页通知设置。")
+                .setNeutralButton("通知诊断") { _, _ -> localDialog() }.setPositiveButton("继续", null).show()
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() { if (web.canGoBack()) web.goBack() else finish() }
@@ -196,32 +202,52 @@ class MainActivity : ComponentActivity() {
     }
     private fun refreshLocalStatus() {
         val p = NotificationSupport.prefs(this)
-        localStatus?.text = "通知权限：${NotificationSupport.permission(this)}\n精确权限：${NotificationSupport.exactPermission(this)}\n${p.getString("local_result", "尚未安排") }"
+        fun state(allowed: Boolean) = if (allowed) "已开启" else "未开启"
+        val pending = p.getLong("local_due", 0L)
+        val due = if (pending > 0) "\n预计触发：${DateFormat.getTimeInstance().format(Date(pending))}" else ""
+        localStatus?.text = "通知权限：${state(NotificationSupport.permission(this))}\n本地通知类别：${state(NotificationSupport.channelEnabled(this, NotificationSupport.LOCAL_CHANNEL))}\n精确闹钟：${state(NotificationSupport.exactPermission(this))}$due\n${p.getString("local_result", "尚未安排")}"
+    }
+    private fun openExactAlarmSettings() {
+        if (Build.VERSION.SDK_INT >= 31) startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName")))
+    }
+    private fun openNotificationChannel(channel: String) {
+        val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName).putExtra(Settings.EXTRA_CHANNEL_ID, channel)
+        startActivity(intent)
     }
     private fun localDialog() {
-        if (!BuildConfig.DEVELOPER_TOOLS) return
+        if (localStatus != null) return
         val padding = (16 * resources.displayMetrics.density).toInt()
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(padding, padding, padding, padding)
         }
+        content.addView(TextView(this).apply {
+            text = "安排测试后按 Home 或锁屏，先查看系统通知栏，再回来对照结果。非精确测试可能延迟。手机重启后需重新安排。联网后可在设置里测试谷歌推送。"
+            setPadding(0, 0, 0, padding)
+        })
         localStatus = TextView(this).also { content.addView(it); it.setPadding(0, 0, 0, padding) }
         refreshLocalStatus()
-        arrayOf("授权系统通知", "开启闹钟和提醒", "一分钟后精确测试", "非精确测试（可能延迟）", "取消本地测试").forEachIndexed { index, label ->
+        val actions = buildList<Pair<String, () -> Unit>> {
+            add("授权系统通知" to { askPermission() })
+            add("本地通知类别设置" to { openNotificationChannel(NotificationSupport.LOCAL_CHANNEL) })
+            if (Build.VERSION.SDK_INT >= 31) add("开启闹钟和提醒" to { openExactAlarmSettings() })
+            add("一分钟后精确测试" to { NotificationSupport.schedule(this@MainActivity, true) })
+            add("非精确测试（可能延迟）" to { NotificationSupport.schedule(this@MainActivity, false) })
+            add("取消本地测试" to { NotificationSupport.cancel(this@MainActivity) })
+        }
+        actions.forEach { (label, action) ->
             content.addView(Button(this).apply {
                 text = label; minHeight = (48 * resources.displayMetrics.density).toInt()
                 setOnClickListener {
-                try { when (index) {
-                    0 -> askPermission()
-                    1 -> if (Build.VERSION.SDK_INT >= 31) startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName")))
-                    2 -> NotificationSupport.schedule(this@MainActivity, true)
-                    3 -> NotificationSupport.schedule(this@MainActivity, false)
-                    4 -> NotificationSupport.cancel(this@MainActivity)
-                } } catch (e: Exception) { AlertDialog.Builder(this@MainActivity).setMessage(e.message).setPositiveButton("确定", null).show() }
-                refreshLocalStatus()
+                    try { action() } catch (e: Exception) {
+                        AlertDialog.Builder(this@MainActivity).setMessage(e.message).setPositiveButton("确定", null).show()
+                    }
+                    refreshLocalStatus()
+                    notifyWebStatus()
                 }
             })
         }
-        AlertDialog.Builder(this).setTitle("Orbit 本地通知试验")
+        AlertDialog.Builder(this).setTitle("Orbit 通知诊断")
             .setView(ScrollView(this).apply { addView(content) })
             .setNegativeButton("关闭", null).create().apply {
                 setOnDismissListener { localStatus = null }; show()

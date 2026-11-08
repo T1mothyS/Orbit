@@ -58,3 +58,35 @@ test('mobile search keeps cross-category drafts and declining Settings exit pres
   await page.goBack();await expect(page).toHaveURL(base+'/settings/account/profile');await expect(draft).toHaveValue('通过搜索跳转仍需保护的合成草稿');
   const dialogPromise=page.waitForEvent('dialog');const leaving=page.getByRole('link',{name:'返回今日行动中心',exact:true}).click();const dialog=await dialogPromise;expect(dialog.type()).toBe('confirm');expect(dialog.message()).toContain('未保存');await dialog.dismiss();await leaving;await expect(page).toHaveURL(base+'/settings/account/profile');await expect(draft).toHaveValue('通过搜索跳转仍需保护的合成草稿');
 });
+
+test('periodic reminder card actions follow the metadata on phones', async ({ page, context }) => {
+  const token = await fixtureToken(context, 'preview-guards@example.invalid');
+  await context.addInitScript(value => localStorage.setItem('aicalendar_token', value), token);
+  const card = {
+    type: 'credit_card', name: '用于验证换行的合成信用卡周期提醒'.repeat(4), enabled: true,
+    nextReminderDate: '2030-01-12', lastReminderDate: '2030-01-01',
+    currentCycle: { dueDate: '2030-01-13', status: 'pending' },
+    config: { statementDay: 8, paymentDay: 13, paymentMonthOffset: 0, reminderOffsets: [1, 0] },
+  };
+  await page.route('**/api/cycle-reminders', route => route.fulfill({
+    json: { tasks: [{ ...card, id: 'compact-active' }, { ...card, id: 'compact-paused', enabled: false }] },
+  }));
+  await page.goto(base + '/reminders');
+  const cards = page.locator('.task-card');
+  await expect(cards).toHaveCount(2);
+  for (const width of [390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const item of await cards.all()) {
+      const lastReminder = (await item.locator('.last-reminder').boundingBox())!;
+      const actions = (await item.locator('.card-actions').boundingBox())!;
+      const gap = actions.y - lastReminder.y - lastReminder.height;
+      expect(gap).toBeGreaterThanOrEqual(9);
+      expect(gap).toBeLessThanOrEqual(11);
+      const edit = item.getByRole('button', { name: '编辑周期提醒' });
+      expect((await edit.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(cards.first().locator('.task-card-foot')).toHaveCSS('flex-direction', 'row');
+});

@@ -31,6 +31,12 @@ $env:JAVA_HOME = 'C:\path\to\jdk-17'
 
 macOS / Linux 可运行 `sh android/gradlew -p android :app:assembleRelease --no-daemon`，Windows 用 `android\gradlew.bat`。输出位于 `android/app/build/outputs/apk/release/`。使用 Android Build Tools 的 `apksigner verify --print-certs` 与上一正式包比较证书指纹，再记录版本、大小、SHA-256、覆盖安装及启动结果。调试构建只用于本地验证。
 
+### 原签名暂不可用时的个人版
+
+原 APK 可以用于核对包名与证书指纹。覆盖安装需要持有匹配的原私钥。个人版使用 `io.github.t1mothys.orbit.personal` 和独立长期签名，可与旧版并装。把个人版登记到同一 Firebase 项目，下载包含个人包名的客户端配置。将个人签名配置放在被忽略的 `android/signing.personal.local.properties`，密钥库放在受保护的位置并另做安全备份。构建使用 `-PorbitPersonal=true`，校验包名、版本、签名和 Firebase 资源后再交付。正式包与个人版签名配置分别读取。
+
+在新包登录同一个 Orbit 账号可读取已有数据。重新授权通知、注册设备及添加桌面组件。优先用测试账号验证新包，切换正式账号时检查旧安装已退出并解绑，以免两个安装同时接收正式提醒。
+
 ## 桌面今日待办
 
 在手机桌面长按空白处，打开系统小组件列表并添加「orbit 今日待办」。添加后打开 Orbit，沿用正式站点和已登录账号同步。点击标题打开今日，点击任务打开对应事项，点「刷新」主动同步。系统约每 30 分钟安排后台更新，实际频率由桌面和省电策略决定。可调整大小查看更多任务。组件通过原生桌面接口运行，无需 Google Play 服务。服务端需提供 [今日待办接口](../docs/ARCHITECTURE.md#今日待办小组件)。切换账户后清理旧快照，断网时同日最后一次同步可继续展示。
@@ -48,17 +54,13 @@ macOS / Linux 可运行 `sh android/gradlew -p android :app:assembleRelease --no
 
 退出或换账号会取消本地测试、清理系统通知、解绑当前设备并撤销 FCM 注册/FID。离线时保留仅能解绑的补偿凭据，下次启动或回到前台联网时自动重试，不把登录 JWT 交给原生存储。已经发送的后台系统通知无法保证撤回。
 
-## 显式开发者构建的本地试验入口
+## 常规 APK 的通知诊断
 
-普通 debug 和 release 默认关闭开发者工具，不显示顶部/离线测试按钮、常规设置的测试入口或“尚未测试”状态。需要排错时使用 `scripts/build-android.ps1 -DeveloperTools`，或对 debug 构建传 `-PorbitDeveloperTools=true`；仅 debug 构建允许该标记，release 始终关闭。桥接的安排/取消本地试验同样检查开发者标记。
+在 **设置 → 通知与提醒 → Android 手机提醒** 查看系统通知、两类通知、精确闹钟、Google Play 服务及设备绑定状态。可跳转到系统类别设置、刷新注册、安排或取消本地测试、单独发送 FCM 测试，并在系统通知栏确认后记录结果。最近 10 条手动观察按账号保存在这台设备；复制报告仅包含版本、权限、状态、时间及观察结果。旧普通 APK 提示更新，旧开发者 APK 可继续使用原有测试能力。
 
-显式开发者 APK 顶部“本地通知试验”可查看权限、安排精确/非精确一分钟测试或取消。旧网页、断网和 Firebase 未配置时仍可排错。每台设备仅一个待触发测试，重启不恢复；网页设置也保留开发者 FCM 与本地试验。普通模式继续保留通知授权、注册、账号开关、绑定/解绑和正式 FCM 展示。
+连接失败页内置「通知诊断」，断网仍能操作本地测试并查看系统触发状态。正式 APK 包含通知诊断；`-PorbitDeveloperTools=true` 仍仅在 debug 开启 WebView 调试和顶部快捷入口。网页通过站点发布更新，原生面板、桥接、Firebase 配置或安装版本变化时重新打包。
 
-试验对话框使用可滚动的自定义视图，状态文字、五项操作和关闭按钮同时显示；权限回调、操作后和回到前台均刷新状态，不再组合平台的 message/items 内容分支。Web UI 通过线上页面进入现有 WebView，网页变更无需重新打包；原生、桥接、Firebase 配置或安装版本变化时重建 APK。部署 Android 服务端代码前，须按依赖变更流程准备 Linux 运行依赖，不复用缺少 firebase-admin 的旧 node_modules。
-
-实际展示、声音、锁屏、划掉 App、强行停止、国内无代理网络及键盘仍按 [真机矩阵](../docs/archive/engineering/TEST-MATRIX-20261018.md#android-一期) 验证。构建或 JVM 测试不证明手机送达。
-
-2026-10-08 后续用户真实手机反馈：精准和非精准提醒均触发，App 退到后台后均显示 Android 系统通知。此项核心后台展示验收已通过；证据来自用户运行反馈，不是代码推断。新 APK 的入口隐藏仍需安装后确认，不能因此撤销既有通知通过结果。本轮不更改 AlarmManager、Receiver、渠道、FCM 展示及绑定/解绑链路。
+实际展示、声音、锁屏、划掉 App、强行停止、国内无代理网络及键盘按 [真机矩阵](../docs/archive/engineering/TEST-MATRIX-20261018.md#android-一期) 验证。2026-10-08 用户曾确认旧构建的精确、非精确和后台通知正常；新包的设备表现单独验收。
 
 ### 后台与延迟排查
 

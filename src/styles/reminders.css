@@ -194,6 +194,7 @@
   .completion-proof-grid .form-label.full { grid-column: auto; }
   .task-card { padding: 16px; }
   .task-card-foot { align-items: flex-start; flex-direction: column; }
+  .task-card-foot .task-reminder-meta { flex: 0 1 auto; }
   .card-actions { align-self: stretch; width: 100%; flex: 0 1 auto; justify-content: flex-start; }
   .card-actions .complete-button { flex: 1 1 150px; }
   .card-actions .icon-button.small { width: 40px; height: 40px; flex: 0 0 40px; }

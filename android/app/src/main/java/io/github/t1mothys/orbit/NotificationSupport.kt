@@ -19,7 +19,7 @@ import java.util.Date
 object NotificationSupport {
     const val LOCAL_ID = 1001
     const val CHANNEL = "orbit_reminders"
-    private const val LOCAL_CHANNEL = "orbit_local_test"
+    const val LOCAL_CHANNEL = "orbit_local_test"
     fun prefs(c: Context) = c.getSharedPreferences("orbit_native", Context.MODE_PRIVATE)
     fun createChannels(c: Context) {
         c.getSystemService(NotificationManager::class.java).createNotificationChannels(listOf(
@@ -27,6 +27,9 @@ object NotificationSupport {
             NotificationChannel(LOCAL_CHANNEL, "Orbit 本地通知试验", NotificationManager.IMPORTANCE_HIGH)))
     }
     fun permission(c: Context) = NotificationManagerCompat.from(c).areNotificationsEnabled()
+    fun channelEnabled(c: Context, channel: String) =
+        c.getSystemService(NotificationManager::class.java).getNotificationChannel(channel)
+            ?.importance?.let { it != NotificationManager.IMPORTANCE_NONE } == true
     fun exactPermission(c: Context): Boolean = Build.VERSION.SDK_INT < 31 || c.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
     private fun pending(c: Context) = PendingIntent.getBroadcast(c, LOCAL_ID, Intent(c, LocalTestReceiver::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     fun cancel(c: Context, result: String = "本地测试已取消") {
@@ -42,6 +45,7 @@ object NotificationSupport {
     }
     fun schedule(c: Context, exact: Boolean) {
         require(permission(c)) { "请先授权系统通知" }
+        require(channelEnabled(c, LOCAL_CHANNEL)) { "请先开启 Orbit 本地通知试验类别" }
         require(!exact || exactPermission(c)) { "请先开启闹钟和提醒，或选择非精确测试" }
         cancel(c)
         val at = SystemClock.elapsedRealtime() + 60_000L
@@ -75,9 +79,12 @@ class LocalTestReceiver : BroadcastReceiver() {
         NotificationSupport.clearObsoleteTest(context)
         val p = NotificationSupport.prefs(context)
         if (!p.contains("local_due")) return
-        val delay = (SystemClock.elapsedRealtime() - p.getLong("local_elapsed", 0)) / 1000
-        val status = if (NotificationSupport.permission(context)) "本地测试已提交系统展示" else "本地测试触发，通知权限已关闭"
+        val elapsed = SystemClock.elapsedRealtime() - p.getLong("local_elapsed", 0)
+        if (elapsed < 0) return // An already dispatched alarm may arrive after its replacement.
+        val delay = elapsed / 1000
+        val allowed = NotificationSupport.permission(context) && NotificationSupport.channelEnabled(context, NotificationSupport.LOCAL_CHANNEL)
+        val status = if (allowed) "本地测试已提交系统展示" else "本地测试触发，通知权限或类别已关闭"
         p.edit().remove("local_due").remove("local_elapsed").putString("local_result", "$status；${DateFormat.getTimeInstance().format(Date())}；延迟 ${delay.coerceAtLeast(0)} 秒").apply()
-        NotificationSupport.show(context, NotificationSupport.LOCAL_ID, "Orbit 本地通知测试", "一分钟测试 · ${DateFormat.getTimeInstance().format(Date())}")
+        if (allowed) NotificationSupport.show(context, NotificationSupport.LOCAL_ID, "Orbit 本地通知测试", "一分钟测试 · ${DateFormat.getTimeInstance().format(Date())}")
     }
 }
