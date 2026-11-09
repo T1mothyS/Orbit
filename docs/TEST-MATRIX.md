@@ -19,6 +19,8 @@ Quick 默认包括当前未提交的暂存/未暂存/未跟踪文件；任务已
 
 build 已包含 Tools、项目成长和帮助生成，不再额外调用同一轮检查。Electron 构建使用进程级合法 HTTPS ELECTRON_APP_URL（runner 默认构建占位地址），不改仓库 .env。跨项目只在相关合同变化时显式提供 DAILY_REPORT_V2_ROOT 并运行 `npm run test:cross-project`，不访问另一项目的个人配置。
 
+今日行动提醒的领域回归由 `daily-action.test.ts`、`notification-scheduler.test.ts` 与 `connected-report.test.ts` 覆盖提前周期触发、账号时区、实例去重、纯读、认证隔离、冻结与旧卡回退；`notification-cards.spec.ts` 在四尺寸明暗下检查现有编辑弹窗、快照/最新往返、加载/失败/失效对象、周报日期与展开。截图为本地候选，不自动批准基线。手动可用隔离预览参数 `--notification-cards-preview` 生成真实 API 的合成卡片；禁止连接生产数据。
+
 ## 浏览器范围与隔离
 
 | 入口 | 运行条件和保护目标 |
@@ -30,7 +32,7 @@ build 已包含 Tools、项目成长和帮助生成，不再额外调用同一�
 | 原生弹窗 | Release，或 confirm/beforeunload/未保存保护/自动化引导变化时提前运行 native-dialog-browser-smoke.cjs |
 | 其余专项 Smoke | 按领域和变更运行，历史专项没有证明对等替代前保留；不作为每次小改动的统一前置 |
 
-浏览器和依赖：首次可用 `npx playwright install chromium`；已有 Edge 时可在进程级设置 ORBIT_BROWSER_CHANNEL=msedge。输出默认系统临时目录，ORBIT_UI_QA_DIR 可指定目录。服务仅 loopback、临时 DATA_DIR，后台邮件/Push/主动任务和真实模型关闭，不加载生产配置。Release 的两个可变 Smoke 分别创建新的服务/数据库；不为了复用登录共享可变账号状态。 只在隔离预览中，稳定合成账号每轮经真实登录建立一次会话并在 worker 间复用。每个测试继续通过认证 API 建立独立 Cookie，登录与改密用例继续执行真实请求，生产限流规则照常生效。
+浏览器和依赖：首次可用 `npx playwright install chromium`；已有 Chrome 或 Edge 时可在进程级设置 ORBIT_BROWSER_CHANNEL=chrome 或 msedge。输出默认系统临时目录，ORBIT_UI_QA_DIR 可指定目录。服务仅 loopback、临时 DATA_DIR，后台邮件/Push/主动任务和真实模型关闭，不加载生产配置。Release 的两个可变 Smoke 分别创建新的服务/数据库；不为了复用登录共享可变账号状态。 只在隔离预览中，稳定合成账号每轮经真实登录建立一次会话并在 worker 间复用。每个测试继续通过认证 API 建立独立 Cookie，登录与改密用例继续执行真实请求，生产限流规则照常生效。
 
 第三轮导航后的业务 Smoke 通过邮箱独立页返回今日再进入原对话，验证未发送草稿仍在；知识库浮层选择立即生效，排序失败保留已保存值及筛选，Escape 关闭并归还焦点。原生弹窗 Smoke 的设置/资料返回目标为今日，保留设置导航真实 confirm/beforeunload；日程关闭迁移为应用内确认，取消留稿、确认离开和浏览器返回断言继续执行。平台截图必须覆盖展开改密及全部设置/帮助页面，不能把只检查首张账户截图的专项结果当作完整视觉差异清单。
 

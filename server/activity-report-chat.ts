@@ -1,6 +1,24 @@
 import { queryOne } from './database/connection.js';
 import type { ActivityReport } from './activity-reports.js';
 import { safeOrbitLink } from '../src/utils/orbit-links.js';
+import type { ActivityReportCardData, ActivityReportCardItem } from '../src/utils/activity-report-card.js';
+
+/** Presentation of the owned, frozen report; never recompute its historical metrics. */
+export function activityReportChatCard(userId: string, reportId: string): ActivityReportCardData | undefined {
+  const row = queryOne<{ snapshot: string; insights: string | null }>('SELECT snapshot,insights FROM orbit_activity_reports WHERE user_id=? AND id=?', [userId, reportId]);
+  if (!row) return undefined;
+  const snapshot = JSON.parse(row.snapshot) as ActivityReport['snapshot'];
+  const a = snapshot.activity;
+  const items = (rows: ActivityReportCardItem[]) => rows.map(item => ({ ...item, href: item.href ? safeOrbitLink(item.href, 'https://orbit.invalid') : null }));
+  const pending = [...a.metricDetails.overdue, ...a.metricDetails.backlog];
+  return {
+    reportId, start: snapshot.window.start, end: snapshot.window.end, timezone: snapshot.window.timezone,
+    completed: a.actualCompleted, created: a.created, notes: a.notesAdded, overdue: a.overdue, backlog: a.backlog,
+    completedItems: items(a.metricDetails.completed),
+    pendingItems: items(pending.filter((item, index) => pending.findIndex(other => other.id === item.id) === index)),
+    upcoming: items(a.upcoming), insights: (row.insights ? JSON.parse(row.insights) as ActivityReport['insights'] : []).map(item => item.text),
+  };
+}
 
 const prose = (text: string) => text.replace(/[\\`*_{}\[\]()<>#+.!|~-]/g, '\\$&');
 /** Rebuild known system report prose from its owned snapshot, never rewrite stored chat. */

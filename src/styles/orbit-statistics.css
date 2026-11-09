@@ -46,7 +46,108 @@
 .orbit-statistics .activity-module { border-top:2px solid color-mix(in srgb,var(--module-color) 65%,var(--orbit-border)); }
 .activity-module > h2 { display:flex; gap:10px; align-items:center; }.activity-module > h2 svg { color:var(--module-color); }
 .orbit-stat-controls { grid-template-columns:minmax(0,1fr); border-block:1px solid var(--orbit-border); padding-block:12px; }
-.activity-range-popover { width:min(440px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto; padding:16px; }
+.activity-range-popover { width:min(440px,calc(100vw - 32px)); max-height:min(var(--available-height,calc(100dvh - 32px)),calc(100dvh - 32px)); overflow:auto; padding:16px; }
 .activity-range-popover .activity-custom-range { margin-block:16px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .statistics-saved-list { list-style:none; padding:0; }.statistics-saved-list li { border-bottom:1px solid var(--orbit-border); padding-block:16px; overflow-wrap:anywhere; }
 @media(max-width:767px){.orbit-statistics .activity-overview{padding:16px}.activity-overview-metrics>.orbit-stat-metric{padding:16px 12px}.activity-overview-metrics>.orbit-stat-metric:nth-child(-n+2){border-bottom:1px solid var(--orbit-border)}.activity-overview-metrics>.orbit-stat-metric:nth-child(2n){border-inline-end:0}.activity-period-controls{display:flex;align-items:center}.activity-period-navigation{margin-left:auto}.activity-range-popover .activity-custom-range{grid-template-columns:1fr}}
+
+/* Personal activity: compact controls, open metrics and two-column analysis. */
+.orbit-statistics { background:transparent; padding-top:24px; }
+.orbit-statistics header { align-items:center; margin:8px 0 24px; }
+.orbit-statistics h1 { font-size:30px; letter-spacing:-.025em; }
+.orbit-statistics .orbit-stat-controls { margin:0; padding:16px 0; border-top:0; }
+.activity-period-controls { width:100%; align-items:center; }
+.activity-period-navigation { align-items:center; padding:0; }
+.activity-current-period { font-size:13px; font-weight:550; font-variant-numeric:tabular-nums; white-space:nowrap; padding-inline:6px; }
+.orbit-statistics .activity-window { align-items:center; justify-content:flex-end; gap:4px; margin:4px 0 0; font-size:12px; color:var(--orbit-text-secondary); }
+.orbit-statistics .activity-window .oui-icon-button { min-height:32px; }
+.orbit-statistics .activity-overview-metrics { margin:0; padding:18px 0 28px; border-top:0; border-bottom:1px solid var(--orbit-border); }
+.activity-overview-metrics > .orbit-stat-metric { background:none; border:0; padding:8px 24px; }
+.activity-overview-metrics > .orbit-stat-metric:first-child { padding-left:0; }
+.activity-overview-metrics > .orbit-stat-metric + .orbit-stat-metric { border-left:1px solid var(--orbit-border); }
+.activity-metric-button { display:flex; flex-direction:column; gap:12px; width:100%; border:0; padding:4px 0; background:transparent; color:var(--orbit-text); text-align:left; cursor:pointer; border-radius:var(--orbit-radius-control); font:inherit; }
+.activity-metric-button > span { display:flex; flex-direction:column; gap:12px; width:100%; align-items:stretch; }
+.activity-metric-button:hover { color:var(--orbit-brand); }
+.activity-metric-button > span > span { display:flex; align-items:center; gap:8px; color:var(--orbit-text-secondary); font-size:13px; }
+.activity-metric-button > span > span > svg:first-child { color:var(--metric-color,var(--orbit-brand)); flex-shrink:0; }
+.activity-metric-button > span > span > svg:last-child { margin-left:auto; flex-shrink:0; }
+.activity-overview-metrics strong { font-size:40px; font-weight:650; letter-spacing:-.04em; line-height:1.15; color:var(--orbit-text); font-variant-numeric:tabular-nums; }
+.metric-notes { --metric-color:var(--stat-ai); }
+.activity-analysis-grid,.activity-detail-grid { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); gap:36px; }
+.orbit-statistics .activity-module { border-top:0; padding:26px 0; }
+.activity-section-heading { display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.orbit-statistics .activity-section-heading h2 { display:flex; gap:9px; align-items:center; font-size:17px; margin:0; }
+.activity-section-heading h2 svg { color:var(--module-color,var(--orbit-text-secondary)); }
+.activity-chart-legend { display:flex; gap:14px; font-size:12px; white-space:nowrap; }
+.activity-trend { min-height:190px; max-height:260px; }
+.activity-trend text { font-size:17px; }
+.activity-analysis-grid .module-completion { padding-left:30px; border-left:1px solid var(--orbit-border); margin-block:26px; padding-block:0; }
+.activity-completion-ratio { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-top:22px; font-variant-numeric:tabular-nums; }
+.activity-completion-ratio > strong { font-size:52px; letter-spacing:-.05em; line-height:1.15; font-weight:650; }
+.activity-completion-ratio small { font-size:23px; font-weight:500; margin-left:3px; }
+.activity-completion-ratio > span { color:var(--orbit-text-secondary); font-size:13px; }
+.activity-progress { margin:20px 0 12px; height:7px; border-radius:var(--orbit-radius-control); overflow:hidden; }
+.activity-progress span { background:var(--stat-completion); border-radius:var(--orbit-radius-control); }
+.activity-completion-key { display:flex; justify-content:space-between; gap:8px; color:var(--orbit-text-secondary); font-size:12px; }
+.activity-completion-key span:first-child { color:var(--stat-completion); }
+.orbit-statistics .activity-pending-link { width:100%; justify-content:space-between; margin-top:20px; padding-inline:0; }
+.activity-overdue-status { display:flex; align-items:center; gap:8px; color:var(--stat-completion); font-size:13px; padding-top:14px; margin-top:14px; border-top:1px solid var(--orbit-border); }
+.activity-overdue-status.has-overdue { color:var(--stat-backlog); }
+.activity-detail-grid { border-top:1px solid var(--orbit-border); }
+.activity-detail-tabs { display:flex; flex-wrap:wrap; gap:4px; width:fit-content; border-radius:var(--orbit-radius-control); padding:3px; background:var(--orbit-muted); }
+.activity-detail-tabs button { gap:9px; }
+.activity-detail-tabs button span { font-variant-numeric:tabular-nums; opacity:.75; font-size:12px; }
+.module-records .activity-objects { margin-top:18px; max-height:380px; }
+.activity-objects li { padding:12px 0; gap:5px; }
+.module-records .activity-objects li { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:14px; }
+.activity-objects a { color:var(--orbit-text); text-decoration:none; }
+.activity-objects a:hover { color:var(--orbit-brand); text-decoration:underline; }
+.activity-objects time { white-space:nowrap; color:var(--orbit-text-secondary); font-size:12px; }
+.activity-heatmap { margin:22px 0 14px; }
+.activity-heat-row { gap:4px; margin-bottom:4px; }
+.activity-heat-details { font-size:12px; color:var(--orbit-text-secondary); }
+.activity-rhythm-metrics { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:22px; padding-top:18px; border-top:1px solid var(--orbit-border); }
+.activity-rhythm-metrics strong { font-size:25px; }
+.orbit-statistics .activity-more-statistics { margin:0; padding-block:18px; border-top:1px solid var(--orbit-border); }
+.activity-more-statistics > summary { font-size:14px; color:var(--orbit-text-secondary); }
+.activity-more-statistics .orbit-stat-grid { row-gap:24px; }
+.activity-more-statistics .metric-intervals { margin-top:24px; }
+.activity-more-statistics .activity-module + .activity-module { border-top:1px solid var(--orbit-border); }
+.activity-info-popover { width:min(360px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto; }
+.activity-stat-explanation { color:var(--orbit-text-secondary); font-size:13px; line-height:1.75; overflow-wrap:anywhere; }
+.activity-stat-explanation p { margin:10px 0 0; }
+.activity-metric-detail .activity-objects { max-height:none; }
+.activity-metric-detail .activity-objects li { font-size:14px; }
+.activity-visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@media(max-width:1000px) {
+  .activity-period-controls { flex-wrap:wrap; gap:12px; }
+  .activity-period-navigation { margin-left:0; }
+  .activity-analysis-grid,.activity-detail-grid { gap:24px; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); }
+  .activity-analysis-grid .module-completion { padding-left:24px; }
+  .activity-chart-legend { gap:8px; }
+}
+@media(max-width:767px) {
+  .orbit-statistics { padding:20px 20px 48px; }
+  .orbit-statistics header { flex-direction:row; gap:12px; margin-bottom:16px; }
+  .orbit-statistics h1 { font-size:26px; }
+  .activity-period-controls { display:grid; grid-template-columns:1fr; }
+  .activity-period-navigation { width:100%; justify-content:space-between; gap:2px; }
+  .activity-current-period { font-size:12px; padding-inline:0; }
+  .orbit-statistics .activity-window { display:flex; margin-top:6px; }
+  .orbit-statistics .activity-overview-metrics { padding:8px 0 20px; row-gap:22px; }
+  .activity-overview-metrics > .orbit-stat-metric { padding:0 16px; border:0; }
+  .activity-overview-metrics > .orbit-stat-metric:nth-child(odd) { padding-left:0; border-left:0; }
+  .activity-overview-metrics > .orbit-stat-metric:nth-child(even) { border-left:1px solid var(--orbit-border); }
+  .activity-overview-metrics > .orbit-stat-metric:nth-child(-n+2) { border-bottom:0; }
+  .activity-overview-metrics strong { font-size:34px; }
+  .activity-analysis-grid,.activity-detail-grid { grid-template-columns:1fr; gap:0; }
+  .activity-analysis-grid .module-completion { padding:24px 0; margin:0; border-left:0; border-top:1px solid var(--orbit-border); }
+  .activity-detail-grid .module-rhythm { border-top:1px solid var(--orbit-border); }
+  .activity-trend { min-height:160px; }
+  .activity-trend text { font-size:25px; }
+  .activity-metric-button > span > span { font-size:12px; gap:6px; }
+  .activity-heat-row { gap:4px; }
+  .module-records .activity-objects li { gap:8px; }
+  .activity-objects time { font-size:11px; }
+  .activity-range-popover .activity-custom-range { grid-template-columns:1fr; }
+}

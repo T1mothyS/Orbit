@@ -83,6 +83,23 @@ db.createNoteItem({id:'connected-note',user_id:uid,content:'普通正文可以�
 for (let i=0;i<18;i++) db.createLibraryEntry({id:'mobile-library-'+i,user_id:uid,kind:i%3?'article':'fragment',type:i%2?'knowledge':'reference',source_id:'synthetic-'+i,slug:'synthetic-'+i,title:i===0?'长标题用于核对知识库卡片和阅读返回行为'.repeat(5):'合成知识 '+i,content:'# 合成正文\n\n用于隔离浏览器验收的内容，不是实际知识库数据。\n\n'+Array.from({length:12},(_,section)=>`## 第 ${section+1} 节\n\n${'用于验证阅读滚动、章节定位和顶部遮挡的合成段落。'.repeat(35)}\n\n`).join(''),summary:'移动端紧凑布局、筛选条件、列表位置与搜索跳转的合成内容。',tags_json:'["合成","验收"]',status:'active',source_type:'local',source_ref:null,source_url:null,metadata_json:'{}',relations_json:'[]',content_hash:'synthetic-'+i,created_at:new Date(Date.now()-i*86400000).toISOString(),updated_at:stamp,published_at:stamp,archived_at:null});
 for (let i=0;i<10;i++) activity.createDailyReport({userId:uid,reportDate:new Date(Date.now()-i*86400000).toISOString().slice(0,10),source:'local',deliveryStatus:i===9?'candidate':'received',markdown:'# 合成日报 '+i+'\n\n这是移动布局和筛选验收内容。'+ '长摘要用于核对卡片和正文换行。'.repeat(12),contentHash:'synthetic-report-'+i});
 reporting.setReportInsightGenerator(async()=>JSON.stringify({insights:[{text:'本期已有有效完成记录，建议从积压明细选择下一项。',metrics:['completed','backlog'],objects:[]}]}));
+// Optional real API cards for visual review; only synthetic, isolated account data.
+if (process.argv.includes('--notification-cards-preview')) {
+  const daily = await import('../server/daily-action.js');
+  const reminderStore = await import('../server/reminder-store.js');
+  const sync = await import('../server/reminder-calendar-sync.js');
+  const today = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const dueDate = new Date(Date.parse(today+'T12:00:00Z')+3*86400000).toISOString().slice(0,10);
+  const task = reminderStore.createReminderTask({userId:uid,name:'合成周期报表',type:'generic',timezone:'Asia/Shanghai',config:{templateKey:'custom',rule:{frequency:'once',anchorDate:dueDate,advancePolicy:'calendar'},reminderOffsets:[3],reminderTime:'10:00',actionGuide:'',priority:'medium'}});
+  sync.syncReminderTaskToCalendar(task);
+  db.upsertReminder({...db.getReminder(uid)!,enabled:1,in_app_enabled:1,timezone:'Asia/Shanghai'});
+  const notice=activity.enqueueNotificationDetailed({userId:uid,sourceType:'digest',sourceId:today,channel:'in_app',kind:'daily_digest',title:'今日行动提醒',body:'合成验收内容',scheduledAt:stamp,dedupeKey:'preview-daily-card'}).notification;
+  const snapshot=daily.getDailyActionSnapshot(uid,today);
+  notifications.deliverInApp(notice,undefined,false,{...daily.freezeDailyAction(snapshot),weather:{state:'available',place:'合成城市',code:1,description:'晴',low:2,high:13,rain:0,cached:false}});
+  const report=reporting.createActivityReport(uid,{period:'week',date:today});
+  const delivery=activity.enqueueNotificationDetailed({userId:uid,sourceType:'activity_report',sourceId:report.id,channel:'in_app',kind:'weekly_report',title:'Orbit Weekly · 个人活动报告',body:reporting.renderActivityReport(report),scheduledAt:stamp,dedupeKey:'preview-weekly-card'}).notification;
+  notifications.deliverInApp(delivery);
+}
 if(process.argv.includes('--iteration')) {
   const cloud=await import('../server/daily-report-cloud-store.js');
   cloud.saveDailyReportCloudContext(uid,{

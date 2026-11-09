@@ -7,10 +7,22 @@ import { sendDailyReminderEmail, summarizeEmailSendResult } from '../email-servi
 import { createTodayWidgetAccess, todayWidgetSnapshot } from '../today-widget.js';
 import { getActionCenter } from '../action-center.js';
 import { addLog } from '../log-service.js';
+import { getDailyActionSnapshot } from '../daily-action.js';
+import { isValidDateKey } from '../date-key.js';
 import * as db from '../db.js';
 
 export function createActionCenterRouter({ authenticate, JWT_SECRET }: Pick<ReturnType<typeof createAuth>, 'authenticate'> & { JWT_SECRET: string }) {
   const app = Router();
+  app.get('/api/action-center/daily-action', authenticate, (req, res) => {
+    const date = req.query.date;
+    if (typeof date !== 'string' || (date !== 'today' && !isValidDateKey(date))) return res.status(400).json({ error: '日期格式不正确，请使用 YYYY-MM-DD 或 today' });
+    try {
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json(getDailyActionSnapshot((req as any).user.userId, date));
+    } catch {
+      res.status(500).json({ error: '获取当日行动失败，请稍后重试' });
+    }
+  });
   app.get("/api/action-center", authenticate, (req, res) => {
     try {
       const userId = (req as any).user.userId;

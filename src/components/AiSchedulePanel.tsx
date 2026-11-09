@@ -2,11 +2,12 @@ import { Button, IconButton, Tooltip, Input, Textarea, TimePicker, isClockTime, 
 import { composerDraftKey, readComposerDraft, updateComposerDraft, snapshotComposerDraft, consumeComposerDraft, subscribeComposerDraft, type NotificationContext } from '../utils/composer-draft';
 import type { NoteImage } from '../utils/note-images';
 import { NoteImageGallery, NoteImageInput, useNoteImageUpload } from './NoteImages';
-import type { DailyActionMeta } from '../utils/daily-action';
+import { DailyActionCard } from './DailyActionCard';
+import { WeeklyActivityCard } from './WeeklyActivityCard';
 import { OrbitNotificationCard, type NotificationMeta } from './OrbitNotificationCard';
 import { ReminderActionButtons } from './ReminderActionButtons';
 import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle, type CSSProperties } from 'react';
-import { Bot, BookOpen, ArrowUp, Loader2, Check, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus, Bell, ArrowUpRight, Cloud, CloudRain, CloudSnow, CloudSun, CloudLightning, Copy } from 'lucide-react';
+import { Bot, BookOpen, ArrowUp, Loader2, Check, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus, Bell, ArrowUpRight, Copy } from 'lucide-react';
 import type { ActionConfirmation } from '../ui';
 import {safeChatHref} from '../utils/chat-markdown';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -394,82 +395,6 @@ function ScheduleMiniCard({ schedule, onOpen, onOpenMenu, edit = false }: {
   </Button>;
 }
 
-function DailyActionCard({ action, schedules, onOpen, onRefresh }: {
-  action: DailyActionMeta; schedules: Schedule[]; onOpen?: (id: string, edit?: boolean) => void; onRefresh?: () => void;
-}) {
-  const { authHeaders } = useAuth();
-  const updating = useRef<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState('');
-  const todos = schedules.filter(schedule => schedule.type === 'todo');
-  const events = schedules.filter(schedule => schedule.type !== 'todo');
-  const completed = todos.filter(schedule => schedule.is_completed).length;
-  const weather = action.weather;
-
-  async function complete(schedule: Schedule) {
-    if (updating.current) return;
-    updating.current = schedule.id;
-    setBusy(schedule.id);
-    setError('');
-    try {
-      const response = await fetch(`/api/schedules/${encodeURIComponent(schedule.id)}/toggle`, {
-        method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: !schedule.is_completed }), signal: AbortSignal.timeout(15000),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || '待办更新失败');
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '待办更新失败');
-    } finally {
-      onRefresh?.();
-      updating.current = null;
-      setBusy(null);
-    }
-  }
-
-  const WeatherIcon = weather.state !== 'available' ? Cloud : weather.code >= 95 ? CloudLightning
-    : [71, 73, 75, 77, 85, 86].includes(weather.code) ? CloudSnow
-    : weather.code >= 51 ? CloudRain : CloudSun;
-  function renderItems(items: Schedule[], label: string, count: string) {
-    if (!items.length) return null;
-    return <section className="orbit-daily-list" aria-label={label}>
-      <div className="orbit-daily-list-heading"><h3>{label}</h3><span>{count}</span></div>
-      <ul>{items.map(schedule => <li key={schedule.id} className="orbit-daily-task">
-        {schedule.type === 'todo' && !schedule.id.startsWith('reminder-cycle:') && <IconButton
-          label={`${schedule.is_completed ? '恢复待办' : '完成待办'}：${schedule.title}`} variant="quiet"
-          className="orbit-daily-complete" aria-pressed={schedule.is_completed} loading={busy === schedule.id}
-          disabled={!!busy} onClick={() => void complete(schedule)}>
-          <span className="orbit-daily-completion-ring">{schedule.is_completed && <Check size={14} aria-hidden="true" />}</span>
-        </IconButton>}
-        <ScheduleMiniCard schedule={schedule} onOpen={onOpen} edit />
-      </li>)}</ul>
-    </section>;
-  }
-
-  return <section className="orbit-daily-action" aria-label="今日行动提醒">
-    <div className="orbit-daily-paper">
-      <time dateTime={action.date}>{action.date}</time>
-      <h2>今日行动提醒</h2>
-      <p>{todos.length - completed} 项待办待处理 · {events.length} 项日程</p>
-    </div>
-    <div className="orbit-daily-weather">
-      <WeatherIcon size={25} aria-hidden="true" />
-      {weather.state === 'available' ? <>
-        <span>{[weather.place, weather.description].filter(Boolean).join(' · ')}</span>
-        {weather.low != null && weather.high != null && <strong>{Math.round(weather.low)}–{Math.round(weather.high)}°C</strong>}
-        {weather.rain != null && <small>降雨 {Math.round(weather.rain)}%</small>}
-        {weather.cached && <small>缓存预报</small>}
-      </> : <span>{weather.state === 'unavailable' ? [weather.place, '天气暂不可用'].filter(Boolean).join(' · ') : '设置常驻地点后显示天气'}</span>}
-    </div>
-    <div className="orbit-daily-body">
-      {renderItems(todos, '待办', `已完成 ${completed}/${todos.length}`)}
-      {renderItems(events, '日程', `${events.length} 项`)}
-      {!schedules.length && <p>这份提醒里的事项已移出，或当天没有待处理事项。</p>}
-      {error && <p className="orbit-inline-error" role="alert">{error}</p>}
-    </div>
-  </section>;
-}
-
 // ==================== 消息气泡 ====================
 
 function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSchedule, onOpenScheduleMenu, onConfirmPlan, onDiscardPlan, onUpdatePlanOperation, confirmingPlanId, savingPlanOperationKey, onQuickReply, quickReplyDisabled }: {
@@ -526,8 +451,9 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
   const notification = msg.orbitMeta?.origin === 'notification' ? msg.orbitMeta : undefined;
   const notice = notification?.notification;
   const dailyAction = notification?.dailyAction;
-  const showNoticeTitle = !dailyAction && notice && !scheduleItems?.some(schedule => schedule.title === notice.title);
-  const prose = dailyAction ? '' : notice ? notice.body : msg.text;
+  const weeklyReport = notification?.weeklyReport;
+  const showNoticeTitle = !dailyAction && !weeklyReport && notice && !scheduleItems?.some(schedule => schedule.title === notice.title);
+  const prose = dailyAction || weeklyReport ? '' : notice ? notice.body : msg.text;
   const intentLabel: Record<string, string> = { create: '创建', update: '修改', delete: '删除', query: '查询', weather: '天气' };
 
   return (
@@ -546,9 +472,10 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
       ) : (
         <div className="orbit-message-content">
           {showNoticeTitle && <h2 className="orbit-notification-title">{notice.title}</h2>}
-          {dailyAction && <DailyActionCard action={dailyAction} schedules={scheduleItems || []}
+          {dailyAction && <DailyActionCard action={dailyAction} legacyText={notice?.body} pushedAt={notice?.triggerAt}
             onOpen={onOpenSchedule} onRefresh={onNotificationRefresh} />}
-          {notification && !dailyAction && scheduleItems && scheduleItems.length > 0 && (
+          {weeklyReport && <WeeklyActivityCard report={weeklyReport} />}
+          {notification && !dailyAction && !weeklyReport && scheduleItems && scheduleItems.length > 0 && (
             <div className="orbit-chat-task-list">{scheduleItems.map(schedule => <ScheduleMiniCard key={schedule.id} schedule={schedule} onOpen={onOpenSchedule} onOpenMenu={onOpenScheduleMenu} />)}</div>
           )}
           {prose && <ChatMarkdown text={prose} />}

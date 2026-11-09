@@ -76,7 +76,7 @@ const errors = [], checks = [];
         await page.getByRole('button', { name: '缩小架构图' }).click();
         await page.getByRole('button', { name: '适应画布', exact: true }).click();
         await noOverflow(`${width} ${theme} full map`);
-        await page.getByRole('button', { name: '简明架构', exact: true }).click();
+        await page.getByRole('button', { name: '概览', exact: true }).click();
         await page.getByText('趋势、测试与工程证据', {exact:true}).click(); await page.locator('.evolution-metrics').scrollIntoViewIfNeeded();
         assert.equal(await page.locator('.evolution-test-evidence li').count(), data.milestones.filter(m => m.tests).length);
         await page.screenshot({ path: path.join(output, `${width}-${theme}-metrics.png`) });
@@ -93,8 +93,7 @@ const errors = [], checks = [];
     for (const snapshot of data.snapshots) {
       await page.locator('[data-milestone="' + snapshot.milestone + '"]').click();
       const priorMilestone = data.milestones[data.milestones.findIndex(item => item.id === snapshot.milestone) - 1], prior = data.snapshots.find(item => item.id === priorMilestone?.snapshot);
-      // Select full history so the comparison always uses the adjacent historical snapshot.
-      await page.getByRole('button', { name: `完整历史 · ${data.milestones.length} 个里程碑`, exact: true }).click();
+      // The only playback sequence is the complete history; compare adjacent milestones.
       const expected = new Set([...snapshot.nodes, ...(prior?.nodes || [])].map(n => n.id)).size;
       assert.equal(await page.locator('.evolution-map [data-node]').count(), expected);
       const geometry = await page.locator('.evolution-map').evaluate(map => {
@@ -104,7 +103,7 @@ const errors = [], checks = [];
       });
       assert.deepEqual(geometry, { overlap: false, invalid: false }); checks.push(`snapshot ${snapshot.id}: nodes and edges`);
     }
-    await page.getByRole('button', { name: '简明架构', exact: true }).click();
+    await page.getByRole('button', { name: '概览', exact: true }).click();
     await page.locator('[data-milestone="' + 'retrieval' + '"]').click(); await page.waitForURL('**milestone=retrieval'); await page.waitForFunction(() => document.querySelector('.evolution-page')?.getAttribute('data-current-milestone') === 'retrieval');
     await page.locator('[data-milestone="' + 'cloud' + '"]').click(); await page.waitForURL('**milestone=cloud'); await page.waitForFunction(() => document.querySelector('.evolution-page')?.getAttribute('data-current-milestone') === 'cloud');
     await page.goBack(); await page.waitForFunction(() => document.querySelector('.evolution-page')?.getAttribute('data-current-milestone') === 'retrieval'); assert.equal(await page.locator('.evolution-page').getAttribute('data-current-milestone'), 'retrieval');

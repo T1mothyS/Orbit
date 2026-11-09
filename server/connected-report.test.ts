@@ -253,7 +253,7 @@ test('Today widget projects live owned todos and scopes its native credential', 
   }
 });
 
-test('daily action history attaches owner-scoped live items and a weather snapshot, with a safe legacy fallback', async () => {
+test('daily action history freezes owner-scoped facts, decorates current access, and identifies legacy records', async () => {
   const date = '2026-10-29';
   const prefs = db.getReminder(owner)!;
   db.upsertReminder({ ...prefs, enabled: 1, in_app_enabled: 1, home_location_name: '测试地点', home_latitude: 30, home_longitude: 120 });
@@ -272,6 +272,7 @@ test('daily action history attaches owner-scoped live items and a weather snapsh
   });
   const failedId = await chat.deliverDailyAction(enqueue(date + 'T01:00:00Z'), async () => { throw new Error('offline'); });
   const oldId = chat.deliverInApp(enqueue(date + 'T02:00:00Z'));
+  const legacyId = chat.deliverInApp(enqueue(date + 'T03:00:00Z'), undefined, false, { date, weather: { state: 'unconfigured' } });
   const server = api.app.listen(0, '127.0.0.1');
   await new Promise<void>(resolve => server.once('listening', resolve));
   const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
@@ -283,21 +284,93 @@ test('daily action history attaches owner-scoped live items and a weather snapsh
   try {
     const messages = await history();
     const digest = messages.find((entry: { id: string }) => entry.id === messageId);
-    assert.deepEqual(digest.orbitMeta.dailyAction, { date, weather: { state: 'available', place: '测试地点', code: 61,
-      description: '小雨', low: 14, high: 21, rain: 60, cached: true } });
-    assert.deepEqual(digest.scheduleItems.map((entry: { id: string }) => entry.id), [task.id]);
+    assert.deepEqual(digest.orbitMeta.dailyAction.weather, { state: 'available', place: '测试地点', code: 61,
+      description: '小雨', low: 14, high: 21, rain: 60, cached: true });
+    assert.equal(digest.orbitMeta.dailyAction.date, date);
+    assert.equal(digest.orbitMeta.dailyAction.schemaVersion, 1);
+    assert.deepEqual(digest.orbitMeta.dailyAction.items.map((entry: { sourceId: string }) => entry.sourceId), [task.id]);
+    assert.deepEqual(digest.scheduleItems, []);
     assert.equal(messages.find((entry: { id: string }) => entry.id === failedId).orbitMeta.dailyAction.weather.state, 'unavailable');
     assert.equal(messages.find((entry: { id: string }) => entry.id === oldId).orbitMeta.dailyAction, undefined);
+    assert.equal(messages.find((entry: { id: string }) => entry.id === legacyId).orbitMeta.dailyAction.legacy, true);
+    assert.equal(messages.find((entry: { id: string }) => entry.id === legacyId).orbitMeta.dailyAction.items, undefined);
     assert.ok(!(await history(other)).some((entry: { id: string }) => entry.id === messageId));
+    const latestPath = '/api/action-center/daily-action?date=' + date;
+    assert.equal((await fetch(base + latestPath)).status, 401);
+    for (const invalidDate of ['2026-02-30', '2026-10-29T00:00:00Z', '']) {
+      assert.equal((await call(owner, '/api/action-center/daily-action?date=' + invalidDate)).status, 400);
+    }
+    const before = schedules.exportScheduleDb();
+    const latest = await call(owner, latestPath);
+    assert.equal(latest.status, 200);
+    assert.equal(latest.headers.get('cache-control'), 'private, no-store');
+    assert.deepEqual((await latest.json()).items.map((entry: { sourceId: string }) => entry.sourceId), [task.id]);
+    assert.ok(!(await (await call(other, latestPath)).json()).items.some((entry: { sourceId: string }) => entry.sourceId === task.id));
+    assert.deepEqual(schedules.exportScheduleDb(), before);
+    const currentDay = await call(owner, '/api/action-center/daily-action?date=today');
+    assert.equal(currentDay.status, 200);
+    const currentDayData = await currentDay.json();
+    assert.equal(currentDayData.date, new Intl.DateTimeFormat('en-CA', { timeZone: currentDayData.timezone,
+      year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()));
     const toggle = '/api/schedules/' + task.id + '/toggle';
     assert.equal((await call(other, toggle, 'POST', { completed: true })).status, 403);
     for (let i = 0; i < 2; i++) assert.equal((await call(owner, toggle, 'POST', { completed: true })).status, 200);
-    assert.equal((await history()).find((entry: { id: string }) => entry.id === messageId).scheduleItems[0].is_completed, true);
+    const frozen = (await history()).find((entry: { id: string }) => entry.id === messageId).orbitMeta.dailyAction.items[0];
+    assert.equal(frozen.completed, false);
+    assert.equal(frozen.current.completed, true);
     assert.equal(activity.listCompletions(owner, { sourceType: 'schedule', sourceId: task.id }).length, 1);
     schedules.updateSchedule(task.id, { start_time: '2026-10-30T09:30:00' });
-    assert.deepEqual((await history()).find((entry: { id: string }) => entry.id === messageId).scheduleItems, []);
+    const moved = (await history()).find((entry: { id: string }) => entry.id === messageId).orbitMeta.dailyAction.items[0];
+    assert.equal(moved.startTime, date + 'T09:30:00');
+    assert.equal(moved.current.available, true);
+    assert.match(moved.current.href, /2026-10-30/);
+    assert.deepEqual((await (await call(owner, latestPath)).json()).items, []);
+    schedules.deleteSchedule(task.id);
+    const deleted = (await history()).find((entry: { id: string }) => entry.id === messageId).orbitMeta.dailyAction.items[0];
+    assert.equal(deleted.title, task.title);
+    assert.equal(deleted.current.available, false);
+    assert.equal(deleted.current.href, null);
   } finally {
     db.upsertReminder(prefs);
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});
+
+test('weekly notification cards use only owned frozen report facts and disappear when their report is removed', async () => {
+  const userId = randomUUID();
+  db.createUser({ id: userId, email: `${userId}@example.invalid`, password_hash: 'synthetic-only', role: 'user', disabled: 0, created_at: stamp, updated_at: stamp });
+  chat.setInAppEnabled(userId, true);
+  const task = item('周报冻结标题', { user_id: userId });
+  completion.toggleScheduleCompletion(task.id, userId);
+  const report = reports.createActivityReport(userId, range);
+  const notice = activity.enqueueNotificationDetailed({ userId, sourceType: 'activity_report', sourceId: report.id,
+    channel: 'in_app', kind: 'weekly_report', title: 'Orbit Weekly', body: 'original notification', scheduledAt: stamp, dedupeKey: randomUUID() }).notification;
+  const messageId = chat.deliverInApp(notice)!;
+  const stored = queryOne<{ content: string }>('SELECT content FROM ai_schedule_messages WHERE id=? AND user_id=?', [messageId, userId])!.content;
+  const card = chat.notificationView(userId, notice.id).weeklyReport!;
+  assert.equal(card.reportId, report.id);
+  assert.equal(card.completed, 1);
+  assert.equal(card.completedItems[0].title, '周报冻结标题');
+  assert.equal(card.timezone, report.snapshot.window.timezone);
+  schedules.updateSchedule(task.id, { title: '后来改过的标题' });
+  completion.toggleScheduleCompletion(item('后来新增并完成', { user_id: userId }).id, userId);
+  assert.deepEqual(chat.notificationView(userId, notice.id).weeklyReport, card);
+  assert.equal(chat.notificationView(other, notice.id).weeklyReport, undefined);
+  const server = api.app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  try {
+    const response = await fetch(`http://127.0.0.1:${(server.address() as { port: number }).port}/api/ai-schedule/history`, {
+      headers: { Authorization: 'Bearer ' + api.signUserToken(db.getUserById(userId)!) },
+    });
+    assert.equal(response.status, 200);
+    const history = await response.json();
+    assert.deepEqual(history.messages.find((message: { id: string }) => message.id === messageId).orbitMeta.weeklyReport, card);
+    run('DELETE FROM orbit_activity_reports WHERE id=? AND user_id=?', [report.id, userId]);
+    assert.equal(chat.notificationView(userId, notice.id).weeklyReport, undefined);
+    assert.equal(chat.notificationView(userId, notice.id).state, 'discarded');
+    assert.equal(queryOne<{ content: string }>('SELECT content FROM ai_schedule_messages WHERE id=? AND user_id=?', [messageId, userId])!.content, stored);
+  } finally {
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));
   }

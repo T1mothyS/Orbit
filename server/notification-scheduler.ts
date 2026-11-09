@@ -1,3 +1,6 @@
+import { getDailyActionSnapshot, dailyActionSummary } from './daily-action.js';
+import { parseScheduleStart, timePartsInTimezone } from './schedule-time.js';
+export { parseScheduleStart } from './schedule-time.js';
 import * as db from './db.js';
 import * as scheduleStore from './schedule-store.js';
 import { todayInTimezone } from './reminder-store.js';
@@ -34,104 +37,7 @@ export interface HighPriorityScheduleResult {
   skipped: Record<string, number>;
 }
 
-interface LocalDateTimeParts {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  second: number;
-  millisecond: number;
-}
-
 export type NotificationSchedulerLogger = NotificationLogger;
-
-function timePartsInTimezone(date: Date, timezone: string): LocalDateTimeParts {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-  return {
-    year: Number(values.year),
-    month: Number(values.month),
-    day: Number(values.day),
-    hour: Number(values.hour),
-    minute: Number(values.minute),
-    second: Number(values.second),
-    millisecond: date.getUTCMilliseconds(),
-  };
-}
-
-function timezoneOffsetMs(date: Date, timezone: string): number {
-  const parts = timePartsInTimezone(date, timezone);
-  const localAsUtc = Date.UTC(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-    parts.minute,
-    parts.second,
-    parts.millisecond,
-  );
-  return localAsUtc - date.getTime();
-}
-
-/**
- * 解析日程保存的开始时间。表单产生的是不带偏移量的用户本地时间，AI/导入数据也可能带 Z 或显式偏移量。
- */
-export function parseScheduleStart(value: string, timezone: string): Date | null {
-  const input = String(value || '').trim();
-  if (!input) return null;
-
-  if (/(?:Z|[+-]\d{2}:?\d{2})$/i.test(input)) {
-    const parsed = new Date(input);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(input);
-  if (!match) return null;
-  const [, year, month, day, hour, minute, second = '0', millisecond = '0'] = match;
-  const wallTimeMs = Date.UTC(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    Number(second),
-    Number(millisecond.padEnd(3, '0')),
-  );
-  if (Number.isNaN(wallTimeMs)) return null;
-  const wallTime = new Date(wallTimeMs);
-  if (
-    wallTime.getUTCFullYear() !== Number(year)
-    || wallTime.getUTCMonth() !== Number(month) - 1
-    || wallTime.getUTCDate() !== Number(day)
-    || wallTime.getUTCHours() !== Number(hour)
-    || wallTime.getUTCMinutes() !== Number(minute)
-    || wallTime.getUTCSeconds() !== Number(second)
-    || wallTime.getUTCMilliseconds() !== Number(millisecond.padEnd(3, '0'))
-  ) return null;
-
-  let candidate = new Date(wallTimeMs);
-  try {
-    // Recalculate once after applying the offset so DST transitions use the offset at the target instant.
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const adjusted = new Date(wallTimeMs - timezoneOffsetMs(candidate, timezone));
-      if (adjusted.getTime() === candidate.getTime()) return adjusted;
-      candidate = adjusted;
-    }
-    return candidate;
-  } catch {
-    return null;
-  }
-}
 
 function hasExplicitStartTime(schedule: Schedule): boolean {
   return /[T ]\d{2}:\d{2}/.test(String(schedule.start_time || ''));
@@ -171,7 +77,8 @@ export function enqueueDueDailyDigestNotifications(
       if (reminder.hour !== local.hour || reminder.minute !== local.minute) continue;
       due += 1;
       const localDate = todayInTimezone(timezone, now);
-      const schedules = scheduleStore.getSchedulesByDate(localDate, reminder.user_id).filter(item => !item.is_completed);
+      const snapshot = getDailyActionSnapshot(reminder.user_id, localDate, now);
+      const schedules = snapshot.items;
       schedulesScanned += schedules.length;
       const configuredHour = String(reminder.hour).padStart(2, '0');
       const configuredMinute = String(reminder.minute).padStart(2, '0');
@@ -181,7 +88,7 @@ export function enqueueDueDailyDigestNotifications(
         sourceId: localDate,
         kind: 'daily_digest',
         title: `今日行动提醒 · ${schedules.length} 项待处理`,
-        body: schedules.length ? schedules.map(item => `${item.start_time.slice(11, 16)} ${item.title}`).join('\n') : '今天暂无未完成日程。',
+        body: dailyActionSummary(snapshot),
         scheduledAt: now.toISOString(),
         // 不再按“账号 + 自然日”全局去重；修改当天提醒时间后允许再次触发。
         // 同一配置时间的重复扫描仍保持幂等，避免同一分钟重复入队。

@@ -12,10 +12,12 @@ const db = await import('./db.js');
 const schedules = await import('./schedule-store.js');
 const activity = await import('./activity-store.js');
 const scheduler = await import('./notification-scheduler.js');
+const reminders = await import('./reminder-store.js');
 
 await db.initDb();
 await schedules.initScheduleDb();
 await activity.initActivityDb();
+await reminders.initReminderDb();
 
 function createUser(id: string, disabled = 0): void {
   const now = new Date().toISOString();

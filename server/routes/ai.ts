@@ -153,10 +153,12 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
         const view = toAiScheduleHistoryMessage(message);
         if (view.plan?.id) view.plan = buildAiPlanSnapshot(resolveAiPlan(payload.userId, view.plan.id)!);
         const meta = view.orbitMeta;
+        if (meta?.dailyAction) meta.dailyAction = dailyActionHistory(payload.userId, meta.dailyAction);
         const snapshot = Array.isArray(view.scheduleItems) ? view.scheduleItems[0] : undefined;
         if (Array.isArray(view.scheduleItems)) {
           const dailyItems = meta?.dailyAction
-            ? new Map(scheduleStore.getSchedulesByDate(meta.dailyAction.date, payload.userId).map(item => [item.id, item]))
+            ? new Map(scheduleStore.getAllSchedules(payload.userId).filter(item => !item.is_unscheduled
+              && dailyActionScheduleDate(item, dailyActionTimezone(payload.userId)) === meta.dailyAction.date).map(item => [item.id, item]))
             : undefined;
           view.scheduleItems = view.scheduleItems.flatMap(item => {
             const live = dailyItems ? dailyItems.get(item.id) : scheduleStore.getSchedule(item.id);
@@ -1017,3 +1019,4 @@ ${selectedNotification}
 import { activityOrigin, recordActivityEvent } from '../activity-events.js';
 import { notificationView, notificationMessageContent } from '../notification-chat.js';
 import { findSettings } from '../../src/utils/settings-registry.js';
+import { dailyActionHistory, dailyActionScheduleDate, dailyActionTimezone } from '../daily-action.js';

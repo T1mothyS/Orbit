@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import type { EvolutionData } from '../../src/types/project-evolution';
 import { fixtureToken } from './auth-fixture';
 import { checkVisual } from './visual-check';
+const data = JSON.parse(fs.readFileSync(new URL('../../project-evolution/generated.json', import.meta.url), 'utf8')) as EvolutionData;
 const base = 'http://127.0.0.1:4187';
 for (const [width, height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (const theme of ['light','dark']) {
   test(`evolution and note theme ${width} ${theme}`, async ({ page, context }) => {
@@ -30,10 +33,10 @@ for (const [width, height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (
     await expect(page.locator('.evolution-map [data-node]').first()).toBeVisible();
     expect(await page.locator('.evolution-map .is-muted').count()).toBeGreaterThan(0);
     expect(await page.locator('.evolution-map path.is-related').count()).toBeGreaterThan(0);
-    await page.getByRole('button', { name: '简明架构', exact: true }).click();
+    await page.getByRole('button', { name: '概览', exact: true }).click();
     await page.getByText('趋势、测试与工程证据', {exact:true}).click(); await page.locator('.evolution-metrics').scrollIntoViewIfNeeded(); await expect(page.locator('.evolution-test-evidence li')).toHaveCount(4);
     await expect(page.locator('.evolution-test-evidence')).toContainText('本里程碑未记录');
-    await page.getByText('查看数据表与统计口径', { exact: true }).click(); await expect(page.locator('.evolution-table-scroll tbody tr')).toHaveCount(54);
+    await page.getByText('查看数据表与统计口径', { exact: true }).click(); await expect(page.locator('.evolution-table-scroll tbody tr')).toHaveCount(data.milestones.length);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await checkVisual(page, `evolution-evidence-${width}-${theme}.png`, false, false); expect(errors).toEqual([]);
   });
@@ -43,7 +46,7 @@ test('evolution story ends at latest, replays and keeps URL and history intact',
   await page.setViewportSize({width:1440,height:900}); await page.clock.install(); await page.clock.pauseAt(new Date());
   await page.goto(base + '/project?view=architecture'); await expect(page.locator('.evolution-overview-group')).toHaveCount(4);
   const before = await page.evaluate(() => ({ url: location.href, length: history.length }));
-  await page.clock.runFor(40000); await expect(page.locator('.evolution-page')).toHaveAttribute('data-current-milestone', 'nested-navigation-growth-quips');
+  await page.clock.runFor(data.milestones.length * 6000); await expect(page.locator('.evolution-page')).toHaveAttribute('data-current-milestone', data.milestones.at(-1)!.id);
   await expect(page.getByRole('button', { name: '继续播放', exact: true })).toBeVisible();
   expect(await page.evaluate(() => ({ url: location.href, length: history.length }))).toEqual(before);
   await page.getByRole('button', { name: '重新播放', exact: true }).click(); await expect(page.locator('.evolution-page')).toHaveAttribute('data-current-milestone', 'baseline');
