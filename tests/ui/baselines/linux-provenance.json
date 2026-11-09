@@ -333,5 +333,35 @@
       "settings-header-search-390-dark.png": "b934f311b972f64ad554b4a1d75676c9027ed16d02b270ee206f57d614b30f60"
     },
     "workflowRun": 40103532401
+  },
+  "advancedSettingsReview20261109": {
+    "sourceCommit": "39f87bf1916426a9a87f53464cd486ff81bff459",
+    "sourceVersion": "0.69.1-261109.1944",
+    "workflowRun": 42636624704,
+    "platform": "ubuntu-24.04",
+    "node": "v22.23.2",
+    "browser": "156.0.8078.4",
+    "reviewer": "Agent",
+    "scope": "Advanced settings at four viewports in both themes. Review matched the requested title-adjacent action icons, removed standalone actions and dividers, and resulting section spacing. All eight candidate images matched the reviewed strict-run images pixel for pixel.",
+    "priorHashes": {
+      "settings-advanced-390-dark.png": "87911a1cea845b50605eb4baf559696a0c29be59d67df18dd5ffa07e300e3044",
+      "settings-advanced-390-light.png": "1e28a69cf27b5e7326d47abf03d115609dd7695ef30f17d145ce2eff75d5bf99",
+      "settings-advanced-430-dark.png": "afc942392094c6270283a7edbce0d45fd3c6cbdf107f6b83f1c018dd3cd0aba4",
+      "settings-advanced-430-light.png": "f5c54979f4d9312e0674b592f8e881fcf4d96a044e7ae21be36ad3c8fdf9237f",
+      "settings-advanced-768-dark.png": "b7e32ae33381255a10a5b44f787eb5a7753eae038ee18d2db3f53a900886e01c",
+      "settings-advanced-768-light.png": "35d13b253373cfdc355e4dfa14ff3095c6b023e9049e7416cffdc8591470a352",
+      "settings-advanced-1440-dark.png": "3d9db18750d628ba18cabe417c3800ff4fe555fbcf61a75312ef0adb5267e79f",
+      "settings-advanced-1440-light.png": "34bd81e9535195d12cb18e932d811b9015e00083e7f2924912c968c1a86f2239"
+    },
+    "hashes": {
+      "settings-advanced-390-dark.png": "a18f537bfc3bb590ec5c65555c23eb2440bd6c314ff68cdd5b1939f134c228a8",
+      "settings-advanced-390-light.png": "86702d2f6b9bc2a3cecb65981908c535e1652d67e16534ef970caa758df152dd",
+      "settings-advanced-430-dark.png": "311907c570726e160d84eee3e47bc2f4d9946918d7874b2f81157ef9adfd372d",
+      "settings-advanced-430-light.png": "564cf28c0c455f7e493f21f42f82a497ccdfecc08fb0e0e2986e3968207ccb74",
+      "settings-advanced-768-dark.png": "7127cd62da106cc527bec5d570abcfef0b73009bcd63299fe698aee5eaea9d62",
+      "settings-advanced-768-light.png": "7c73ac63b2ac1b65e783a377e2423cd03dc5c88b8353e9aa9b4127bc0ef4ca8b",
+      "settings-advanced-1440-dark.png": "d3aefcd40459f983175537ecccc33956e1f115811674258111020784019bae48",
+      "settings-advanced-1440-light.png": "3bb3c23bdf2607f393aa44c786bb134788018a1058ca78117fcd5a801808867d"
+    }
   }
 }
