@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, CalendarDays, Check, Cloud, CloudLightning, CloudRain, CloudSnow, CloudSun, Repeat2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Circle, CircleCheck, Cloud, CloudLightning, CloudRain, CloudSnow, CloudSun } from 'lucide-react';
 import { Button, IconButton } from '../ui';
 import { ChatMarkdown } from './ChatMarkdown';
 import { useAuth } from '../hooks/useAuth';
@@ -18,13 +18,22 @@ export function DailyActionCard({ action, legacyText, pushedAt, onOpen, onRefres
   const { authHeaders } = useAuth();
   const navigate = useNavigate();
   const [latest, setLatest] = useState<DailyActionSnapshot | null>(null);
+  const [completedOverrides, setCompletedOverrides] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    setCompletedOverrides(previous => Object.fromEntries(Object.entries(previous).filter(([id, completed]) =>
+      !(action.items || []).some(item => item.id === id && item.current?.completed === completed))));
+  }, [action.items]);
+  useEffect(() => {
+    setCompletedOverrides(previous => Object.fromEntries(Object.entries(previous).filter(([id, completed]) =>
+      !(latest?.items || []).some(item => item.id === id && item.current?.completed === completed))));
+  }, [latest?.items]);
   const [mode, setMode] = useState<'snapshot' | 'latest'>('snapshot');
   const [loading, setLoading] = useState(false), [busy, setBusy] = useState<string | null>(null), [error, setError] = useState('');
   const request = useRef<AbortController | null>(null), updating = useRef(false);
   const requestedMode = useRef<'snapshot' | 'latest'>('snapshot');
   useEffect(() => () => request.current?.abort(), []);
   const timezone = latest && mode === 'latest' ? latest.timezone : action.timezone || 'Asia/Shanghai';
-  const items = mode === 'latest' ? latest?.items || [] : action.items || [];
+  const items = (mode === 'latest' ? latest?.items || [] : action.items || []).map(item => completedOverrides[item.id] === undefined || !item.current ? item : { ...item, current: { ...item.current, completed: completedOverrides[item.id] } });
   const shownDate = mode === 'latest' ? latest?.date || action.date : action.date;
   const weather = action.weather;
   async function loadLatest(activate = true) {
@@ -49,17 +58,20 @@ export function DailyActionCard({ action, legacyText, pushedAt, onOpen, onRefres
   }, [mode, authHeaders]);
   async function complete(item: DailyActionItem) {
     const scheduleId = item.current?.scheduleId;
-    if (updating.current || !scheduleId || !item.current?.available) return;
+    const recurring = item.sourceType === 'reminder';
+    if (updating.current || !item.current?.available || (recurring ? !item.current.editable || item.current.completed || !item.instanceId : !scheduleId)) return;
+    const completed = !item.current.completed;
     updating.current = true; setBusy(item.id); setError('');
     try {
-      const response = await fetch(`/api/schedules/${encodeURIComponent(scheduleId)}/toggle`, {
+      const response = await fetch(recurring ? `/api/cycle-reminders/${encodeURIComponent(item.sourceId)}/complete` : `/api/schedules/${encodeURIComponent(scheduleId!)}/toggle`, {
         method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: !item.current.completed }), signal: AbortSignal.timeout(15000),
+        body: JSON.stringify(recurring ? { cycleId: item.instanceId } : { completed }), signal: AbortSignal.timeout(15000),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || '待办更新失败');
+      if (!response.ok) throw new Error(data.error || '事项更新失败');
+      setCompletedOverrides(previous => ({ ...previous, [item.id]: completed }));
       window.dispatchEvent(new Event('orbit:data-change'));
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '待办更新失败'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : '事项更新失败'); }
     finally { onRefresh?.(); updating.current = false; setBusy(null); }
   }
   function open(item: DailyActionItem) {
@@ -79,7 +91,7 @@ export function DailyActionCard({ action, legacyText, pushedAt, onOpen, onRefres
       const label = { todo: '待办', event: '日程', reminder: '周期事务' }[type];
       return <section className="orbit-daily-list" aria-label={label} key={type}><div className="orbit-daily-list-heading"><h3>{label} <span>{group.length}</span></h3></div><ul>{group.map(item => <li className="orbit-daily-task" key={item.id}>
         <time dateTime={item.startTime}>{item.allDay ? '全天' : clock(item.startTime, timezone)}</time>
-        {type === 'todo' && item.current?.available ? <IconButton label={`${item.current.completed ? '恢复待办' : '完成待办'}：${item.title}`} variant="quiet" className="orbit-daily-complete" aria-pressed={item.current.completed} loading={busy === item.id} disabled={!!busy} onClick={() => void complete(item)}><span className="orbit-daily-completion-ring">{item.current.completed && <Check size={14} aria-hidden="true" />}</span></IconButton> : <span className="orbit-daily-type">{type === 'reminder' ? <Repeat2 size={19} aria-hidden="true" /> : type === 'event' ? <CalendarDays size={19} aria-hidden="true" /> : <span className="orbit-daily-completion-ring" />}</span>}
+        <IconButton label={`${item.current?.completed ? (type === 'reminder' ? '已完成周期事务' : `恢复${label}`) : `完成${label}`}：${item.title}`} variant="quiet" className="orbit-daily-complete" aria-pressed={!!item.current?.completed} loading={busy === item.id} disabled={!!busy || !item.current?.available || (type === 'reminder' ? !item.current.editable || item.current.completed || !item.instanceId : !item.current.scheduleId)} onClick={() => void complete(item)}><span className="orbit-daily-completion-ring">{item.current?.completed ? <CircleCheck size={20} aria-hidden="true" /> : <Circle size={20} aria-hidden="true" />}</span></IconButton>
         <Button variant="quiet" className="orbit-daily-item" disabled={!item.current?.available} onClick={() => open(item)}><strong>{item.title}</strong>{item.dueDate && type === 'reminder' && <small>{item.dueDate} 到期</small>}{!item.current?.available ? <small>原事项已移除或不可用</small> : item.current.completed && <small>当前已完成</small>}</Button>
       </li>)}</ul></section>;
     })}

@@ -6,7 +6,7 @@ import type { EvolutionData } from '../../src/types/project-evolution';
 const base = 'http://127.0.0.1:4187';
 const data = JSON.parse(fs.readFileSync(new URL('../../project-evolution/generated.json', import.meta.url), 'utf8')) as EvolutionData;
 const latest = data.milestones.at(-1)!;
-async function speed(page:Page,rate:number){await page.getByRole('combobox',{name:'演示倍速',exact:true}).click();await page.clock.runFor(16);await page.getByRole('option',{name:`${rate}×`,exact:true}).click();await page.clock.runFor(16);}
+
 
 for (const [width,height] of [[390,844],[430,932],[768,1024],[1024,800],[1440,900],[2560,1440],[3759,1849]]) for (const theme of ['light','dark']) test(`evolution stage ${width} ${theme}: viewport, timeline, scroll, search and account access`, async ({page,context}) => {
   const token = await fixtureToken(context,'preview-guards@example.invalid'); await context.addInitScript(({token,theme}) => {localStorage.setItem('aicalendar_token',token);localStorage.setItem('theme',theme);},{token,theme}); await page.setViewportSize({width,height}); await page.emulateMedia({reducedMotion:'reduce'});
@@ -61,16 +61,24 @@ test('full graph bounds its interactive viewport, semantic connections survive f
   const url=page.url();await page.getByRole('button',{name:'完整架构',exact:true}).click();const scroll=page.locator('.evolution-map-scroll');expect(await scroll.evaluate(e=>getComputedStyle(e).overflowY)).toBe('hidden');expect((await scroll.boundingBox())!.height).toBeGreaterThanOrEqual(420);expect((await scroll.boundingBox())!.height).toBeLessThanOrEqual(680);const path=page.locator('.evolution-map path.is-related.change-added').first();await expect(path).toBeVisible();expect(await path.evaluate(e=>getComputedStyle(e).stroke)).toBe(await path.evaluate(e=>getComputedStyle(e).color));await page.getByRole('button',{name:'清除节点聚焦',exact:true}).click();await expect(page.locator('.evolution-node-detail')).toHaveCount(0);expect(page.url()).toBe(url);await expect(page.getByRole('button',{name:'完整架构',exact:true})).toHaveAttribute('aria-pressed','true');await page.getByRole('button',{name:'概览',exact:true}).click();await expect(page.locator('.evolution-map-scroll')).toHaveCount(0);
 });
 
-for(const rate of [.5,1,1.5,2])test(`playback speed ${rate} controls actual milestone dwell`,async({page,context})=>{
-  const token=await fixtureToken(context,'preview-guards@example.invalid');await context.addInitScript(token=>localStorage.setItem('aicalendar_token',token),token);await page.emulateMedia({reducedMotion:'reduce'});await page.clock.install();await page.clock.pauseAt(new Date());await page.goto(base+'/project?milestone='+latest.id);
-  await speed(page,rate);await page.getByRole('button',{name:'重新播放',exact:true}).click();await expect(page.locator('.evolution-page')).toHaveAttribute('data-current-milestone',data.milestones[0].id);await page.clock.runFor(Math.floor(4000/rate)-1);await expect(page.locator('.evolution-page')).toHaveAttribute('data-current-milestone',data.milestones[0].id);await page.clock.runFor(2);await expect(page.locator('.evolution-page')).toHaveAttribute('data-current-milestone',data.milestones[1].id);
-});
-
-test('changing speed retains elapsed dwell, pause and background time; node, line and story animations use it',async({page,context})=>{
-  const token=await fixtureToken(context,'preview-guards@example.invalid');await context.addInitScript(token=>localStorage.setItem('aicalendar_token',token),token);await page.emulateMedia({reducedMotion:'reduce'});await page.clock.install();await page.clock.pauseAt(new Date());await page.goto(base+'/project?milestone='+latest.id);await page.getByRole('button',{name:'重新播放',exact:true}).click();const root=page.locator('.evolution-page');await page.clock.runFor(1000);await speed(page,2);await page.clock.runFor(1000);await expect(root).toHaveAttribute('data-current-milestone',data.milestones[0].id);await page.getByRole('button',{name:'暂停架构播放'}).click();await page.clock.runFor(20000);await speed(page,.5);await page.getByRole('button',{name:'播放历史',exact:true}).click();await page.clock.runFor(1903);await expect(root).toHaveAttribute('data-current-milestone',data.milestones[0].id);await page.clock.runFor(2);await expect(root).toHaveAttribute('data-current-milestone',data.milestones[1].id);
-  await page.emulateMedia({reducedMotion:'no-preference'});await page.getByRole('button',{name:'暂停架构播放'}).click();await page.getByRole('button',{name:'完整架构',exact:true}).click();await page.getByRole('button',{name:'重新播放',exact:true}).click();await page.clock.runFor(32);const animations=await page.locator('.evolution-architecture').evaluate(e=>e.getAnimations({subtree:true}).map(a=>({name:(a as CSSAnimation).animationName,rate:a.playbackRate})));for(const name of ['evolution-node-grow','evolution-edge-grow','evolution-story-reveal']){expect(animations.some(a=>a.name===name&&a.rate===.5)).toBe(true);}
-  const before=await page.locator('.evolution-story-frame').evaluate(e=>e.getAnimations()[0].currentTime);await speed(page,2);await page.clock.runFor(32);const after=await page.locator('.evolution-story-frame').evaluate(e=>({time:e.getAnimations()[0].currentTime,rate:e.getAnimations()[0].playbackRate}));expect(Number(after.time)).toBeGreaterThanOrEqual(Number(before));expect(after.rate).toBe(2);
-  const hidden=await root.getAttribute('data-current-milestone');await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));});await expect(page.locator('#evolution-architecture')).toHaveAttribute('data-playback-active','false');await speed(page,1.5);await page.clock.runFor(20000);await expect(root).toHaveAttribute('data-current-milestone',hidden);await page.evaluate(()=>{delete (document as any).hidden;document.dispatchEvent(new Event('visibilitychange'));});await page.clock.runFor(10000);await expect(root).not.toHaveAttribute('data-current-milestone',hidden);
+test('icon playback keeps fixed dwell, pause progress and background suspension',async({page,context})=>{
+  const token=await fixtureToken(context,'preview-guards@example.invalid');
+  await context.addInitScript(token=>localStorage.setItem('aicalendar_token',token),token);
+  await page.emulateMedia({reducedMotion:'reduce'});await page.clock.install();await page.clock.pauseAt(new Date());
+  await page.goto(base+'/project?milestone='+latest.id);
+  await expect(page.getByRole('combobox',{name:'演示倍速'})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'重新播放'})).toHaveCount(0);
+  const play=page.getByRole('button',{name:'播放历史',exact:true});await expect(play).toHaveText('');await play.click();
+  const root=page.locator('.evolution-page');await page.clock.runFor(1000);
+  await expect(root).toHaveAttribute('data-current-milestone',data.milestones[0].id);
+  await page.getByRole('button',{name:'暂停架构播放'}).click();await page.clock.runFor(20000);
+  await play.click();await page.clock.runFor(2999);await expect(root).toHaveAttribute('data-current-milestone',data.milestones[0].id);
+  await page.clock.runFor(2);await expect(root).toHaveAttribute('data-current-milestone',data.milestones[1].id);
+  const hidden=await root.getAttribute('data-current-milestone');
+  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));});
+  await expect(page.locator('#evolution-architecture')).toHaveAttribute('data-playback-active','false');await page.clock.runFor(20000);await expect(root).toHaveAttribute('data-current-milestone',hidden);
+  await page.evaluate(()=>{delete (document as any).hidden;document.dispatchEvent(new Event('visibilitychange'));});
+  await page.clock.runFor(4000);await expect(root).not.toHaveAttribute('data-current-milestone',hidden);
 });
 
 test('compact viewport pans blank space, zooms at the pointer, keeps outside scrolling and preserves story/overview heights',async({page,context})=>{

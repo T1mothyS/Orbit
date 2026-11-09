@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   CreditCard,
   Edit3,
-  Mail,
   PauseCircle,
   PlayCircle,
   Plus,
@@ -366,15 +365,6 @@ export function ReminderPage() {
     });
   };
 
-  const sendTestEmail = async () => {
-    try {
-      const response = await fetch('/api/cycle-reminders/test-email', { method: 'POST', headers: authHeaders() });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || '测试邮件发送失败');
-      setNotice({ type: 'success', message: '测试邮件已发送' });
-    } catch (error) { setNotice({ type: 'error', message: requestError(error, '测试邮件发送失败', true) }); }
-  };
-
   return (
     <div className="reminder-page">{confirmation.dialog}
       <main className="reminder-content">
@@ -384,7 +374,7 @@ export function ReminderPage() {
 
 
 
-        <section className="reminder-toolbar"><div><h2>我的提醒</h2><span>已发送的提醒会自动记录，不会重复发送。</span></div><div className="toolbar-actions"><button className="secondary-button" onClick={sendTestEmail}><Mail size={15} /> 测试邮件</button></div></section>
+        <section className="reminder-toolbar"><div><h2>我的提醒</h2><span>已发送的提醒会自动记录，不会重复发送。</span></div></section>
 
         {loading && !visibleTasks.length ? <div className="empty-panel"><div className="loading-dot" /><span>正在加载提醒...</span></div> : visibleTasks.length === 0 ? <div className="empty-panel"><div className="empty-icon"><BellRing size={23} /></div><h3>还没有周期提醒</h3><p>记录订阅、账单或定期事务，到期前及时提醒。</p><button className="primary-button" onClick={() => openCreate()}><Plus size={17} /> 新建第一条提醒</button></div> : (
           <section className="task-grid">{visibleTasks.map(task => {

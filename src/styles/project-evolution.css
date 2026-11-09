@@ -83,8 +83,6 @@
 .evolution-map .evolution-node { position:absolute; width:164px; height:62px; padding:6px 8px; text-align:start; border:1px solid currentColor; border-radius:var(--orbit-radius-control); background:var(--orbit-surface); cursor:pointer; }
 .evolution-map .evolution-node > span { width:100%; margin-top:0; }
 .evolution-zoom-value { min-width:4ch; font-variant-numeric:tabular-nums; }
-.evolution-speed { width:82px; }
-.evolution-speed .oui-select { min-height:44px; }
 .evolution-touch-edit,.evolution-touch-hint { display:none; }
 .evolution-canvas-hint { margin:8px 0 0; }
 .evolution-canvas-hint > span { display:block; }
@@ -96,7 +94,7 @@
 .evolution-state { padding:48px 20px; border:1px solid var(--orbit-border); text-align:center; }.evolution-state a { display:inline-flex; align-items:center; padding-inline:14px; }
 .evolution-notice { font-size:14px; line-height:1.7; }
 @media(max-width:1023px) { .evolution-page { padding:20px; gap:20px; }.evolution-playback-section { flex:none; gap:20px; }.evolution-diagram-column { padding:20px; }.evolution-overview { gap:24px; } }
-@media(max-width:767px) { .evolution-page { padding:16px; }.evolution-hero { grid-template-columns:36px minmax(0,1fr) auto; gap:12px; }.evolution-hero h1 { font-size:24px; }.evolution-current { max-width:110px; font-size:11px; }.evolution-intro { font-size:12px; }.evolution-playback-header { gap:8px; }.evolution-playback-header h2 { font-size:15px; }.evolution-playback-actions { gap:2px; }.evolution-playback-actions > .oui-button:not(.oui-icon-button) { padding-inline:8px; }.evolution-speed { width:82px; }.evolution-map-actions { gap:4px; }.evolution-map-actions .orbit-segmented { min-width:0; }.evolution-map-actions .orbit-segmented button { padding-inline:10px; font-size:12px; }.evolution-diagram-column { padding:16px; }.evolution-story-copy h2 { font-size:22px; }.evolution-detail dl { grid-template-columns:1fr; gap:6px; } }
+@media(max-width:767px) { .evolution-page { padding:16px; }.evolution-hero { grid-template-columns:36px minmax(0,1fr) auto; gap:12px; }.evolution-hero h1 { font-size:24px; }.evolution-current { max-width:110px; font-size:11px; }.evolution-intro { font-size:12px; }.evolution-playback-header { gap:8px; }.evolution-playback-header h2 { font-size:15px; }.evolution-playback-actions { gap:2px; }.evolution-playback-actions > .oui-button:not(.oui-icon-button) { padding-inline:8px; } .evolution-map-actions { gap:4px; }.evolution-map-actions .orbit-segmented { min-width:0; }.evolution-map-actions .orbit-segmented button { padding-inline:10px; font-size:12px; }.evolution-diagram-column { padding:16px; }.evolution-story-copy h2 { font-size:22px; }.evolution-detail dl { grid-template-columns:1fr; gap:6px; } }
 @media(max-width:479px) { .evolution-overview { grid-template-columns:1fr; }.evolution-playback-header h2 { flex:1 0 100%; }.evolution-playback-actions { width:100%; justify-content:space-between; }.evolution-current { grid-column:2 / -1; max-width:none; }.evolution-current summary { white-space:nowrap; }.evolution-hero { grid-template-columns:36px minmax(0,1fr); }.evolution-current summary { min-height:28px; padding-block:0; } }
 @media(prefers-reduced-motion:reduce) { .evolution-page .evolution-node,.evolution-page .architecture-edge,.evolution-page .chart-line,.evolution-page .chart-dot,.is-playing .evolution-overview-group,.is-playing .evolution-story-frame { animation:none!important; transition:none; }.evolution-page .architecture-edge.change-added { stroke-dasharray:none; } }
 .evolution-metrics { margin-top: 36px; }

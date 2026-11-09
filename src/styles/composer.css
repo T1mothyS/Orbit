@@ -260,7 +260,7 @@
 .orbit-daily-task + .orbit-daily-task { border-top:1px solid var(--orbit-border); }
 .orbit-daily-task > time { flex:0 0 42px; color:var(--orbit-text-secondary); font-size:12px; font-variant-numeric:tabular-nums; }
 .orbit-daily-type, .orbit-daily-task .orbit-daily-complete { display:grid; place-items:center; flex:0 0 36px; min-width:36px; min-height:44px; color:var(--orbit-brand); }
-.orbit-daily-completion-ring { display:grid; place-items:center; width:19px; height:19px; border:1.5px solid currentColor; border-radius:var(--orbit-radius-full); }
+.orbit-daily-completion-ring { display:grid; place-items:center; width:20px; height:20px; border-radius:var(--orbit-radius-full); }
 .orbit-daily-complete[aria-pressed=true] .orbit-daily-completion-ring { color:var(--orbit-success); border-color:var(--orbit-success); background:var(--orbit-success-soft); }
 .orbit-daily-task .orbit-daily-item { flex:1; justify-content:flex-start; text-align:left; min-width:0; padding:6px; }
 .orbit-daily-item > span { display:grid; gap:4px; width:100%; min-width:0; }

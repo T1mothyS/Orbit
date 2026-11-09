@@ -5,13 +5,13 @@ import { ReturnToToday } from '../components/ReturnToToday';
 import { useEvolutionAdvance,useReducedMotion,useVisibleMotion } from '../hooks/useEvolutionMotion';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Layers, Play, Pause, ChevronLeft, ChevronRight, RotateCcw, Monitor, Server, Database, Plug, Plus, X } from 'lucide-react';
+import { Layers, Play, Pause, ChevronLeft, ChevronRight, Monitor, Server, Database, Plug, Plus, X } from 'lucide-react';
 import { architectureFocus, architectureGroups, compactArchitecture, compactNode, evolutionSequence } from '../utils/evolution-presentation';
 import { APP_CONFIG } from '../config';
 import { getStoredAuthHeaders } from '../hooks/useAuth';
 import { architectureChanges, type EvolutionData, type EvolutionMilestone, type EvolutionSnapshot } from '../types/project-evolution';
 import '../styles/project-evolution.css';
-import { Button, IconButton, Tooltip, Select } from '../ui';
+import { Button, IconButton, Tooltip } from '../ui';
 import { UsageStatisticsView } from '../components/UsageStatisticsView';
 
 const day = (date: string) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Hong_Kong', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
@@ -36,7 +36,7 @@ function ProjectEvolutionContent() {
   const [playing, setPlaying] = useState(() => !params.has('milestone') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [autoIndex, setAutoIndex] = useState(0), [selection, setSelection] = useState(params.get('milestone') || ''), [playbackRound, setPlaybackRound] = useState(0);
   const [copyStatus, setCopyStatus] = useState(''), [evidenceOpen, setEvidenceOpen] = useState(false);
-  const [speed, setSpeed] = useState(1);
+  const speed = 1;
   const heading = useRef<HTMLHeadingElement>(null), mapSection = useRef<HTMLElement>(null), linked = useRef(false);
   const motionVisible = useVisibleMotion(mapSection);
   const sequence = useMemo(() => data ? evolutionSequence(data, 'history') : [], [data]);
@@ -85,9 +85,9 @@ function ProjectEvolutionContent() {
       <section id="evolution-architecture" data-playback-active={playing && motionVisible} ref={mapSection} className="evolution-playback-section">
         <header className="evolution-playback-header"><h2><Layers size={20} />全部成长</h2>
           <div className="evolution-playback-actions"><Tooltip content="上一里程碑"><IconButton label="上一里程碑" variant="quiet" disabled={index <= 0} onClick={() => select(data.milestones[index - 1].id)}><ChevronLeft size={18} /></IconButton></Tooltip>
-            <Button variant="secondary" leadingIcon={playing ? <Pause size={17} /> : <Play size={17} />} onClick={togglePlayback}>{playing ? '暂停架构播放' : reduced ? '播放历史' : '继续播放'}</Button>
+            <IconButton title={playing ? '暂停播放' : '播放'} label={playing ? '暂停架构播放' : reduced ? '播放历史' : '继续播放'} variant="quiet" onClick={togglePlayback}>{playing ? <Pause size={19} aria-hidden="true" /> : <Play size={19} aria-hidden="true" />}</IconButton>
             <Tooltip content="下一里程碑"><IconButton label="下一里程碑" variant="quiet" disabled={index >= data.milestones.length - 1} onClick={() => select(data.milestones[index + 1].id)}><ChevronRight size={18} /></IconButton></Tooltip>
-            <Tooltip content="重新播放"><IconButton label="重新播放" variant="quiet" onClick={() => startPlayback(0, true)}><RotateCcw size={17} /></IconButton></Tooltip><div className="evolution-speed"><Select label="演示倍速" value={String(speed)} onValueChange={value => { if (value) setSpeed(Number(value)); }} options={[.5,1,1.5,2].map(value => ({value:String(value),label:`${value}×`}))} /></div></div>
+          </div>
         </header>
         <EvolutionTimeline data={data} selectedId={milestone.id} onSelect={select} onPause={pause} />
         <Architecture data={data} current={snapshot} previous={prior} playing={playing && !reduced} motionActive={motionVisible} speed={speed} onPause={pause} milestone={milestone} />

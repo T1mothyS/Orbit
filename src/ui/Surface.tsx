@@ -16,10 +16,10 @@ export function Section({ title, description, help, children, id, action, hideTi
     <div>{children}</div>
   </section>;
 }
-export function SettingRow({ label, description, help, children, htmlFor, id }: { label: string; description?: ReactNode; help?: ReactNode; children: ReactNode; htmlFor?: string; id?: string }) {
-  return <div className="oui-setting-row" id={id} tabIndex={id ? -1 : undefined}>
-    <div className="oui-setting-copy"><div className="oui-setting-label">{htmlFor ? <label htmlFor={htmlFor}>{label}</label> : <h3>{label}</h3>}{help && <HelpPopover label={label}>{help}</HelpPopover>}</div>{description && <p>{description}</p>}</div>
-    <div className="oui-setting-control">{children}</div>
+export function SettingRow({ label, description, help, children, headingAction, htmlFor, id }: { label: string; description?: ReactNode; help?: ReactNode; children?: ReactNode; headingAction?: ReactNode; htmlFor?: string; id?: string }) {
+  return <div className={`oui-setting-row${headingAction && children == null ? ' oui-setting-row--navigation' : ''}`} id={id} tabIndex={id ? -1 : undefined}>
+    <div className="oui-setting-copy"><div className="oui-setting-label">{htmlFor ? <label htmlFor={htmlFor}>{label}</label> : <h3>{label}</h3>}{headingAction}{help && <HelpPopover label={label}>{help}</HelpPopover>}</div>{description && <p>{description}</p>}</div>
+    {(!headingAction || children != null) && <div className="oui-setting-control">{children}</div>}
   </div>;
 }
 export function Badge({ tone = 'neutral', children }: { tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'brand'; children: ReactNode }) {

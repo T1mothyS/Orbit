@@ -7,7 +7,7 @@ import { WeeklyActivityCard } from './WeeklyActivityCard';
 import { OrbitNotificationCard, type NotificationMeta } from './OrbitNotificationCard';
 import { ReminderActionButtons } from './ReminderActionButtons';
 import { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle, type CSSProperties } from 'react';
-import { Bot, BookOpen, ArrowUp, Loader2, Check, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus, Bell, ArrowUpRight, Copy } from 'lucide-react';
+import { Bot, BookOpen, ArrowUp, Loader2, Check, Edit3, MapPin, Clock, Save, X, StickyNote, Trash2, Pin, Plus, Bell, ArrowUpRight, Copy, Newspaper, UserRound, Settings } from 'lucide-react';
 import type { ActionConfirmation } from '../ui';
 import {safeChatHref} from '../utils/chat-markdown';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -549,7 +549,18 @@ function MessageBubble({ msg, onNotificationRefresh, onReminderAction, onOpenSch
               </div>
             )}
             {notification && <OrbitNotificationCard meta={notification} title={notice?.title || (msg.text || 'Orbit 通知').split('\n')[0]} onRefresh={onNotificationRefresh} />}
-            {navigation.map(action=><Link className="orbit-setting-card" key={action.settingId} to={navigationHref(action,user?.role === 'admin')!}>{settingAction(action.settingId,user?.role === 'admin')!.label} →</Link>)}
+            {navigation.length > 0 && <div className="orbit-setting-shortcuts">{navigation.map(action => {
+              const known = settingAction(action.settingId, user?.role === 'admin')!;
+              const presentation = {
+                'settings.dailyReport': { icon: Newspaper, tone: 'report', label: '日报设置' },
+                'settings.knowledge': { icon: BookOpen, tone: 'knowledge', label: '知识库设置' },
+                'settings.profile': { icon: UserRound, tone: 'profile', label: '个人资料' },
+                'settings.notifications': { icon: Bell, tone: 'notifications', label: '通知设置' },
+                'settings.general': { icon: Settings, tone: 'report', label: known.label.replace(/^打开/, '') },
+              }[known.target];
+              const Icon = presentation.icon;
+              return <Link className={`orbit-setting-card orbit-setting-card--${presentation.tone}`} aria-label={known.label} key={action.settingId} to={navigationHref(action, user?.role === 'admin')!}><Icon size={25} aria-hidden="true" /><span>{presentation.label}</span></Link>;
+            })}</div>}
             {msg.orbitMeta?.origin==='proactive' && <div className={`orbit-reminder-actions ${msg.orbitMeta.state==='handled'?'is-handled':''}`}><small>{msg.orbitMeta.enhanced?'Orbit 主动提醒':'Orbit 主动提醒 · 基于事项信息'}</small>{msg.orbitMeta.state==='sent' && <div><ReminderActionButtons busy={reminderBusy} onAction={action=>{setReminderBusy(true);setReminderError('');void onReminderAction?.(msg.orbitMeta!.eventId!,action).catch(e=>setReminderError(e.message)).finally(()=>setReminderBusy(false));}} /></div>}{msg.orbitMeta.state==='handled'&&<span>{msg.orbitMeta.handledAction==='complete'?'✓ 已完成':msg.orbitMeta.nextReminderAt?`已延后 · ${new Date(msg.orbitMeta.nextReminderAt).toLocaleString()}`:'已处理'}{msg.orbitMeta.handledAt&&<small> · {new Date(msg.orbitMeta.handledAt).toLocaleString()}</small>}</span>}{msg.orbitMeta.state==='discarded'&&<span>提醒已失效，请查看当前事项</span>}{reminderError&&<p role="alert">{reminderError}</p>}</div>}
             {!!(msg.orbitMeta as any)?.sources?.length&&<details className="orbit-message-sources"><summary>联网来源 · {(msg.orbitMeta as any).sources.length}</summary>{(msg.orbitMeta as any).sources.map((source:any)=><a key={source.url} href={safeChatHref(source.url)} target="_blank" rel="noopener noreferrer"><strong>{source.title}</strong><small>{source.source} · {source.publishedAt?new Date(source.publishedAt).toLocaleString():'发布时间未知'} · 获取 {new Date(source.retrievedAt).toLocaleString()}</small></a>)}</details>}
             {!!(msg.orbitMeta as any)?.steps?.length&&<details className="orbit-message-steps"><summary>处理步骤</summary>{(msg.orbitMeta as any).steps.map((s:any)=><p key={s.id}>{s.state==='completed'?'✓':s.state==='failed'?'!':'…'} {s.label} · {s.query}</p>)}</details>}

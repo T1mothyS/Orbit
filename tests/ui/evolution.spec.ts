@@ -49,7 +49,7 @@ test('evolution story ends at latest, replays and keeps URL and history intact',
   await page.clock.runFor(data.milestones.length * 6000); await expect(page.locator('.evolution-page')).toHaveAttribute('data-current-milestone', data.milestones.at(-1)!.id);
   await expect(page.getByRole('button', { name: '继续播放', exact: true })).toBeVisible();
   expect(await page.evaluate(() => ({ url: location.href, length: history.length }))).toEqual(before);
-  await page.getByRole('button', { name: '重新播放', exact: true }).click(); await expect(page.locator('.evolution-page')).toHaveAttribute('data-current-milestone', 'baseline');
+  await page.getByRole('button', { name: '继续播放', exact: true }).click(); await expect(page.locator('.evolution-page')).toHaveAttribute('data-current-milestone', 'baseline');
   await page.getByRole('button', { name: '暂停架构播放', exact: true }).click();
   await page.getByRole('button', { name: '下一里程碑', exact: true }).click(); await expect(page.locator('.evolution-page')).toHaveAttribute('data-current-milestone', 'action-center');
   await page.getByRole('button', { name: '上一里程碑', exact: true }).click(); await expect(page.locator('.evolution-page')).toHaveAttribute('data-current-milestone', 'baseline');
