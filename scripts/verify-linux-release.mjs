@@ -4,9 +4,10 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 const root = process.cwd();
+const commit = process.env.ORBIT_RELEASE_SMOKE_COMMIT;
 if (process.env.ORBIT_RELEASE_SMOKE !== 'true' || process.env.BACKGROUND_JOBS_ENABLED !== 'false' ||
     process.env.ORBIT_PROACTIVE_ENABLED !== 'false' || process.env.ANDROID_PUSH_ENABLED !== 'false' ||
-    process.env.APP_URL !== 'https://release-smoke.invalid' || !process.env.DATA_DIR) {
+    process.env.APP_URL !== 'https://release-smoke.invalid' || !process.env.DATA_DIR || !/^[a-f0-9]{40}$/.test(commit || '')) {
   throw new Error('Release smoke requires the isolated archive runner and an external temporary DATA_DIR');
 }
 const dataDir = await realpath(process.env.DATA_DIR);
@@ -27,6 +28,11 @@ try {
   const health = await get('/api/health');
   assert.equal(health.status, 200);
   assert.equal((await health.json()).status, 'ok');
+  const ready = await get('/api/ready');
+  assert.equal(ready.status, 200);
+  assert.equal(ready.headers.get('cache-control'), 'no-store');
+  const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+  assert.deepEqual(await ready.json(), { status: 'ready', version: pkg.version, commit });
   const entry = await readFile('dist/index.html', 'utf8');
   for (const route of ['/', '/today']) {
     const response = await get(route);

@@ -62,6 +62,9 @@ import { createDailyReportCloudMcpRouter } from './daily-report-cloud-mcp.js';
 import { createDailyReportCloudOAuthRouter } from './daily-report-cloud-auth.js';
 import { createToolsApiRouter } from './protected-tools.js';
 import { createProjectEvolutionRouter } from './project-evolution.js';
+import { queryOne } from './database/connection.js';
+import { releaseReadiness } from './release-readiness.js';
+import pkg from '../package.json';
 
 // 数据库实例（等待初始化后赋值）
 let db: typeof dbModule;
@@ -95,6 +98,13 @@ app.use(createDigestV3Router({ authenticate }));
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+app.get('/api/ready', releaseReadiness({
+  version: pkg.version,
+  manifestPath: path.resolve(__dirname, '../.release-manifest.json'),
+  checkStore() {
+    if (queryOne<{ ok: number }>('SELECT 1 AS ok')?.ok !== 1) throw new Error('Store probe failed');
+  },
+}));
 
 app.use(createGuidesRouter({ authenticate }));
 

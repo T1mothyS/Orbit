@@ -109,7 +109,12 @@ jobs:
       - name: Verify exact Linux archive in an isolated runtime
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          sha256sum --check "$RUNNER_TEMP/orbit-linux-release.sha256"
+          set -euo pipefail
+          expected_sha="$(cut -d ' ' -f 1 "$RUNNER_TEMP/orbit-linux-release.sha256")"
+          version="$(node -p 'require("./package.json").version')"
+          python3 scripts/operations/verify-release-archive.py "$RUNNER_TEMP/orbit-linux-release.tgz" \
+            --sha256 "$expected_sha" --commit "$GITHUB_SHA" --version "$version" \
+            | tee "$RUNNER_TEMP/orbit-linux-release.inventory.json"
           smoke_root="$(mktemp -d "$RUNNER_TEMP/orbit-release-smoke.XXXXXX")"
           mkdir "$smoke_root/data" "$smoke_root/home"
           tar -xzf "$RUNNER_TEMP/orbit-linux-release.tgz" -C "$smoke_root"
@@ -119,7 +124,7 @@ jobs:
             APP_ENV=production APP_URL=https://release-smoke.invalid \
             JWT_SECRET=synthetic-release-smoke-only-not-a-secret \
             ADMIN_INVITE_CODE=synthetic-release-admin-code USER_INVITE_CODE=synthetic-release-user-code \
-            ORBIT_RELEASE_SMOKE=true BACKGROUND_JOBS_ENABLED=false \
+            ORBIT_RELEASE_SMOKE=true ORBIT_RELEASE_SMOKE_COMMIT="$GITHUB_SHA" BACKGROUND_JOBS_ENABLED=false \
             ORBIT_PROACTIVE_ENABLED=false ANDROID_PUSH_ENABLED=false \
             node --import tsx scripts/verify-linux-release.mjs
 
@@ -131,5 +136,6 @@ jobs:
           path: |
             ${{ runner.temp }}/orbit-linux-release.tgz
             ${{ runner.temp }}/orbit-linux-release.sha256
+            ${{ runner.temp }}/orbit-linux-release.inventory.json
           retention-days: 3
           compression-level: 0

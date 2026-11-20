@@ -48,6 +48,8 @@ UI 发布前先核对 [批准基线与平台验收](archive/engineering/TEST-MAT
 
 上传 Linux 制品前，CI 在独立临时目录验证 tarball SHA-256、解包并记录块占用，使用合成配置启动包内应用。验收健康、首页、`/today`、入口 JS/CSS 响应类型和内容，以及受保护 Tools 的匿名访问边界。应用数据在空的同级临时目录，不启动后台任务。严格 UI 原门禁继续执行。
 
+`verify-release-archive.py` 在解包前比对期望的 SHA-256、commit、版本和归档 manifest，核对源码文件哈希并阻止不安全的归档条目。制品同时上传 `orbit-linux-release.inventory.json`（压缩字节、文件字节、条目数和按常用 4 KiB 块估算的体积）。解包后的实际块占用记录于同次 CI 日志。估算不替代目标挂载、备份和临时写的容量预检。隔离运行时用 `/api/ready` 的版本和 commit 核对启动的是这一份制品。
+
 如果变化仅限可证明的纯JavaScript补丁，可以采用[路径B受控暂存条件](DEPLOYMENT-PATHS.md#路径-b依赖或环境变更升级)，复用未变化的Linux原生运行时；完整锁定差异、SRI、无安装脚本、平台及实际版本/运行探针必须同时通过。不把Windows依赖复制到Linux，也不因部署授权自动执行GitHub push。
 
 - main/tag 已同步且服务器目标 commit/包/配置相同且验收有效时，只做复核，不再切换重启。

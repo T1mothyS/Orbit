@@ -98,3 +98,42 @@ test('V2 CSP permits only a validated exact R2 image origin', () => {
     process.env.DIGEST_R2_ENV='test';process.env.DIGEST_V2_ENABLED='false';assert.doesNotMatch(policy(),/img-src[^;]*https:/);
   } finally {keys.forEach((k,i)=>{if(saved[i]===undefined)delete process.env[k];else process.env[k]=saved[i];});}
 });
+
+test('发布就绪检查核对归档身份并在持久化不可用时返回 503', async () => {
+  const { createApp } = await import('./app.js');
+  const { releaseReadiness } = await import('./release-readiness.js');
+  const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const directory = mkdtempSync(join(tmpdir(), 'orbit-release-ready-'));
+  const manifestPath = join(directory, 'manifest.json');
+  const commit = 'a'.repeat(40);
+  writeFileSync(manifestPath, JSON.stringify({ version: '0.1.0', commit, secret: 'synthetic-hidden-value' }));
+  let ready = false;
+  let blocked = false;
+  const probe = releaseReadiness({ manifestPath, version: '0.1.0', checkStore: () => {
+    if (blocked) throw new Error('synthetic-private-error');
+  } });
+  const app = createApp({ isProduction: false, isReady: () => ready, registerRoutes(app) {
+    app.get('/api/ready', probe);
+    app.get('/api/ready-other', releaseReadiness({ manifestPath, version: '0.2.0', checkStore() {} }));
+  } });
+  const server = app.listen(0, '127.0.0.1');
+  try {
+    await once(server, 'listening');
+    const base = 'http://127.0.0.1:' + (server.address() as { port: number }).port;
+    assert.equal((await fetch(base + '/api/ready')).status, 503);
+    ready = true;
+    const ok = await fetch(base + '/api/ready');
+    assert.equal(ok.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await ok.json(), { status: 'ready', version: '0.1.0', commit });
+    assert.deepEqual(await (await fetch(base + '/api/ready-other')).json(), { status: 'ready', version: '0.2.0', commit: null });
+    blocked = true;
+    const error = await fetch(base + '/api/ready');
+    assert.equal(error.status, 503);
+    assert.deepEqual(await error.json(), { status: 'unavailable' });
+  } finally {
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

@@ -66,6 +66,10 @@ Android 一期新增 `firebase-admin`，后端发布必须走路径 B，不能�
 
 除 A 的代码部署判据外，还必须证明新依赖/运行时已在兼容环境验证，配置变化已生效，迁移后的数据可被目标代码读取，且升级前应用仍可用。任一项失败都保留失败环境和日志，恢复升级前的代码、配置、依赖和数据；不能只切换代码目录来回滚已发生的数据结构变化。
 
+### 冻结制品和就绪检查
+
+解包前从可信的同次 CI 证据传入期望 SHA-256、40 位 commit 和版本，使用 `python3 scripts/operations/verify-release-archive.py <制品> --sha256 <sha> --commit <commit> --version <version>`。失败时不进入暂存。成功输出的容量估算与 CI 实际解包记录一起用于容量计划。生产切换及回滚的运行验收用 `GET /api/ready` 核对冻结身份及存储查询。存储被持久化保护阻断时返回 503。无匹配归档清单的旧运行目录返回空 commit，不能作为新制品验收。旧 `/api/health` 保持原存活合同。
+
 ## 数据、配置和版本记录
 
 Daily Digest V2.5 增加 `sharp` 与 R2 S3 客户端，属于路径 B 的依赖变更。Windows 构建产物不能替代 Linux 上匹配架构的 sharp 可选二进制依赖；在兼容 Linux 环境按同一 lockfile 准备并验证解码/转换，再考虑生产切换。不得将本机 `node_modules` 直接覆盖 Linux 生产目录。

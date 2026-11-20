@@ -1,8 +1,11 @@
 import importlib.util
+import hashlib
+import io
 import json
 import os
 from pathlib import Path
 import tempfile
+import tarfile
 import unittest
 import sys
 from unittest.mock import patch
@@ -10,6 +13,106 @@ sys.dont_write_bytecode = True
 
 spec = importlib.util.spec_from_file_location('ops', Path(__file__).with_name('orbit-operations.py'))
 ops = importlib.util.module_from_spec(spec); spec.loader.exec_module(ops)
+
+archive_spec = importlib.util.spec_from_file_location('release_archive', Path(__file__).parent / 'operations/verify-release-archive.py')
+release_archive = importlib.util.module_from_spec(archive_spec)
+archive_spec.loader.exec_module(release_archive)
+
+sample_spec = importlib.util.spec_from_file_location('resource_sample', Path(__file__).parent / 'operations/sample-linux-resources.py')
+resource_sample = importlib.util.module_from_spec(sample_spec)
+sample_spec.loader.exec_module(resource_sample)
+
+
+class ResourceSampleTests(unittest.TestCase):
+    def test_window_uses_interval_deltas_and_excludes_guest_from_total(self):
+        before = {'cpu': resource_sample.cpu_counters('cpu 10 2 3 50 5 1 2 0 100 100'),
+                  'paging': (4, 2), 'disk': (10, 20, 5, 10, 20)}
+        after = {'cpu': resource_sample.cpu_counters('cpu 12 2 3 55 6 1 2 2 105 102'),
+                 'paging': (5, 2), 'disk': (12, 20, 9, 10, 30)}
+        result = resource_sample.window(before, after, 2, 4096)
+        self.assertEqual(result['cpu'], {'busyPercent': 20, 'ioWaitPercent': 10, 'stealPercent': 20})
+        self.assertEqual(result['paging'], {'swapInBytes': 4096, 'swapOutBytes': 0})
+        self.assertEqual(result['disk']['readsPerSecond'], 1)
+        self.assertEqual(result['disk']['meanReadMs'], 2)
+        self.assertIsNone(result['disk']['meanWriteMs'])
+
+    def test_missing_device_and_reset_do_not_appear_as_zero_load(self):
+        self.assertIsNone(resource_sample.disk_counters('8 1 sda1 1 0 10 4 1 0 20 5 0 2 3', (8, 2)))
+        before = {'cpu': (8,) * 8, 'paging': None, 'disk': None}
+        after = {'cpu': (2,) * 8, 'paging': (0, 0), 'disk': (0,) * 5}
+        self.assertEqual(resource_sample.window(before, after, 1, 4096), {'cpu': None, 'paging': None, 'disk': None})
+
+
+class ReleaseArchiveTests(unittest.TestCase):
+    commit = '2' * 40
+    version = '0.56.0-261008.2200'
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.archive = Path(self.temp.name) / 'test.tgz'
+
+    def write_archive(self, *, add_member=None, bad_source_hash=False):
+        files = {name: b'fixture' for name in release_archive.REQUIRED}
+        manifest = {'commit': self.commit, 'version': self.version, 'platform': 'linux', 'arch': 'x64',
+                    'node': 'v22.23.2', 'dependencies': 'complete-linux-node_modules',
+                    'files': {name: hashlib.sha256(value).hexdigest() for name, value in files.items()
+                              if not name.startswith('node_modules/')}}
+        if bad_source_hash:
+            files['dist/index.html'] = b'changed after building the manifest'
+        files[release_archive.MANIFEST] = json.dumps(manifest).encode()
+        with tarfile.open(self.archive, 'w:gz') as archive:
+            directory = tarfile.TarInfo(release_archive.ROOT)
+            directory.type = tarfile.DIRTYPE
+            archive.addfile(directory)
+            for name, value in files.items():
+                member = tarfile.TarInfo(f'{release_archive.ROOT}/{name}')
+                member.size = len(value)
+                archive.addfile(member, io.BytesIO(value))
+            cli = tarfile.TarInfo(f'{release_archive.ROOT}/node_modules/.bin/tsx')
+            cli.type = tarfile.SYMTYPE
+            cli.linkname = '../tsx/dist/cli.mjs'
+            archive.addfile(cli)
+            if add_member:
+                archive.addfile(add_member)
+        return hashlib.sha256(self.archive.read_bytes()).hexdigest()
+
+    def verify(self, sha, commit=None):
+        return release_archive.verify_archive(self.archive, sha, commit or self.commit, self.version)
+
+    def test_frozen_identity_runtime_symlink_and_capacity_inventory(self):
+        sha = self.write_archive()
+        result = self.verify(sha)
+        self.assertEqual(result['sha256'], sha)
+        self.assertEqual(result['archiveBytes'], self.archive.stat().st_size)
+        self.assertGreater(result['estimatedBlockBytes'], result['fileBytes'])
+        self.assertEqual(result['entries'], len(release_archive.REQUIRED) + 3)
+
+    def test_outer_sha_target_commit_and_source_hash_are_independent(self):
+        sha = self.write_archive()
+        with self.assertRaisesRegex(ValueError, 'RELEASE_ARCHIVE_SHA_MISMATCH'):
+            self.verify('0' * 64)
+        with self.assertRaisesRegex(ValueError, 'RELEASE_MANIFEST_IDENTITY_MISMATCH'):
+            self.verify(sha, '3' * 40)
+        with self.assertRaisesRegex(ValueError, 'RELEASE_SOURCE_HASH_MISMATCH'):
+            self.verify(self.write_archive(bad_source_hash=True))
+
+    def test_rejects_path_escape_server_files_and_duplicate_members(self):
+        for name, reason in [('smart-schedule-agent/../elsewhere', 'ARCHIVE_PATH_INVALID'),
+                             ('smart-schedule-agent/data/unrelated', 'ARCHIVE_SERVER_FILES_FORBIDDEN'),
+                             ('smart-schedule-agent/dist/index.html', 'ARCHIVE_DUPLICATE_MEMBER')]:
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, reason):
+                self.verify(self.write_archive(add_member=tarfile.TarInfo(name)))
+
+    def test_rejects_link_escape_and_child_written_through_runtime_link(self):
+        outside = tarfile.TarInfo('smart-schedule-agent/node_modules/unsafe')
+        outside.type = tarfile.SYMTYPE
+        outside.linkname = '../../elsewhere'
+        with self.assertRaisesRegex(ValueError, 'ARCHIVE_LINK_OUTSIDE_DEPENDENCIES'):
+            self.verify(self.write_archive(add_member=outside))
+        child = tarfile.TarInfo('smart-schedule-agent/node_modules/.bin/tsx/child')
+        with self.assertRaisesRegex(ValueError, 'ARCHIVE_PATH_THROUGH_NON_DIRECTORY'):
+            self.verify(self.write_archive(add_member=child))
 
 class OperationsTests(unittest.TestCase):
     def setUp(self):
