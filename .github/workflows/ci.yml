@@ -164,6 +164,7 @@ jobs:
         with:
           artifact-ids: ${{ needs.verify.outputs.artifact-id }}
           path: release
+          merge-multiple: true
       - name: Check signed release input
         run: |
           expected_sha="$(cut -d ' ' -f 1 release/orbit-linux-release.sha256)"
