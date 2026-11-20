@@ -311,6 +311,9 @@ class ReleaseSwitchTests(unittest.TestCase):
                             raise RuntimeError('synthetic readiness failure')
                         assert (folder / 'version').read_text() == ('after' if commit else 'before')
 
+                    def verify_public(self, commit=None, version=None):
+                        pass
+
                 real_call = deploy.call
                 def call(*args, **kwargs):
                     return b'' if args[0] == 'fixture-pm2' else real_call(*args, **kwargs)

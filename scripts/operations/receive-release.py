@@ -69,6 +69,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for option in ('current', 'staging', 'backups', 'pm2', 'node', 'signing-key'):
         parser.add_argument('--' + option, type=Path, required=True)
+    parser.add_argument('--public-base', required=True)
     args = parser.parse_args()
     os.umask(0o077)
     stream = sys.stdin.buffer
@@ -102,7 +103,7 @@ def main():
             signal.alarm(0)
             options = [
                 '--current', args.current, '--staging', args.staging, '--backups', args.backups,
-                '--pm2', args.pm2, '--node', args.node, '--id', identifier,
+                '--pm2', args.pm2, '--node', args.node, '--id', identifier, '--public-base', args.public_base,
                 '--archive', archive, '--sha256', header['sha256'], '--commit', header['commit'],
                 '--version', header['version'], '--previous-commit', previous, '--ci-run', header['run'], '--apply',
             ]

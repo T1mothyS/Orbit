@@ -471,7 +471,8 @@ for (const [width, height, theme] of [[390, 844, 'dark'], [1440, 900, 'light']] 
     }));
     await page.goto(base + '/today');
     await page.getByRole('button', { name: '个人菜单', exact: true }).click();
-    await page.getByRole('dialog', { name: '个人菜单', exact: true }).getByRole('button', { name: '管理面板', exact: true }).click();
+    await page.getByRole('menuitem', { name: '管理面板', exact: true })
+      .or(page.getByRole('dialog', { name: '个人菜单', exact: true }).getByRole('button', { name: '管理面板', exact: true })).click();
     const dialog = page.getByRole('dialog', { name: '管理面板', exact: true });
     await dialog.getByRole('tab', { name: '运行性能', exact: true }).click();
     await expect(dialog.getByRole('heading', { name: '关键接口', exact: true })).toBeVisible();

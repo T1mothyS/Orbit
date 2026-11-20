@@ -14,6 +14,7 @@ import subprocess
 import tempfile
 import time
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from urllib.request import build_opener, HTTPRedirectHandler, ProxyHandler, Request
 
 sys_spec = importlib.util.spec_from_file_location('orbit_release_archive', Path(__file__).with_name('verify-release-archive.py'))
@@ -79,11 +80,12 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 class Runtime:
-    def __init__(self, pm2, node, process, base):
+    def __init__(self, pm2, node, process, base, public_base=None):
         self.pm2 = pm2
         self.node = node
         self.process = process
         self.base = base
+        self.public_base = public_base
         self.client = build_opener(ProxyHandler({}), NoRedirect())
         self.env = dict(os.environ)
 
@@ -101,12 +103,29 @@ class Runtime:
             flags = {key: self.env.get(key, 'false') for key in flags}
         call(self.pm2, 'restart', self.process, '--update-env', env={**self.env, **flags})
 
-    def get(self, path, limit=16 * 1024 * 1024):
-        with self.client.open(Request(self.base + path, headers={'Cache-Control': 'no-cache'}), timeout=3) as response:
+    def get(self, path, limit=16 * 1024 * 1024, base=None):
+        with self.client.open(Request((base or self.base) + path, headers={'Cache-Control': 'no-cache'}), timeout=5) as response:
             result = response.read(limit + 1)
             if len(result) > limit:
                 raise RuntimeError('RELEASE_PROBE_TOO_LARGE')
             return response.headers.get('Content-Type', ''), result
+
+    def verify_public(self, commit=None, version=None):
+        if not self.public_base:
+            return
+        for attempt in range(3):
+            try:
+                path = '/api/ready' if commit else '/api/health'
+                payload = json.loads(self.get(path, 4096, base=self.public_base)[1])
+                if not commit and payload.get('status') == 'ok':
+                    return
+                if commit and (payload.get('status'), payload.get('commit'), payload.get('version')) == ('ready', commit, version):
+                    return
+            except (URLError, TimeoutError, ValueError, RuntimeError):
+                pass
+            if attempt < 2:
+                time.sleep(2)
+        raise RuntimeError('PUBLIC_READINESS_VERIFY_FAILED')
 
     def verify(self, root, commit=None, version=None):
         deadline = time.monotonic() + 55
@@ -161,6 +180,7 @@ def recover(runtime, current, rollback, staged, failed, previous_enabled):
         move(rollback, current)
     runtime.restart(enabled=previous_enabled)
     runtime.verify(current)
+    runtime.verify_public()
     call(runtime.pm2, 'save', env=runtime.env)
 
 
@@ -194,6 +214,7 @@ def switch_release(runtime, current, rollback, staged, failed, backup_dir, metad
         phase('switched')
         runtime.restart(enabled=True)
         runtime.verify(current, metadata['commit'], metadata['version'])
+        runtime.verify_public(metadata['commit'], metadata['version'])
         call(runtime.pm2, 'save', env=runtime.env)
         phase('success')
     except (Exception, KeyboardInterrupt):
@@ -214,6 +235,7 @@ def main():
     parser.add_argument('--pm2', type=Path, required=True)
     parser.add_argument('--node', type=Path, required=True)
     parser.add_argument('--process', default='smart-schedule')
+    parser.add_argument('--public-base')
     parser.add_argument('--port', default=3000, type=int)
     parser.add_argument('--id', required=True)
     parser.add_argument('--archive', type=Path)
@@ -232,7 +254,11 @@ def main():
         parser.error('use existing absolute roots without symlinks')
     if len({path.stat().st_dev for path in (args.current.parent, args.staging, args.backups)}) != 1:
         parser.error('switching requires a single filesystem')
-    runtime = Runtime(args.pm2, args.node, args.process, f'http://127.0.0.1:{args.port}')
+    if args.public_base:
+        public = urlsplit(args.public_base)
+        if public.scheme != 'https' or not public.hostname or public.username or public.password or public.query or public.fragment or public.path:
+            parser.error('public-base must be an HTTPS origin')
+    runtime = Runtime(args.pm2, args.node, args.process, f'http://127.0.0.1:{args.port}', args.public_base)
     rollback = args.current.with_name(args.current.name + '.rollback-' + args.id)
     failed = args.current.with_name(args.current.name + '.failed-' + args.id)
     backup_dir = args.backups / args.id
@@ -271,6 +297,7 @@ def main():
     cold_bytes, _ = backup_bytes(args.current)
     ensure_space(args.staging, cold_bytes + inventory['estimatedBlockBytes'] + RESERVE, inventory['entries'] + 100)
     runtime.verify(args.current)
+    runtime.verify_public()
     print(json.dumps({'archive': inventory, 'coldBackupBytes': cold_bytes, 'reserveBytes': RESERVE}), flush=True)
     if not args.apply:
         return
