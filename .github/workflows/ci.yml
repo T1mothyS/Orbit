@@ -55,6 +55,45 @@ jobs:
       - name: Verify Gallery stays development-only
         run: node scripts/verify-ui-build.mjs
 
+      # A dependency-changing release is assembled on Linux; production only
+      # receives this verified artifact and never installs or builds in place.
+      - name: Prepare Linux release
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+        run: |
+          stage="$RUNNER_TEMP/orbit-release"
+          mkdir -p "$stage"
+          git archive --prefix=smart-schedule-agent/ HEAD | tar -x -C "$stage"
+          rm "$stage/smart-schedule-agent/AGENTS.md"
+          cp -a dist node_modules "$stage/smart-schedule-agent/"
+          cp server/.product-help.json "$stage/smart-schedule-agent/server/"
+          node scripts/prepare-linux-release.mjs "$stage/smart-schedule-agent" "$GITHUB_SHA"
+          # Emit regular files for hardlinked dependency entries and strip privilege bits
+          # from archive metadata. The extractor still rejects unsafe member types.
+          tar --hard-dereference --mode='u-s,g-s' -czf "$RUNNER_TEMP/orbit-linux-release.tgz" -C "$stage" smart-schedule-agent
+          sha256sum "$RUNNER_TEMP/orbit-linux-release.tgz" > "$RUNNER_TEMP/orbit-linux-release.sha256"
+
+      - name: Verify exact Linux archive in an isolated runtime
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          expected_sha="$(cut -d ' ' -f 1 "$RUNNER_TEMP/orbit-linux-release.sha256")"
+          version="$(node -p 'require("./package.json").version')"
+          python3 scripts/operations/verify-release-archive.py "$RUNNER_TEMP/orbit-linux-release.tgz" \
+            --sha256 "$expected_sha" --commit "$GITHUB_SHA" --version "$version" \
+            | tee "$RUNNER_TEMP/orbit-linux-release.inventory.json"
+          smoke_root="$(mktemp -d "$RUNNER_TEMP/orbit-release-smoke.XXXXXX")"
+          mkdir "$smoke_root/data" "$smoke_root/home"
+          tar -xzf "$RUNNER_TEMP/orbit-linux-release.tgz" -C "$smoke_root"
+          du -sk "$smoke_root/smart-schedule-agent"
+          cd "$smoke_root/smart-schedule-agent"
+          env -i PATH="$PATH" HOME="$smoke_root/home" DATA_DIR="$smoke_root/data" \
+            APP_ENV=production APP_URL=https://release-smoke.invalid \
+            JWT_SECRET=synthetic-release-smoke-only-not-a-secret \
+            ADMIN_INVITE_CODE=synthetic-release-admin-code USER_INVITE_CODE=synthetic-release-user-code \
+            ORBIT_RELEASE_SMOKE=true ORBIT_RELEASE_SMOKE_COMMIT="$GITHUB_SHA" BACKGROUND_JOBS_ENABLED=false \
+            ORBIT_PROACTIVE_ENABLED=false ANDROID_PUSH_ENABLED=false \
+            node --import tsx scripts/verify-linux-release.mjs
+
       - name: Install UI test browser
         run: npx playwright install --with-deps chromium
 
@@ -93,43 +132,6 @@ jobs:
           name: orbit-ui-failures
           path: ${{ runner.temp }}/orbit-ui-tests
           retention-days: 7
-
-      # A dependency-changing release is assembled on Linux; production only
-      # receives this verified artifact and never installs or builds in place.
-      - name: Prepare Linux release
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
-        run: |
-          stage="$RUNNER_TEMP/orbit-release"
-          mkdir -p "$stage"
-          git archive --prefix=smart-schedule-agent/ HEAD | tar -x -C "$stage"
-          rm "$stage/smart-schedule-agent/AGENTS.md"
-          cp -a dist node_modules "$stage/smart-schedule-agent/"
-          cp server/.product-help.json "$stage/smart-schedule-agent/server/"
-          node scripts/prepare-linux-release.mjs "$stage/smart-schedule-agent" "$GITHUB_SHA"
-          tar -czf "$RUNNER_TEMP/orbit-linux-release.tgz" -C "$stage" smart-schedule-agent
-          sha256sum "$RUNNER_TEMP/orbit-linux-release.tgz" > "$RUNNER_TEMP/orbit-linux-release.sha256"
-
-      - name: Verify exact Linux archive in an isolated runtime
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
-        run: |
-          set -euo pipefail
-          expected_sha="$(cut -d ' ' -f 1 "$RUNNER_TEMP/orbit-linux-release.sha256")"
-          version="$(node -p 'require("./package.json").version')"
-          python3 scripts/operations/verify-release-archive.py "$RUNNER_TEMP/orbit-linux-release.tgz" \
-            --sha256 "$expected_sha" --commit "$GITHUB_SHA" --version "$version" \
-            | tee "$RUNNER_TEMP/orbit-linux-release.inventory.json"
-          smoke_root="$(mktemp -d "$RUNNER_TEMP/orbit-release-smoke.XXXXXX")"
-          mkdir "$smoke_root/data" "$smoke_root/home"
-          tar -xzf "$RUNNER_TEMP/orbit-linux-release.tgz" -C "$smoke_root"
-          du -sk "$smoke_root/smart-schedule-agent"
-          cd "$smoke_root/smart-schedule-agent"
-          env -i PATH="$PATH" HOME="$smoke_root/home" DATA_DIR="$smoke_root/data" \
-            APP_ENV=production APP_URL=https://release-smoke.invalid \
-            JWT_SECRET=synthetic-release-smoke-only-not-a-secret \
-            ADMIN_INVITE_CODE=synthetic-release-admin-code USER_INVITE_CODE=synthetic-release-user-code \
-            ORBIT_RELEASE_SMOKE=true ORBIT_RELEASE_SMOKE_COMMIT="$GITHUB_SHA" BACKGROUND_JOBS_ENABLED=false \
-            ORBIT_PROACTIVE_ENABLED=false ANDROID_PUSH_ENABLED=false \
-            node --import tsx scripts/verify-linux-release.mjs
 
       - name: Upload Linux release
         id: release-upload
