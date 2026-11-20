@@ -14,6 +14,7 @@ import { createAndroidPushRouter } from './routes/android-push.js';
 import { createAndroidPushJobs } from './android-push.js';
 import { createSystemRouter } from './routes/system.js';
 import { observeOperation, systemAlertsEnabled } from './system-events.js';
+import { performanceEnabled, recordPerformance, startPerformanceCollection, stopPerformanceCollection } from './performance-metrics.js';
 
 import { createSchedulesRouter } from './routes/schedules.js';
 import { createCaldavRouter } from './routes/caldav.js';
@@ -82,7 +83,10 @@ export const app = createApp({
   oauthRouter: createDailyReportCloudOAuthRouter(), mcpRouter: createDailyReportCloudMcpRouter(),
   media: { route: DAILY_REPORT_MEDIA_ROUTE, root: dailyReportMediaRoot() },
   staticPath: path.resolve(__dirname, '../dist'),
-  observeOperation: systemAlertsEnabled() ? observeOperation : undefined,
+  observeOperation: systemAlertsEnabled() || performanceEnabled() ? (route, timing, id) => {
+    recordPerformance(route, timing, id);
+    observeOperation(route, timing, id);
+  } : undefined,
   protectedTools: { root: path.resolve(__dirname, '../protected-tools'), authenticatePage, isReady: () => dbInitialized },
 });
 
@@ -178,6 +182,7 @@ export const proactiveJobs=createProactiveJobs(()=>dbInitialized);
 export const runtimeProactiveEnabled=runtimeConfig.proactiveJobsEnabled;
 export const androidPushJobs=createAndroidPushJobs(()=>dbInitialized);
 export const runtimeAndroidPushEnabled=process.env.ANDROID_PUSH_ENABLED==='true';
+export const performanceCollection = { start: startPerformanceCollection, stop: stopPerformanceCollection };
 export function logServiceStarted() {
   addLog('info', 'system', '启动配置已记录', { event: 'service_started', pid: process.pid, nodeVersion: process.version,
     backgroundJobsEnabled, appTimezone: process.env.APP_TIMEZONE || 'Asia/Shanghai',

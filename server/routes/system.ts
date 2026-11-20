@@ -2,9 +2,27 @@ import { Router, type RequestHandler } from 'express';
 import { querySystem, SystemQueryError, type SystemQueryKind } from '../system-query.js';
 import { searchProductHelp } from '../product-help.js';
 import { getUserById } from '../db.js';
-import { listSystemEvents } from '../system-events.js';
+import { listSystemEvents, systemEventRoleAllowed } from '../system-events.js';
+import { performanceOverview, performanceRange, recordBrowserPerformance } from '../performance-metrics.js';
 export function createSystemRouter({authenticate}:{authenticate:RequestHandler}) {
   const router = Router();
+  const adminSystem: RequestHandler = (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if (!systemEventRoleAllowed((req as any).user.userId)) {
+      res.status(403).json({ error: '仅管理员可访问性能记录' });
+      return;
+    }
+    next();
+  };
+  router.get('/api/system/performance', authenticate, adminSystem, (req, res) => {
+    const range = req.query.range ?? '1h';
+    if (!performanceRange(range)) return res.status(400).json({ error: '时间范围不正确' });
+    return res.json(performanceOverview(range));
+  });
+  router.post('/api/system/performance/browser', authenticate, adminSystem, (req, res) => {
+    if (!recordBrowserPerformance(req.body)) return res.status(400).json({ error: '不接受该采样' });
+    return res.sendStatus(204);
+  });
   router.get('/api/system/events', authenticate, (req, res) => {
     const id = req.query.id;
     if (id !== undefined && (typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id))) {

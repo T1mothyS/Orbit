@@ -1,3 +1,4 @@
+import { monitoredFetch } from '../utils/browser-performance';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 export interface OrbitConversation {
@@ -56,7 +57,7 @@ export function useOrbitChat(authHeaders: () => Record<string, string>, authenti
     const current = useRef(cid);
     current.current = cid;
     const api = useCallback(async (path: string, method = 'GET', body?: unknown) => {
-        const res = await fetch(path, { method, headers: { ...authHeaders(), 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(20000) });
+        const res = await monitoredFetch(path, { method, headers: { ...authHeaders(), 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(20000) });
         const data = await res.json();
         if (!res.ok)
             throw new Error(data.error || '操作失败');

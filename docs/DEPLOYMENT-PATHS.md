@@ -60,7 +60,7 @@ Android 一期新增 `firebase-admin`，后端发布必须走路径 B，不能�
 - 生成独立归档包，按 A 的哈希、备份、暂存、原子切换和分层验收流程执行。服务器只有在资源已明确满足条件且获得专项授权时，才可采用受控的服务器安装流程；旧的服务器安装/构建脚本不是当前 2 GB 默认入口。
 - 若涉及配置变化或首次安装，先在暂存环境验证启动、健康和静态资源；若涉及数据迁移，必须把迁移前备份、迁移顺序、旧代码读取能力和恢复步骤写入本次记录。
 
-依赖或环境变更升级先用 `python3 scripts/operations/release-capacity.py <经测量的 JSON 计划>` 做只读容量检查。JSON 包含 `version: 1`、上一版的 `previousRelease` 绝对路径和 `allocations`。每个 `archive/expanded/backup/temporary/reserve` 项记录真实存在的目标 `directory`、预计 `bytes` 和 `inodes`。同设备的并存占用加总，依据有效可用块和 inode 判断。缺失、不可读或不足均拒绝。目录存在仅用于容量准备，恢复点和上一版可否启动仍需独立核验。当前启用生产 CD 仍需专项授权。
+依赖或环境变更升级先用 `python3 scripts/operations/release-capacity.py <经测量的 JSON 计划>` 做只读容量检查。JSON 包含 `version: 1`、上一版的 `previousRelease` 绝对路径和 `allocations`。每个 `archive/expanded/backup/temporary/reserve` 项记录真实存在的目标 `directory`、预计 `bytes` 和 `inodes`。同设备的并存占用加总，依据有效可用块和 inode 判断。缺失、不可读或不足均拒绝。目录存在仅用于容量准备，恢复点和上一版可否启动仍需独立核验。生产 CD 需要部署专项授权，并由仓库变量控制。
 
 ### 成功判据与回滚
 
@@ -69,6 +69,14 @@ Android 一期新增 `firebase-admin`，后端发布必须走路径 B，不能�
 ### 冻结制品和就绪检查
 
 解包前从可信的同次 CI 证据传入期望 SHA-256、40 位 commit 和版本，使用 `python3 scripts/operations/verify-release-archive.py <制品> --sha256 <sha> --commit <commit> --version <version>`。失败时不进入暂存。成功输出的容量估算与 CI 实际解包记录一起用于容量计划。生产切换及回滚的运行验收用 `GET /api/ready` 核对冻结身份及存储查询。存储被持久化保护阻断时返回 503。无匹配归档清单的旧运行目录返回空 commit，不能作为新制品验收。旧 `/api/health` 保持原存活合同。
+
+### 主站自动发布与站外就绪探测
+
+`main` 的推送须通过完整的 Linux CI 和严格 UI 截图比较。生产任务只读取同次检查上传的制品。GitHub `production` 环境仅允许 `main`，提供专用 SSH 密钥、主机公钥和独立制品签名密钥。服务器以固定命令接收签名头和精确字节数，用受信任的公钥校验。部署账号没有交互式 Shell、转发或任意 sudo 权限。受保护的服务器接收程序独立安装和更新，安装配置放在本机 runbook。
+
+自动发布由 `ORBIT_CD_ENABLED` 控制。接收端验证文件与身份，按生产实测复算空间和 inode，使用合成数据暂存启动。停写后生成受保护的冷备，保留旧程序和运行时，将现有数据移入新目录并执行启动、静态资产和认证边界验收。切换失败时把有效数据带回旧版本。中断时依据事务日志核对现状和恢复。GitHub 继续从公网核对新发布身份。每次发布前保留容量余量与可验证的旧版本。需要释放空间时先核对保留的恢复点和运行时引用。带数据库架构变化的发布需要单独制定回滚方案。
+
+独立的 `Orbit P0 readiness` GitHub 工作流定时从站外请求 `ORBIT_HEALTH_URL` 配置的 HTTPS `/api/ready`。一次运行连续三次失败就标记失败，通过已有 GitHub Actions 通知设置投递。GitHub 可能延迟调度，收件方由 GitHub 通知设置决定。站内 P1/P2 和管理员性能面板可与站外探测独立使用。
 
 ## 数据、配置和版本记录
 

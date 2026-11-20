@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, Download, RefreshCw, Trash2 } from 'lucide-react';
 import { Badge, Button, Dialog, EmptyState, InlineNotice, Input, LoadingState, Select, SettingRow, Switch, Tabs, ToastProvider, useToast } from '../ui';
 import { useAuth } from '../hooks/useAuth';
+import { PerformanceTab } from './PerformanceTab';
 import './admin.css';
 
 interface User {
@@ -537,11 +538,24 @@ export function AdminModal({ visible, onClose }: { visible: boolean; onClose: ()
 }
 function AdminPanel({ onClose }: { onClose: () => void }) {
   const [tab,setTab] = useState('users'), [busy,setBusy] = useState(false);
+  const [performanceEnabled, setPerformanceEnabled] = useState(false);
+  const { authHeaders } = useAuth();
+  const auth = useRef(authHeaders);
+  auth.current = authHeaders;
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/system/performance?range=5m', { headers: auth.current(), signal: controller.signal, cache: 'no-store' })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => { if (!controller.signal.aborted) setPerformanceEnabled(data?.enabled === true); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
   return <Dialog open title="管理面板" size="wide" busy={busy} onOpenChange={open => { if (!open) onClose(); }}>
     <div className="admin-workspace"><Tabs disabled={busy} label="管理面板分区" value={tab} onValueChange={setTab} items={[
       {value:'users',label:'用户管理',content:<UserManagementTab mode="users" onBusyChange={setBusy}/>},
       {value:'invites',label:'邀请码',content:<UserManagementTab mode="invites" onBusyChange={setBusy}/>},
       {value:'logs',label:'调试日志',content:<DebugLogsTab onBusyChange={setBusy}/>},
+      ...(performanceEnabled ? [{value:'performance',label:'运行性能',content:tab === 'performance' ? <PerformanceTab /> : null}] : []),
     ]}/></div>
   </Dialog>;
 }

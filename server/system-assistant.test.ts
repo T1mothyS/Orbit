@@ -22,7 +22,7 @@ const stamp=new Date().toISOString();
 for(const [id,role] of [['owner','user'],['other','user'],['admin','admin']] as const)db.createUser({id,email:id+'@example.invalid',password_hash:'synthetic',role,disabled:0,created_at:stamp,updated_at:stamp});
 for(const id of ['owner','other'])schedules.createSchedule({id:id+'-schedule',user_id:id,calendar_id:'personal',type:'event',title:id+' private schedule',start_time:stamp,end_time:stamp,all_day:false,category:'life',priority:'medium',is_completed:false,is_repeated:false,reminders:[],is_high_risk:false});
 const auth=createAuth({secret:'synthetic-system-test-only',getUserById:db.getUserById});
-const app=express();app.use(createSystemRouter({authenticate:auth.authenticate}));
+const app=express();app.use(express.json());app.use(createSystemRouter({authenticate:auth.authenticate}));
 const listener=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>listener.once('listening',resolve));
 const base='http://127.0.0.1:'+(listener.address() as {port:number}).port;
 const headers=(id:string)=>({Authorization:'Bearer '+auth.signUserToken(db.getUserById(id)!)});
@@ -174,5 +174,33 @@ test('low-traffic system events persist, deduplicate, deliver in-app and require
     else process.env.ORBIT_SYSTEM_ALERTS_ENABLED = oldEnabled;
     if (oldAdmins === undefined) delete process.env.ORBIT_SYSTEM_ALERT_ADMINS;
     else process.env.ORBIT_SYSTEM_ALERT_ADMINS = oldAdmins;
+  }
+});
+
+test('performance API restricts reads and writes and only retains numeric telemetry', async () => {
+  const endpoint = base + '/api/system/performance';
+  const before = process.env.ORBIT_PERFORMANCE_ENABLED;
+  process.env.ORBIT_PERFORMANCE_ENABLED = 'true';
+  try {
+    assert.equal((await fetch(endpoint)).status, 401);
+    assert.equal((await fetch(endpoint, { headers: headers('owner') })).status, 403);
+    assert.equal((await fetch(endpoint + '?range=all', { headers: headers('admin') })).status, 400);
+    const send = (role: string, data: object) => fetch(endpoint + '/browser', {
+      method: 'POST', headers: { ...headers(role), 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    });
+    assert.equal((await send('owner', { navigationMs: 250 })).status, 403);
+    assert.equal((await send('admin', { navigationMs: -1 })).status, 400);
+    const requestId = '843ef0d2-4642-4e6b-a155-0dd3dfe362fb';
+    assert.equal((await send('admin', { requestId, requestMs: 231, rawText: 'fixture-private-text' })).status, 400);
+    assert.equal((await send('admin', { requestId, requestMs: 231 })).status, 204);
+    const result = await fetch(endpoint, { headers: headers('admin') });
+    assert.equal(result.headers.get('cache-control'), 'no-store');
+    const data = await result.json();
+    assert.equal(data.browser[0].requestMs, 231);
+    assert.equal(data.browser[0].requestId, requestId);
+    assert.doesNotMatch(JSON.stringify(data), /fixture-private-text/);
+  } finally {
+    if (before === undefined) delete process.env.ORBIT_PERFORMANCE_ENABLED;
+    else process.env.ORBIT_PERFORMANCE_ENABLED = before;
   }
 });

@@ -1,3 +1,4 @@
+import { monitoredFetch } from '../utils/browser-performance';
 import { requestError } from '../utils/request-error';
 import { OrbitDialog } from './OrbitDialog';
 import { ArrowUpRight, CalendarClock, CheckCircle2, ChevronDown, Edit3, MoreVertical, Paperclip, RefreshCw, Trash2, X } from 'lucide-react';
@@ -215,7 +216,7 @@ export function ActionCenterPage() {
   const loadActions = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const response = await fetch('/api/action-center?upcomingDays=' + days, { headers: authHeaders() });
+      const response = await monitoredFetch('/api/action-center?upcomingDays=' + days, { headers: authHeaders() });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || '加载失败');
       setData({ ...emptyData, ...result });
@@ -239,7 +240,7 @@ export function ActionCenterPage() {
     setCompletingId(item.id);
     setActionError('');
     try {
-      const response = await fetch('/api/completions', {
+      const response = await monitoredFetch('/api/completions', {
         method: 'POST',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(30000),
         body: JSON.stringify({
@@ -287,7 +288,7 @@ export function ActionCenterPage() {
     setCompletingId(item.id);
     setActionError('');
     try {
-      const response = await fetch('/api/completions/' + item.completionId, {
+      const response = await monitoredFetch('/api/completions/' + item.completionId, {
         method: 'PUT',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(30000),
         body: JSON.stringify({
@@ -318,7 +319,7 @@ export function ActionCenterPage() {
       }
 
       for (const attachmentId of completionRemovedFileIds) {
-        const remove = await fetch('/api/attachments/' + attachmentId, { method: 'DELETE', headers: authHeaders() });
+        const remove = await monitoredFetch('/api/attachments/' + attachmentId, { method: 'DELETE', headers: authHeaders() });
         if (!remove.ok) {
           const removeResult = await remove.json().catch(() => ({}));
           throw new Error(removeResult.error || '删除旧附件失败');
@@ -337,7 +338,7 @@ export function ActionCenterPage() {
   const openScheduleEditor = async (item: ActionItem) => {
     if (item.sourceType !== 'schedule') return;
     try {
-      const response = await fetch('/api/schedules/' + item.sourceId, { headers: authHeaders() });
+      const response = await monitoredFetch('/api/schedules/' + item.sourceId, { headers: authHeaders() });
       const result = await response.json();
       if (!response.ok || !result.schedule) throw new Error(result.error || '读取日程失败');
       setEditingSchedule(result.schedule as Schedule);
@@ -368,7 +369,7 @@ export function ActionCenterPage() {
     }
     if (item.sourceType !== 'schedule') return;
     try {
-      const response = await fetch('/api/schedules/' + item.sourceId + '/actions', {
+      const response = await monitoredFetch('/api/schedules/' + item.sourceId + '/actions', {
         method: 'POST',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(30000),
         body: JSON.stringify({ action }),
@@ -392,7 +393,7 @@ export function ActionCenterPage() {
       return;
     }
     try {
-      const response = await fetch('/api/schedules/' + item.sourceId, { headers: authHeaders() });
+      const response = await monitoredFetch('/api/schedules/' + item.sourceId, { headers: authHeaders() });
       const result = await response.json();
       if (!response.ok || !result.schedule) throw new Error(result.error || '读取日程详情失败');
       setCompletedDetail(item);
@@ -407,12 +408,12 @@ export function ActionCenterPage() {
     setReopeningId(item.id);
     try {
       const response = item.completionId
-        ? await fetch('/api/completions/' + item.completionId + '/reopen', {
+        ? await monitoredFetch('/api/completions/' + item.completionId + '/reopen', {
           method: 'POST',
           headers: authHeaders(),
         })
         : item.sourceType === 'schedule'
-        ? await fetch('/api/schedules/' + item.sourceId + '/toggle', {
+        ? await monitoredFetch('/api/schedules/' + item.sourceId + '/toggle', {
           method: 'POST',
           headers: authHeaders(),
         })
@@ -432,7 +433,7 @@ export function ActionCenterPage() {
 
   const deleteScheduleFromDetails = async (id: string) => {
     try {
-      const response = await fetch('/api/schedules/' + id, { method: 'DELETE', headers: authHeaders() });
+      const response = await monitoredFetch('/api/schedules/' + id, { method: 'DELETE', headers: authHeaders() });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || '删除日程失败');
       setDetailSchedule(null);
@@ -445,7 +446,7 @@ export function ActionCenterPage() {
 
   const toggleScheduleFromDetails = async (id: string) => {
     try {
-      const response = await fetch('/api/schedules/' + id + '/toggle', { method: 'POST', headers: authHeaders() });
+      const response = await monitoredFetch('/api/schedules/' + id + '/toggle', { method: 'POST', headers: authHeaders() });
       const result = await response.json();
       if (!response.ok || !result.schedule) throw new Error(result.error || '更新完成状态失败');
       setDetailSchedule(null);
@@ -459,7 +460,7 @@ export function ActionCenterPage() {
   const saveScheduleEdit = async (form: Partial<Schedule>) => {
     if (!editingSchedule) return;
     try {
-      const response = await fetch('/api/schedules/' + editingSchedule.id, {
+      const response = await monitoredFetch('/api/schedules/' + editingSchedule.id, {
         method: 'PUT',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(30000),
         body: JSON.stringify(form),
@@ -474,7 +475,7 @@ export function ActionCenterPage() {
   };
 
   const openAttachment = async (attachment: { id: string; originalName: string }) => {
-    const response = await fetch('/api/attachments/' + attachment.id, { headers: authHeaders() });
+    const response = await monitoredFetch('/api/attachments/' + attachment.id, { headers: authHeaders() });
     if (!response.ok) { setActionError('附件读取失败，请重试。'); return; }
     const url = URL.createObjectURL(await response.blob());
     const anchor = document.createElement('a');

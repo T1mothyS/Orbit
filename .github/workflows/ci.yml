@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -10,7 +11,9 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
+    outputs:
+      artifact-id: ${{ steps.release-upload.outputs.artifact-id }}
     env:
       ELECTRON_APP_URL: https://build.invalid.local
     steps:
@@ -94,7 +97,7 @@ jobs:
       # A dependency-changing release is assembled on Linux; production only
       # receives this verified artifact and never installs or builds in place.
       - name: Prepare Linux release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
         run: |
           stage="$RUNNER_TEMP/orbit-release"
           mkdir -p "$stage"
@@ -107,7 +110,7 @@ jobs:
           sha256sum "$RUNNER_TEMP/orbit-linux-release.tgz" > "$RUNNER_TEMP/orbit-linux-release.sha256"
 
       - name: Verify exact Linux archive in an isolated runtime
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
           expected_sha="$(cut -d ' ' -f 1 "$RUNNER_TEMP/orbit-linux-release.sha256")"
@@ -129,7 +132,8 @@ jobs:
             node --import tsx scripts/verify-linux-release.mjs
 
       - name: Upload Linux release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: release-upload
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: orbit-linux-release
@@ -139,3 +143,49 @@ jobs:
             ${{ runner.temp }}/orbit-linux-release.inventory.json
           retention-days: 3
           compression-level: 0
+
+  deploy:
+    name: Deploy verified Linux release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.ORBIT_CD_ENABLED == 'true'
+    needs: verify
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 45
+    concurrency:
+      group: orbit-production-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.verify.outputs.artifact-id }}
+          path: release
+      - name: Check signed release input
+        run: |
+          expected_sha="$(cut -d ' ' -f 1 release/orbit-linux-release.sha256)"
+          version="$(node -p 'require("./package.json").version')"
+          python3 scripts/operations/verify-release-archive.py release/orbit-linux-release.tgz \
+            --sha256 "$expected_sha" --commit "$GITHUB_SHA" --version "$version" > release/verified.json
+      - name: Deploy exact current main to production
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ORBIT_DEPLOY_TARGET: ${{ secrets.ORBIT_DEPLOY_TARGET }}
+          ORBIT_DEPLOY_SSH_KEY: ${{ secrets.ORBIT_DEPLOY_SSH_KEY }}
+          ORBIT_DEPLOY_SIGNING_KEY: ${{ secrets.ORBIT_DEPLOY_SIGNING_KEY }}
+          ORBIT_DEPLOY_KNOWN_HOSTS: ${{ secrets.ORBIT_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          head="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          if [[ "$head" != "$GITHUB_SHA" ]]; then
+            echo "A newer main commit has superseded this release."
+            exit 0
+          fi
+          python3 scripts/operations/send-release.py --archive release/orbit-linux-release.tgz --inventory release/verified.json
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+        id: release
+      - name: Verify public readiness and release identity
+        if: steps.release.outputs.deployed == 'true'
+        env:
+          ORBIT_HEALTH_URL: ${{ vars.ORBIT_HEALTH_URL }}
+        run: python3 scripts/operations/probe-readiness.py --commit "$GITHUB_SHA" --version "$(node -p 'require("./package.json").version')"

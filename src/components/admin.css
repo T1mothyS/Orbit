@@ -58,3 +58,24 @@
   .admin-user-card-meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--orbit-space-2); margin-block: var(--orbit-space-2); }
   .admin-invite-role-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+.admin-performance { display: grid; gap: var(--orbit-space-4); }
+.admin-performance .admin-toolbar { margin: 0; }
+.admin-performance-pairs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--orbit-space-4); }
+.admin-performance section, .admin-performance-trend { min-width: 0; padding: var(--orbit-space-4); border: 1px solid var(--orbit-border); border-radius: var(--orbit-radius-card); }
+.admin-performance h3 { margin: 0 0 var(--orbit-space-3); font-size: var(--orbit-type-section-title); }
+.admin-performance dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--orbit-space-2) var(--orbit-space-3); margin: var(--orbit-space-3) 0 0; font-size: var(--orbit-type-secondary); }
+.admin-performance dt { color: var(--orbit-text-secondary); }
+.admin-performance dd { margin: 0; max-width: 28ch; font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.admin-performance .oui-help { margin: 0 0 var(--orbit-space-2); }
+.admin-performance-table { overflow: auto; max-height: 300px; }
+.admin-performance-table table { width: 100%; border-collapse: collapse; text-align: left; font-size: var(--orbit-type-secondary); }
+.admin-performance-table td, .admin-performance-table th { padding: var(--orbit-space-2); border-bottom: 1px solid var(--orbit-border); }
+.admin-performance-table td { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.admin-performance-trend summary { cursor: pointer; }
+.admin-performance-trend[open] summary { margin-bottom: var(--orbit-space-3); }
+@media (max-width: 700px) {
+  .admin-performance-pairs { grid-template-columns: minmax(0, 1fr); }
+  .admin-performance section, .admin-performance-trend { padding: var(--orbit-space-3); }
+  .admin-performance dd { max-width: 19ch; }
+}

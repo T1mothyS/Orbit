@@ -452,3 +452,38 @@ for (const [width,height] of [[390,844],[430,932],[768,1024],[1440,900]]) for (c
     await page.goto(base+'/tools');await expect(page.locator('[data-tool-slug]')).toHaveCount(5);await capture('tools');expect(errors).toEqual([]);
   });
 }
+
+for (const [width, height, theme] of [[390, 844, 'dark'], [1440, 900, 'light']] as const) {
+  test(`admin performance at ${width} in ${theme} can inspect request samples`, async ({ context, page }) => {
+    const token = await fixtureToken(context, 'preview@example.invalid');
+    await context.addInitScript(value => localStorage.setItem('aicalendar_token', value), token);
+    await page.emulateMedia({ colorScheme: theme });
+    await page.setViewportSize({ width, height });
+    const id = '843ef0d2-4642-4e6b-a155-0dd3dfe362fb';
+    const now = Date.now();
+    let fail = false;
+    await page.route('**/api/system/performance?**', route => route.fulfill(fail ? { status: 503 } : {
+      json: { enabled: true, observedAt: now, writeFailed: false, lastSavedAt: now,
+        host: { cpu: { busyPercent: 23 } }, loop: { p95Ms: 23 },
+        routes: [{ route: 'GET /api/action-center', count: 1, errors: 0, p50: 1000, p95: 1000, p99: 1000 }],
+        traces: [{ id, route: 'GET /api/action-center', status: 200, observedAt: now, durationMs: 700 }],
+        browser: [{ requestId: id, observedAt: now, requestMs: 725 }], trend: [{ at: now, count: 1, errors: 0 }] },
+    }));
+    await page.goto(base + '/today');
+    await page.getByRole('button', { name: '个人菜单', exact: true }).click();
+    await page.getByRole('dialog', { name: '个人菜单', exact: true }).getByRole('button', { name: '管理面板', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: '管理面板', exact: true });
+    await dialog.getByRole('tab', { name: '运行性能', exact: true }).click();
+    await expect(dialog.getByRole('heading', { name: '关键接口', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('switch', { name: '采集此浏览器的性能' })).not.toBeChecked();
+    await dialog.getByRole('combobox', { name: '按请求编号查找' }).click();
+    await page.getByRole('option', { name: /843ef0d2/ }).click();
+    await expect(dialog.getByText(id, { exact: true })).toBeVisible();
+    fail = true;
+    await dialog.getByRole('button', { name: '刷新', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toContainText('性能数据读取失败');
+    await expect(dialog.getByText(id, { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath('admin-performance.png') });
+  });
+}

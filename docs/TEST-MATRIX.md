@@ -94,7 +94,7 @@ CI 始终运行完整服务、类型、UI 边界、构建、批准截图和产�
 
 Release runner 仅执行隔离 Web 回归，不自动 push、tag、发布、部署、发送邮件、调用真实 AI 或触发手机。Electron/Android 原生构建运行、跨项目、生产恢复、OAuth 自然刷新、长期 CalDAV、真实 SMTP/IMAP 和手机自然通知按本次影响与授权分别验收。PUBLISHED/QUEUED、health、PM2、SMTP accepted 与收件箱/系统展示不是同一结果。
 
-发布准备可本地运行 `python3 scripts/orbit_operations_test.py`，覆盖制品 SHA、源码清单、错误身份、路径和符号链接边界，以及资源采样缺字段或计数重置。HTTP 安全套件覆盖 `/api/ready` 启动前和存储阻断时的 503，以及实际匹配版本才公开归档 commit。隔离启动需要匹配的合成归档标识与外部空数据目录。
+发布准备可本地运行 `python3 scripts/orbit_operations_test.py`，覆盖制品 SHA、源码清单、错误身份、路径和符号链接边界，资源采样缺字段或计数重置，以及用合成目录演练停写、冷备和回滚。管理员性能面板验证授权、移动端明暗布局、请求关联、读取失败和禁用态。HTTP 安全套件覆盖 `/api/ready` 启动前和存储阻断时的 503，以及实际匹配版本才公开归档 commit。隔离启动需要匹配的合成归档标识与外部空数据目录。
 
 ## 文档与流水维护
 

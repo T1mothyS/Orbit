@@ -272,4 +272,63 @@ class OperationsTests(unittest.TestCase):
         self.assertTrue((self.releases/'release-0').exists())
         self.assertNotIn('prunedAt',ops.read(self.state/'deployments.json',{})['records'][0])
 
+@unittest.skipUnless(os.name == 'posix', 'deployment uses a Unix host')
+class ReleaseSwitchTests(unittest.TestCase):
+    def test_switch_and_failure_preserve_current_data(self):
+        deploy_spec = importlib.util.spec_from_file_location(
+            'release_switch', Path(__file__).parent / 'operations/deploy-release.py')
+        deploy = importlib.util.module_from_spec(deploy_spec)
+        deploy_spec.loader.exec_module(deploy)
+        for fail in (False, True):
+            with self.subTest(fail=fail), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                current, old, stage, failed, backup = (root / name for name in ('current', 'old', 'staged', 'failed', 'backup'))
+                for folder in (current, stage, backup):
+                    folder.mkdir()
+                (current / 'data').mkdir()
+                (current / '.env').write_text('old config fixture')
+                (current / 'data/local.db').write_text('old data fixture')
+                (current / 'version').write_text('before')
+                (stage / 'version').write_text('after')
+
+                class FixtureRuntime:
+                    pm2 = 'fixture-pm2'
+                    env = {}
+                    started = True
+
+                    def stop(self):
+                        self.started = False
+
+                    def restart(self, enabled=False):
+                        self.started = True
+                        if enabled:
+                            (current / 'data/local.db').write_text('new valid data fixture')
+
+                    def verify(self, folder, commit=None, version=None):
+                        if not self.started:
+                            raise AssertionError('runtime should be running')
+                        if commit and fail:
+                            raise RuntimeError('synthetic readiness failure')
+                        assert (folder / 'version').read_text() == ('after' if commit else 'before')
+
+                real_call = deploy.call
+                def call(*args, **kwargs):
+                    return b'' if args[0] == 'fixture-pm2' else real_call(*args, **kwargs)
+                with patch.object(deploy, 'call', side_effect=call):
+                    args = (FixtureRuntime(), current, old, stage, failed, backup, {'commit': '0' * 40, 'version': 'new'})
+                    if fail:
+                        with self.assertRaisesRegex(RuntimeError, 'synthetic readiness failure'):
+                            deploy.switch_release(*args)
+                    else:
+                        deploy.switch_release(*args)
+
+                self.assertEqual(json.loads((backup / 'transaction.json').read_text())['phase'], 'rolled-back' if fail else 'success')
+                self.assertEqual((current / '.env').read_text(), 'old config fixture')
+                self.assertEqual((current / 'data/local.db').read_text(), 'new valid data fixture')
+                self.assertEqual((current / 'version').read_text(), 'before' if fail else 'after')
+                self.assertTrue((failed if fail else old).is_dir())
+                with tarfile.open(backup / 'data-config.tar') as archived:
+                    self.assertEqual(archived.extractfile('data/local.db').read(), b'old data fixture')
+
+
 if __name__ == '__main__': unittest.main()

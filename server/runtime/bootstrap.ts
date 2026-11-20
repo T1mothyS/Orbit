@@ -16,6 +16,7 @@ interface RuntimeDependencies {
   runtimeProactiveEnabled?: boolean;
   androidPushJobs?: {start():void;stop():Promise<void>};
   runtimeAndroidPushEnabled?: boolean;
+  performanceCollection?: { start(): void; stop(): void };
   logServiceStarted: () => void;
 }
 
@@ -50,9 +51,11 @@ export function createRuntime(deps: RuntimeDependencies) {
           if (deps.runtimeConfig.backgroundJobsEnabled) deps.backgroundJobs.start();
           if(deps.runtimeProactiveEnabled)deps.proactiveJobs?.start();
           if(deps.runtimeAndroidPushEnabled)deps.androidPushJobs?.start();
+          deps.performanceCollection?.start();
           deps.logServiceStarted();
           return server;
         } catch (error) {
+          deps.performanceCollection?.stop();
           await Promise.allSettled([deps.backgroundJobs.stop(),deps.proactiveJobs?.stop(),deps.androidPushJobs?.stop(), closeServer()]);
           throw error;
         }
@@ -64,6 +67,7 @@ export function createRuntime(deps: RuntimeDependencies) {
       stopping = (async () => {
         // A signal arriving during initialization still closes the eventual listener.
         if (starting) await starting.catch(() => undefined);
+        deps.performanceCollection?.stop();
         const results = await Promise.allSettled([deps.backgroundJobs.stop(),deps.proactiveJobs?.stop(),deps.androidPushJobs?.stop(), closeServer()]);
         const failed = results.find(result => result.status === 'rejected');
         if (failed?.status === 'rejected') throw failed.reason;
