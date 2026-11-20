@@ -55,6 +55,25 @@
         ],
         "createdAt": "2026-10-22T16:26:21.241Z",
         "reason": "Agent reviewed: the sole occurrence is .agenda-schedule-card; AgendaView derives --schedule-color from getScheduleCategory(schedule.category).color to identify the event category. It predates this task in d83990e8 and is unchanged from the deployed c159ea3 UI baseline; retain the semantic category marker."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "server/daily-email-template.ts"
+        ],
+        "createdAt": "2026-11-20T13:02:55.789Z",
+        "reason": "Agent reviewed: both markers predate de49409 and appear in the supplied daily email. Their colors distinguish overdue from unscheduled items and identify schedule categories. Each has a matching text label for clients that render colors differently."
+      },
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "files": [
+          "server/daily-email-template.ts",
+          "server/email-service.ts"
+        ],
+        "createdAt": "2026-11-20T13:02:55.808Z",
+        "reason": "Agent reviewed: Arial with PingFang SC and Microsoft YaHei is the existing HTML email font stack. Keep the installed-font fallback for daily, cycle, and generic notification emails without requiring a web font."
       }
     ]
   }
