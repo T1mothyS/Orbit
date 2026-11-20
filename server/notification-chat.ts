@@ -14,6 +14,7 @@ import { getDailyWeather, getWeatherErrorKind, reminderWeatherLocation } from '.
 import { addLog } from './log-service.js';
 import type { DailyActionMeta, DailyActionWeather } from '../src/utils/daily-action.js';
 import { quietAdjustedDate } from './notification-service.js';
+import { listSystemEvents, systemEventRoleAllowed } from './system-events.js';
 
 export function inAppEnabled(userId:string) {return getReminder(userId)?.in_app_enabled === 1;}
 export function setInAppEnabled(userId:string,enabled:boolean) {
@@ -60,6 +61,7 @@ export async function deliverDailyAction(item: activity.NotificationDelivery, we
 export function deliverInApp(item:activity.NotificationDelivery,eventId?:string,enhanced=false,
   dailyAction?: DailyActionMeta):string|undefined {
   if(!inAppEnabled(item.userId)||getUserById(item.userId)?.disabled)return;
+  if(item.sourceType==='system_event'&&!systemEventRoleAllowed(item.userId))return;
   const ref=notificationObject(item);
   if(['schedule','reminder','activity_report'].includes(item.sourceType)&&!ref)return;
   if(ref?.type==='schedule'&&getSchedule(ref.id)?.is_completed)return;
@@ -78,7 +80,7 @@ export function deliverInApp(item:activity.NotificationDelivery,eventId?:string,
     // Daily actions retain full immutable facts in orbit_meta. schedule_items is
     // reserved for live object cards so history hydration cannot rewrite a snapshot.
     const digestItems = dailyAction ? [] : undefined;
-    const meta={dailyAction,sourceLabel:({schedule:'日程',reminder:'周期提醒',activity_report:'个人周报',digest:'每日行动提醒'} as Record<string,string>)[item.sourceType]||'用户通知',origin:'notification',notificationId:item.id,eventId,enhanced,object:ref,expectedState:linkedSchedule?scheduleFingerprint(linkedSchedule):undefined,href:item.sourceType==='digest'?'/today':ref?orbitObjectPath(ref):undefined};
+    const meta={dailyAction,sourceLabel:({schedule:'日程',reminder:'周期提醒',activity_report:'个人周报',digest:'每日行动提醒',system_event:'系统事件'} as Record<string,string>)[item.sourceType]||'用户通知',origin:'notification',notificationId:item.id,eventId,enhanced,object:ref,expectedState:linkedSchedule?scheduleFingerprint(linkedSchedule):undefined,href:item.sourceType==='digest'?'/today':ref?orbitObjectPath(ref):undefined};
     const body=item.kind==='weekly_report' && item.sourceType==='activity_report' ? activityReportChatText(item.userId,item.sourceId) : item.body;
     run('INSERT INTO ai_schedule_messages (id,user_id,role,type,content,schedule_items,created_at,conversation_id,orbit_meta) VALUES (?,?,?,?,?,?,?,?,?)',[id,item.userId,'assistant','text',`${item.title}\n\n${body}`,digestItems ? JSON.stringify(digestItems) : linkedSchedule ? JSON.stringify([linkedSchedule]) : null,at,cid,JSON.stringify(meta)]);
     run('INSERT INTO orbit_notification_messages (notification_id,user_id,message_id,delivery_key) VALUES (?,?,?,?)',[item.id,item.userId,id,deliveryKey]);
@@ -93,6 +95,13 @@ export function notificationMessageContent(
   snapshot?: ReturnType<typeof getSchedule>,
   showSchedule = false,
 ) {
+  if (item.sourceType === 'system_event') {
+    if (!systemEventRoleAllowed(item.userId)) return { title: '系统事件', body: '这条记录需要管理员权限。', triggerAt: item.scheduledAt };
+    const event = listSystemEvents(item.userId, item.sourceId)?.[0];
+    const summary = event ? [item.body, event.operation, event.metrics.p95Ms === null ? '' : `P95 ${event.metrics.p95Ms} ms（${event.metrics.count} 次请求）`,
+      event.metrics.slowOperations ? `最近 10 分钟观察到 ${event.metrics.slowOperations} 次独立慢操作` : '', `事件 ID ${event.id}`].filter(Boolean).join('\n') : item.body;
+    return { title: item.title, body: summary, triggerAt: item.scheduledAt };
+  }
   let body = item.sourceType === 'activity_report' && item.kind === 'weekly_report'
     ? activityReportChatText(item.userId, item.sourceId)
     : item.body;
@@ -115,6 +124,7 @@ export function notificationMessageContent(
 
 export function notificationView(userId:string,id:string) {
   const item=activity.getNotification(id,userId);if(!item)return {state:'discarded',canContinue:false,href:null,object:null,actionable:false};
+  if(item.sourceType==='system_event'&&!systemEventRoleAllowed(userId))return {state:'discarded',canContinue:false,href:null,object:null,actionable:false};
   const ref=notificationObject(item);
   let state='sent';
   if(['schedule','reminder','activity_report'].includes(item.sourceType)&&!ref)state='discarded';
@@ -135,6 +145,7 @@ export function notificationContinuation(userId:string,id:string) {
   if(!view.canContinue)throw new Error('通知已失效，不能继续关联');
   return {
     notificationId:item.id,title:item.title,body:item.body,
+    ...(item.sourceType==='system_event'?{systemEvent:listSystemEvents(userId,item.sourceId)?.[0]??null}:{}),
     sourceType:item.sourceType,sourceId:item.sourceId,
     scheduledAt:item.scheduledAt,sentAt:item.sentAt,createdAt:item.createdAt,state:view.state,object:view.object,
   };

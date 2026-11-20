@@ -173,6 +173,12 @@ Phase 5 的所有权、等价性和迁移验收见 [Phase 5 验证记录](archiv
 
 这条路径只适合本人控制或已经审阅的 HTML。由于它们仍处于同域，受信任的应用脚本可以看到浏览器本地存储；它不是第三方插件沙箱。未来若要挂载不受信任的代码，必须改用独立 origin 或更严格的沙箱边界。
 
+### 系统告警首批站内反馈
+
+在唯一主站同时启用 `ORBIT_SYSTEM_ALERTS_ENABLED` 和站内调度后，关键 API 以请求 ID、固定路由和完成耗时作轻量采样。两段 5 分钟窗口各满 30 个样本且 P95 超过 1500 ms 或 5xx 达 5% 会触发统计型 P1。同一关键操作最近 10 分钟内三个独立的至少 2 秒慢样本可触发操作型 P1。同一已有操作 ID 避免重复计数，两个规则共享同一路由事故状态。观察到三次独立健康操作且异常窗退出后记录恢复，默认静默 30 分钟。P2 记录事件循环长时间等待。事件文件在运维状态目录有界保存，仅含受控字段。
+
+`GET /api/system/events?id=<事件 ID>` 只向有效管理员公开。P1 和恢复通过现有站内投递，收件方由 `ORBIT_SYSTEM_ALERT_ADMINS` 明确配置且开启站内通知。对话按事件 ID 或选中的通知取得当前有权查看的结构化事实。投递先持久化事件，与 AI 是否生成解释无关。外部 P0、四层监控面板和完整性能归因按专项计划后续交付。
+
 ## 4. 持久化
 
 Daily Digest V2.5 使用原活动库中的 `digest_v2_runs`（账号/日期/输入快照/版本与诊断）和 `digest_v2_artifacts`（账号/日期/模式/内容哈希唯一的冻结产物）。`daily_reports`、通知、认证与备份入口复用；Shadow 不写正式表。快照七天过期，长期诊断不保留邮箱正文。媒体采用内容寻址字节：独立隔离服务的 Shadow 经测试 R2 并留本地镜像；正式服务可显式让 Shadow 与 production 使用原媒体目录的持久公开路径，另有 R2 选项。文章来源/许可保留在账号产物引用中。账号恢复重映射运行与产物 ID，跨账号恢复不允许沿用旧输入运行。具体发布状态、失败恢复、媒体生命周期及限制见 [V2.5 合同](CHATGPT-WORK-CLOUD.md#daily-digest-v25隔离新版合同)。
@@ -393,6 +399,10 @@ Office 共享同一 worker：DOCX 用 Mammoth 纯文本，XLSX 用 ExcelJS 缓�
 - 个人报告页面直接消费同一统计/冻结快照：主指标与活动明细通过 `metricDetails` 查原对象，安排未完成明细仅取 `details` 中 `completed=false` 的记录。周/月/年与自定义范围、账号默认筛选及快照发送合同不随布局改变；零与未采集保持独立表达，未知历史不以空列表解释为零。
 - `orbit_activity_reports` 保存范围、统计、摘要 hash、洞察、失败信息及自动截止点；模型无写工具，最多三条洞察、有界统计/必要摘要与证据对象，账号选择的 Provider/model，60 秒上限。快照 hash 忽略展示时刻/锚点；事实变化后可重新生成。接口：`GET/POST /api/orbit/activity-reports`、`GET /:id`、`GET /:id/current`、`POST /:id/insights`、`POST /:id/deliver`（confirm=true）。全部检查账号归属。发送预览先绑定保存的事实快照；确认时发送原报告 ID，数据变化不会悄悄替换已预览的内容。
 - `orbit_weekly_preferences` 默认 enabled=0，账号时区周日 20:00。`GET/PATCH /api/orbit/weekly/preferences` 只接受 enabled/weekday/hour/minute。稳定计划使用相邻本地周截止点，跨 DST 可能不是 168 小时；修改时点的首期接续最近实际截止点，长停服只取最近一周。账号、截止点唯一；邮件/站内按报告 ID/渠道唯一，报告与投递共用事实快照。模型失败仍为事实版；邮件 sent 仅表示 SMTP accepted。恢复不开启自动周报、不重投旧通知。
+- 周报邮件用 `weekly-email-template.ts` 从账号冻结报告生成 HTML 和纯文本，优先展示新快照中的当前未完成、逾期和到期日。历史快照缺失未完成总量时省略该数字。旧区间和站内卡片保留原快照。
+- 每日提醒发送日期仍用提醒时区。邮件天气以产生通知的时点换算常驻地日期。天气服务在一个 Open-Meteo 请求内保留 best match 的原天气内容，同时使用同一 ECMWF IFS 数据集的两个整日均值计算体感变化。丢失、不可信或夏令时边界只保留可用天气，旧缓存中的温差省略。
+- `scripts/preview-orbit-mail.ts` 用版本化 JSON 直接调用纯渲染器，输出到新建的本地目录。真实样本和预览仅保存在忽略目录，导出不加载应用服务器或发送通道。
+
 - `orbit_profiles` 只存账号头像附件 ID。JPEG/PNG/WebP ≤5 MB，复用图片签名/配额/文件存储，sharp 转 256px WebP 并清除 EXIF。`GET /api/orbit/profile` 和头像 GET/POST/DELETE 必须认证；响应 private/no-store。
 - 账号备份 orbit.connected 保存事件/报告/偏好/头像映射/通知消息映射，文件沿现有 attachments 备份。旧备份缺字段兼容；跨账号恢复保留历史证据并停用原账号链接，自动周报保持关闭；未发送通知转 suppressed。删除/清空账号清理所有新表。
 - 首次新增报告表前在运行数据目录 migration-backups 保存既有 SQLite 文件；正常跨库事务保留 undo 恢复。回滚需停服务、保留当前新增数据，再恢复对应四库快照并切回原代码；不能以恢复旧数据库保留升级后新数据。生产迁移、部署、真实 AI/SMTP 与收件箱验收分别授权。

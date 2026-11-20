@@ -1,3 +1,4 @@
+import { measureRequestPhase } from './request-timing.js';
 import { recordActivityEvent,activityOrigin } from './activity-events.js';
 import { withPersistenceTransaction } from './persistence.js';
 import { isValidDateKey } from './date-key.js';
@@ -208,12 +209,14 @@ function isReminderTimeDue(task: ReminderTask, date: Date): boolean {
 
 function queryAll<T>(sql: string, params: unknown[] = []): T[] {
   assertPersistenceReady();
-  const statement = db.prepare(sql);
-  statement.bind(params.map(value => value === undefined ? null : value));
-  const rows: T[] = [];
-  while (statement.step()) rows.push(statement.getAsObject() as T);
-  statement.free();
-  return rows;
+  return measureRequestPhase('sqlMs', () => {
+    const statement = db.prepare(sql);
+    statement.bind(params.map(value => value === undefined ? null : value));
+    const rows: T[] = [];
+    while (statement.step()) rows.push(statement.getAsObject() as T);
+    statement.free();
+    return rows;
+  });
 }
 
 function queryOne<T>(sql: string, params: unknown[] = []): T | undefined {
@@ -225,7 +228,7 @@ function persist(): void {
 }
 
 function run(sql: string, params: unknown[] = []): number {
-  db.run(sql, params.map(value => value === undefined ? null : value));
+  measureRequestPhase('sqlMs', () => db.run(sql, params.map(value => value === undefined ? null : value)));
   const changes = db.getRowsModified();
   persist();
   return changes;

@@ -27,10 +27,27 @@ function greeting(hour: number): string {
   return '晚上好';
 }
 
+function weekdayLabel(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+}
+
 function dateLabel(date: string): string {
   const [year, month, day] = date.split('-').map(Number);
-  const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
-  return `${year}年${month}月${day}日 ${weekday}`;
+  return `${year}年${month}月${day}日 ${weekdayLabel(date)}`;
+}
+
+function apparentWeather(weather: DailyWeather | null | undefined, reminderDate: string): string[] {
+  const apparent = weather?.apparentTemperature;
+  if (!weather || !apparent) return [];
+  const label = weather.date === reminderDate ? '全天体感' : `${weather.date.slice(5)} 体感`;
+  const parts = [`${label} ${Math.round(apparent.min)}～${Math.round(apparent.max)}°C`];
+  const change = apparent.changeFromPreviousDay;
+  if (!weather.isStale && change !== null) {
+    const degrees = Math.round(Math.abs(change) + 1e-9);
+    parts.push(degrees === 0 ? '较昨日预报基本持平' : `较昨日预报${change < 0 ? '降' : '升'} ${degrees}°C`);
+  }
+  return parts;
 }
 
 function scheduleTime(schedule: Schedule): string {
@@ -40,7 +57,8 @@ function scheduleTime(schedule: Schedule): string {
   return end && end !== start ? `${start}–${end}` : start;
 }
 
-function weatherLine(weather: DailyWeather | null, locationName?: string | null, weatherError?: string | null): string {
+function weatherLines(date: string, weather: DailyWeather | null, locationName?: string | null, weatherError?: string | null): string[] {
+  const place = locationName ? locationName + ' · ' : '';
   if (weather) {
     const temperature = weather.temperatureMin == null || weather.temperatureMax == null
       ? ''
@@ -49,10 +67,12 @@ function weatherLine(weather: DailyWeather | null, locationName?: string | null,
     const cacheNote = weather.source === 'cache' || weather.isStale
       ? ` · 使用缓存，仅供参考（已缓存约 ${Math.max(1, Math.round(weather.cacheAgeMs / 60_000))} 分钟）`
       : '';
-    return `${locationName ? escapeEmailHtml(locationName) + ' · ' : ''}${escapeEmailHtml(weather.description)}${temperature}${rain}${cacheNote}`;
+    const apparent = apparentWeather(weather, date);
+    const current = `${place}${weather.description}${temperature}${rain}${cacheNote}`;
+    return apparent.length ? [current, `${apparent.join(' · ')} · ECMWF IFS 预报`] : [current];
   }
-  if (weatherError) return `${locationName ? escapeEmailHtml(locationName) + ' · ' : ''}天气暂不可用，不影响日程提醒`;
-  return locationName ? `${escapeEmailHtml(locationName)} · 尚未取得天气信息` : '设置常驻城市或区县后，可在邮件中查看天气';
+  if (weatherError) return [`${place}天气暂不可用，不影响日程提醒`];
+  return [locationName ? `${place}尚未取得天气信息` : '设置常驻城市或区县后，可在邮件中查看天气'];
 }
 
 export function getDailyReminderWeatherSubjectPrefix(weather: DailyWeather | null | undefined): string {
@@ -111,7 +131,7 @@ export function renderDailyReminderEmail(input: {
   locationName?: string | null;
   weather?: DailyWeather | null;
   weatherError?: string | null;
-}): { subject: string; html: string } {
+}): { subject: string; html: string; text: string } {
   const schedules = [...input.schedules].sort((left, right) => left.start_time.localeCompare(right.start_time));
   const pending = schedules.filter(schedule => !schedule.is_completed);
   const overdue = [...(input.overdue || [])];
@@ -126,7 +146,12 @@ export function renderDailyReminderEmail(input: {
         ? '今天的安排已全部完成'
         : `${input.date.slice(5)} 今日还有 ${pending.length} 项安排`;
   const weatherPrefix = getDailyReminderWeatherSubjectPrefix(input.weather);
-  const subject = weatherPrefix ? `${weatherPrefix} ${baseSubject}` : baseSubject;
+  const apparent = apparentWeather(input.weather, input.date);
+  const subjectBase = apparent.length
+    ? [`${input.date.slice(5)} ${weekdayLabel(input.date)}`, ...apparent,
+        pending.length ? `今日 ${pending.length} 项待处理` : allCompleted ? '今日安排已完成' : '今日 0 项安排'].join('｜')
+    : baseSubject;
+  const subject = weatherPrefix ? `${weatherPrefix} ${subjectBase}` : subjectBase;
   const intro = pending.length === 0 && backlogCount > 0
     ? `今天没有待处理安排，另有 ${backlogCount} 项待整理。`
     : schedules.length === 0
@@ -155,8 +180,16 @@ export function renderDailyReminderEmail(input: {
       </td></tr>`;
   }).join('');
 
+  const weatherDisplay = weatherLines(input.date, input.weather || null, input.locationName, input.weatherError);
+  const backlogText = (title: string, items: ActionItem[]) => items.length ? [
+    '', `${title} ${items.length} 项`, ...items.slice(0, 10).map(item => `${item.title} · ${actionItemDueLabel(item, title)}`),
+  ] : [];
+  const text = [dateLabel(input.date), ...weatherDisplay, '天气来自 Open-Meteo', '', intro,
+    ...schedules.map(schedule => `${scheduleTime(schedule)} · ${schedule.title}${schedule.is_completed ? '（已完成）' : ''}`),
+    ...backlogText('已逾期', overdue), ...backlogText('无固定期限', unscheduled), '', '打开今日行动中心', input.appUrl].join('\n');
   return {
     subject,
+    text,
     html: `<!doctype html>
 <html lang="zh-CN"><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;color:#0f172a">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#f1f5f9">
@@ -169,7 +202,7 @@ export function renderDailyReminderEmail(input: {
         </td></tr>
         <tr><td style="padding:0 26px 18px">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;background:#eff6ff;border-radius:10px">
-            <tr><td style="padding:12px 14px;font-size:13px;line-height:1.6;color:#1e3a8a">${weatherLine(input.weather || null, input.locationName, input.weatherError)}</td></tr>
+            <tr><td style="padding:12px 14px;font-size:13px;line-height:1.6;color:#1e3a8a">${weatherDisplay.map(escapeEmailHtml).join('<br>')}</td></tr>
           </table>
         </td></tr>
         <tr><td style="padding:0 26px 15px;font-size:14px;line-height:1.7;color:#475569">${intro}</td></tr>

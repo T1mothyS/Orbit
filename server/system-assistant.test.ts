@@ -129,3 +129,50 @@ test('tools expose read queries and actions, without notification tests, shell o
 test('operations retention regression tests use synthetic directories only',()=>{
   execFileSync(process.platform==='win32'?'python':'python3',['scripts/orbit_operations_test.py'],{cwd:path.resolve('.'),timeout:60000,stdio:'pipe'});
 });
+
+test('low-traffic system events persist, deduplicate, deliver in-app and require an administrator', async () => {
+  const { listSystemEvents, observeOperation, observeRuntimeEvents } = await import('./system-events.js');
+  const { setInAppEnabled, processInAppNotifications, notificationContinuation } = await import('./notification-chat.js');
+  const oldEnabled = process.env.ORBIT_SYSTEM_ALERTS_ENABLED;
+  const oldAdmins = process.env.ORBIT_SYSTEM_ALERT_ADMINS;
+  process.env.ORBIT_SYSTEM_ALERTS_ENABLED = 'true';
+  process.env.ORBIT_SYSTEM_ALERT_ADMINS = 'admin,owner';
+  setInAppEnabled('admin', true);
+  setInAppEnabled('owner', true);
+  try {
+    const at = Date.now();
+    const route = 'POST /api/completions';
+    for (let index = 0; index < 4; index++) {
+      observeOperation(route, { durationMs: 2300, operationId: String(index), observedAt: at + index * 2000, status: 200 }, 'sample');
+    }
+    observeRuntimeEvents();
+    observeRuntimeEvents();
+    processInAppNotifications(new Date(at + 20_000));
+    const events = listSystemEvents('admin');
+    assert.equal(events?.length, 1);
+    assert.equal(events?.[0].rule, 'REPEATED_SLOW_OPERATION');
+    assert.equal(listSystemEvents('owner'), null);
+    const notice = activity.listNotifications('admin', { sourceType: 'system_event' });
+    assert.equal(notice.length, 1);
+    assert.equal(notice[0].status, 'sent');
+    assert.equal(activity.listNotifications('owner', { sourceType: 'system_event' }).length, 0);
+    assert.equal(notificationContinuation('admin', notice[0].id).systemEvent?.id, events?.[0].id);
+    assert.throws(() => notificationContinuation('owner', notice[0].id));
+    const response = await fetch(base + '/api/system/events', { headers: headers('owner') });
+    assert.equal(response.status, 403);
+
+    for (let index = 0; index < 3; index++) {
+      observeOperation(route, { durationMs: 100, operationId: 'recovery-' + index, observedAt: at + 620_000 + index * 2000, status: 200 }, 'sample');
+    }
+    observeRuntimeEvents();
+    observeRuntimeEvents();
+    processInAppNotifications(new Date(at + 700_000));
+    assert.ok(listSystemEvents('admin')?.[0].recoveredAt);
+    assert.equal(activity.listNotifications('admin', { sourceType: 'system_event' }).length, 2);
+  } finally {
+    if (oldEnabled === undefined) delete process.env.ORBIT_SYSTEM_ALERTS_ENABLED;
+    else process.env.ORBIT_SYSTEM_ALERTS_ENABLED = oldEnabled;
+    if (oldAdmins === undefined) delete process.env.ORBIT_SYSTEM_ALERT_ADMINS;
+    else process.env.ORBIT_SYSTEM_ALERT_ADMINS = oldAdmins;
+  }
+});

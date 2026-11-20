@@ -1,3 +1,4 @@
+import { measureRequestPhase } from './request-timing.js';
 import { registerPersistence, persistDatabase, recoverPersistence, assertPersistenceReady, withPersistenceTransaction } from './persistence.js';
 import { recordActivityEvent, activityOrigin } from './activity-events.js';
 import { validateScheduleTime } from './schedule-time.js';
@@ -171,14 +172,16 @@ function saveScheduleDb(): void {
 // 辅助函数：将结果转为对象数组
 function queryAll<T>(sql: string, params: any[] = []): T[] {
   assertPersistenceReady();
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const results: T[] = [];
-  while (stmt.step()) {
-    results.push(stmt.getAsObject() as T);
-  }
-  stmt.free();
-  return results;
+  return measureRequestPhase('sqlMs', () => {
+    const stmt = db.prepare(sql);
+    stmt.bind(params);
+    const results: T[] = [];
+    while (stmt.step()) {
+      results.push(stmt.getAsObject() as T);
+    }
+    stmt.free();
+    return results;
+  });
 }
 
 function queryOne<T>(sql: string, params: any[] = []): T | undefined {
@@ -189,7 +192,7 @@ function queryOne<T>(sql: string, params: any[] = []): T | undefined {
 function run(sql: string, params: any[] = []): { changes: number } {
   // 将所有 undefined 转为 null（sql.js 不允许 undefined）
   const safeParams = params.map(p => p === undefined ? null : p);
-  db.run(sql, safeParams);
+  measureRequestPhase('sqlMs', () => db.run(sql, safeParams));
   const changes = db.getRowsModified();
   saveScheduleDb();
   return { changes };

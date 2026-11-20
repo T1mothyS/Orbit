@@ -1,3 +1,7 @@
+import { isValidDateKey } from './date-key.js';
+import { addDateDays } from './orbit-time.js';
+import { parseScheduleStart } from './schedule-time.js';
+
 export interface WeatherLocation {
   id: number;
   name: string;
@@ -20,6 +24,12 @@ export interface DailyWeather {
   temperatureMin: number | null;
   precipitationProbabilityMax: number | null;
   windSpeedMax: number | null;
+  apparentTemperature?: {
+    min: number;
+    max: number;
+    changeFromPreviousDay: number | null;
+    dataset: 'ecmwf_ifs025';
+  };
   source: 'live' | 'cache';
   isStale: boolean;
   retrievedAt: string;
@@ -50,6 +60,9 @@ interface CacheEntry<T> {
 
 const locationCache = new Map<string, CacheEntry<WeatherLocation[]>>();
 const weatherCache = new Map<string, CacheEntry<DailyWeather>>();
+const pendingWeather = new Map<string, Promise<DailyWeather>>();
+const APPARENT_DATASET = 'ecmwf_ifs025';
+const DAY_MS = 86_400_000;
 const LOCATION_CACHE_MS = 12 * 60 * 60 * 1000;
 const WEATHER_CACHE_MS = 15 * 60 * 1000;
 const STALE_CACHE_MS = 6 * 60 * 60 * 1000;
@@ -243,14 +256,96 @@ export function reminderWeatherLocation(preference?: {
   };
 }
 
-export async function getDailyWeather(
-  location: Pick<WeatherLocation, 'latitude' | 'longitude' | 'timezone'>,
+type DailyWeatherOptions = { fetcher?: FetchLike; timeoutMs?: number; totalTimeoutMs?: number; now?: number; includeApparent?: boolean };
+type WeatherCoordinates = Pick<WeatherLocation, 'latitude' | 'longitude' | 'timezone'>;
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function hasComparableDays(date: string, previousDate: string, timezone: string): boolean {
+  const midnight = (day: string) => parseScheduleStart(day + 'T00:00:00', timezone)?.getTime();
+  const previous = midnight(previousDate);
+  const current = midnight(date);
+  const next = midnight(addDateDays(date, 1));
+  // Open-Meteo daily data uses a fixed offset for the range. Skip comparisons
+  // that would rely on a 24-hour aggregation across a local clock change.
+  return previous !== undefined && current !== undefined && next !== undefined
+    && current - previous === DAY_MS && next - current === DAY_MS;
+}
+
+async function requestDailyWeather(
+  location: WeatherCoordinates,
   date: string,
-  options: { fetcher?: FetchLike; timeoutMs?: number; totalTimeoutMs?: number; now?: number } = {},
+  options: DailyWeatherOptions,
+  now: number,
 ): Promise<DailyWeather> {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('天气日期格式不正确');
+  const compare = options.includeApparent === true;
+  const previousDate = compare ? addDateDays(date, -1) : date;
+  const url = new URL('https://api.open-meteo.com/v1/forecast');
+  url.searchParams.set('latitude', String(location.latitude));
+  url.searchParams.set('longitude', String(location.longitude));
+  url.searchParams.set('timezone', location.timezone);
+  url.searchParams.set('start_date', previousDate);
+  url.searchParams.set('end_date', date);
+  const fields = ['weather_code', 'temperature_2m_max', 'temperature_2m_min', 'precipitation_probability_max', 'wind_speed_10m_max'];
+  if (compare) {
+    url.searchParams.set('models', 'best_match,' + APPARENT_DATASET);
+    url.searchParams.set('temperature_unit', 'celsius');
+    fields.push('apparent_temperature_min', 'apparent_temperature_max', 'apparent_temperature_mean');
+  }
+  url.searchParams.set('daily', fields.join(','));
+  const payload = await fetchJsonWithRetry(url, options.fetcher || fetch, options);
+  const days = payload?.daily?.time;
+  const dayIndex = Array.isArray(days) ? days.indexOf(date) : -1;
+  const fieldName = (field: string) => compare ? field + '_best_match' : field;
+  const dailyValue = (field: string) => finiteNumber(payload?.daily?.[fieldName(field)]?.[dayIndex]);
+  const weatherCode = dailyValue('weather_code');
+  if (dayIndex < 0 || dayIndex !== days.lastIndexOf(date) || weatherCode === null) {
+    throw new WeatherServiceError('天气服务未返回指定日期的数据', 'response');
+  }
+  const result: DailyWeather = {
+    date,
+    timezone: cleanPart(payload.timezone) || location.timezone,
+    weatherCode,
+    description: weatherDescription(weatherCode),
+    temperatureMax: dailyValue('temperature_2m_max'),
+    temperatureMin: dailyValue('temperature_2m_min'),
+    precipitationProbabilityMax: dailyValue('precipitation_probability_max'),
+    windSpeedMax: dailyValue('wind_speed_10m_max'),
+    source: 'live',
+    isStale: false,
+    retrievedAt: new Date(now).toISOString(),
+    cacheAgeMs: 0,
+  };
+  if (compare && payload.timezone === location.timezone) {
+    const modelValue = (stat: string, index: number) => {
+      const name = 'apparent_temperature_' + stat + '_' + APPARENT_DATASET;
+      return payload.daily_units?.[name] === '°C' ? finiteNumber(payload.daily?.[name]?.[index]) : null;
+    };
+    const min = modelValue('min', dayIndex);
+    const max = modelValue('max', dayIndex);
+    if (min !== null && max !== null && min <= max) {
+      const today = modelValue('mean', dayIndex);
+      const priorIndex = days.indexOf(previousDate);
+      const yesterday = priorIndex >= 0 && priorIndex === days.lastIndexOf(previousDate) ? modelValue('mean', priorIndex) : null;
+      const comparable = today !== null && today >= min && today <= max && yesterday !== null
+        && hasComparableDays(date, previousDate, location.timezone);
+      result.apparentTemperature = { min, max, changeFromPreviousDay: comparable ? today - yesterday : null, dataset: APPARENT_DATASET };
+    }
+  }
+  return result;
+}
+
+export async function getDailyWeather(
+  location: WeatherCoordinates,
+  date: string,
+  options: DailyWeatherOptions = {},
+): Promise<DailyWeather> {
+  if (!isValidDateKey(date)) throw new Error('天气日期格式不正确');
   if (!Number.isFinite(location.latitude) || !Number.isFinite(location.longitude)) throw new Error('天气地点坐标不正确');
-  const cacheKey = `${location.latitude.toFixed(4)}:${location.longitude.toFixed(4)}:${location.timezone}:${date}`;
+  const plainKey = `${location.latitude.toFixed(4)}:${location.longitude.toFixed(4)}:${location.timezone}:${date}`;
+  const cacheKey = options.includeApparent ? plainKey + ':' + APPARENT_DATASET : plainKey;
   const now = options.now ?? Date.now();
   const cached = weatherCache.get(cacheKey);
   if (cached && cached.expiresAt > now) {
@@ -262,47 +357,31 @@ export async function getDailyWeather(
     };
   }
 
-  const url = new URL('https://api.open-meteo.com/v1/forecast');
-  url.searchParams.set('latitude', String(location.latitude));
-  url.searchParams.set('longitude', String(location.longitude));
-  url.searchParams.set('timezone', location.timezone);
-  url.searchParams.set('start_date', date);
-  url.searchParams.set('end_date', date);
-  url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max');
-  try {
-    const payload = await fetchJsonWithRetry(url, options.fetcher || fetch, options);
-    const weatherCode = Number(payload?.daily?.weather_code?.[0]);
-    if (!Number.isFinite(weatherCode) || payload?.daily?.time?.[0] !== date) {
-      throw new WeatherServiceError('天气服务未返回指定日期的数据', 'response');
+  const pending = pendingWeather.get(cacheKey);
+  if (pending) return pending;
+  const request = requestDailyWeather(location, date, options, now).then(result => {
+    const entry = { expiresAt: now + WEATHER_CACHE_MS, storedAt: now, value: result };
+    setBoundedCache(weatherCache, cacheKey, entry, MAX_WEATHER_CACHE_ENTRIES);
+    if (options.includeApparent) {
+      const { apparentTemperature: _, ...plain } = result;
+      setBoundedCache(weatherCache, plainKey, { ...entry, value: plain }, MAX_WEATHER_CACHE_ENTRIES);
     }
-    const numberOrNull = (value: unknown) => value != null && Number.isFinite(Number(value)) ? Number(value) : null;
-    const result: DailyWeather = {
-      date,
-      timezone: cleanPart(payload.timezone) || location.timezone,
-      weatherCode,
-      description: weatherDescription(weatherCode),
-      temperatureMax: numberOrNull(payload.daily.temperature_2m_max?.[0]),
-      temperatureMin: numberOrNull(payload.daily.temperature_2m_min?.[0]),
-      precipitationProbabilityMax: numberOrNull(payload.daily.precipitation_probability_max?.[0]),
-      windSpeedMax: numberOrNull(payload.daily.wind_speed_10m_max?.[0]),
-      source: 'live',
-      isStale: false,
-      retrievedAt: new Date(now).toISOString(),
-      cacheAgeMs: 0,
-    };
-    setBoundedCache(weatherCache, cacheKey, { expiresAt: now + WEATHER_CACHE_MS, storedAt: now, value: result }, MAX_WEATHER_CACHE_ENTRIES);
     return result;
-  } catch (error) {
-    if (cached && now >= cached.expiresAt && now - cached.expiresAt <= STALE_CACHE_MS) {
+  }).catch((error: unknown) => {
+    const standard = weatherCache.get(plainKey);
+    const fallback = standard && (!cached || standard.storedAt > cached.storedAt) ? standard : cached;
+    if (fallback && now - fallback.expiresAt <= STALE_CACHE_MS) {
       return {
-        ...cached.value,
-        source: 'cache',
-        isStale: true,
-        cacheAgeMs: Math.max(0, now - cached.storedAt),
-      };
+        ...fallback.value,
+        source: now >= fallback.expiresAt ? 'cache' : 'live',
+        isStale: now >= fallback.expiresAt,
+        cacheAgeMs: Math.max(0, now - fallback.storedAt),
+      } satisfies DailyWeather;
     }
     throw error;
-  }
+  }).finally(() => pendingWeather.delete(cacheKey));
+  pendingWeather.set(cacheKey, request);
+  return request;
 }
 
 export function clearWeatherCaches(): void {

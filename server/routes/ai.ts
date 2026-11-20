@@ -8,6 +8,7 @@ import { parseStatisticsFilters } from '../../src/utils/statistics-filters.js';
 import { chatTimelinePage } from '../chat-timeline.js';
 import { getNotification } from '../activity-store.js';
 import { notificationObject, notificationContinuation } from '../notification-chat.js';
+import { listSystemEvents } from '../system-events.js';
 import { ORBIT_AI_QUERY_POLICY } from '../orbit-ai-policy.js';
 import { isOrbitDiagnosticQuestion, isOrbitProductQuestion, isOrbitIntegrationQuestion, PRODUCT_ASSISTANT_RULES } from '../product-assistant-intent.js';
 import { productAssistantContext } from '../product-assistant-context.js';
@@ -171,7 +172,7 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
           Object.assign(meta, status);
           if (notice) {
             meta.notification = notificationMessageContent(notice, snapshot, status.state !== 'discarded' && view.scheduleItems?.length === 1);
-            if (notice.sourceType === 'activity_report' && notice.kind === 'weekly_report') {
+            if (notice.sourceType === 'system_event' || (notice.sourceType === 'activity_report' && notice.kind === 'weekly_report')) {
               view.text = meta.notification.title + '\n\n' + meta.notification.body;
             }
           }
@@ -330,6 +331,11 @@ export function createAiRouter({ authenticate }: Pick<ReturnType<typeof createAu
         const notification=getNotification(body.notificationId,userId)!;
         const ref=notificationObject(notification);if(ref?.type==='schedule')referencedIds.add(ref.id);if(ref?.type==='reminder'&&ref.instanceId)referencedIds.add('reminder-cycle:'+ref.instanceId);
       } catch(error) {return res.status(400).json({error:error instanceof Error?error.message:'无法读取关联通知'});}
+    }
+    const systemEventId = /(?:事件|告警)\s*(?:ID\s*)?[：:]?\s*([a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12})\b/i.exec(text)?.[1];
+    if (systemEventId && !selectedNotification) {
+      const event = listSystemEvents(userId, systemEventId.toLowerCase())?.[0];
+      if (event) selectedNotification = `用户明确选择的 Orbit 运行事件。仅解释这些观测事实，排查建议保持只读。\n${JSON.stringify(event)}`;
     }
     const scopeId=context ? orbit.conversation(userId,context.conversationId).scope_schedule_id : null;
     if(scopeId)referencedIds.add(scopeId);

@@ -28,6 +28,8 @@ export function activityStatistics(userId:string,range:{startAt:string;endAt:str
   const overdue=schedules.filter(s=>!s.is_completed&&!s.is_unscheduled&&instant(s.start_time)<now.getTime());
   const cycleOverdue=projections.filter(p=>p.cycle&&p.cycle.status!=='completed'&&p.cycle.status!=='cancelled'&&(p.cycle.plannedDate||p.cycle.dueDate)<dateInZone(now,p.task.timezone));
   const aging=backlog.filter(s=>now.getTime()-instant(s.created_at)>=7*86400000);
+  const openSchedules = schedules.filter(s => !s.is_completed);
+  const openCycles = projections.filter(p => p.current && p.task.enabled && p.cycle && ['pending', 'expired'].includes(p.cycle.status));
   const intervals=[...valid.values()].flatMap(c=>{const s=c.sourceType==='schedule'?schedules.find(s=>s.id===c.sourceId):null;const at=s?instant(s.created_at):NaN,done=instant(c.completedAt);return Number.isFinite(at)&&done>=at?[(done-at)/3600000]:[];});
   const heatmap=Array.from({length:7},()=>Array<number>(24).fill(0));
   const activityTimes=[...created.map(s=>s.created_at),...recurring.map(t=>t.createdAt),...[...valid.values()].map(c=>c.sourceType==='reminder'?c.createdAt:c.completedAt).filter(inside),...notes.filter(n=>inside(n.created_at)).map(n=>n.created_at),...messages.filter(m=>inside(m.created_at)).map(m=>m.created_at)];
@@ -52,5 +54,27 @@ export function activityStatistics(userId:string,range:{startAt:string;endAt:str
   for(const c of categories)metricDetails['category:'+c.id]=created.filter(s=>s.category===c.id).map(scheduleDetail);
   metricDetails.intervals=completedDetails.filter(d=>{const c=[...valid.values()].find(c=>c.id===d.id);const item=c?.sourceType==='schedule'?schedules.find(s=>s.id===c.sourceId):null;return item&&Number.isFinite(instant(item.created_at))&&instant(d.date)>=instant(item.created_at);});
   const daily=[...new Set([...activityTimes.map(v=>dateInZone(new Date(instant(v)),range.timezone)),...completedDetails.map(d=>dateInZone(new Date(instant(d.date)),range.timezone)),...rescheduled.map(e=>dateInZone(new Date(e.occurred_at),range.timezone))])].sort().map(date=>({date,created:metricDetails.created.filter(d=>dateInZone(new Date(instant(d.date)),range.timezone)===date).length,completed:completedDetails.filter(d=>dateInZone(new Date(instant(d.date)),range.timezone)===date).length,rescheduled:rescheduled.filter(e=>dateInZone(new Date(e.occurred_at),range.timezone)===date).length,notes:metricDetails.notes.filter(d=>dateInZone(new Date(instant(d.date)),range.timezone)===date).length}));
-  return {range,coverage:{since,mode:coverage},created:created.length+recurring.length,actualCompleted:valid.size,backlog:backlog.length,overdue:metricDetails.overdue.length,aging:aging.length,averageCompletionHours:intervals.length?Math.round(intervals.reduce((a,b)=>a+b,0)/intervals.length*10)/10:null,completionSamples:intervals.length,rescheduled:coverage==='none'?null:rescheduled.length,notesAdded:metricDetails.notes.length,notesOptimized:coverage==='none'?null:optimized.length,aiConfirmed:coverage==='none'?null:metricDetails.ai.length,aiAcceptedPlans:coverage==='none'?null:collaboration.length,reminderCompleted:assisted.length,toolUses:steps.length,heatmap,categories,sources,daily,metricDetails,upcoming:[...schedules.filter(s=>!s.is_completed&&!s.is_unscheduled&&instant(s.start_time)>=end&&instant(s.start_time)<nextEnd).map(s=>({...scheduleDetail(s),date:s.start_time})),...projections.filter(p=>p.task.enabled&&p.cycle&&!['completed','cancelled'].includes(p.cycle.status)).flatMap(p=>{const date=p.cycle!.dueDate+'T'+p.task.config.reminderTime;const at=parseScheduleStart(date,p.task.timezone)?.getTime()??NaN;return at>=end&&at<nextEnd?[{...taskDetail(p.task),id:p.cycle!.id,date,href:orbitObjectPath({type:'reminder',id:p.task.id,instanceId:p.cycle!.id})}]:[];})].sort((a,b)=>instant(a.date)-instant(b.date))};
+  const today = dateInZone(now, range.timezone);
+  const weeklyOverdue = openSchedules.filter(s => !s.is_unscheduled && (s.all_day
+    ? s.start_time.slice(0, 10) < today
+    : instant(s.type === 'event' ? s.end_time || s.start_time : s.start_time) < now.getTime()))
+    .map(s => ({ ...scheduleDetail(s), date: s.type === 'event' && !s.all_day ? s.end_time || s.start_time : s.start_time, allDay: s.all_day }));
+  const weeklyUpcoming = openSchedules.filter(s => !s.is_unscheduled && instant(s.start_time) >= end && instant(s.start_time) < nextEnd)
+    .map(s => ({ ...scheduleDetail(s), date: s.start_time, allDay: s.all_day }));
+  for (const { task, cycle } of openCycles) {
+    if (!cycle) continue;
+    const dueDay = cycle.plannedDate || cycle.dueDate;
+    const dueAt = parseScheduleStart(dueDay + 'T' + task.config.reminderTime, task.timezone);
+    const item = { ...taskDetail(task), id: cycle.id, allDay: false,
+      href: orbitObjectPath({ type: 'reminder', id: task.id, instanceId: cycle.id }) };
+    if (dueDay < dateInZone(now, task.timezone)) weeklyOverdue.push({ ...item, date: dueAt?.toISOString() ?? dueDay });
+    if (dueAt && dueAt.getTime() >= end && dueAt.getTime() < nextEnd) weeklyUpcoming.push({ ...item, date: dueAt.toISOString() });
+  }
+  const weekly = {
+    open: openSchedules.length + openCycles.length,
+    overdue: weeklyOverdue.length,
+    overdueDetails: weeklyOverdue.sort((a, b) => instant(a.date) - instant(b.date)).slice(0, 8),
+    upcomingDetails: weeklyUpcoming.sort((a, b) => instant(a.date) - instant(b.date)).slice(0, 8),
+  };
+  return {range,weekly,coverage:{since,mode:coverage},created:created.length+recurring.length,actualCompleted:valid.size,backlog:backlog.length,overdue:metricDetails.overdue.length,aging:aging.length,averageCompletionHours:intervals.length?Math.round(intervals.reduce((a,b)=>a+b,0)/intervals.length*10)/10:null,completionSamples:intervals.length,rescheduled:coverage==='none'?null:rescheduled.length,notesAdded:metricDetails.notes.length,notesOptimized:coverage==='none'?null:optimized.length,aiConfirmed:coverage==='none'?null:metricDetails.ai.length,aiAcceptedPlans:coverage==='none'?null:collaboration.length,reminderCompleted:assisted.length,toolUses:steps.length,heatmap,categories,sources,daily,metricDetails,upcoming:[...schedules.filter(s=>!s.is_completed&&!s.is_unscheduled&&instant(s.start_time)>=end&&instant(s.start_time)<nextEnd).map(s=>({...scheduleDetail(s),date:s.start_time})),...projections.filter(p=>p.task.enabled&&p.cycle&&!['completed','cancelled'].includes(p.cycle.status)).flatMap(p=>{const date=p.cycle!.dueDate+'T'+p.task.config.reminderTime;const at=parseScheduleStart(date,p.task.timezone)?.getTime()??NaN;return at>=end&&at<nextEnd?[{...taskDetail(p.task),id:p.cycle!.id,date,href:orbitObjectPath({type:'reminder',id:p.task.id,instanceId:p.cycle!.id})}]:[];})].sort((a,b)=>instant(a.date)-instant(b.date))};
 }

@@ -1,10 +1,12 @@
 import * as activityStore from './activity-store.js';
 import * as db from './db.js';
+import { getActivityReport } from './activity-reports.js';
 import { deliverDailyAction, deliverInApp, isDailyAction } from './notification-chat.js';
 import {
   sendDailyReminderEmail,
   sendDailyReportEmail,
   sendQueuedNotificationEmail,
+  sendWeeklyActivityEmail,
   summarizeEmailSendResult,
   type EmailSendResult,
 } from './email-service.js';
@@ -249,10 +251,12 @@ export async function processNotificationQueue(log?: NotificationLogger): Promis
         if (!email) throw new Error('用户没有可用的提醒邮箱');
         const emailStartedAt = Date.now();
         const sendResult = item.kind === 'daily_digest'
-          ? await sendDailyReminderEmail(email, item.userId, item.sourceId)
+          ? await sendDailyReminderEmail(email, item.userId, item.sourceId, item.createdAt)
           : item.kind === 'daily_report'
             ? await sendDailyReportEmail(email, item.sourceId, item.body)
-            : await sendQueuedNotificationEmail(email, item.title, item.body);
+            : item.kind === 'weekly_report' && item.sourceType === 'activity_report'
+              ? await sendWeeklyActivityEmail(email, getActivityReport(item.userId, item.sourceId))
+              : await sendQueuedNotificationEmail(email, item.title, item.body);
         log?.('SMTP 已接受收件人', undefined, notificationLogData(claimedItem, {
           event: 'email_smtp_accepted',
           recipient: email,

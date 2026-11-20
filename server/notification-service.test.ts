@@ -207,3 +207,46 @@ test('桌面弹窗仅读取当前账号近 15 分钟到期且未读的浏览器�
   assert.deepEqual(activity.listBrowserPopups(userId, now).map(item => item.id), [fresh, boundary]);
   assert.equal(activity.listNotifications(userId, { unreadOnly: true }).some(item => item.id === old), true);
 });
+
+test('每日邮件在跨时区重试和天气 API 失败时仍保留提醒并完成替身发送', async () => {
+  const { initReminderDb } = await import('./reminder-store.js');
+  const { sendDailyReminderEmail, setEmailTransportForTests } = await import('./email-service.js');
+  await initReminderDb();
+  const userId = 'notification-service-user';
+  const preference = db.getReminder(userId)!;
+  db.upsertReminder({
+    ...preference, hour: 0, minute: 30,
+    home_latitude: 34, home_longitude: -118, home_timezone: 'America/Los_Angeles', home_location_name: '测试天气城市',
+  });
+  const expectedRecipient = 'test@example.invalid';
+  let sent: Record<string, unknown> | undefined;
+  setEmailTransportForTests({ sendMail: async options => {
+    sent = options;
+    return { accepted: [expectedRecipient], rejected: [], pending: [] };
+  } });
+  const originalFetch = globalThis.fetch;
+  const oldPassword = process.env.SMTP_PASS;
+  process.env.SMTP_PASS = 'synthetic-mail-transport-only';
+  let lookups = 0;
+  globalThis.fetch = async input => {
+    const url = new URL(String(input));
+    assert.equal(url.hostname, 'api.open-meteo.com');
+    assert.equal(url.searchParams.get('timezone'), 'America/Los_Angeles');
+    assert.equal(url.searchParams.get('start_date'), '2026-11-18');
+    assert.equal(url.searchParams.get('end_date'), '2026-11-19');
+    lookups++;
+    return new Response('upstream unavailable', { status: 503 });
+  };
+  try {
+    const result = await sendDailyReminderEmail(expectedRecipient, userId, '2026-11-20', '2026-11-19T16:30:01Z');
+    assert.deepEqual(result.accepted, [expectedRecipient]);
+    assert.equal(lookups, 2);
+    assert.match(String(sent?.html), /2026年11月20日 周五/);
+    assert.match(String(sent?.text), /天气暂不可用/);
+    assert.doesNotMatch(String(sent?.subject), /较昨日/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (oldPassword === undefined) delete process.env.SMTP_PASS;
+    else process.env.SMTP_PASS = oldPassword;
+  }
+});

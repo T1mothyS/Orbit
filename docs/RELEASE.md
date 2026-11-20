@@ -46,6 +46,8 @@ UI 发布前先核对 [批准基线与平台验收](archive/engineering/TEST-MAT
 
 依赖变化且本机为 Windows 时，main 的 CI 使用 Ubuntu 24.04/Node 22.23.2，完整校验通过后生成 `orbit-linux-release` 短期 artifact：冻结源码、前端构建和同一轮安装的 Linux `node_modules`（包含 PM2 使用的 tsx）。构建机验证 sharp/PDF/Office 加载；manifest 记录 commit/version/源文件哈希，完整包另有 SHA-256。下载后核对 workflow head、成功状态、包 hash 与 manifest，再按路径 B 在生产暂存并做运行时探针。该 CI 不保存生产凭据，也不自动部署；生产旧依赖保留用于回滚。
 
+上传 Linux 制品前，CI 在独立临时目录验证 tarball SHA-256、解包并记录块占用，使用合成配置启动包内应用。验收健康、首页、`/today`、入口 JS/CSS 响应类型和内容，以及受保护 Tools 的匿名访问边界。应用数据在空的同级临时目录，不启动后台任务。严格 UI 原门禁继续执行。
+
 如果变化仅限可证明的纯JavaScript补丁，可以采用[路径B受控暂存条件](DEPLOYMENT-PATHS.md#路径-b依赖或环境变更升级)，复用未变化的Linux原生运行时；完整锁定差异、SRI、无安装脚本、平台及实际版本/运行探针必须同时通过。不把Windows依赖复制到Linux，也不因部署授权自动执行GitHub push。
 
 - main/tag 已同步且服务器目标 commit/包/配置相同且验收有效时，只做复核，不再切换重启。

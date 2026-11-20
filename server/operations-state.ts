@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 export function operationsDirectory(): string {
   return path.resolve(process.env.ORBIT_OPERATIONS_DIR || path.join(process.env.DATA_DIR || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../data'), 'operations'));
 }
-export function readOperations<T>(name: 'deployments.json' | 'status.json' | 'jobs.json', fallback: T): T {
+export function readOperations<T>(name: 'deployments.json' | 'status.json' | 'jobs.json' | 'system-events.json', fallback: T): T {
   try {
     const file = path.join(operationsDirectory(), name);
     const stat = fs.lstatSync(file);

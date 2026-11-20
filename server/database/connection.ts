@@ -1,3 +1,4 @@
+import { measureRequestPhase } from '../request-timing.js';
 import { applyChatSchema } from './schema.js';
 import { registerPersistence, persistDatabase, recoverPersistence, assertPersistenceReady } from '../persistence.js';
 import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
@@ -96,14 +97,16 @@ export function saveDb(): void {
 // 辅助函数：将结果转为对象数组
 export function queryAll<T>(sql: string, params: any[] = []): T[] {
   assertPersistenceReady();
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const results: T[] = [];
-  while (stmt.step()) {
-    results.push(stmt.getAsObject() as T);
-  }
-  stmt.free();
-  return results;
+  return measureRequestPhase('sqlMs', () => {
+    const stmt = db.prepare(sql);
+    stmt.bind(params);
+    const results: T[] = [];
+    while (stmt.step()) {
+      results.push(stmt.getAsObject() as T);
+    }
+    stmt.free();
+    return results;
+  });
 }
 
 export function queryOne<T>(sql: string, params: any[] = []): T | undefined {
@@ -114,7 +117,7 @@ export function queryOne<T>(sql: string, params: any[] = []): T | undefined {
 export function run(sql: string, params: any[] = []): { changes: number } {
   // 将所有 undefined 转为 null（sql.js 不允许 undefined）
   const safeParams = params.map(p => p === undefined ? null : p);
-  db.run(sql, safeParams);
+  measureRequestPhase('sqlMs', () => db.run(sql, safeParams));
   const changes = db.getRowsModified();
   saveDb();
   return { changes };

@@ -12,6 +12,9 @@ import { getActionCenter } from './action-center.js';
 import { renderDailyReminderEmail } from './daily-email-template.js';
 import { renderDailyDigestEmailPage, renderDailyDigestPlainText } from './daily-digest-template.js';
 import { getDailyWeather, getWeatherErrorKind, reminderWeatherLocation } from './weather-service.js';
+import { parseScheduleStart } from './schedule-time.js';
+import type { ActivityReport } from './activity-reports.js';
+import { renderWeeklyActivityEmail, weeklyEmailInput } from './weekly-email-template.js';
 import { addLog } from './log-service.js';
 import { escapeHtml, renderMarkdown } from './markdown-renderer.js';
 
@@ -296,18 +299,25 @@ export async function sendVerificationEmail(to: string, code: string, purpose: '
 }
 
 // 发送每日提醒邮件
-export async function sendDailyReminderEmail(to: string, userId: string, dateOverride?: string): Promise<EmailSendResult> {
+export async function sendDailyReminderEmail(to: string, userId: string, dateOverride?: string, enqueuedAt?: string): Promise<EmailSendResult> {
   const preference = db.getReminder(userId);
   const timezone = preference?.timezone || 'Asia/Shanghai';
-  const dateStr = dateOverride || dateInTimezone(new Date(), timezone);
+  const now = new Date();
+  const dateStr = dateOverride || dateInTimezone(now, timezone);
   const schedules = getSchedulesByDate(dateStr, userId);
-  const actionCenter = getActionCenter(userId, 7, new Date(), dateStr);
+  const actionCenter = getActionCenter(userId, 7, now, dateStr);
   let weather = null;
   let weatherError: string | null = null;
   const location = reminderWeatherLocation(preference);
   if (location) {
     try {
-      weather = await getDailyWeather(location, dateStr);
+      const queued = enqueuedAt ? new Date(enqueuedAt) : null;
+      const time = [preference?.hour ?? 8, preference?.minute ?? 0].map(value => String(value).padStart(2, '0')).join(':');
+      const weatherAnchor = !dateOverride ? now
+        : queued && Number.isFinite(queued.getTime()) && dateInTimezone(queued, timezone) === dateStr ? queued
+          : parseScheduleStart(`${dateStr}T${time}:00`, timezone);
+      const weatherDate = weatherAnchor ? dateInTimezone(weatherAnchor, location.timezone) : dateStr;
+      weather = await getDailyWeather(location, weatherDate, { includeApparent: true });
       if (weather.source === 'cache') {
         addLog('info', 'weather', '每日邮件使用天气缓存', {
           event: 'daily_weather_cache_fallback',
@@ -343,6 +353,7 @@ export async function sendDailyReminderEmail(to: string, userId: string, dateOve
     to,
     subject: rendered.subject,
     html: rendered.html,
+    text: rendered.text,
     mailType: 'daily_digest',
   });
 }
@@ -480,6 +491,11 @@ export async function sendQueuedNotificationEmail(to: string, title: string, bod
     `,
     mailType: 'queued_notification',
   });
+}
+
+export async function sendWeeklyActivityEmail(to: string, report: ActivityReport): Promise<EmailSendResult> {
+  const message = renderWeeklyActivityEmail(weeklyEmailInput(report), process.env.APP_URL || 'http://localhost:3000');
+  return sendEmail({ ...message, from: `"Orbit" <${OFFICIAL_SENDER_EMAIL}>`, to, mailType: 'weekly_report' });
 }
 
 export async function sendReminderTestEmail(to: string): Promise<EmailSendResult> {

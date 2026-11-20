@@ -144,3 +144,41 @@ test('今日没有待处理安排时显示积压摘要，并限制每组最多�
   assert.doesNotMatch(result.html, /不应进入无固定期限组/);
   assert.doesNotMatch(result.html, /逾期事项 11/);
 });
+
+test('每日邮件主题和卡片显示体感、预报差值与待处理事项', () => {
+  for (const [delta, expected] of [
+    [-2.5, '较昨日预报降 3°C'],
+    [2.5, '较昨日预报升 3°C'],
+    [-0.4, '较昨日预报基本持平'],
+    [null, ''],
+  ] as const) {
+    const result = renderDailyReminderEmail({
+      date: '2026-11-20', hour: 7, schedules: [schedule()], appUrl: 'https://example.com/today',
+      overdue: [actionItem()],
+      locationName: '测试地点',
+      weather: {
+        ...weather(0), date: '2026-11-20',
+        apparentTemperature: { min: -2.1, max: 6, changeFromPreviousDay: delta, dataset: 'ecmwf_ifs025' },
+      },
+    });
+    assert.equal(result.subject, ['11-20 周五', '全天体感 -2～6°C', expected, '今日 1 项待处理'].filter(Boolean).join('｜'));
+    assert.match(result.html, /测试地点.*降雨概率最高 70%/);
+    assert.match(result.html, /已逾期/);
+    assert.match(result.html, /ECMWF IFS 预报/);
+    if (expected) assert.ok(result.html.includes(expected));
+    else assert.doesNotMatch(result.html, /较昨日/);
+  }
+});
+
+test('异地天气明确日期，陈旧缓存保留体感但省略温差', () => {
+  const result = renderDailyReminderEmail({
+    date: '2026-11-20', hour: 8, schedules: [], appUrl: 'https://example.com/today',
+    weather: {
+      ...weather(95), date: '2026-11-19', source: 'cache', isStale: true,
+      apparentTemperature: { min: -2, max: 6, changeFromPreviousDay: -3, dataset: 'ecmwf_ifs025' },
+    },
+  });
+  assert.equal(result.subject, '11-20 周五｜11-19 体感 -2～6°C｜今日 0 项安排');
+  assert.match(result.html, /使用缓存/);
+  assert.doesNotMatch(result.html, /较昨日/);
+});

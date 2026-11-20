@@ -2,12 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { recoverSystemRestore } from './restore-journal.js';
+import { measureRequestPhase } from './request-timing.js';
 
 // Windows does not expose directory fsync through Node. File fsync still applies there.
 function syncDirectory(directory: string): void {
   if (process.platform === 'win32') return;
   const fd = fs.openSync(directory, 'r');
-  try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  try { measureRequestPhase('syncMs', () => fs.fsyncSync(fd)); } finally { fs.closeSync(fd); }
 }
 
 /** Same-directory replacement: the live file is never opened for truncation. */
@@ -17,8 +18,9 @@ export function atomicWriteFile(target: string, bytes: Uint8Array): void {
   let fd: number | undefined;
   try {
     fd = fs.openSync(temporary, 'wx', 0o600);
-    fs.writeFileSync(fd, bytes);
-    fs.fsyncSync(fd);
+    const file = fd;
+    measureRequestPhase('writeMs', () => fs.writeFileSync(file, bytes));
+    measureRequestPhase('syncMs', () => fs.fsyncSync(file));
     fs.closeSync(fd);
     fd = undefined;
     fs.renameSync(temporary, target);
@@ -110,7 +112,8 @@ export function withPersistenceTransaction<T>(callback: () => T): T {
 }
 
 export function registerPersistence(target: string, snapshot: Store['snapshot'], restore: Store['restore']): void {
-  stores.set(target, { snapshot, restore, committed: snapshot().slice() });
+  const measuredSnapshot = () => measureRequestPhase('exportMs', snapshot);
+  stores.set(target, { snapshot: measuredSnapshot, restore, committed: measuredSnapshot().slice() });
 }
 
 export function persistDatabase(target: string): void {

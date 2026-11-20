@@ -14,6 +14,8 @@ export function restoreConnected(userId:string,data:Partial<ReturnType<typeof ex
       for(const rows of Object.values(parsed.activity.metricDetails) as any[][])for(const d of rows)d.href=null;
       for(const key of ['details','knowledgeDetails'])for(const d of parsed[key]||[])d.href=null;
       for(const d of parsed.activity.upcoming||[])d.href=null;
+      for(const d of parsed.activity.weekly?.overdueDetails||[])d.href=null;
+      for(const d of parsed.activity.weekly?.upcomingDetails||[])d.href=null;
       const snapshot=JSON.stringify(parsed),hash=createHash('sha256').update(snapshot).digest('hex');
       run('INSERT OR IGNORE INTO orbit_activity_reports (id,user_id,range_start,range_end,snapshot,snapshot_hash,insights,created_at) VALUES (?,?,?,?,?,?,?,?)',[randomUUID(),userId,r.range_start,r.range_end,snapshot,hash,r.insights||null,r.created_at]);
     }

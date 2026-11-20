@@ -13,6 +13,7 @@ import { createProactiveJobs } from './orbit-proactive.js';
 import { createAndroidPushRouter } from './routes/android-push.js';
 import { createAndroidPushJobs } from './android-push.js';
 import { createSystemRouter } from './routes/system.js';
+import { observeOperation, systemAlertsEnabled } from './system-events.js';
 
 import { createSchedulesRouter } from './routes/schedules.js';
 import { createCaldavRouter } from './routes/caldav.js';
@@ -78,6 +79,7 @@ export const app = createApp({
   oauthRouter: createDailyReportCloudOAuthRouter(), mcpRouter: createDailyReportCloudMcpRouter(),
   media: { route: DAILY_REPORT_MEDIA_ROUTE, root: dailyReportMediaRoot() },
   staticPath: path.resolve(__dirname, '../dist'),
+  observeOperation: systemAlertsEnabled() ? observeOperation : undefined,
   protectedTools: { root: path.resolve(__dirname, '../protected-tools'), authenticatePage, isReady: () => dbInitialized },
 });
 

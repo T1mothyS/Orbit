@@ -180,3 +180,72 @@ test('天气服务超时时明确失败而不是返回虚构结果', async () =>
     /天气服务响应超时/,
   );
 });
+
+test('邮件使用同一个明确模型的摄氏日均值，并行请求和普通天气共用结果', async () => {
+  clearWeatherCaches();
+  const location = { latitude: 52.52, longitude: 13.41, timezone: 'Europe/Berlin' };
+  let calls = 0;
+  const fetcher: typeof fetch = async input => {
+    calls++;
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    assert.equal(url.searchParams.get('models'), 'best_match,ecmwf_ifs025');
+    assert.equal(url.searchParams.get('start_date'), '2026-11-19');
+    assert.equal(url.searchParams.get('end_date'), '2026-11-20');
+    assert.equal(url.searchParams.get('temperature_unit'), 'celsius');
+    return Response.json({
+      timezone: location.timezone,
+      daily_units: {
+        apparent_temperature_min_ecmwf_ifs025: '°C',
+        apparent_temperature_max_ecmwf_ifs025: '°C',
+        apparent_temperature_mean_ecmwf_ifs025: '°C',
+      },
+      daily: {
+        time: ['2026-11-20', '2026-11-19'],
+        weather_code_best_match: [0, 3],
+        temperature_2m_max_best_match: [9, 10],
+        precipitation_probability_max_best_match: [20, 30],
+        apparent_temperature_min_ecmwf_ifs025: [-2, 0],
+        apparent_temperature_max_ecmwf_ifs025: [6, 9],
+        apparent_temperature_mean_ecmwf_ifs025: [2, 5],
+        apparent_temperature_mean_best_match: [1, 99],
+      },
+    });
+  };
+  const options = { fetcher, includeApparent: true };
+  const values = await Promise.all([getDailyWeather(location, '2026-11-20', options), getDailyWeather(location, '2026-11-20', options)]);
+  assert.deepEqual(values[0], values[1]);
+  assert.deepEqual(values[0].apparentTemperature, { min: -2, max: 6, changeFromPreviousDay: -3, dataset: 'ecmwf_ifs025' });
+  assert.equal(values[0].precipitationProbabilityMax, 20);
+  const standard = await getDailyWeather(location, '2026-11-20', { fetcher });
+  assert.equal(standard.apparentTemperature, undefined);
+  assert.equal(calls, 1);
+});
+
+test('昨日数据缺失、单位不一致和夏令时变更时只提供当天体感', async () => {
+  const location = { latitude: 40.71, longitude: -74, timezone: 'America/New_York' };
+  for (const scenario of [
+    { date: '2026-11-20', prior: '2026-11-19', previousMean: null, unit: '°C' },
+    { date: '2026-01-01', prior: '2025-12-31', previousMean: 5, unit: '°F' },
+    { date: '2026-03-09', prior: '2026-03-08', previousMean: 5, unit: '°C' },
+    { date: '2026-11-02', prior: '2026-11-01', previousMean: 5, unit: '°C' },
+  ]) {
+    clearWeatherCaches();
+    const fetcher: typeof fetch = async () => Response.json({
+      timezone: location.timezone,
+      daily_units: {
+        apparent_temperature_min_ecmwf_ifs025: '°C',
+        apparent_temperature_max_ecmwf_ifs025: '°C',
+        apparent_temperature_mean_ecmwf_ifs025: scenario.unit,
+      },
+      daily: {
+        time: [scenario.prior, scenario.date],
+        weather_code_best_match: [3, 0],
+        apparent_temperature_min_ecmwf_ifs025: [0, -2],
+        apparent_temperature_max_ecmwf_ifs025: [9, 6],
+        apparent_temperature_mean_ecmwf_ifs025: [scenario.previousMean, 2],
+      },
+    });
+    const result = await getDailyWeather(location, scenario.date, { fetcher, includeApparent: true });
+    assert.deepEqual(result.apparentTemperature, { min: -2, max: 6, changeFromPreviousDay: null, dataset: 'ecmwf_ifs025' }, scenario.date);
+  }
+});

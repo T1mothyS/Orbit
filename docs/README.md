@@ -11,6 +11,7 @@
 | [route.md](../route.md) | 阶段顺序、范围与暂不做事项 |
 | [CHANGELOG.md](../CHANGELOG.md) | 具体版本成果及验证边界 |
 | [TASKS.md](TASKS.md) | 已修复、部分完成、待修复/待验收与完成条件 |
+| [运维专项实施计划](plans/ORBIT-OPS-UPGRADE-PLAN.md) | 周报、每日邮件、Linux CI/CD、系统告警及性能监控的实施与生产门槛 |
 | [archive/README.md](archive/README.md) | 历史报告分类和旧路径对照；原证据日期/结论保留 |
 
 ## 协作、使用和发布
