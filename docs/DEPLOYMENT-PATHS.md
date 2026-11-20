@@ -76,7 +76,7 @@ Android 一期新增 `firebase-admin`，后端发布必须走路径 B，不能�
 
 自动发布由 `ORBIT_CD_ENABLED` 控制。接收端验证文件与身份，按生产实测复算空间和 inode，使用合成数据暂存启动。停写后生成受保护的冷备，保留旧程序和运行时，将现有数据移入新目录并执行启动、静态资产和认证边界验收。切换失败时把有效数据带回旧版本。中断时依据事务日志核对现状和恢复。GitHub 继续从公网核对新发布身份。每次发布前保留容量余量与可验证的旧版本。需要释放空间时先核对保留的恢复点和运行时引用。带数据库架构变化的发布需要单独制定回滚方案。
 
-独立的 `Orbit P0 readiness` GitHub 工作流定时从站外请求 `ORBIT_HEALTH_URL` 配置的 HTTPS `/api/ready`。一次运行连续三次失败就标记失败，通过已有 GitHub Actions 通知设置投递。GitHub 可能延迟调度，收件方由 GitHub 通知设置决定。站内 P1/P2 和管理员性能面板可与站外探测独立使用。
+独立的 `Orbit P0 readiness` GitHub 工作流在 `ORBIT_P0_ENABLED` 启用后定时从站外请求 `ORBIT_HEALTH_URL` 配置的 HTTPS `/api/ready`。一次运行连续三次失败就标记失败，通过已有 GitHub Actions 通知设置投递。GitHub 可能延迟调度，收件方由 GitHub 通知设置决定。站内 P1/P2 和管理员性能面板可与站外探测独立使用。
 
 ## 数据、配置和版本记录
 

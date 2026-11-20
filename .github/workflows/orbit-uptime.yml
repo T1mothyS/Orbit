@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   probe:
-    if: vars.ORBIT_HEALTH_URL != ''
+    if: vars.ORBIT_HEALTH_URL != '' && (vars.ORBIT_P0_ENABLED == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
