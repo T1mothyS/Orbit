@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, ArrowRight, ImagePlus, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, X } from 'lucide-react';
 import { useDialogLifecycle } from '../hooks/useDialogLifecycle';
 import { fetchNoteImage, removeUnboundNoteImage, uploadNoteImage } from '../utils/note-image-client';
 import { NOTE_IMAGES_MAX_BYTES, type NoteImage } from '../utils/note-images';
@@ -43,9 +43,4 @@ export function useNoteImageUpload(images: NoteImage[], onChange: (images: NoteI
 }
 export function NoteImageInput({ inputRef, disabled, onFiles }: { inputRef: RefObject<HTMLInputElement>; disabled: boolean; onFiles: (files: File[]) => void }) {
   return <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden disabled={disabled} onChange={event => { onFiles(Array.from(event.target.files || [])); event.target.value = ''; }} />;
-}
-export function NoteImageEditor({ images, onChange, disabled, onBusyChange }: { images: NoteImage[]; onChange: (images: NoteImage[]) => void; disabled: boolean; onBusyChange: (busy: boolean) => void }) {
-  const input = useRef<HTMLInputElement>(null), upload = useNoteImageUpload(images, onChange);
-  useEffect(() => { onBusyChange(upload.busy); }, [upload.busy, onBusyChange]);
-  return <div className="note-image-editor"><NoteImageGallery images={images} editable disabled={disabled || upload.busy} onChange={onChange} /><NoteImageInput inputRef={input} disabled={disabled || upload.busy} onFiles={files => { void upload.add(files); }} /><button type="button" className="secondary-button" disabled={disabled || upload.busy || images.length >= 3} onClick={() => input.current?.click()}><ImagePlus size={16} />{upload.busy ? '上传中…' : '添加图片'}</button>{upload.error && <p role="alert" className="orbit-inline-error">{upload.error}</p>}</div>;
 }

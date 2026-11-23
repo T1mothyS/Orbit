@@ -1,10 +1,15 @@
 import { blobDataUrl, fetchNoteImage } from './note-image-client';
-import type { NoteImage } from './note-images';
+import { noteImageParts, type NoteImage } from './note-images';
 
 export const escapeClipboardHtml = (text: string) => text.replace(/[&<>"']/g, value => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[value]!);
 export async function richNoteHtml(content: string, images: NoteImage[]): Promise<string> {
-  const sources = await Promise.all(images.map(async image => ({ image, src: await blobDataUrl(await fetchNoteImage(image)) })));
-  return `<div>${content ? `<p style="white-space:pre-wrap">${escapeClipboardHtml(content).replace(/\n/g, '<br>')}</p>` : ''}${sources.map(({ image, src }) => `<p><img src="${src}" alt="${escapeClipboardHtml(image.name)}" style="max-width:100%;height:auto" /></p>`).join('')}</div>`;
+  const { parts, trailing } = noteImageParts(content, images);
+  const html = await Promise.all([...parts, ...trailing].map(async part => {
+    if (typeof part === 'string') return `<p style="white-space:pre-wrap">${escapeClipboardHtml(part).replace(/\n/g, '<br>')}</p>`;
+    const src = await blobDataUrl(await fetchNoteImage(part));
+    return `<p><img src="${src}" alt="${escapeClipboardHtml(part.name)}" style="max-width:100%;height:auto" /></p>`;
+  }));
+  return `<div>${html.join('')}</div>`;
 }
 /** Call synchronously from the click handler; WebKit requires activation at write(). */
 export function copyRichNote(content: string, images: NoteImage[]): Promise<void> {

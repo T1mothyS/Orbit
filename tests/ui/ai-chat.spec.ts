@@ -209,20 +209,132 @@ test('paste and drop images, retry one upload, send explicitly, and drop on the 
   await expect(reading.getByRole('button', { name: /查看图片.*阅读图片/ })).toBeEnabled();
   await expect(reading.getByRole('textbox')).toHaveCount(0);
   await expect(editing.getByRole('button', { name: /查看图片/ })).toHaveCount(0);
+  expect(await editing.locator('.note-board-content-button').evaluate(el => getComputedStyle(el).fontSize)).toBe('12px');
   await editing.getByRole('button', { name: /^编辑记事/ }).click();
   const editor = editing.getByRole('textbox', { name: '编辑记事正文' });
-  await editor.fill('仍未保存的正文');
-  await editor.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(2, 2));
-  await drop(editing, ['编辑图片.png']);
-  await expect(editing.getByRole('button', { name: /查看图片.*编辑图片/ })).toBeEnabled();
-  await expect(editor).toHaveValue('仍未保存的正文');
-  expect(await editor.evaluate((el: HTMLTextAreaElement) => el.selectionStart)).toBe(2);
-  await expect(editor).toBeFocused();
+  await expect(editing.locator('.note-board-row-toolbar button')).toHaveCount(2);
+  expect(await editor.evaluate(el => getComputedStyle(el).fontSize)).toBe('12px');
+  await editor.fill('插图前插图后');
+  const location = await editor.evaluate(el => {
+    const text = el.querySelector('p')!.firstChild!;
+    const range = document.createRange();
+    range.setStart(text, 3);
+    range.collapse(true);
+    const { left, top, height } = range.getBoundingClientRect();
+    return { clientX: left, clientY: top + height / 2 };
+  });
+  const payload = await page.evaluateHandle(image => {
+    const data = new DataTransfer();
+    data.items.add(new File([Uint8Array.from(atob(image), char => char.charCodeAt(0))], '编辑图片.png', { type: 'image/png' }));
+    return data;
+  }, image);
+  await editor.dispatchEvent('dragover', { ...location, dataTransfer: payload });
+  await expect(editing.locator('.note-editor-drop-caret')).toBeVisible();
+  await editor.dispatchEvent('drop', { ...location, dataTransfer: payload });
+  await payload.dispose();
+  await expect(editor.getByRole('img', { name: '编辑图片.png' })).toBeVisible();
+  await expect(editor.locator('p').nth(0)).toHaveText('插图前');
+  await expect(editor.locator('p').nth(1)).toHaveText('插图后');
+  await page.keyboard.insertText('继续写');
+  await expect(editor.locator('p').nth(1)).toHaveText('继续写插图后');
+  const noteUrl = base + '/api/note-items/' + editingId;
+  let failSave = true;
+  await page.route(noteUrl, route => {
+    if (route.request().method() === 'PATCH' && failSave) {
+      failSave = false;
+      return route.fulfill({ status: 503, json: { error: '合成记事保存失败' } });
+    }
+    return route.continue();
+  });
+  const save = editing.getByRole('button', { name: /^保存记事/ });
+  await save.click();
+  await expect(editing.getByRole('alert')).toHaveText('合成记事保存失败');
+  await expect(editor.getByRole('img', { name: '编辑图片.png' })).toBeVisible();
+  const prior = (await (await context.request.get(base + '/api/note-items', { headers: auth })).json()).items.find((item: { id: string }) => item.id === editingId);
+  expect(prior.content).toBe('编辑态原始记事');
+  expect(prior.images).toEqual([]);
+  await save.click();
+  await expect(editing.locator('.note-board-content-button').getByRole('img', { name: '编辑图片.png' })).toBeVisible();
   await drop(reading, ['非法.txt'], 'text/plain');
   await expect(reading.getByRole('alert')).toContainText('JPEG、PNG 或 WebP');
   await page.reload();
   await expect(reading.getByRole('button', { name: /查看图片.*阅读图片/ })).toBeEnabled();
   await expect(editing.getByRole('button', { name: /查看图片.*编辑图片/ })).toBeEnabled();
-  await expect(editing.getByText('编辑态原始记事')).toBeVisible();
+  await expect(editing.locator('.note-board-text-part').first()).toHaveText('插图前');
+  await expect(editing.locator('.note-board-text-part').last()).toHaveText('继续写插图后');
+  await editing.getByRole('button', { name: /^复制记事/ }).click();
+  await expect.poll(() => page.evaluate(async () => {
+    const items = await navigator.clipboard.read();
+    const html = items.find(item => item.types.includes('text/html'));
+    if (!html) return [];
+    const body = new DOMParser().parseFromString(await (await html.getType('text/html')).text(), 'text/html');
+    return Array.from(body.querySelectorAll('p')).map(p => p.querySelector('img')?.alt || p.textContent);
+  })).toEqual(['插图前', '编辑图片.png', '继续写插图后']);
   await expect(page.getByRole('button', { name: '下载附件 粘贴.png' })).toBeVisible();
 });
+
+for (const width of [390, 1440]) for (const theme of ['light', 'dark']) {
+  test(`remember note line breaks and cancel edits ${width} ${theme}`, async ({ context, page }) => {
+    const token = await fixtureToken(context, 'preview-chat-experience@example.invalid');
+    const auth = { Authorization: 'Bearer ' + token };
+    await context.addInitScript(({ token, theme }) => {
+      localStorage.setItem('aicalendar_token', token);
+      localStorage.setItem('theme', theme);
+    }, { token, theme });
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(base + '/assistant');
+    await page.getByRole('button', { name: '记事', exact: true }).click();
+    const checkbox = page.getByRole('checkbox', { name: '整段保存' });
+    await expect(checkbox).not.toBeChecked();
+    const compose = page.getByRole('textbox', { name: '记事输入框' });
+    const content = `整段保存 ${width} ${theme}\n\n第二行`;
+    const saveNote = async () => {
+      const sent = page.waitForResponse(response => response.url().endsWith('/api/note-items') && response.request().method() === 'POST');
+      await compose.fill(content);
+      await page.getByRole('button', { name: '保存记事', exact: true }).click();
+      const response = await sent;
+      expect(response.status()).toBe(201);
+      return (await response.json()).items;
+    };
+    expect((await saveNote()).map((item: { content: string }) => item.content)).toEqual(content.split('\n').filter(Boolean));
+    await checkbox.check();
+    const [item] = await saveNote();
+    expect(item.content).toBe(content);
+    const toggle = page.getByRole('button', { name: '打开 AI 记事板', exact: true });
+    if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click();
+    const row = page.locator('#orbit-note-' + item.id);
+    const readingFont = await row.locator('.note-board-content-button').evaluate(el => {
+      const style = getComputedStyle(el);
+      return [style.fontSize, style.fontFamily, style.lineHeight];
+    });
+    const edit = row.getByRole('button', { name: /^编辑记事/ });
+    await edit.click();
+    const editor = row.getByRole('textbox', { name: '编辑记事正文' });
+    expect(readingFont[0]).toBe('12px');
+    expect(await editor.evaluate(el => {
+      const style = getComputedStyle(el);
+      return [style.fontSize, style.fontFamily, style.lineHeight];
+    })).toEqual(readingFont);
+    await expect(row.locator('.note-board-row-toolbar button')).toHaveCount(2);
+    const bytes = await (await context.request.get(base + '/orbit-logo.png')).body();
+    const file = { name: '取消图片.png', mimeType: 'image/png', buffer: bytes };
+    await page.route('**/api/note-items/images', route => route.fulfill({ status: 503, json: { error: '合成上传失败' } }));
+    const picker = row.locator('input[type=file]');
+    await picker.setInputFiles(file);
+    await expect(row.getByRole('alert')).toHaveText('合成上传失败');
+    await page.unroute('**/api/note-items/images');
+    await editor.fill('尚未保存的修改');
+    const uploaded = page.waitForResponse(response => response.url().endsWith('/api/note-items/images') && response.request().method() === 'POST');
+    await picker.setInputFiles(file);
+    const image = (await (await uploaded).json()).image;
+    await expect(editor.getByRole('img', { name: file.name })).toBeVisible();
+    const cleanup = page.waitForResponse(response => response.url().endsWith('/api/note-items/images/' + image.id) && response.request().method() === 'DELETE');
+    if (theme === 'dark') await editor.press('Escape');
+    else await row.getByRole('button', { name: /^取消编辑记事/ }).click();
+    expect((await cleanup).status()).toBe(200);
+    await expect(edit).toBeFocused();
+    await expect(row.locator('.note-board-content-button')).toHaveText(content);
+    const response = await context.request.get(base + '/api/note-items/images/' + image.id, { headers: auth });
+    expect(response.status()).toBe(404);
+  });
+}

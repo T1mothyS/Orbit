@@ -1,10 +1,14 @@
-import { IconButton, Textarea, useActionConfirmation } from '../ui';
+import { IconButton, useActionConfirmation } from '../ui';
 import { NoteLinks } from './NoteLinks';
-import { NoteImageGallery, NoteImageEditor } from './NoteImages';
+import { NoteImageGallery } from './NoteImages';
+import { NoteEditor } from './NoteEditor';
 import { NoteCopyDialog } from './NoteCopyDialog';
 import { copyRichNote } from '../utils/note-clipboard';
-import type { NoteImage } from '../utils/note-images';
-import { useEffect, useRef, useState } from 'react';
+import { noteImageParts, type NoteImage } from '../utils/note-images';
+import { NOTE_OPTIMIZATION_MAX_LENGTH } from '../utils/note-content';
+import { removeUnboundNoteImage } from '../utils/note-image-client';
+import { getStoredAuthHeaders } from '../hooks/useAuth';
+import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDialogLifecycle } from '../hooks/useDialogLifecycle';
 import { useFileDrop } from '../hooks/useFileDrop';
@@ -39,7 +43,7 @@ interface NoteBoardProps {
   onCloseDrawer: () => void;
   onToggleCompleted: (note: NoteItem) => Promise<void>;
   onEdit: (note: NoteItem, content: string, images: NoteImage[]) => Promise<void>;
-  onAddImages: (note: NoteItem, files: File[], draftImages: NoteImage[]) => Promise<NoteItem>;
+  onAddImages: (note: NoteItem, files: File[]) => Promise<NoteItem>;
   onColorChange: (note: NoteItem, color: NoteColor) => Promise<void>;
   onMerge: (source: NoteItem, target: NoteItem) => Promise<void>;
   onOptimize: (note: NoteItem, signal?: AbortSignal) => Promise<NoteItem>;
@@ -99,16 +103,31 @@ function NoteColorPicker({ note, disabled, open, onToggle, onChange }: {
 
 type CopyFeedback = 'success' | 'error' | null;
 
+const NoteBody = memo(function NoteBody({ content, images }: { content: string; images: NoteImage[] }) {
+  const { parts, trailing } = noteImageParts(content, images);
+  return <>
+    {parts.map((part, index) => typeof part === 'string'
+      ? <div key={index} className="note-board-text-part"><NoteLinks text={part} /></div>
+      : <div key={part.id} className="note-board-inline-image" onClick={event => event.stopPropagation()}>
+        <NoteImageGallery images={[part]} />
+      </div>)}
+    {!!trailing.length && <div onClick={event => event.stopPropagation()}><NoteImageGallery images={trailing} /></div>}
+  </>;
+});
+
 function NoteRow({
   note,
   displayIndex,
   selected,
-  aiBusy,
   editing,
   editValue,
   editImages,
-  onEditImagesChange,
+  editError,
+  editRevision,
+  onEditChange,
+  onUploaded,
   onImageBusyChange,
+  imageBusy,
   saving,
   colorPickerOpen,
   copyFeedback,
@@ -119,7 +138,6 @@ function NoteRow({
   optimizationDisabled,
   onToggleSelected,
   onStartEdit,
-  onEditValueChange,
   onSaveEdit,
   onCancelEdit,
   onChangeColor,
@@ -133,12 +151,15 @@ function NoteRow({
   note: NoteItem & { displayIndex: number };
   displayIndex: number;
   selected: boolean;
-  aiBusy: boolean;
   editing: boolean;
   editValue: string;
   editImages: NoteImage[];
-  onEditImagesChange: (images: NoteImage[]) => void;
+  editError: string;
+  editRevision: number;
+  onEditChange: (content: string, images: NoteImage[]) => void;
+  onUploaded: (images: NoteImage[], authorization: string | undefined) => void;
   onImageBusyChange: (busy: boolean) => void;
+  imageBusy: boolean;
   saving: boolean;
   colorPickerOpen: boolean;
   copyFeedback: CopyFeedback;
@@ -149,7 +170,6 @@ function NoteRow({
   optimizationDisabled: boolean;
   onToggleSelected: () => void;
   onStartEdit: () => void;
-  onEditValueChange: (value: string) => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
   onChangeColor: (color: NoteColor) => void;
@@ -165,6 +185,12 @@ function NoteRow({
   const [uploading, setUploading] = useState(false);
   const [dropError, setDropError] = useState('');
   const uploadingRef = useRef(false);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (wasEditing.current && !editing) editButton.current?.focus({ preventScroll: true });
+    wasEditing.current = editing;
+  }, [editing]);
   const disabled = saving || mergeBusy || optimizing;
   const { dragging, dropProps } = useFileDrop(disabled || uploading, files => {
     if (uploadingRef.current) return;
@@ -185,11 +211,27 @@ function NoteRow({
     <article
       id={'orbit-note-'+note.id}
       data-dragging={dragging || undefined}
-      {...dropProps}
-      className={`note-board-row${note.completed ? ' is-completed' : ''}${colorPickerOpen ? ' is-color-picker-open' : ''}${mergeSourceSelected ? ' is-merge-source' : ''}`}
+      {...(editing ? {} : dropProps)}
+      className={`note-board-row${editing ? ' is-editing' : ''}${note.completed ? ' is-completed' : ''}${colorPickerOpen ? ' is-color-picker-open' : ''}${mergeSourceSelected ? ' is-merge-source' : ''}`}
       style={{ backgroundColor: colorStyle.surface, borderColor: colorStyle.border }}
     >
-      <div className="note-board-row-toolbar">
+      <div className="note-board-row-toolbar" onKeyDown={event => {
+        if (editing && event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          onCancelEdit();
+        }
+      }}>
+        {editing ? <>
+          <IconButton variant="quiet" size="small" className="note-board-action" onClick={onSaveEdit}
+            disabled={disabled || imageBusy} title="保存修改" label={`保存记事 ${displayIndex}`}>
+            <Check size={15} aria-hidden="true" />
+          </IconButton>
+          <IconButton variant="quiet" size="small" className="note-board-action" onClick={onCancelEdit}
+            disabled={disabled} title="取消编辑" label={`取消编辑记事 ${displayIndex}`}>
+            <X size={15} aria-hidden="true" />
+          </IconButton>
+        </> : <>
         <label className="note-board-select" title={selected ? '取消选择' : '选择记事'}>
           <input
             type="checkbox"
@@ -200,15 +242,16 @@ function NoteRow({
           <span aria-hidden="true" />
         </label>
         <IconButton
+          ref={editButton}
           variant="quiet"
           size="small"
           className="note-board-action"
-          onClick={editing ? onSaveEdit : onStartEdit}
+          onClick={onStartEdit}
           disabled={disabled || uploading}
-          title={editing ? '确认保存' : '编辑记事'}
-          label={`${editing ? '保存' : '编辑'}记事 ${displayIndex}`}
+          title="编辑记事"
+          label={`编辑记事 ${displayIndex}`}
         >
-          {editing ? <Check size={15} /> : <Pencil size={15} />}
+          <Pencil size={15} aria-hidden="true" />
         </IconButton>
         <button
           type="button"
@@ -242,45 +285,30 @@ function NoteRow({
         >
           <GitMerge size={15} />
         </button>
+        </>}
       </div>
 
       <div className="note-board-row-content">
-        <NoteColorPicker
+        {!editing && <NoteColorPicker
           note={{ ...note, displayIndex }}
           disabled={disabled}
           open={colorPickerOpen}
           onToggle={onToggleColorPicker}
           onChange={onChangeColor}
-        />
+        />}
         <div className="note-board-row-text">
           {editing ? (
-            <><Textarea
-              className="note-board-edit-input"
-              value={editValue}
-              onChange={event => onEditValueChange(event.target.value)}
-              onKeyDown={event => {
-                if (event.nativeEvent.isComposing) return;
-                if (event.key === 'Enter' && event.ctrlKey) {
-                  event.preventDefault();
-                  if (!uploadingRef.current) onSaveEdit();
-                } else if (event.key === 'Escape') {
-                  event.preventDefault();
-                  onCancelEdit();
-                }
-              }}
-              disabled={disabled}
-              autoFocus
-              aria-label="编辑记事正文"
-            /><NoteImageEditor images={editImages} onChange={onEditImagesChange} disabled={disabled || uploading} onBusyChange={onImageBusyChange} /></>
+            <NoteEditor key={editRevision} content={editValue} images={editImages} error={editError}
+              disabled={disabled} onChange={onEditChange} onSave={onSaveEdit} onCancel={onCancelEdit}
+              onUploaded={onUploaded} onBusyChange={onImageBusyChange} />
           ) : (
             <div className="note-board-content-button" onClick={()=>{if(!disabled)onStartEdit();}}>
-              <NoteLinks text={note.content}/>
+              <NoteBody content={note.content} images={note.images} />
             </div>
           )}
-          {!editing && <NoteImageGallery images={note.images} />}
-          {dragging && <p className="note-drop-feedback" role="status">松开，把图片添加到这条记事</p>}
-          {uploading && <p className="note-drop-feedback" role="status">正在保存图片…</p>}
-          {dropError && <p className="orbit-inline-error" role="alert">{dropError}</p>}
+          {!editing && dragging && <p className="note-drop-feedback" role="status">松开，把图片添加到这条记事</p>}
+          {!editing && uploading && <p className="note-drop-feedback" role="status">正在保存图片…</p>}
+          {!editing && dropError && <p className="orbit-inline-error" role="alert">{dropError}</p>}
         </div>
       </div>
     </article>
@@ -292,7 +320,6 @@ export function NoteBoard({
   notes,
   loading,
   error,
-  aiBusy,
   drawerOpen,
   onCloseDrawer,
   onToggleCompleted,
@@ -308,7 +335,11 @@ export function NoteBoard({
   const editBase = useRef<NoteItem | null>(null);
   const [editValue, setEditValue] = useState('');
   const [editImages, setEditImages] = useState<NoteImage[]>([]);
+  const [editError, setEditError] = useState('');
   const [imageBusy, setImageBusy] = useState(false);
+  const savingEdit = useRef(false);
+  const mounted = useRef(false);
+  const draftUploads = useRef<{ images: NoteImage[]; authorization: string | undefined } | null>(null);
   const [copyPreview, setCopyPreview] = useState<NoteItem | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -331,6 +362,14 @@ export function NoteBoard({
   const copyTimerRef = useRef<number | null>(null);
   const optimizationAbortRef = useRef<AbortController | null>(null);
 
+  const discardUploads = (saved: NoteImage[] = []) => {
+    const draft = draftUploads.current;
+    draftUploads.current = null;
+    if (draft && getStoredAuthHeaders().Authorization === draft.authorization) {
+      void Promise.allSettled(draft.images.filter(image => !saved.some(item => item.id === image.id)).map(removeUnboundNoteImage));
+    }
+  };
+
   useEffect(() => {
     if (!drawerOpen || mobile) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -352,45 +391,71 @@ export function NoteBoard({
     if (!drawerOpen) setMergeSourceId(null);
   }, [drawerOpen]);
 
-  useEffect(() => () => {
-    if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
-    optimizationAbortRef.current?.abort();
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
+      optimizationAbortRef.current?.abort();
+      if (!savingEdit.current) discardUploads();
+    };
   }, []);
 
   const confirmation = useActionConfirmation();
   const currentEditing = useRef(editingId);currentEditing.current=editingId;
   const startEdit = (note: NoteItem) => {
-    if (optimizationBusyId === note.id || imageBusy) return;
-    const apply = () => { editBase.current = note; setEditingId(note.id); setEditValue(note.content); setEditImages(note.images); setColorPickerId(null); };
+    if (optimizationBusyId !== null || imageBusy || savingEdit.current) return;
+    const apply = () => {
+      discardUploads();
+      editBase.current = note;
+      setEditingId(note.id);
+      setEditValue(note.content);
+      setEditImages(note.images);
+      setEditError('');
+      setColorPickerId(null);
+    };
     if (confirmation.discard(editingId !== note.id && hasUnsavedEdit, apply, '当前记事有未保存的修改，切换会丢弃修改。是否继续？')) apply();
   };
 
-  const cancelEdit = () => {
+  const endEdit = (saved?: NoteImage[]) => {
+    discardUploads(saved);
+    if (!mounted.current) return;
     editBase.current = null;
     setEditingId(null);
     setEditValue('');
     setEditImages([]);
+    setEditError('');
   };
 
   const saveEdit = async (note: NoteItem) => {
     const content = editValue.trim();
-    if (imageBusy || (!content && !editImages.length)) return;
+    if (imageBusy || savingEdit.current || optimizationBusyId === note.id) return;
+    if (!content && !editImages.length) {
+      setEditError('请保留文字或至少一张图片');
+      return;
+    }
+    savingEdit.current = true;
+    setEditError('');
     setSavingId(note.id);
     try {
-      await onEdit(editBase.current?.id === note.id ? editBase.current : note, content, editImages);
-      cancelEdit();
-    } catch {
-      // 父组件会把错误显示在记事板顶部，保留编辑态便于修正后重试。
+      const base = editBase.current?.id === note.id ? editBase.current : note;
+      if (hasUnsavedEdit) await onEdit(base, content, editImages);
+      endEdit(editImages);
+    } catch (error) {
+      if (mounted.current) setEditError(error instanceof Error ? error.message : '保存记事失败，请重试');
+      else discardUploads();
     } finally {
-      setSavingId(null);
+      savingEdit.current = false;
+      if (mounted.current) setSavingId(null);
     }
   };
 
-  const editingNote = editingId ? notes.find(note => note.id === editingId) : undefined;
-  const hasUnsavedEdit = Boolean(editingNote && (editValue !== editingNote.content || editImages.map(image => image.id).join() !== editingNote.images.map(image => image.id).join()));
+  const base = editBase.current;
+  const hasUnsavedEdit = Boolean(base && (editValue !== base.content || editImages.length !== base.images.length
+    || editImages.some((image, index) => image.id !== base.images[index].id || image.textOffset !== base.images[index].textOffset)));
 
   const runOptimization = async (note: NoteItem) => {
-    if (optimizationBusyId !== null) return;
+    if (optimizationBusyId !== null || savingEdit.current || imageBusy) return;
     if (hasUnsavedEdit) return;
 
     if (editingId !== note.id) {
@@ -398,6 +463,7 @@ export function NoteBoard({
       setEditingId(note.id);
       setEditValue(note.content);
       setEditImages(note.images);
+      setEditError('');
       setColorPickerId(null);
     }
 
@@ -408,7 +474,11 @@ export function NoteBoard({
       const item = note.isOptimized
         ? await onRevertOptimization(note, controller.signal)
         : await onOptimize(note, controller.signal);
-      if(currentEditing.current===note.id) {editBase.current = item;setEditingId(item.id);setEditValue(item.content);}
+      if (currentEditing.current === note.id) {
+        editBase.current = item;
+        setEditValue(item.content);
+        setEditImages(item.images);
+      }
     } catch {
       // 父组件负责显示错误；失败时保留原正文和当前编辑态。
     } finally {
@@ -512,7 +582,7 @@ export function NoteBoard({
   const mergeNote = async (note: NoteItem) => {
     if (mergeBusy) return;
     if (!mergeSourceId) {
-      const apply = () => { setMergeSourceId(note.id); setEditingId(null); setColorPickerId(null); };
+      const apply = () => { endEdit(); setMergeSourceId(note.id); setColorPickerId(null); };
       if (confirmation.discard(hasUnsavedEdit, apply, '当前记事有未保存的修改，确定放弃并选择合并来源吗？')) apply();
       return;
     }
@@ -548,34 +618,32 @@ export function NoteBoard({
       note={{ ...note, displayIndex }}
       displayIndex={displayIndex}
       selected={selectedIds.has(note.id)}
-      aiBusy={aiBusy}
       editing={editingId === note.id}
       editValue={editingId === note.id ? editValue : note.content}
       editImages={editImages}
-      onEditImagesChange={setEditImages}
+      editRevision={editBase.current?.contentRevision ?? note.contentRevision}
+      editError={editError}
+      onEditChange={(value, images) => { setEditValue(value); setEditImages(images); setEditError(''); }}
+      onUploaded={(images, authorization) => {
+        draftUploads.current = { images: [...(draftUploads.current?.images || []), ...images], authorization };
+      }}
       onImageBusyChange={setImageBusy}
-      saving={savingId === note.id || (editingId === note.id && imageBusy)}
+      imageBusy={imageBusy}
+      saving={savingId === note.id}
       colorPickerOpen={colorPickerId === note.id}
       copyFeedback={copyFeedback.id === note.id ? copyFeedback.kind : null}
       mergeSourceSelected={mergeSourceId === note.id}
       mergeSourceExists={mergeSourceId !== null}
       mergeBusy={mergeBusy}
       optimizing={optimizationBusyId === note.id}
-      optimizationDisabled={optimizationBusyId !== null || hasUnsavedEdit || !note.content.trim()}
-      onDropImages={async files => {
-        const base = editBase.current?.id === note.id ? editBase.current : note;
-        const result = await onAddImages(base, files, editingId === note.id ? editImages : base.images);
-        if (editBase.current?.id === note.id && editBase.current.contentRevision === base.contentRevision) {
-          const added = result.images.filter(image => !base.images.some(existing => existing.id === image.id));
-          editBase.current = result;
-          setEditImages(images => [...images, ...added]);
-        }
-      }}
+      optimizationDisabled={optimizationBusyId !== null || hasUnsavedEdit || !note.content.trim()
+        || note.images.some(image => image.textOffset !== undefined)
+        || (!note.isOptimized && note.content.length > NOTE_OPTIMIZATION_MAX_LENGTH)}
+      onDropImages={async files => { await onAddImages(note, files); }}
       onToggleSelected={() => toggleSelected(note.id)}
       onStartEdit={() => startEdit(note)}
-      onEditValueChange={setEditValue}
       onSaveEdit={() => { void saveEdit(note); }}
-      onCancelEdit={cancelEdit}
+      onCancelEdit={() => { if (!savingEdit.current && optimizationBusyId !== note.id) endEdit(); }}
       onChangeColor={color => { void changeColor(note, color); }}
       onToggleCompleted={() => { void completeOrRestore(note); }}
       onMerge={() => { void mergeNote(note); }}

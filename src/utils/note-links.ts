@@ -15,14 +15,26 @@ function noteHref(raw: string, origin: string) {
 export function noteLinkPieces(text: string, origin: string): NoteLinkPiece[] {
   const pieces: NoteLinkPiece[] = [];
   // Consume explicit schemes first so a rejected URL cannot expose its domain as a separate link.
-  const pattern = /\[([^\]\n]+)\]\(([^\s)]+)\)|[a-z][a-z0-9+.-]*:[^\s<>。，；！？、）]+|\/(?:assistant|schedule|reminders|project|reports|library|tools)(?:[/?][^\s<>。，；！？、）]*)?|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?(?:[/?#][^\s<>。，；！？、）]*)?/gi;
+  // Start schemes and bare domains at token boundaries so long unmatched words are scanned once.
+  const pattern = /\[([^\[\]\n]+)\]\(([^\s()]+)\)|(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*:[^\s<>。，；！？、）]+|\/(?:assistant|schedule|reminders|project|reports|library|tools)(?:[/?][^\s<>。，；！？、）]*)?|(?<![a-z0-9.-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?(?:[/?#][^\s<>。，；！？、）]*)?/gi;
   let start = 0;
   for (const match of text.matchAll(pattern)) {
     const at = match.index!;
     if (at > start) pieces.push({ text: text.slice(start, at) });
-    let raw = (match[2] || match[0]).replace(/[。，；！？、）.,;!?:]+$/u, '');
+    const candidate = match[2] || match[0];
+    let end = candidate.length;
+    while (end > 0 && '。，；！？、）.,;!?:'.includes(candidate[end - 1])) end--;
+    let raw = candidate.slice(0, end);
     for (const [open, close] of [['(', ')'], ['[', ']'], ['{', '}']]) {
-      while (raw.endsWith(close) && raw.split(close).length > raw.split(open).length) raw = raw.slice(0, -1);
+      if (!raw.endsWith(close)) continue;
+      let balance = 0;
+      for (const character of raw) {
+        if (character === open) balance++;
+        if (character === close) balance--;
+      }
+      let end = raw.length;
+      while (balance < 0 && raw[end - 1] === close) { end--; balance++; }
+      raw = raw.slice(0, end);
     }
     const bare = !match[1] && domain.test(raw);
     const before = text[at - 1] || '', after = text[at + match[0].length] || '';

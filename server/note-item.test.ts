@@ -139,7 +139,7 @@ test('记事 API 支持逐行保存、完成恢复、删除并隔离账号', asy
 
     const tooLong = await request('/api/note-items', userToken, {
       method: 'POST',
-      body: JSON.stringify({ content: 'x'.repeat(2_001) }),
+      body: JSON.stringify({ content: 'x'.repeat(1_000_001) }),
     });
     assert.equal(tooLong.status, 400);
 
@@ -188,6 +188,51 @@ test('记事进入加密备份和可读导出，旧备份缺少颜色或记事�
 
   db.clearUserData(user.id);
   assert.deepEqual(noteItems.listNoteItems(user.id), []);
+});
+
+test('百万 Unicode 字符可整段创建、编辑、读取和加密恢复', async () => {
+  const makeUser = (id: string) => db.createUser({
+    id, email: id + '@example.invalid', password_hash: 'synthetic',
+    role: 'user', disabled: 0, created_at: now, updated_at: now,
+  });
+  const owner = makeUser('long-note-owner');
+  const receiver = makeUser('long-note-restore');
+  const server = http.createServer(api.app);
+  const port = await listen(server);
+  const request = (pathname: string, method: string, body?: object, actor = owner) => fetch(
+    `http://127.0.0.1:${port}/api/note-items${pathname}`, {
+      method,
+      headers: { Authorization: 'Bearer ' + api.signUserToken(actor), 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    },
+  );
+  try {
+    const content = '中文\n\n' + '字😀'.repeat(499_998);
+    const created = await request('', 'POST', { contents: [content] });
+    assert.equal(created.status, 201);
+    const { items: [item] } = await created.json();
+    assert.equal(item.content, content);
+    const changed = '改行\n\n' + '文🎨'.repeat(499_998);
+    const edited = await request('/' + item.id, 'PATCH', { content: changed, expectedContent: content, expectedRevision: 0 });
+    assert.equal(edited.status, 200);
+    assert.equal((await edited.json()).item.content, changed);
+    const stale = { content: '覆盖', expectedContent: content, expectedRevision: 0 };
+    assert.equal((await request('/' + item.id, 'PATCH', stale)).status, 409);
+    assert.equal((await request('/' + item.id, 'PATCH', stale, receiver)).status, 404);
+    assert.equal((await request('', 'POST', { contents: [changed + '多'] })).status, 400);
+    assert.equal((await (await request('', 'GET')).json()).items[0].content, changed);
+    const password = 'long-note-backup-fixture';
+    const backup = backups.createUserBackup(owner.id, password);
+    backups.restoreUserBackup(receiver.id, backup, password, 'replace');
+    assert.equal(noteItems.listNoteItems(receiver.id)[0].content, changed);
+    const payload = backups.decryptBackup<any>(backup, password);
+    payload.noteItems[0].content += '多';
+    assert.throws(() => backups.restoreUserBackup(receiver.id, backups.encryptBackup(payload, password), password, 'replace'), /1,000,000/);
+    assert.equal(noteItems.listNoteItems(receiver.id)[0].content, changed);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
 });
 
 test('记事合并按目标在前追加来源，并以事务移入废纸篓', async () => {
@@ -294,19 +339,19 @@ test('记事合并按目标在前追加来源，并以事务移入废纸篓', as
     });
     assert.equal(missingSourceResponse.status, 404);
 
-    const [longSource] = noteItems.createNoteItems(mergeUser.id, ['s'.repeat(1_001)]);
-    const [longTarget] = noteItems.createNoteItems(mergeUser.id, ['t'.repeat(999)]);
+    const [longSource] = noteItems.createNoteItems(mergeUser.id, ['s'.repeat(500_001)]);
+    const [longTarget] = noteItems.createNoteItems(mergeUser.id, ['t'.repeat(499_999)]);
     const tooLongResponse = await request(`/api/note-items/${longSource.id}/merge`, mergeToken, {
       method: 'POST',
       body: JSON.stringify({ targetId: longTarget.id }),
     });
     assert.equal(tooLongResponse.status, 400);
-    assert.match(String((await tooLongResponse.json()).error), /2,000/);
+    assert.match(String((await tooLongResponse.json()).error), /1,000,000/);
     const unchangedLongSource = noteItems.getNoteItem(mergeUser.id, longSource.id);
     const unchangedLongTarget = noteItems.getNoteItem(mergeUser.id, longTarget.id);
-    assert.equal(unchangedLongSource?.content, 's'.repeat(1_001));
+    assert.equal(unchangedLongSource?.content, 's'.repeat(500_001));
     assert.equal(unchangedLongSource?.completed, false);
-    assert.equal(unchangedLongTarget?.content, 't'.repeat(999));
+    assert.equal(unchangedLongTarget?.content, 't'.repeat(499_999));
     assert.equal(unchangedLongTarget?.completed, false);
 
     const [foreignTarget] = noteItems.createNoteItems(mergeOtherUser.id, ['其他账号目标']);

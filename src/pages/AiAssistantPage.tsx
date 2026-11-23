@@ -23,7 +23,7 @@ export function AiAssistantPage() {
   const noteBoard = useAiNoteBoard({
     initialNoteId: searchParams.get('note') || undefined,
   });
-  const saveNote = useCallback((content: string, imageIds?: string[]) => noteBoard.createNote(content, imageIds), [noteBoard.createNote]);
+  const saveNote = useCallback((content: string, imageIds?: string[], saveAsOne?: boolean) => noteBoard.createNote(content, imageIds, saveAsOne), [noteBoard.createNote]);
 
   const clearKey = `clear:${searchParams.get('conversation') || ''}`;
   const clearing = confirmation.busy === clearKey;

@@ -48,7 +48,16 @@ export function createApp(deps: AppDependencies): express.Express {
   app.use(createApiRateLimiter());
   const largeJsonParser = express.json({ limit: '75mb' });
   const chatAttachmentParser=express.json({limit:'15mb'});
+  const noteWriteParser = express.json({ limit: '12mb' });
   app.use((req, res, next) => {
+    if ((req.method === 'POST' && /^\/api\/note-items\/?$/i.test(req.path))
+      || (req.method === 'PATCH' && /^\/api\/note-items\/[^/]+\/?$/i.test(req.path))) {
+      return noteWriteParser(req, res, (error?: { status?: number }) => {
+        if (!error) return next();
+        if (error.status === 413) return res.status(413).json({ error: '记事提交内容太大，请缩短正文后重试' });
+        return res.status(error.status || 400).json({ error: '记事提交格式无效' });
+      });
+    }
     if(req.method==='POST'&&(/^\/api\/orbit\/conversations\/[^/]+\/attachments$/.test(req.path)||/^\/api\/library\/experience-sessions\/[^/]+\/images$/.test(req.path)||req.path==='/api/orbit/profile/avatar'||req.path==='/api/note-items/images'))return chatAttachmentParser(req,res,next);
     const acceptsLargeJson = req.method === 'POST' && (
       /^\/api\/completions\/[^/]+\/attachments$/.test(req.path)

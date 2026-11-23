@@ -44,7 +44,7 @@ UI 发布前先核对 [批准基线与平台验收](archive/engineering/TEST-MAT
 
 前端构建同时从现有 canonical 文档生成 `server/.product-help.json`；它不属于公共 `dist`，也不提交 Git。CI 暂存明确复制此产物；其他预构建打包入口也必须复制到包内同一位置。Linux release 准备核对索引版本和原文 hash，缺失或过期直接阻止发布。运维的 running/success/failed 记录、十个旧版与日志保留、配置/恢复引用见 [部署路径](DEPLOYMENT-PATHS.md#受控运维记录与保留)。成功前不得启动旧版删除；首轮服务器配置、timer 与 Shadow 日志切换需要单独上线验收。
 
-依赖变化且本机为 Windows 时，main 的 CI 使用 Ubuntu 24.04/Node 22.23.2，完整校验通过后生成 `orbit-linux-release` 短期 artifact：冻结源码、前端构建和同一轮安装的 Linux `node_modules`（包含 PM2 使用的 tsx）。构建机验证 sharp/PDF/Office 加载；manifest 记录 commit/version/源文件哈希，完整包另有 SHA-256。下载后核对 workflow head、成功状态、包 hash 与 manifest，再按路径 B 在生产暂存并做运行时探针。该 CI 不保存生产凭据，也不自动部署；生产旧依赖保留用于回滚。
+main 的 CI 在 Ubuntu 上生成短期保留的 `orbit-linux-release`，包含冻结源码、前端构建及同一轮安装的 Linux `node_modules`。已授权自动部署时，将冻结提交快进推送到 main，由 `ORBIT_CD_ENABLED` 控制的生产作业接续验证签名制品、生产暂存、冷备切换和公网就绪检查。手动触发 CI 可生成制品以供检查。生产旧依赖保留用于回滚。
 
 上传 Linux 制品前，CI 在独立临时目录验证 tarball SHA-256、解包并记录块占用，使用合成配置启动包内应用。验收健康、首页、`/today`、入口 JS/CSS 响应类型和内容，以及受保护 Tools 的匿名访问边界。应用数据在空的同级临时目录，不启动后台任务。严格 UI 原门禁继续执行。
 

@@ -2,6 +2,7 @@ import { executeWithoutSave, queryAll, queryOne, run, runTransaction } from '../
 import { escapeLike } from './search-utils.js';
 import type { DbNoteItem } from '../types.js';
 import crypto from 'node:crypto';
+import { noteContentTooLong } from '../../../src/utils/note-content.js';
 
 export function getNoteItem(id: string, userId: string): DbNoteItem | undefined {
   return queryOne<DbNoteItem>('SELECT * FROM note_items WHERE id = ? AND user_id = ?', [id, userId]);
@@ -206,7 +207,8 @@ export function restoreUserNoteItems(
   if (mode === 'replace') run('DELETE FROM note_items WHERE user_id = ?', [userId]);
   let items = 0;
   for (const row of rows || []) {
-    const content = String(row.content || '').trim().slice(0, 2_000);
+    const content = String(row.content || '').trim();
+    if (noteContentTooLong(content)) throw new Error('备份中的单条记事超过 1,000,000 个字符');
     if (!content && !imageNoteIds.has(String(row.id))) continue;
     const id = String(row.id || '').trim() || crypto.randomUUID();
     if (getNoteItem(id, userId)) continue;
@@ -228,8 +230,9 @@ export function restoreUserNoteItems(
       : 0;
     const rawPreviousContent = rawRow.optimization_previous_content ?? rawRow.optimizationPreviousContent;
     const previousContent = typeof rawPreviousContent === 'string' && rawPreviousContent.trim()
-      ? rawPreviousContent.trim().slice(0, 2_000)
+      ? rawPreviousContent.trim()
       : null;
+    if (previousContent && noteContentTooLong(previousContent)) throw new Error('备份中的记事优化原文超过 1,000,000 个字符');
     const isOptimized = (rawOptimized === true || Number(rawOptimized) === 1) && previousContent !== null;
     const rawRevision = rawRow.content_revision ?? rawRow.contentRevision;
     const contentRevision = Number.isInteger(Number(rawRevision)) && Number(rawRevision) >= 0 ? Number(rawRevision) : 0;

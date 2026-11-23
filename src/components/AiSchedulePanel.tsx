@@ -1,4 +1,4 @@
-import { Button, IconButton, Tooltip, Input, Textarea, TimePicker, isClockTime, TextLink } from '../ui';
+import { Button, Checkbox, IconButton, Tooltip, Input, Textarea, TimePicker, isClockTime, TextLink } from '../ui';
 import { composerDraftKey, readComposerDraft, updateComposerDraft, snapshotComposerDraft, consumeComposerDraft, subscribeComposerDraft, type NotificationContext } from '../utils/composer-draft';
 import type { NoteImage } from '../utils/note-images';
 import { NoteImageGallery, NoteImageInput, useNoteImageUpload } from './NoteImages';
@@ -128,7 +128,7 @@ interface AiSchedulePanelProps {
   onOpenScheduleMenu?: (id: string, x: number, y: number) => void;
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
-  onSaveNote: (content: string, imageIds?: string[]) => Promise<void>;
+  onSaveNote: (content: string, imageIds?: string[], saveAsOne?: boolean) => Promise<void>;
   confirmation: ActionConfirmation;
   onChatStateChange?: (state: { hasMessages: boolean; busy: boolean; clearDisabled: boolean }) => void;
 }
@@ -609,6 +609,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
   const [savingPlanOperationKey, setSavingPlanOperationKey] = useState<string | null>(null);
   const planMutationRef = useRef(false);
   const [noteMode, setNoteMode] = useState(false);
+  const [saveNoteAsOne, setSaveNoteAsOne] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
 
   const { isAuthenticated, authHeaders, user } = useAuth();
@@ -783,7 +784,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
     setSavingNotes(true);
     orbit.setError('');
     try {
-      await onSaveNote(submitted.text, submitted.images.map(image => image.id));
+      await onSaveNote(submitted.text, submitted.images.map(image => image.id), saveNoteAsOne);
       consumeComposerDraft(submitted, true);
     } catch (error) {
       orbit.setError(error instanceof Error ? error.message : '保存记事失败，输入已保留。');
@@ -791,7 +792,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
       savingNotesRef.current = false; setSavingNotes(false);
       textareaRef.current?.focus();
     }
-  }, [inputText, noteImages, imageUpload.busy, onSaveNote, orbit.creating, mutationBusy, draftKey, orbit.setError]);
+  }, [inputText, noteImages, imageUpload.busy, onSaveNote, saveNoteAsOne, orbit.creating, mutationBusy, draftKey, orbit.setError]);
 
 
   const handleConfirmPlan = useCallback(async (messageId: string, planId: string) => {
@@ -996,7 +997,12 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
             <div className="orbit-composer-controls">
               <OrbitSegmentedControl label="发送方式" value={noteMode ? 'note' : 'command'} options={[{ value: 'command', label: '指令' }, { value: 'note', label: '记事' }]}
                 disabled={orbit.creating || orbit.submitting || savingNotes || mutationBusy} onChange={value => setNoteMode(value === 'note')} />
-              {!noteMode && <AiProviderSelect provider={ai.provider} disabled={ai.loading || ai.saving || orbit.creating || orbit.submitting || savingNotes || mutationBusy} onChange={provider => void ai.chooseProvider(provider)} />}
+              {noteMode ? (
+                <label className="orbit-composer-save-as-one">
+                  <Checkbox label="整段保存" checked={saveNoteAsOne} onCheckedChange={setSaveNoteAsOne} disabled={savingNotes} />
+                  整段保存
+                </label>
+              ) : <AiProviderSelect provider={ai.provider} disabled={ai.loading || ai.saving || orbit.creating || orbit.submitting || savingNotes || mutationBusy} onChange={provider => void ai.chooseProvider(provider)} />}
             </div>
             <div className="orbit-composer-drop" data-dragging={dragging || undefined} {...dropProps}>
             {dragging && <div className="orbit-composer-drop-hint" role="status">松开添加图片</div>}
@@ -1041,7 +1047,7 @@ export const AiSchedulePanel = forwardRef<AiSchedulePanelHandle, AiSchedulePanel
                 }}
                 onKeyDown={handleKeyDown}
                 disabled={!draftReady || orbit.creating || mutationBusy}
-                placeholder={noteMode ? noteImages.length ? '记录文字，与图片一起保存…' : '每行一条，或添加图片…' : '发消息或安排日程…'}
+                placeholder={noteMode ? noteImages.length ? '记录文字，与图片一起保存…' : saveNoteAsOne ? '保留换行，保存为一条记事…' : '每行一条，或添加图片…' : '发消息或安排日程…'}
                 rows={1}
                 className="resize-none text-sm outline-none bg-transparent border-0 schedule-ai-composer-field"
                 style={{ color: 'var(--td-text-color-primary)', border: 0, boxShadow: 'none' }}

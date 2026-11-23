@@ -35,10 +35,10 @@ export interface AiNoteBoardController {
   pendingCount: number;
   toggleDrawer: () => void;
   closeDrawer: () => void;
-  createNote: (content: string, imageIds?: string[]) => Promise<void>;
+  createNote: (content: string, imageIds?: string[], saveAsOne?: boolean) => Promise<void>;
   toggleCompleted: (note: NoteItem) => Promise<void>;
   edit: (note: NoteItem, content: string, images: NoteImage[]) => Promise<void>;
-  addImages: (note: NoteItem, files: File[], draftImages: NoteImage[]) => Promise<NoteItem>;
+  addImages: (note: NoteItem, files: File[]) => Promise<NoteItem>;
   changeColor: (note: NoteItem, color: NoteItem['color']) => Promise<void>;
   merge: (source: NoteItem, target: NoteItem) => Promise<void>;
   optimize: (note: NoteItem, signal?: AbortSignal) => Promise<NoteItem>;
@@ -117,22 +117,16 @@ export function useAiNoteBoard({ initialNoteId }: UseAiNoteBoardOptions): AiNote
   }, [updateNote]);
 
   const edit = useCallback(async (note: NoteItem, content: string, images: NoteImage[]) => {
-    try {
-      await updateNote(note.id, { content, imageIds: images.map(image => image.id), expectedContent: note.content, expectedRevision: note.contentRevision });
-    } catch (editError) {
-      setError(editError instanceof Error ? editError.message : '更新记事失败');
-      throw editError;
-    }
+    const imagePlacements = images.map(({ id, textOffset }) => ({ id, textOffset }));
+    await updateNote(note.id, { content, imagePlacements, expectedContent: note.content, expectedRevision: note.contentRevision });
   }, [updateNote]);
 
-  const addImages = useCallback(async (note: NoteItem, files: File[], draftImages: NoteImage[]) => {
+  const addImages = useCallback(async (note: NoteItem, files: File[]) => {
     if (!files.length || files.some(file => !NOTE_IMAGE_TYPES.some(mime => mime === file.type) || !file.size || file.size > NOTE_IMAGE_MAX_BYTES)) {
       throw new Error('请拖入 10MB 以内的 JPEG、PNG 或 WebP 图片');
     }
-    for (const images of [note.images, draftImages]) {
-      if (images.length + files.length > NOTE_IMAGE_MAX_COUNT || [...images, ...files].reduce((sum, file) => sum + file.size, 0) > NOTE_IMAGES_MAX_BYTES) {
-        throw new Error('每条记事最多 3 张图片，合计不超过 20MB');
-      }
+    if (note.images.length + files.length > NOTE_IMAGE_MAX_COUNT || [...note.images, ...files].reduce((sum, file) => sum + file.size, 0) > NOTE_IMAGES_MAX_BYTES) {
+      throw new Error('每条记事最多 3 张图片，合计不超过 20MB');
     }
     const authorization = getStoredAuthHeaders().Authorization;
     const checkAccount = () => {
@@ -189,14 +183,14 @@ export function useAiNoteBoard({ initialNoteId }: UseAiNoteBoardOptions): AiNote
     }
   }, [authHeaders]);
 
-  const createNote = useCallback(async (content: string, imageIds: string[] = []) => {
+  const createNote = useCallback(async (content: string, imageIds: string[] = [], saveAsOne = false) => {
     const trimmedContent = content.trim();
     if (!trimmedContent && !imageIds.length) return;
     try {
       const response = await fetch('/api/note-items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ content: trimmedContent, imageIds }),
+        body: JSON.stringify(saveAsOne && !imageIds.length ? { contents: [trimmedContent] } : { content: trimmedContent, imageIds }),
       });
       const data = await readJsonResponse(response);
       if (!response.ok) throw new Error(data.error || '保存记事失败');

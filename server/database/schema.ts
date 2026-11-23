@@ -517,6 +517,9 @@ export function applyChatSchema(db: Database, { queryAll, queryOne }: SchemaQuer
   db.run('CREATE INDEX IF NOT EXISTS idx_note_items_user_updated ON note_items(user_id, updated_at)');
   db.run('CREATE TABLE IF NOT EXISTS note_images (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, created_at TEXT NOT NULL)');
   db.run('CREATE TABLE IF NOT EXISTS note_item_images (user_id TEXT NOT NULL, note_id TEXT NOT NULL, image_id TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY(user_id,note_id,image_id))');
+  if (!queryAll<{ name: string }>('PRAGMA table_info(note_item_images)').some(column => column.name === 'text_offset')) {
+    db.run('ALTER TABLE note_item_images ADD COLUMN text_offset INTEGER');
+  }
   db.run('CREATE INDEX IF NOT EXISTS idx_note_item_images_file ON note_item_images(user_id,image_id)');
   db.run('CREATE INDEX IF NOT EXISTS idx_library_entries_user_updated ON library_entries(user_id, updated_at)');
   db.run('CREATE INDEX IF NOT EXISTS idx_library_entries_user_kind ON library_entries(user_id, kind, status)');

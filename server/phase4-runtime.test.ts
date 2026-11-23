@@ -113,7 +113,12 @@ test('app preserves parser exceptions, readiness, OAuth/MCP and static fallback 
     assert.equal(await (await fetch(base + '/schedule')).text(), 'synthetic SPA');
     const body = JSON.stringify({ text: 'x'.repeat(1024 * 1024 + 1) });
     const send = (url: string, method = 'POST') => fetch(base + url, { method, headers: { 'Content-Type': 'application/json' }, body });
-    assert.equal((await send('/api/note-items')).status, 413);
+    assert.equal((await send('/api/note-items')).status, 200);
+    assert.equal((await send('/api/note-items/fixture', 'PATCH')).status, 200);
+    assert.equal((await send('/api/note-items/fixture/optimize')).status, 413);
+    const hugeNote = await fetch(base + '/api/note-items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'x'.repeat(12 * 1024 * 1024) }) });
+    assert.equal(hugeNote.status, 413);
+    assert.match((await hugeNote.json()).error, /记事提交内容太大/);
     assert.equal((await send('/api/ai/imports/parse')).status, 200);
     assert.equal((await send('/api/completions/fixture/attachments')).status, 200);
     assert.equal((await send('/api/ai/imports/parse', 'PUT')).status, 413);

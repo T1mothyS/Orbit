@@ -77,3 +77,35 @@ test('图文图片完整生命周期、账号归属、冲突、合并、旧备�
     images.deleteUnboundNoteImage(user.id, draftImage.id);
   } finally { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); }
 });
+
+test('正文图片位置随版本原子保存，合并和加密恢复保持位置', async () => {
+  const [owner, other] = users;
+  const png = await sharp({ create: { width: 16, height: 16, channels: 3, background: '#cc3355' } }).png().toBuffer();
+  const image = await images.uploadNoteImage(owner.id, { name: 'inline.png', mime: 'image/png', base64: png.toString('base64') });
+  const [source] = notes.createNoteItems(owner.id, '前😀后');
+  const [target] = notes.createNoteItems(owner.id, '目标');
+  const placement = { id: image.id, textOffset: 3 };
+  assert.throws(() => notes.updateNoteItem(owner.id, source.id, {
+    imagePlacements: [{ ...placement, textOffset: 2 }], expectedRevision: 0,
+  }), /位置/);
+  assert.throws(() => notes.updateNoteItem(other.id, notes.createNoteItems(other.id, '其他账号')[0].id, {
+    imagePlacements: [placement], expectedRevision: 0,
+  }), /无权/);
+  assert.equal(notes.getNoteItem(owner.id, source.id)?.contentRevision, 0);
+  const positioned = notes.updateNoteItem(owner.id, source.id, {
+    content: source.content, imagePlacements: [placement], expectedRevision: 0,
+  })!;
+  assert.equal(positioned.images[0].textOffset, 3);
+  assert.throws(() => notes.updateNoteItem(owner.id, source.id, { content: '改' }), /提供图片位置/);
+  assert.throws(() => notes.updateNoteItem(owner.id, source.id, { imagePlacements: [], expectedRevision: 0 }), notes.NoteContentConflict);
+  const merged = notes.mergeNoteItems(owner.id, source.id, target.id)!;
+  assert.equal(merged.target.content, '目标\n前😀后');
+  assert.equal(merged.target.images[0].textOffset, 6);
+  assert.equal(merged.source.images[0].textOffset, 3);
+  const password = 'inline-image-fixture';
+  const backup = backups.createUserBackup(owner.id, password);
+  backups.restoreUserBackup(other.id, backup, password, 'replace');
+  const restored = notes.listNoteItems(other.id).find(note => note.content === merged.target.content)!;
+  assert.equal(restored.images[0].textOffset, 6);
+  assert.notEqual(restored.images[0].id, image.id);
+});

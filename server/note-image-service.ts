@@ -4,9 +4,9 @@ import { queryAll, queryOne, run } from './database/connection.js';
 import * as activity from './activity-store.js';
 import * as storage from './attachment-service.js';
 import { withPersistenceTransaction } from './persistence.js';
-import { NOTE_IMAGE_MAX_COUNT, NOTE_IMAGE_TYPES, NOTE_IMAGES_MAX_BYTES, type NoteImage } from '../src/utils/note-images.js';
+import { NOTE_IMAGE_MAX_COUNT, NOTE_IMAGE_TYPES, NOTE_IMAGES_MAX_BYTES, type NoteImage, type NoteImagePlacement } from '../src/utils/note-images.js';
 
-export interface NoteImageLink { note_id: string; image_id: string; position: number }
+export interface NoteImageLink { note_id: string; image_id: string; position: number; text_offset?: number | null }
 function ownedImage(userId: string, id: string) {
   const row = queryOne('SELECT id FROM note_images WHERE user_id=? AND id=?', [userId, id]);
   const file = activity.getAttachment(id, userId);
@@ -22,8 +22,8 @@ export function readNoteImage(userId: string, id: string) {
   return { mime: file.mimeType, bytes: storage.readAttachment(file) };
 }
 export function listNoteImages(userId: string, noteId: string): NoteImage[] {
-  return queryAll<{ image_id: string }>('SELECT image_id FROM note_item_images WHERE user_id=? AND note_id=? ORDER BY position', [userId, noteId])
-    .map(row => noteImageView(userId, row.image_id));
+  return queryAll<{ image_id: string; text_offset: number | null }>('SELECT image_id, text_offset FROM note_item_images WHERE user_id=? AND note_id=? ORDER BY position', [userId, noteId])
+    .map(row => ({ ...noteImageView(userId, row.image_id), ...(row.text_offset == null ? {} : { textOffset: row.text_offset }) }));
 }
 export function validateNoteImageIds(userId: string, value: unknown): string[] {
   if (!Array.isArray(value) || value.length > NOTE_IMAGE_MAX_COUNT || value.some(id => typeof id !== 'string') || new Set(value).size !== value.length) throw new Error('每条记事最多 3 张不同图片');
@@ -32,11 +32,14 @@ export function validateNoteImageIds(userId: string, value: unknown): string[] {
   if (bytes > NOTE_IMAGES_MAX_BYTES) throw new Error('记事图片合计不能超过 20MB');
   return value;
 }
-export function replaceNoteImages(userId: string, noteId: string, imageIds: string[]) {
-  validateNoteImageIds(userId, imageIds);
+export function replaceNoteImages(userId: string, noteId: string, images: NoteImagePlacement[]) {
+  validateNoteImageIds(userId, images.map(image => image.id));
   if (!queryOne('SELECT id FROM note_items WHERE user_id=? AND id=?', [userId, noteId])) throw new Error('记事不存在或无权访问');
   run('DELETE FROM note_item_images WHERE user_id=? AND note_id=?', [userId, noteId]);
-  imageIds.forEach((id, position) => run('INSERT INTO note_item_images(user_id,note_id,image_id,position) VALUES (?,?,?,?)', [userId, noteId, id, position]));
+  images.forEach(({ id, textOffset }, position) => run(
+    'INSERT INTO note_item_images(user_id,note_id,image_id,position,text_offset) VALUES (?,?,?,?,?)',
+    [userId, noteId, id, position, textOffset ?? null],
+  ));
 }
 export function deleteUnboundNoteImage(userId: string, id: string) {
   ownedImage(userId, id);
@@ -72,7 +75,7 @@ export async function uploadNoteImage(userId: string, input: { name: string; mim
   });
 }
 export function exportNoteImageLinks(userId: string): NoteImageLink[] {
-  return queryAll<NoteImageLink>('SELECT note_id,image_id,position FROM note_item_images WHERE user_id=? ORDER BY note_id,position', [userId]);
+  return queryAll<NoteImageLink>('SELECT note_id,image_id,position,text_offset FROM note_item_images WHERE user_id=? ORDER BY note_id,position', [userId]);
 }
 export function clearNoteImageLinks(userId: string) {
   run('DELETE FROM note_item_images WHERE user_id=?', [userId]);
@@ -80,7 +83,7 @@ export function clearNoteImageLinks(userId: string) {
 }
 export function restoreNoteImageLinks(userId: string, links: NoteImageLink[], attachmentIds: Map<string, string>): string[] {
   const missing: string[] = [];
-  const grouped = new Map<string, string[]>();
+  const grouped = new Map<string, NoteImagePlacement[]>();
   // Restore the registry for draft files too, so unbound backup assets remain eligible for cleanup.
   for (const id of new Set(attachmentIds.values())) {
     const file = activity.getAttachment(id, userId);
@@ -92,11 +95,11 @@ export function restoreNoteImageLinks(userId: string, links: NoteImageLink[], at
     if (!queryOne('SELECT id FROM note_items WHERE user_id=? AND id=?', [userId, row.note_id])) throw new Error('图片备份关联的记事不存在');
     run('INSERT OR IGNORE INTO note_images(id,user_id,created_at) VALUES (?,?,?)', [id, userId, file.createdAt]);
     const values = grouped.get(row.note_id) || [];
-    values.push(id); grouped.set(row.note_id, values);
+    values.push({ id, textOffset: row.text_offset ?? undefined }); grouped.set(row.note_id, values);
   }
-  for (const [note, ids] of grouped) {
+  for (const [note, images] of grouped) {
     // A merge keeps existing note/image edits, just as the text-note restore does.
-    if (!queryOne('SELECT image_id FROM note_item_images WHERE user_id=? AND note_id=?', [userId, note])) replaceNoteImages(userId, note, ids);
+    if (!queryOne('SELECT image_id FROM note_item_images WHERE user_id=? AND note_id=?', [userId, note])) replaceNoteImages(userId, note, images);
   }
   return missing;
 }

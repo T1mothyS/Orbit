@@ -65,6 +65,13 @@ export async function initDb(): Promise<void> {
     fs.mkdirSync(snapshot, { recursive: true });
     for (const name of fs.readdirSync(dataDir).filter(name => name.endsWith('.db'))) fs.copyFileSync(path.join(dataDir, name), path.join(snapshot, name), fs.constants.COPYFILE_EXCL);
   }
+  if (fs.existsSync(dbPath)
+    && queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='note_item_images'")
+    && !queryAll<{ name: string }>('PRAGMA table_info(note_item_images)').some(column => column.name === 'text_offset')) {
+    const snapshot = path.join(dataDir, 'migration-backups', `note-image-positions-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+    fs.mkdirSync(snapshot, { recursive: true });
+    fs.copyFileSync(dbPath, path.join(snapshot, path.basename(dbPath)), fs.constants.COPYFILE_EXCL);
+  }
   if (fs.existsSync(dbPath) && !queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='library_experience_sessions'")) {
     const snapshot = path.join(dataDir, 'migration-backups', `experience-memory-${new Date().toISOString().replace(/[:.]/g, '-')}`);
     fs.mkdirSync(snapshot, { recursive: true });

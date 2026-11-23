@@ -20,6 +20,7 @@ import * as experience from './experience-service.js';
 import { dailyReportMediaRoot } from './daily-report-media-service.js';
 import * as dailyReportCloudStore from './daily-report-cloud-store.js';
 import { captureBridgeState, pauseForRestoreSync } from './caldav-control.js';
+import { noteContentTooLong, validNoteTextOffset } from '../src/utils/note-content.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -369,12 +370,22 @@ function validateUserPayload(payload: UserBackupPayload): void {
   const researchUser = researchRows?.researchRuns[0]?.user_id;
   if (v3User && researchUser && v3User !== researchUser) throw new Error('研究备份与事件记录账号不一致');
   if (payload.noteItems !== undefined && !Array.isArray(payload.noteItems)) throw new Error('备份记事内容不完整');
+  const noteContents = new Map<string, string>();
+  for (const note of payload.noteItems || []) {
+    if (!note || typeof note.id !== 'string') throw new Error('备份记事内容不完整');
+    const content = String(note.content || '').trim();
+    const rawPrevious = note.optimization_previous_content ?? (note as { optimizationPreviousContent?: unknown }).optimizationPreviousContent;
+    if (noteContentTooLong(content) || (typeof rawPrevious === 'string' && noteContentTooLong(rawPrevious.trim()))) {
+      throw new Error('备份中的单条记事超过 1,000,000 个字符');
+    }
+    noteContents.set(note.id, content);
+  }
   if (payload.noteImages !== undefined) {
     if (!Array.isArray(payload.noteImages)) throw new Error('备份记事图片关联无效');
-    const notes = new Set((payload.noteItems || []).map(note => note.id));
     const grouped = new Map<string, Set<string>>();
     for (const link of payload.noteImages) {
-      if (!link || typeof link.note_id !== 'string' || !notes.has(link.note_id) || typeof link.image_id !== 'string' || !link.image_id || !Number.isInteger(link.position) || link.position < 0 || link.position > 2) throw new Error('备份记事图片关联无效');
+      if (!link || typeof link.note_id !== 'string' || !noteContents.has(link.note_id) || typeof link.image_id !== 'string' || !link.image_id || !Number.isInteger(link.position) || link.position < 0 || link.position > 2) throw new Error('备份记事图片关联无效');
+      if (link.text_offset != null && !validNoteTextOffset(noteContents.get(link.note_id)!, link.text_offset)) throw new Error('备份中的记事图片位置无效');
       const ids = grouped.get(link.note_id) || new Set<string>();
       if (ids.has(link.image_id) || ids.size >= 3 || payload.noteImages.some(other => other !== link && other.note_id === link.note_id && other.position === link.position)) throw new Error('备份记事图片顺序或数量无效');
       ids.add(link.image_id); grouped.set(link.note_id, ids);
